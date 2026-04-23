@@ -3,7 +3,8 @@
   "memory": "project",
   "hooks": {
     "pre-commit": ".claude/hooks/pre-commit.sh",
-    "on-save": ".claude/hooks/lint-on-save.sh"
+    "on-save": ".claude/hooks/lint-on-save.sh",
+    "session-start": ".claude/hooks/session-start.sh"
   },
   "rules": [
     ".claude/rules/frontend.md",
@@ -15,6 +16,26 @@
   },
   "commands": {
     "directory": ".claude/commands"
+  },
+  "skills": {
+    "directory": ".claude/skills",
+    "sources": [
+      {
+        "slug": "superpowers",
+        "repo": "https://github.com/obra/superpowers.git",
+        "skillPath": "skills"
+      },
+      {
+        "slug": "ui-ux-pro-max",
+        "repo": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git",
+        "skillPath": ".claude/skills"
+      },
+      {
+        "slug": "claude-mem",
+        "repo": "https://github.com/thedotmack/claude-mem.git",
+        "skillPath": "plugin/skills"
+      }
+    ]
   },
   "modelStrategy": {
     "planning": "claude-opus-4-7",

@@ -31,6 +31,9 @@ yarn-error.log*
 postgres-data/
 redis-data/
 
+# Skill update runtime files
+.claude/skills/.update-log
+
 # IDE
 .vscode/
 .idea/

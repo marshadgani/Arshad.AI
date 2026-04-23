@@ -330,7 +330,63 @@ TypeScript 5 treats `moduleResolution: "node"` (node10) as deprecated and will r
 
 ---
 
-## 15. Core Principles
+## 15. External Skill Sources (Auto-Updated Weekly)
+
+Skills from these GitHub repos are synced into `.claude/skills/` every 7 days.
+The update runs **async in the background** at session start — no delay to your first prompt.
+A git commit is created automatically when any skill file changes.
+
+### Active Sources
+
+| Slug | Repo | Skills installed |
+|---|---|---|
+| `superpowers` | https://github.com/obra/superpowers.git | brainstorming, dispatching-parallel-agents, executing-plans, finishing-a-development-branch, receiving-code-review, requesting-code-review, subagent-driven-development, systematic-debugging, test-driven-development, using-git-worktrees, verification-before-completion, writing-plans, writing-skills |
+| `ui-ux-pro-max` | https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git | banner-design, brand, design-system, design, slides, ui-styling, ui-ux-pro-max |
+| `claude-mem` | https://github.com/thedotmack/claude-mem.git | do, knowledge-agent, make-plan, mem-search, smart-explore, timeline-report, version-bump |
+
+### How It Works
+
+1. `.claude/hooks/session-start.sh` runs at session start (async, background)
+2. It reads `.claude/skills/.last-updated` — if < 7 days old, exits silently
+3. If 7+ days old, spawns `scripts/update-skills.sh` in the background
+4. `update-skills.sh` clones each repo, diffs against current skills, copies changes
+5. If any file changed, auto-commits and pushes with message `chore: weekly skill update [YYYY-MM-DD]`
+6. Progress is logged to `.claude/skills/.update-log`
+
+### Adding a New Skill Source
+
+Edit **two lines** in `scripts/update-skills.sh`:
+```bash
+# 1. Add the repo URL
+SKILL_SOURCES["my-slug"]="https://github.com/author/repo.git"
+
+# 2. Add the path inside the repo where SKILL.md files live
+SKILL_PATHS["my-slug"]="path/to/skills"
+```
+That's it — it will be cloned, diffed, and committed on the next weekly run.
+
+### Skill Directory Layout
+
+```
+.claude/skills/
+├── .last-updated          ← Unix timestamp of last successful update
+├── .update-log            ← Running log of all update runs
+├── superpowers/           ← obra/superpowers skills
+│   ├── brainstorming/
+│   ├── systematic-debugging/
+│   ├── test-driven-development/
+│   └── ... (13 skills total)
+├── ui-ux-pro-max/         ← nextlevelbuilder/ui-ux-pro-max-skill skills
+│   ├── brand/
+│   ├── design-system/
+│   └── ... (7 skills total)
+└── claude-mem/            ← thedotmack/claude-mem skills
+    ├── mem-search/
+    ├── smart-explore/
+    └── ... (7 skills + context rule)
+```
+
+## 16. Core Principles
 
 - **Simplicity First** — Make every change as simple as possible. Minimal code impact.
 - **No Laziness** — Find root causes. No temporary fixes. Senior developer standards.

@@ -1,0 +1,12 @@
+exclude = [
+  ".claude/skills",             # third-party upstream skill files — not ours to fix
+  ".venv",
+  "venv",
+  "__pycache__",
+]
+
+[lint]
+select = ["E", "F", "I", "W"]
+
+[lint.per-file-ignores]
+"backend/tests/**" = ["S101"]   # allow assert in tests
