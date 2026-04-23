@@ -6,7 +6,7 @@ tools:
   - write
   - edit
   - bash
-model: sonnet
+model: claude-sonnet-4-6
 memory: project
 ---
 

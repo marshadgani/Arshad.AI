@@ -15,5 +15,10 @@
   },
   "commands": {
     "directory": ".claude/commands"
+  },
+  "modelStrategy": {
+    "planning": "claude-opus-4-7",
+    "execution": "claude-sonnet-4-6",
+    "note": "Use the planner agent (Opus) for any non-trivial task before writing code. All prompts and all other agents run on Sonnet."
   }
 }

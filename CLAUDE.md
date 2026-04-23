@@ -3,6 +3,27 @@
 > This file is the single source of truth for Claude working on this project.
 > Read it fully at the start of every session before touching any code.
 
+## Model Strategy (Read First)
+
+| Phase | Model | When |
+|---|---|---|
+| **Planning** | `claude-opus-4-7` | Any task with 3+ steps, architectural decisions, ambiguous requirements |
+| **Execution** | `claude-sonnet-4-6` | All regular prompts, all agent runs, all code writing |
+
+**Rule:** Before writing a single line of code on any non-trivial task, invoke the `planner` agent (Opus) via `/plan <description>`. Opus thinks, Sonnet builds.
+
+**Never skip planning for:**
+- New features touching multiple files or layers
+- New dependencies or services
+- Database schema changes
+- Any task where the approach is unclear
+
+**Skip planning for:**
+- Single-line fixes
+- Config value changes
+- Renames
+- Adding a single test
+
 ---
 
 ## 1. What This Project Is
