@@ -3,16 +3,17 @@
 Personal AI assistant powered by Claude. Manages your calendar, email, and GitHub through a natural-language chat interface.
 
 ## Stack
-- **Frontend**: React 18 + TypeScript + React Router v6
+- **Frontend**: React 18 + TypeScript + Vite 5
 - **Backend**: FastAPI (Python) + Anthropic SDK
 - **Database**: PostgreSQL 16 (async via SQLAlchemy)
 - **Cache**: Redis 7
+- **Pipelines**: Apache Airflow 2.9
 - **AI**: Claude (tool use for calendar / email / GitHub actions)
 
 ## Quick Start
 
 ```bash
-# 1. Clone and configure
+# 1. Configure environment
 cp backend/.env.example backend/.env
 # Edit backend/.env — set ANTHROPIC_API_KEY at minimum
 
@@ -23,28 +24,69 @@ docker compose up --build
 open http://localhost:3000
 ```
 
-## Services
+## Services at a Glance
 
-| Service  | Port | Description                  |
-|----------|------|------------------------------|
-| frontend | 3000 | React chat UI                |
-| backend  | 8000 | FastAPI + Claude tool runner |
-| postgres | 5432 | Persistent storage           |
-| redis    | 6379 | Session / response cache     |
+| Service      | Port | Tech                          |
+|--------------|------|-------------------------------|
+| Frontend     | 3000 | React 18 + TypeScript         |
+| Backend API  | 8000 | FastAPI + PostgreSQL + Redis  |
+| Airflow      | 8080 | Apache Airflow 2.9            |
+| PostgreSQL   | 5432 | Postgres 16                   |
+| Redis        | 6379 | Redis 7                       |
+
+Everything runs via `docker compose up`. The codebase is a clean scaffold — business logic, data models, UI components, and pipeline tasks are ready to be built on top.
+
+## Workflow Rules (from CLAUDE.md)
+
+| #  | Rule                    | Key Point                                                        |
+|----|-------------------------|------------------------------------------------------------------|
+| 1  | **Plan Mode Default**   | Enter plan mode for any 3+ step task; re-plan if stuck           |
+| 2  | **Subagent Strategy**   | Offload research & parallel work; one task per subagent          |
+| 3  | **Self-Improvement Loop** | Log corrections to `tasks/lessons.md`; review each session    |
+| 4  | **Verification Before Done** | Prove it works — tests, logs, correctness check            |
+| 5  | **Demand Elegance**     | Ask "is there a more elegant way?" for non-trivial changes       |
+| 6  | **Autonomous Bug Fixing** | Given a bug → just fix it, no hand-holding needed              |
+
+**Task Management flow:** Plan → Verify → Track → Explain → Document → Capture lessons
+
+**Core Principles:** Simplicity first · No laziness · Minimal impact
+
+## Project Structure
+
+```
+Arshad.AI/
+├── CLAUDE.md                  ← workflow rules + project conventions
+├── docker-compose.yml         ← all 5 services wired together
+│
+├── backend/                   ← FastAPI + SQLAlchemy + Redis + Anthropic SDK
+│   └── src/
+│       ├── main.py
+│       ├── middleware/cache.py
+│       └── models/database.py
+│
+├── frontend/                  ← React 18 + TypeScript + Vite
+│   └── src/
+│       ├── index.tsx
+│       └── App.tsx
+│
+├── data-pipelines/            ← Apache Airflow 2.9
+│   ├── config/airflow.cfg
+│   └── ingestion/
+│       └── example_dag.py    ← DAG: arshad_ai_data_ingestion (@daily)
+│
+├── .claude/                   ← Claude Code configuration
+│   ├── agents/               ← 6 specialist agents
+│   ├── commands/             ← /fix-issue /deploy /pr-review
+│   ├── hooks/                ← pre-commit + lint-on-save
+│   └── rules/                ← frontend / database / api conventions
+│
+└── tasks/
+    ├── todo.md               ← task plans with checkable items
+    └── lessons.md            ← lessons captured after corrections
+```
 
 ## API Docs
 Interactive Swagger UI at http://localhost:8000/docs when backend is running.
 
-## Project Structure
-```
-backend/src/
-  main.py          FastAPI app entry point
-  middleware/
-    cache.py       Redis singleton
-  models/
-    database.py    Async SQLAlchemy engine + session
-
-frontend/src/
-  index.tsx        React entry point
-  App.tsx          Router + root component
-```
+## Airflow UI
+Dashboard at http://localhost:8080 — login: `admin` / `admin`.
