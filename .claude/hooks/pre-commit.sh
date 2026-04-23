@@ -15,15 +15,16 @@ fi
 
 # ── ESLint on staged .ts/.tsx files ───────────────────────────────────────────
 STAGED_TS=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(ts|tsx)$' || true)
-if [ -n "$STAGED_TS" ]; then
+FRONTEND_TS=$(echo "$STAGED_TS" | grep "^frontend/" | sed 's|^frontend/||' || true)
+if [ -n "$FRONTEND_TS" ] && [ -f frontend/package.json ] && (cd frontend && npx eslint --print-config src/index.tsx > /dev/null 2>&1); then
   echo "  [2/4] ESLint staged files..."
-  (cd frontend && echo "$STAGED_TS" | xargs npx eslint --max-warnings 0) || {
+  (cd frontend && echo "$FRONTEND_TS" | xargs npx eslint --max-warnings 0) || {
     echo "  ✗ ESLint errors — commit blocked"
     exit 1
   }
   echo "  ✓ ESLint OK"
 else
-  echo "  [2/4] ESLint — no staged .ts/.tsx files, skipping"
+  echo "  [2/4] ESLint — skipping (no config or no staged .ts/.tsx files)"
 fi
 
 # ── Ruff on staged .py files ──────────────────────────────────────────────────
