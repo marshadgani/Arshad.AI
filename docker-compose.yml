@@ -54,6 +54,29 @@ services:
     environment:
       - REACT_APP_API_URL=http://localhost:8000
 
+  airflow:
+    image: apache/airflow:2.9.3
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://postgres:postgres@postgres:5432/airflow
+      AIRFLOW__WEBSERVER__SECRET_KEY: airflow-dev-secret
+    volumes:
+      - ./data-pipelines/ingestion:/opt/airflow/dags
+      - ./data-pipelines/config/airflow.cfg:/opt/airflow/airflow.cfg
+      - airflow-logs:/opt/airflow/logs
+    command: >
+      bash -c "airflow db migrate &&
+               airflow users create --username admin --password admin
+                 --firstname Arshad --lastname AI --role Admin --email admin@arshad.ai &&
+               airflow webserver & airflow scheduler"
+
 volumes:
   postgres-data:
   redis-data:
+  airflow-logs:

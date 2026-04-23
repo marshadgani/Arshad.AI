@@ -1,0 +1,8 @@
+apache-airflow==2.9.3
+apache-airflow-providers-postgres>=5.10.0
+apache-airflow-providers-redis>=3.6.0
+apache-airflow-providers-http>=4.10.0
+anthropic>=0.25.0
+pandas>=2.2.0
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.9
