@@ -1,4 +1,4 @@
-<!-- generated from HEAD=7b9ac82 (and pending +1 commit) at 2026-04-25T14:32:00Z by 6-agent gate run #6c (re-stamped, bulletproof workflow) -->
+<!-- generated from HEAD=2687b0b (and pending +1 commit) at 2026-04-25T14:34:30Z by 6-agent gate run #6c (re-stamped, comment-attached step summary) -->
 
 # Arshad.AI Quality Gate Report
 

@@ -247,13 +247,27 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           set -uo pipefail
-          # Find the PR (best-effort; might fail if open-or-update step itself failed before
-          # creating the PR).
           PR=$(gh pr list --base "$BASE" --head "$HEAD" --state open --json number --jq '.[0].number // ""')
           if [ -z "$PR" ]; then
             echo "(no open PR — cannot post diagnostic comment)"
             exit 0
           fi
           run_url="https://github.com/${REPO}/actions/runs/${RUN_ID}"
-          comment=$(printf '## :x: auto-pr workflow failed\n\nThe \`open-pr-and-merge\` job failed at run [%s](%s). Open the run page to see which step exited non-zero. Common causes: empty PR_NUMBER, gh permissions, branch protection, gh CLI version mismatch.\n' "$RUN_ID" "$run_url")
-          gh pr comment "$PR" --body "$comment" || echo "(could not post diagnostic comment — likely a token-permission issue)"
+          summary=""
+          if [ -s "$GITHUB_STEP_SUMMARY" ]; then
+            summary=$(cat "$GITHUB_STEP_SUMMARY")
+          fi
+          # Build the comment body: header + run link + every prior step's
+          # step-summary contribution. The summary contains the bulletproof
+          # diagnostic tables from each step, so we get every captured signal.
+          {
+            printf '## :x: auto-pr workflow failed\n\n'
+            printf 'Run: [%s](%s)\n\n' "$RUN_ID" "$run_url"
+            printf '### Step summaries (verbatim)\n\n'
+            if [ -n "$summary" ]; then
+              printf '%s\n' "$summary"
+            else
+              printf '_(no step summaries were written before the failure)_\n'
+            fi
+          } > /tmp/comment.md
+          gh pr comment "$PR" --body-file /tmp/comment.md || echo "(could not post diagnostic comment)"
