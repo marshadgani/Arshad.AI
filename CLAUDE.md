@@ -3,6 +3,11 @@
 > This file is the single source of truth for Claude working on this project.
 > Read it fully at the start of every session before touching any code.
 
+## Auto-Trigger Rule — GitHub URLs
+
+**Whenever a GitHub URL (github.com/...) appears in a user prompt, automatically run `/fetch-github-repo <url>` on it.**
+No need for the user to type the command — detect the URL and trigger the fetch procedure immediately.
+
 ## Model Strategy (Read First)
 
 | Phase | Model | When |
@@ -394,3 +399,53 @@ That's it — it will be cloned, diffed, and committed on the next weekly run.
 - **No Comments on the Obvious** — Only comment the WHY when it's non-obvious. Never describe WHAT.
 - **No Unused Code** — Don't leave dead imports, commented-out blocks, or unused variables.
 - **Security by Default** — Validate at system boundaries. Never trust user input. Secrets in env vars only.
+
+## 17. /fetch-github-repo Command
+
+Fetch and integrate any external GitHub repo into the project. Runs automatically
+when a GitHub URL appears in a prompt. Re-fetches all saved repos weekly.
+
+### Trigger
+- **Manual:** `/fetch-github-repo <github-url>`
+- **Auto:** Any `github.com/...` URL in a user message
+- **Weekly:** Every 7 days via `session-start.sh` (Monday 00:00 UTC target)
+
+### What It Extracts
+
+| Component | Detection pattern | Integrated to |
+|---|---|---|
+| Skills | `SKILL.md` files, `skills/` dirs | `.claude/skills/<slug>/` |
+| Agents | `agents/*.md`, `.claude/agents/*.md` | `backend/src/agents/<slug>_*.md` |
+| Commands | `commands/*.md`, `.claude/commands/*.md` | `backend/src/commands/<slug>_*.md` |
+| Hooks | `hooks/*.sh`, `.claude/hooks/*.sh` | `backend/src/hooks/<slug>_*.sh` |
+| Token optimisation | keyword scan in `.md`, `.py`, `.ts` | logged in registry |
+
+### Files Involved
+- `scripts/fetch-github-repo.sh` — the integration script
+- `.claude/github-repos.json` — persistent URL registry
+- `.claude/hooks/session-start.sh` — weekly re-fetch trigger
+- `.claude/commands/fetch-github-repo.md` — slash command definition
+
+### Commit Format
+```
+Integrated external repo: <REPO_NAME> on <DATE>
+```
+
+---
+
+## 18. GitHub Repo Registry
+
+All repos fetched via `/fetch-github-repo` are saved in `.claude/github-repos.json`.
+This registry is the source of truth for weekly auto-updates.
+
+**To add a new repo:** just paste a GitHub URL in any prompt — it auto-fetches.
+**To view registry:** `cat .claude/github-repos.json`
+**To force re-fetch all:** restart session (triggers session-start.sh)
+
+### Registered Repos
+
+| Slug | URL | Purpose | Last Fetched |
+|---|---|---|---|
+| *(none yet — paste a GitHub URL to add the first one)* | | | |
+
+> This table is updated automatically by `scripts/fetch-github-repo.sh` when a new repo is integrated.

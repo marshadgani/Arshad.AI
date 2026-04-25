@@ -1,0 +1,6 @@
+{
+  "description": "Registry of all external GitHub repos integrated into Arshad.AI. Auto-updated by scripts/fetch-github-repo.sh. Re-fetched weekly by .claude/hooks/session-start.sh.",
+  "weekly_update_day": "Monday",
+  "weekly_update_time": "00:00 UTC",
+  "repos": {}
+}
