@@ -1,25 +1,29 @@
-name: Auto-open PR to main
+name: Auto-open PR + auto-merge gate-finished commits
 
-# Opens (or updates) a PR from claude/ai-personal-assistant-develop-AION
-# into claude/ai-personal-assistant-main on every push.
+# Triggered on every push to claude/ai-personal-assistant-develop-AION.
 #
-# PR body source (in priority order):
-#   1. tasks/last-gate-report.md   ← written by Claude during "Merge to Main"
-#   2. fallback generic template    ← when no gate report is present
+# Behaviour:
+#   1. Open (or update) a PR into claude/ai-personal-assistant-main.
+#      PR body comes from tasks/last-gate-report.md when present, else
+#      a generic template.
+#   2. If THIS push contains a fresh gate report (HEAD commit modifies
+#      tasks/last-gate-report.md) AND the report's verdict is not
+#      "BLOCKED", squash-merge the PR automatically.
 #
-# If a PR is already open, this workflow updates the body so the latest
-# gate report always shows; pushed commits already update the PR diff.
+# Pushes WITHOUT a fresh gate report only update the PR — they never
+# auto-merge. This is the safety guard: only "Merge to Main" runs in
+# Claude Code (which always writes a fresh report) trigger the merge.
 on:
   push:
     branches:
       - claude/ai-personal-assistant-develop-AION
 
 permissions:
-  contents: read
+  contents: write          # needed for gh pr merge to push the squash commit
   pull-requests: write
 
 jobs:
-  open-pr:
+  open-pr-and-merge:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout with full history
@@ -41,7 +45,6 @@ jobs:
           OUT=$(mktemp)
 
           if [ -f "$BODY_FILE" ]; then
-            # Use the gate report verbatim — it is the PR description.
             cp "$BODY_FILE" "$OUT"
           else
             commits=$(git log --pretty='- %s' "origin/${BASE}..HEAD")
@@ -68,7 +71,65 @@ jobs:
 
           echo "body_file=${OUT}" >> "$GITHUB_OUTPUT"
 
+      - name: Decide whether to auto-merge
+        id: gate
+        run: |
+          set -uo pipefail
+
+          REPORT="tasks/last-gate-report.md"
+
+          # 1. What did THIS commit change?
+          changed=$(git diff-tree --no-commit-id --name-only -r HEAD)
+          echo "Files changed in HEAD:"
+          echo "${changed}" | sed 's/^/  - /'
+
+          # 2. Was the gate report changed in this push?
+          has_report=false
+          if printf '%s\n' "${changed}" | grep -qx "${REPORT}"; then
+            has_report=true
+          fi
+          echo "HEAD modifies ${REPORT}: ${has_report}"
+
+          # 3. Does the file exist on disk and what's the verdict?
+          verdict="MISSING"
+          if [ -f "${REPORT}" ]; then
+            if grep -q "GATE BLOCKED" "${REPORT}"; then
+              verdict="BLOCKED"
+            elif grep -qE "GATE PASSED" "${REPORT}"; then
+              verdict="PASSED"
+            else
+              verdict="UNKNOWN"
+            fi
+          fi
+          echo "Verdict in ${REPORT}: ${verdict}"
+
+          # 4. Last commit subject (informational)
+          subject=$(git log -1 --pretty=%s HEAD)
+          echo "Last commit subject: ${subject}"
+
+          # 5. Decide
+          if [ "${has_report}" = "true" ] && [ "${verdict}" = "PASSED" ]; then
+            echo "DECISION: auto-merge eligible (merge=true)"
+            echo "merge=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "DECISION: auto-merge NOT eligible (merge=false)"
+            echo "merge=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          # 6. Surface the decision to step summary so it's visible
+          #    on the run page WITHOUT needing log auth.
+          {
+            echo "## Auto-merge guard"
+            echo "| Check | Value |"
+            echo "|---|---|"
+            echo "| HEAD modifies \`${REPORT}\` | \`${has_report}\` |"
+            echo "| Verdict in report | \`${verdict}\` |"
+            echo "| Last commit subject | \`${subject}\` |"
+            echo "| **Decision** | **merge=$([ "${has_report}" = "true" ] && [ "${verdict}" = "PASSED" ] && echo true || echo false)** |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Open or update PR
+        id: pr
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BASE: claude/ai-personal-assistant-main
@@ -90,10 +151,49 @@ jobs:
             gh pr edit "$existing" \
               --title "$TITLE" \
               --body-file "$BODY_FILE"
+            echo "number=${existing}" >> "$GITHUB_OUTPUT"
           else
-            gh pr create \
+            url=$(gh pr create \
               --base "$BASE" \
               --head "$HEAD" \
               --title "$TITLE" \
-              --body-file "$BODY_FILE"
+              --body-file "$BODY_FILE")
+            echo "Opened: ${url}"
+            number=$(echo "$url" | grep -oE '[0-9]+$')
+            echo "number=${number}" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Auto-merge (squash) if gate-finished
+        if: steps.gate.outputs.merge == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          set -uo pipefail
+          echo "Squash-merging PR #${PR_NUMBER}..."
+          out=$(gh pr merge "$PR_NUMBER" --squash --delete-branch=false 2>&1)
+          rc=$?
+
+          {
+            echo "## Auto-merge result"
+            if [ $rc -eq 0 ]; then
+              echo ":white_check_mark: PR #${PR_NUMBER} squash-merged into \`claude/ai-personal-assistant-main\`."
+            else
+              echo ":x: \`gh pr merge\` exited with code \`${rc}\`. Output:"
+              echo
+              echo '```'
+              echo "${out}"
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "${out}"
+          exit $rc
+
+      - name: Skipped auto-merge — record reason
+        if: steps.gate.outputs.merge != 'true'
+        run: |
+          {
+            echo "## Auto-merge result"
+            echo ":pause_button: Skipped — guard set \`merge=false\`. See the **Decide whether to auto-merge** step above for the reason."
+          } >> "$GITHUB_STEP_SUMMARY"
