@@ -9,7 +9,22 @@
       "type": "skills",
       "last_fetched": "2026-04-25",
       "components": {
-        "skills": ["brainstorming", "dispatching-parallel-agents", "executing-plans", "finishing-a-development-branch", "receiving-code-review", "requesting-code-review", "subagent-driven-development", "systematic-debugging", "test-driven-development", "using-git-worktrees", "using-superpowers", "verification-before-completion", "writing-plans", "writing-skills"],
+        "skills": [
+          "brainstorming",
+          "dispatching-parallel-agents",
+          "executing-plans",
+          "finishing-a-development-branch",
+          "receiving-code-review",
+          "requesting-code-review",
+          "subagent-driven-development",
+          "systematic-debugging",
+          "test-driven-development",
+          "using-git-worktrees",
+          "using-superpowers",
+          "verification-before-completion",
+          "writing-plans",
+          "writing-skills"
+        ],
         "agents": [],
         "commands": [],
         "hooks": []
@@ -21,7 +36,15 @@
       "type": "skills",
       "last_fetched": "2026-04-25",
       "components": {
-        "skills": ["banner-design", "brand", "design-system", "design", "slides", "ui-styling", "ui-ux-pro-max"],
+        "skills": [
+          "banner-design",
+          "brand",
+          "design-system",
+          "design",
+          "slides",
+          "ui-styling",
+          "ui-ux-pro-max"
+        ],
         "agents": [],
         "commands": [],
         "hooks": []
@@ -33,7 +56,15 @@
       "type": "skills",
       "last_fetched": "2026-04-25",
       "components": {
-        "skills": ["do", "knowledge-agent", "make-plan", "mem-search", "smart-explore", "timeline-report", "version-bump"],
+        "skills": [
+          "do",
+          "knowledge-agent",
+          "make-plan",
+          "mem-search",
+          "smart-explore",
+          "timeline-report",
+          "version-bump"
+        ],
         "agents": [],
         "commands": [],
         "hooks": []
@@ -45,7 +76,13 @@
       "type": "skills",
       "last_fetched": "2026-04-25",
       "components": {
-        "skills": ["defuddle", "json-canvas", "obsidian-bases", "obsidian-cli", "obsidian-markdown"],
+        "skills": [
+          "defuddle",
+          "json-canvas",
+          "obsidian-bases",
+          "obsidian-cli",
+          "obsidian-markdown"
+        ],
         "agents": [],
         "commands": [],
         "hooks": []
@@ -58,7 +95,16 @@
       "last_fetched": "2026-04-25",
       "components": {
         "skills": [],
-        "agents": ["code-reviewer", "context-manager", "debugger", "deployment-engineer", "mcp-backend-engineer", "n8n-mcp-tester", "technical-researcher", "test-automator"],
+        "agents": [
+          "code-reviewer",
+          "context-manager",
+          "debugger",
+          "deployment-engineer",
+          "mcp-backend-engineer",
+          "n8n-mcp-tester",
+          "technical-researcher",
+          "test-automator"
+        ],
         "commands": [],
         "hooks": []
       }
@@ -70,7 +116,41 @@
       "last_fetched": "2026-04-25",
       "components": {
         "skills": [],
-        "agents": ["gsd-advisor-researcher", "gsd-ai-researcher", "gsd-assumptions-analyzer", "gsd-code-fixer", "gsd-code-reviewer", "gsd-codebase-mapper", "gsd-debug-session-manager", "gsd-debugger", "gsd-doc-classifier", "gsd-doc-synthesizer", "gsd-doc-verifier", "gsd-doc-writer", "gsd-domain-researcher", "gsd-eval-auditor", "gsd-eval-planner", "gsd-executor", "gsd-framework-selector", "gsd-integration-checker", "gsd-intel-updater", "gsd-nyquist-auditor", "gsd-pattern-mapper", "gsd-phase-researcher", "gsd-plan-checker", "gsd-planner", "gsd-project-researcher", "gsd-research-synthesizer", "gsd-roadmapper", "gsd-security-auditor", "gsd-ui-auditor", "gsd-ui-checker", "gsd-ui-researcher", "gsd-user-profiler", "gsd-verifier"],
+        "agents": [
+          "gsd-advisor-researcher",
+          "gsd-ai-researcher",
+          "gsd-assumptions-analyzer",
+          "gsd-code-fixer",
+          "gsd-code-reviewer",
+          "gsd-codebase-mapper",
+          "gsd-debug-session-manager",
+          "gsd-debugger",
+          "gsd-doc-classifier",
+          "gsd-doc-synthesizer",
+          "gsd-doc-verifier",
+          "gsd-doc-writer",
+          "gsd-domain-researcher",
+          "gsd-eval-auditor",
+          "gsd-eval-planner",
+          "gsd-executor",
+          "gsd-framework-selector",
+          "gsd-integration-checker",
+          "gsd-intel-updater",
+          "gsd-nyquist-auditor",
+          "gsd-pattern-mapper",
+          "gsd-phase-researcher",
+          "gsd-plan-checker",
+          "gsd-planner",
+          "gsd-project-researcher",
+          "gsd-research-synthesizer",
+          "gsd-roadmapper",
+          "gsd-security-auditor",
+          "gsd-ui-auditor",
+          "gsd-ui-checker",
+          "gsd-ui-researcher",
+          "gsd-user-profiler",
+          "gsd-verifier"
+        ],
         "commands": [],
         "hooks": []
       }
@@ -83,7 +163,9 @@
       "components": {
         "skills": [],
         "agents": [],
-        "commands": ["evaluate-repository"],
+        "commands": [
+          "evaluate-repository"
+        ],
         "hooks": []
       }
     },
@@ -93,9 +175,17 @@
       "type": "skills",
       "last_fetched": "2026-04-25",
       "components": {
-        "skills": ["context7-cli", "context7-mcp", "find-docs"],
-        "agents": ["docs-researcher"],
-        "commands": ["docs"],
+        "skills": [
+          "context7-cli",
+          "context7-mcp",
+          "find-docs"
+        ],
+        "agents": [
+          "docs-researcher"
+        ],
+        "commands": [
+          "docs"
+        ],
         "hooks": []
       }
     },
@@ -105,10 +195,69 @@
       "type": "skills",
       "last_fetched": "2026-04-25",
       "components": {
-        "skills": ["agent-introspection-debugging", "agent-sort", "api-design", "article-writing", "backend-patterns", "brand-voice", "bun-runtime", "claude-api", "coding-standards", "content-engine", "crosspost", "deep-research", "dmux-workflows", "documentation-lookup", "e2e-testing", "eval-harness", "everything-claude-code", "exa-search", "fal-ai-media", "frontend-design", "frontend-patterns", "frontend-slides", "investor-materials", "investor-outreach", "market-research", "mcp-server-patterns", "nextjs-turbopack", "product-capability", "security-review", "strategic-compact", "tdd-workflow", "verification-loop", "video-editing", "x-api"],
+        "skills": [
+          "agent-introspection-debugging",
+          "agent-sort",
+          "api-design",
+          "article-writing",
+          "backend-patterns",
+          "brand-voice",
+          "bun-runtime",
+          "claude-api",
+          "coding-standards",
+          "content-engine",
+          "crosspost",
+          "deep-research",
+          "dmux-workflows",
+          "documentation-lookup",
+          "e2e-testing",
+          "eval-harness",
+          "everything-claude-code",
+          "exa-search",
+          "fal-ai-media",
+          "frontend-design",
+          "frontend-patterns",
+          "frontend-slides",
+          "investor-materials",
+          "investor-outreach",
+          "market-research",
+          "mcp-server-patterns",
+          "nextjs-turbopack",
+          "product-capability",
+          "security-review",
+          "strategic-compact",
+          "tdd-workflow",
+          "verification-loop",
+          "video-editing",
+          "x-api"
+        ],
         "agents": [],
         "commands": [],
         "hooks": []
+      }
+    },
+    "ui-ux-pro-max-skill": {
+      "url": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git",
+      "name": "ui-ux-pro-max-skill",
+      "last_fetched": "2026-04-25 09:33 UTC",
+      "components": {
+        "skills": [
+          "banner-design",
+          "design-system",
+          "brand",
+          "design",
+          "slides",
+          "ui-ux-pro-max",
+          "ui-styling"
+        ],
+        "agents": [],
+        "commands": [],
+        "hooks": [],
+        "token_optimization": [
+          "search.py",
+          "search.py",
+          "search.py"
+        ]
       }
     }
   }
