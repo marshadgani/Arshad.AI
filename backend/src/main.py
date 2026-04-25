@@ -3,7 +3,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
+from src.api.v1.dashboard import router as dashboard_router
+from src.api.v1.domains import router as domains_router
 from src.middleware.cache import close_redis
 
 SECRET_KEY = os.getenv("SECRET_KEY")
@@ -40,3 +41,7 @@ app.add_middleware(
 @app.get("/health", summary="Liveness probe")
 async def health():
     return {"status": "ok"}
+
+
+app.include_router(dashboard_router)
+app.include_router(domains_router)
