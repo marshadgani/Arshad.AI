@@ -1,60 +1,41 @@
 # /pr-review
 
-Run a full review of a pull request using the code-reviewer agent.
+Full quality gate review — alias for `/gate`. Runs all 6 agents in parallel,
+compiles a master gate report, posts it to the PR on GitHub, and presents
+a PASS/FAIL/WARN verdict.
 
 ## Usage
-```
-/pr-review <pr-number>
-```
-
-## Steps
-
-### 1. Fetch the PR
-Retrieve the PR title, description, and full diff from GitHub.
-
-### 2. Understand Intent
-Read the PR description and linked issue (if any). The reviewer must understand what the PR is trying to do before judging whether it does it correctly.
-
-### 3. Run the code-reviewer Agent
-Pass the full diff to the `code-reviewer` agent. It will return structured feedback with severity ratings (🔴 Critical, 🟡 Warning, 🟢 Suggestion).
-
-### 4. Run the security-auditor Agent
-Pass the diff to the `security-auditor` agent independently. Security issues are frequently missed in general code review.
-
-### 5. Check Test Coverage
-- Every new function should have at least one test.
-- Every bug fix should have a regression test.
-- If tests are missing, flag them as 🟡 Warning.
-
-### 6. Verify CI Status
-Check whether all CI checks are passing. Do not approve a PR with failing checks.
-
-### 7. Post Review
-Post the combined review as a GitHub PR comment with this structure:
 
 ```
-## PR Review — #<number>
-
-### Summary
-<What the PR does and overall verdict>
-
-### Critical Issues 🔴
-<Must fix before merge>
-
-### Warnings 🟡
-<Should fix>
-
-### Suggestions 🟢
-<Nice to have>
-
-### Security
-<Output from security-auditor, or "No issues found">
-
-### Verdict
-[ ] Approve  [x] Request Changes  [ ] Block
+/pr-review           ← reviews open PR for current branch
+/pr-review <number>  ← reviews a specific PR by number
 ```
 
-## Rules
-- Never approve a PR with a 🔴 Critical issue.
-- Always run both code-reviewer and security-auditor — don't rely on one alone.
-- If the PR description is missing or unclear, request that it be filled in before reviewing.
+## Agents Invoked (parallel)
+
+| # | Agent | Gate |
+|---|---|---|
+| 1 | `code-reviewer` | Bugs, logic errors, performance |
+| 2 | `security-auditor` | OWASP, secrets, injection, auth |
+| 3 | `debugger` | Runtime failures, unhandled error paths |
+| 4 | `test-writer` | Coverage gaps, missing regression tests |
+| 5 | `refactorer` | Complexity, duplication, naming |
+| 6 | `doc-writer` | Missing docstrings, undocumented APIs |
+
+## Full Protocol
+
+See `.claude/commands/gate.md` for:
+- Step-by-step agent orchestration
+- Exact gate thresholds (PASS / WARN / FAIL per agent)
+- Full report format (posted as PR comment)
+- "Merge to Main" auto-merge handler
+
+## Quick Reference
+
+After all agents finish, the gate report is posted to the PR and you see:
+
+```
+✅ GATE PASSED   → say "Merge to Main" to merge
+⚠️ GATE WARNED   → say "Merge to Main" to merge (warnings non-blocking)
+❌ GATE BLOCKED  → fix Critical issues, then re-run /gate
+```

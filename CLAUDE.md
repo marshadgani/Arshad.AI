@@ -625,3 +625,83 @@ domains/<domain>/
 4. **Async events** — domain-level notifications (e.g. "email received") travel via the message bus, not direct HTTP calls.
 5. **No shared mutable state** — agents do not share in-memory state. Shared state lives in Postgres or Redis only.
 
+
+---
+
+## 20. Quality Gate — Auto-Trigger Rules (PERMANENT)
+
+> These rules are ALWAYS active. They override any default behaviour.
+> Read them at the start of every session.
+
+### Trigger 1 — PR Creation / Review Request
+
+**Whenever the user says any of the following (exact or near-match):**
+- "create PR", "open PR", "make a PR", "raise a PR"
+- "PR to main", "pull request to main", "pull request"
+- "commit to main", "push to main"
+- `/gate`, `/pr-review`
+
+→ **Immediately run the full quality gate** (`/gate` protocol in `.claude/commands/gate.md`):
+1. Resolve open PR or create one
+2. Launch all 6 agents in parallel (code-reviewer, security-auditor, debugger, test-writer, refactorer, doc-writer)
+3. Compile the master gate report
+4. **Post the full report as a comment on the GitHub PR**
+5. Present PASS / WARN / FAIL verdict to user
+6. If PASS or WARN → prompt: *"Say 'Merge to Main' to merge"*
+7. If FAIL → list blockers and stop. Do NOT merge.
+
+---
+
+### Trigger 2 — "Merge to Main"
+
+**Whenever the user says "Merge to Main"** (case-insensitive):
+
+**Rule A — Gate not yet run this session:**
+→ Run `/gate` first. Only merge if gate result is PASS or WARN.
+
+**Rule B — Gate result is FAIL:**
+→ Refuse merge. Show blocking issues. Tell user to fix and re-run `/gate`.
+
+**Rule C — Gate result is PASS or WARN:**
+→ Execute merge via GitHub MCP:
+```
+mcp__github__merge_pull_request(
+  owner="marshadgani",
+  repo="Arshad.AI",
+  pullNumber=<pr_number>,
+  mergeMethod="squash"
+)
+```
+→ Confirm: "🎉 PR #N merged into main."
+
+**This phrase is the ONLY way a branch merges to main. Never merge without it.**
+
+---
+
+### Gate Agents (all 6 must pass)
+
+| Agent | File | What it checks |
+|---|---|---|
+| `code-reviewer` | `.claude/agents/code-reviewer.md` | Bugs, logic errors, performance |
+| `security-auditor` | `.claude/agents/security-auditor.md` | OWASP Top 10, secrets, injection |
+| `debugger` | `.claude/agents/debugger.md` | Unhandled errors, runtime failures |
+| `test-writer` | `.claude/agents/test-writer.md` | Coverage < 70% = FAIL |
+| `refactorer` | `.claude/agents/refactorer.md` | Complexity, duplication |
+| `doc-writer` | `.claude/agents/doc-writer.md` | Undocumented public APIs |
+
+### Gate Verdicts
+
+| Verdict | Condition | Merge allowed? |
+|---|---|---|
+| ✅ PASS | All 6 agents: no FAIL, no Critical | Yes — on "Merge to Main" |
+| ⚠️ WARN | Some WARN, zero FAIL, zero Critical | Yes — on "Merge to Main" |
+| ❌ BLOCKED | Any FAIL gate OR any Critical issue | No — fix first |
+
+**Security exception:** any security finding (even WARN-level) automatically upgrades to FAIL and blocks the merge.
+
+### Gate Report
+
+The full report is **always posted to the GitHub PR as a comment**, regardless of outcome.
+Format: see `.claude/commands/gate.md § Step 2`.
+The report includes: agent-by-agent results table, detailed findings per agent, and a prioritised action-item checklist.
+
