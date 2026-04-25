@@ -1,3 +1,12 @@
+---
+description: React 18 + TypeScript 5 conventions — components, hooks, state, styling, and testing.
+applies_to:
+  - frontend/src/**/*.tsx
+  - frontend/src/**/*.ts
+  - frontend/vite.config.ts
+  - frontend/tsconfig.json
+---
+
 # Frontend Rules — React + TypeScript
 
 ## Components

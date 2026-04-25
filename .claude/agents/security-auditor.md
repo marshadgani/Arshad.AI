@@ -1,6 +1,6 @@
 ---
 name: security-auditor
-description: Audits code for security vulnerabilities — secrets exposure, injection attacks, broken auth, insecure dependencies, and OWASP Top 10 issues.
+description: Audits code for OWASP Top 10 vulnerabilities — secrets, injection, broken auth, insecure deps, sensitive data exposure. **Use for any ad-hoc security review.** Do NOT use `gsd-security-auditor` (verifies threats from PLAN.md — needs the GSD threat-model artifact). Treat any finding as FAIL by default; only downgrade to WARN if the threat model clearly excludes it.
 tools:
   - read
   - bash

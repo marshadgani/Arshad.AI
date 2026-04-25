@@ -1,6 +1,6 @@
 ---
 name: code-reviewer
-description: Reviews every PR for bugs, security vulnerabilities, and performance issues. Provides structured, actionable feedback with severity ratings.
+description: Reviews diffs and PRs for bugs, security vulnerabilities, and performance issues. Outputs SHIP/FIX/BLOCK verdict. **Use this for any ad-hoc review.** Do NOT use for retroactive whole-codebase audit (use security-auditor for security-only audit, or `/gate` for the full 6-agent run). Do NOT use `gsd-code-reviewer` (writes REVIEW.md, requires the GSD orchestrator).
 tools:
   - read
   - bash
@@ -37,8 +37,13 @@ Return a structured review using this format:
 <Nice-to-haves, style improvements, or future-proofing ideas.>
 
 ## Verdict
-[ ] Approve  [ ] Request Changes  [ ] Block
+SHIP / FIX / BLOCK
 ```
+
+**Verdict semantics:**
+- `SHIP` — no Critical, no Warnings; safe to merge as-is.
+- `FIX` — Warnings present, no Criticals; merge after addressing.
+- `BLOCK` — at least one Critical or any security finding; do not merge.
 
 ## Rules
 - Always cite `file:line` for every finding.

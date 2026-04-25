@@ -248,6 +248,35 @@ cp .claude/hooks/pre-commit.sh .git/hooks/pre-commit
 
 **Known behaviour:** ESLint step skips gracefully if no ESLint config is present.
 
+### Claude Code lifecycle hooks (in `.claude/settings.json`)
+
+These run automatically on Claude tool calls — separate from the git/editor hooks above.
+
+| Event | Matcher | Script | Purpose |
+|---|---|---|---|
+| `SessionStart` | `*` | `.claude/hooks/session-start.sh` | Weekly skill / agent / command sync from upstream repos |
+| `PreToolUse` | `Bash` | `.claude/hooks/bash-guard.sh` | Block unambiguously destructive commands (`rm -rf /`, `mkfs`, fork bombs) |
+| `PostToolUse` | `Edit\|Write\|MultiEdit` | `.claude/hooks/post-edit-format.sh` | Best-effort autoformat: `ruff format` on `.py`, `eslint --fix` on `.ts`/`.tsx` |
+
+`bash-guard.sh` exits 2 to block; the matcher list is conservative — extend it only when a command is genuinely dangerous in this repo.
+
+---
+
+## 9b. Personal overrides — `CLAUDE.local.md` + `settings.local.json`
+
+Both are gitignored. Templates committed as `CLAUDE.local.md.example` and `.claude/settings.local.json.example`.
+
+| File | Purpose |
+|---|---|
+| `CLAUDE.local.md` | Personal paths, "when I say X" shortcuts, current focus — anything that shouldn't enter the shared repo. Loaded alongside `CLAUDE.md` every session. |
+| `.claude/settings.local.json` | Per-machine model override, env vars, and Bash allowlist (`permissions.allow`) to reduce permission prompts. Overlays `.claude/settings.json`. |
+
+To start using either:
+```bash
+cp CLAUDE.local.md.example CLAUDE.local.md
+cp .claude/settings.local.json.example .claude/settings.local.json
+```
+
 ---
 
 ## 10. Git
@@ -326,6 +355,28 @@ TypeScript 5 treats `moduleResolution: "node"` (node10) as deprecated and will r
 - Point at logs, errors, failing tests — then resolve them
 - Zero context switching required from the user
 - Go fix failing CI tests without being told how
+
+---
+
+## 13b. Skill / Agent Routing — read this before picking a tool
+
+The repo carries 77 skills (across 6 sources) and 49 agents (across 4 sources). Most overlap. The default routing is:
+
+**Agents — prefer first-party.** Reach for vendored agents only for these specific niches:
+- `deployment-engineer` (n8n-mcp) — new CI/CD, Dockerfiles, Kubernetes
+- `mcp-backend-engineer` (n8n-mcp) — anything in `mcp/` or MCP protocol changes
+- `technical-researcher` (n8n-mcp) — multi-source framework / vuln evaluation
+- `context-manager` (n8n-mcp) — coordinating ≥3 agents across a long task
+- `docs-researcher` (context7) — single-library doc fetch with isolated context
+- `gsd-*` agents — **only** when running their orchestrating slash command (e.g. `/gsd-plan-phase`). Do not spawn individually.
+
+**Skills — most are nested two levels deep and not auto-surfaced.** Check `.claude/skills/INDEX.md` for the full map. For a skill that the `Skill` tool doesn't list, you can still `Read` the SKILL.md at the path shown in the index and apply its workflow.
+
+Detailed routing tables:
+- `.claude/agents/INDEX.md` — task-type → agent
+- `.claude/skills/INDEX.md` — task-type → skill, plus inventory by source
+
+When a skill or agent is genuinely useful but invisible, **promote it** by copying the SKILL.md (or agent .md) one directory up so Claude Code discovers it.
 
 ---
 
@@ -668,28 +719,37 @@ This applies to every "Merge to Main" trigger below.
 
 ### Trigger 2 — "Merge to Main"
 
-**Whenever the user says "Merge to Main"** (case-insensitive):
+**Whenever the user says "Merge to Main"** (case-insensitive), execute this loop:
 
-**Rule A — Gate not yet run this session:**
-→ Run `/gate` first. Only merge if gate result is PASS or WARN.
+**Step 1 — Run `/gate` (mandatory, no skipping).**
+Spawn all 6 agents on the diff between `claude/ai-personal-assistant-develop-AION` and `claude/ai-personal-assistant-main`. Compile the master report.
 
-**Rule B — Gate result is FAIL:**
-→ Refuse merge. Show blocking issues. Tell user to fix and re-run `/gate`.
+**Step 2 — If the gate has any Critical finding or FAIL gate → auto-fix loop.**
+- For each Critical finding, apply the smallest fix that resolves it.
+- Commit each fix atomically (one commit per finding).
+- Push to `claude/ai-personal-assistant-develop-AION`.
+- Re-run `/gate`.
+- Repeat up to **3 iterations**. If criticals still remain, stop and present what's left to the user — do NOT proceed to merge.
 
-**Rule C — Gate result is PASS or WARN:**
-→ Execute merge via GitHub MCP (target is `claude/ai-personal-assistant-main`, NOT `main`):
-```
-mcp__github__merge_pull_request(
-  owner="marshadgani",
-  repo="Arshad.AI",
-  pullNumber=<pr_number>,
-  mergeMethod="squash"
-)
-```
-The PR's base branch must be `claude/ai-personal-assistant-main`.
-→ Confirm: "🎉 PR #N merged into claude/ai-personal-assistant-main."
+WARN-level findings are **not** auto-fixed. They go into the PR body as a checklist; the user decides whether to address before merging.
 
-**This phrase is the ONLY way a branch merges to `claude/ai-personal-assistant-main`. Never merge without it. Never merge directly to `main`.**
+**Step 3 — Write the gate report to `tasks/last-gate-report.md`.**
+The full master gate report (the same markdown that would otherwise be a PR comment) MUST be written to `tasks/last-gate-report.md` and committed in the same push as the final fixes. The `auto-pr.yml` workflow reads this file and uses its contents as the PR description, so the gate report is **embedded directly in the PR body** — not posted as a comment.
+
+If no fixes were needed, still write `tasks/last-gate-report.md` so the PR description reflects the gate verdict.
+
+**Step 4 — Push to develop-AION.**
+- Push the final state to `claude/ai-personal-assistant-develop-AION`.
+- The `.github/workflows/auto-pr.yml` workflow opens (or updates) a PR from `develop-AION` → `claude/ai-personal-assistant-main` and uses `tasks/last-gate-report.md` as the body.
+- Report the PR URL and the gate verdict to the user. Example:
+  > "✅ Gate passed. PR auto-opened: <URL>. Click **Squash and merge** when ready."
+
+**Step 5 — Do NOT execute the merge.**
+Claude does not merge. The user clicks **Squash and merge** on GitHub (or enables auto-merge if their plan supports it). This protects against accidental main-branch writes from a stale gate result.
+
+If the GitHub MCP server is configured and available, Claude MAY offer to call `mcp__github__merge_pull_request` after the user explicitly approves — never automatically.
+
+**This phrase ("Merge to Main") is the ONLY trigger for the gate-and-PR flow. The merge target is always `claude/ai-personal-assistant-main`. Never push directly to `main`.**
 
 ---
 

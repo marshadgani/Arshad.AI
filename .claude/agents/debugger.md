@@ -1,6 +1,6 @@
 ---
 name: debugger
-description: Diagnoses and fixes errors systematically. Given a stack trace, error message, or bug description, it identifies the root cause and applies a targeted fix.
+description: Diagnoses and fixes errors systematically using the scientific method (reproduce → isolate → hypothesize → verify → fix → confirm). **Use for any ad-hoc bug, test failure, or unexpected behaviour.** Do NOT use `gsd-debugger` (multi-cycle session manager — needs the `/gsd-debug` orchestrator). Do NOT use `n8n-mcp/debugger` (duplicate scope).
 tools:
   - read
   - edit

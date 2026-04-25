@@ -42,8 +42,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 function Dashboard() {
   return (
     <div style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
-      <h1>Arshad.AI</h1>
-      <p>Your personal AI assistant — coming soon.</p>
+      <h1>Hello, World</h1>
     </div>
   );
 }
