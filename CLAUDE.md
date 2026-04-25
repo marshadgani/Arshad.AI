@@ -475,3 +475,233 @@ This registry is the source of truth for weekly auto-updates.
 | `everything-claude-code` | https://github.com/affaan-m/everything-claude-code.git | skills | 34 skills | 2026-04-25 |
 
 > This table is updated automatically by `scripts/fetch-github-repo.sh` when a new repo is integrated.
+
+---
+
+## 19. Repository Architecture — Domains, Agents & Branch Strategy
+
+### Project
+- **Name:** Arshad.AI
+- **Type:** Personal AI Operating System
+- **Client / Owner:** Arshad
+
+### Root Branches
+
+| Branch | Purpose |
+|---|---|
+| `main` | Production-ready code only. Never commit directly. |
+| `develop` | Integration and testing. All domain branches merge here before `main`. |
+
+### Merge Path
+
+```
+agent/<domain>/<agent-name>
+        ↓
+  domain/<domain>
+        ↓
+      develop
+        ↓
+       main
+```
+
+### Branch Naming Conventions
+
+| Type | Pattern | Example |
+|---|---|---|
+| Domain branch | `domain/<domain>` | `domain/calendar` |
+| Agent branch | `agent/<domain>/<agent>` | `agent/calendar/event-creator` |
+| Feature branch | `feat/<domain>/<short-desc>` | `feat/email/thread-summary` |
+| Fix branch | `fix/<domain>/<short-desc>` | `fix/github/pr-diff-parser` |
+| Release branch | `release/v<semver>` | `release/v1.0.0` |
+| Hotfix branch | `hotfix/<short-desc>` | `hotfix/auth-token-refresh` |
+
+---
+
+### Business Domains (6)
+
+| Domain | Slug | Purpose |
+|---|---|---|
+| Calendar | `calendar` | Google Calendar integration — events, scheduling, meeting suggestions |
+| Email | `email` | Gmail integration — search, drafting, labelling, summarisation |
+| GitHub | `github` | GitHub integration — issues, PRs, code review, repo monitoring |
+| AI Core | `ai-core` | Claude AI orchestration — tool dispatch, context, streaming |
+| Data Pipeline | `data-pipeline` | Airflow ETL — ingest Calendar, Gmail, GitHub into Postgres |
+| Infrastructure | `infrastructure` | API gateway, auth, cache, health monitoring |
+
+---
+
+### Agents (24 total — 4 per domain)
+
+#### calendar domain
+| Agent | Branch | Purpose |
+|---|---|---|
+| `event-creator` | `agent/calendar/event-creator` | Creates Calendar events from natural language |
+| `event-updater` | `agent/calendar/event-updater` | Updates, reschedules, or cancels events |
+| `meeting-suggester` | `agent/calendar/meeting-suggester` | Analyses availability and suggests meeting slots |
+| `schedule-analyzer` | `agent/calendar/schedule-analyzer` | Summarises upcoming schedule and flags conflicts |
+
+#### email domain
+| Agent | Branch | Purpose |
+|---|---|---|
+| `email-searcher` | `agent/email/email-searcher` | Searches Gmail threads by query, date, sender, label |
+| `email-drafter` | `agent/email/email-drafter` | Composes and saves email drafts from user intent |
+| `email-labeler` | `agent/email/email-labeler` | Applies, removes, or creates Gmail labels |
+| `email-summarizer` | `agent/email/email-summarizer` | Condenses long threads into concise action points |
+
+#### github domain
+| Agent | Branch | Purpose |
+|---|---|---|
+| `issue-manager` | `agent/github/issue-manager` | Creates, updates, and triages GitHub issues |
+| `pr-reviewer` | `agent/github/pr-reviewer` | Summarises PR diffs and generates code review output |
+| `code-summarizer` | `agent/github/code-summarizer` | Plain-English summaries of commits and code changes |
+| `repo-monitor` | `agent/github/repo-monitor` | Watches repo events and alerts Arshad |
+
+#### ai-core domain
+| Agent | Branch | Purpose |
+|---|---|---|
+| `chat-orchestrator` | `agent/ai-core/chat-orchestrator` | Routes user messages to domain agents via API gateway |
+| `tool-dispatcher` | `agent/ai-core/tool-dispatcher` | Resolves and invokes Claude tool calls |
+| `context-manager` | `agent/ai-core/context-manager` | Manages conversation history and context compression |
+| `response-streamer` | `agent/ai-core/response-streamer` | Handles SSE streaming of Claude responses to frontend |
+
+#### data-pipeline domain
+| Agent | Branch | Purpose |
+|---|---|---|
+| `calendar-ingestor` | `agent/data-pipeline/calendar-ingestor` | Airflow DAG: pulls Calendar events into Postgres daily |
+| `email-ingestor` | `agent/data-pipeline/email-ingestor` | Airflow DAG: pulls Gmail threads into Postgres daily |
+| `github-ingestor` | `agent/data-pipeline/github-ingestor` | Airflow DAG: pulls GitHub activity into Postgres daily |
+| `analytics-processor` | `agent/data-pipeline/analytics-processor` | Aggregates ingested data into summary tables |
+
+#### infrastructure domain
+| Agent | Branch | Purpose |
+|---|---|---|
+| `api-gateway` | `agent/infrastructure/api-gateway` | Central routing, auth enforcement, rate limiting |
+| `auth-manager` | `agent/infrastructure/auth-manager` | OAuth2 flows for Google and GitHub; token refresh |
+| `cache-manager` | `agent/infrastructure/cache-manager` | Redis-backed cache for tool responses and sessions |
+| `health-monitor` | `agent/infrastructure/health-monitor` | Polls all services; surfaces health to dashboard |
+
+---
+
+### Core Infrastructure
+
+```
+infrastructure/
+├── api-gateway/    ← All inter-agent traffic passes here. No direct agent-to-agent calls.
+├── message-bus/    ← Async event bus for domain notifications
+└── monitoring/     ← Health checks, metrics, alerting
+
+shared/
+├── auth/           ← OAuth2 helpers, token storage, dependency injectors
+├── models/         ← Shared Pydantic / SQLAlchemy models
+├── utils/          ← Logging, pagination, error formatting
+└── types/          ← TypeScript types shared across frontend apps
+```
+
+### Folder Layout (per domain)
+
+```
+domains/<domain>/
+├── README.md
+├── agents/
+│   └── <agent-name>/
+│       ├── src/        ← implementation code
+│       ├── tests/      ← unit + integration tests
+│       ├── config/     ← config.yaml, env templates
+│       └── README.md
+└── applications/
+    ├── src/            ← React components / FastAPI routes
+    ├── tests/
+    ├── config/
+    └── README.md
+```
+
+---
+
+### Agent Communication Rules
+
+1. **API gateway only** — no agent may call another agent directly. All traffic goes through `infrastructure/api-gateway`.
+2. **Isolated branches** — all code changes for an agent stay on its own `agent/<domain>/<name>` branch. Never commit agent logic to `develop` or `main` directly.
+3. **Standard internal interface** — every agent exposes `POST /api/v1/<domain>/<agent>/<action>`.
+4. **Async events** — domain-level notifications (e.g. "email received") travel via the message bus, not direct HTTP calls.
+5. **No shared mutable state** — agents do not share in-memory state. Shared state lives in Postgres or Redis only.
+
+
+---
+
+## 20. Quality Gate — Auto-Trigger Rules (PERMANENT)
+
+> These rules are ALWAYS active. They override any default behaviour.
+> Read them at the start of every session.
+
+### Trigger 1 — PR Creation / Review Request
+
+**Whenever the user says any of the following (exact or near-match):**
+- "create PR", "open PR", "make a PR", "raise a PR"
+- "PR to main", "pull request to main", "pull request"
+- "commit to main", "push to main"
+- `/gate`, `/pr-review`
+
+→ **Immediately run the full quality gate** (`/gate` protocol in `.claude/commands/gate.md`):
+1. Resolve open PR or create one
+2. Launch all 6 agents in parallel (code-reviewer, security-auditor, debugger, test-writer, refactorer, doc-writer)
+3. Compile the master gate report
+4. **Post the full report as a comment on the GitHub PR**
+5. Present PASS / WARN / FAIL verdict to user
+6. If PASS or WARN → prompt: *"Say 'Merge to Main' to merge"*
+7. If FAIL → list blockers and stop. Do NOT merge.
+
+---
+
+### Trigger 2 — "Merge to Main"
+
+**Whenever the user says "Merge to Main"** (case-insensitive):
+
+**Rule A — Gate not yet run this session:**
+→ Run `/gate` first. Only merge if gate result is PASS or WARN.
+
+**Rule B — Gate result is FAIL:**
+→ Refuse merge. Show blocking issues. Tell user to fix and re-run `/gate`.
+
+**Rule C — Gate result is PASS or WARN:**
+→ Execute merge via GitHub MCP:
+```
+mcp__github__merge_pull_request(
+  owner="marshadgani",
+  repo="Arshad.AI",
+  pullNumber=<pr_number>,
+  mergeMethod="squash"
+)
+```
+→ Confirm: "🎉 PR #N merged into main."
+
+**This phrase is the ONLY way a branch merges to main. Never merge without it.**
+
+---
+
+### Gate Agents (all 6 must pass)
+
+| Agent | File | What it checks |
+|---|---|---|
+| `code-reviewer` | `.claude/agents/code-reviewer.md` | Bugs, logic errors, performance |
+| `security-auditor` | `.claude/agents/security-auditor.md` | OWASP Top 10, secrets, injection |
+| `debugger` | `.claude/agents/debugger.md` | Unhandled errors, runtime failures |
+| `test-writer` | `.claude/agents/test-writer.md` | Coverage < 70% = FAIL |
+| `refactorer` | `.claude/agents/refactorer.md` | Complexity, duplication |
+| `doc-writer` | `.claude/agents/doc-writer.md` | Undocumented public APIs |
+
+### Gate Verdicts
+
+| Verdict | Condition | Merge allowed? |
+|---|---|---|
+| ✅ PASS | All 6 agents: no FAIL, no Critical | Yes — on "Merge to Main" |
+| ⚠️ WARN | Some WARN, zero FAIL, zero Critical | Yes — on "Merge to Main" |
+| ❌ BLOCKED | Any FAIL gate OR any Critical issue | No — fix first |
+
+**Security exception:** any security finding (even WARN-level) automatically upgrades to FAIL and blocks the merge.
+
+### Gate Report
+
+The full report is **always posted to the GitHub PR as a comment**, regardless of outcome.
+Format: see `.claude/commands/gate.md § Step 2`.
+The report includes: agent-by-agent results table, detailed findings per agent, and a prioritised action-item checklist.
+
