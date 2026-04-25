@@ -1,22 +1,35 @@
+import asyncio
 import os
+
 from redis.asyncio import Redis
 
+REDIS_URL = os.getenv("REDIS_URL")
+if not REDIS_URL:
+    raise RuntimeError(
+        "REDIS_URL is not set. Copy backend/.env.example to backend/.env and fill it in."
+    )
+
 _redis: Redis | None = None
+_init_lock = asyncio.Lock()
 
 
 async def get_redis() -> Redis:
     global _redis
-    if _redis is None:
-        _redis = Redis.from_url(
-            os.getenv("REDIS_URL", "redis://localhost:6379"),
-            encoding="utf-8",
-            decode_responses=True,
-        )
+    if _redis is not None:
+        return _redis
+    async with _init_lock:
+        if _redis is None:
+            _redis = Redis.from_url(
+                REDIS_URL,
+                encoding="utf-8",
+                decode_responses=True,
+            )
     return _redis
 
 
 async def close_redis() -> None:
     global _redis
-    if _redis is not None:
-        await _redis.aclose()
-        _redis = None
+    async with _init_lock:
+        if _redis is not None:
+            await _redis.aclose()
+            _redis = None
