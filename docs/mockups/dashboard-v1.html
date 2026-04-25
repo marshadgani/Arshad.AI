@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Arshad.AI — Dashboard Mockup v1</title>
+<style>
+  /* ── Design tokens (derived from ui-ux-pro-max-skill design-system patterns) ── */
+  :root {
+    /* primitives */
+    --neutral-950: #0A0A0B;
+    --neutral-900: #111114;
+    --neutral-850: #16161B;
+    --neutral-800: #1C1C22;
+    --neutral-700: #26262E;
+    --neutral-600: #3D3D47;
+    --neutral-500: #6B6B76;
+    --neutral-400: #9C9CA8;
+    --neutral-300: #C7C7D0;
+    --neutral-100: #F5F5F7;
+    --accent-500: #7C5CFF;     /* primary purple */
+    --accent-400: #9A82FF;
+    --accent-glow: rgba(124, 92, 255, 0.18);
+    --green-500:  #2ECC71;
+    --amber-500:  #F5A623;
+    --red-500:    #E74C3C;
+    --blue-500:   #4FACFE;
+
+    /* semantic */
+    --bg-app: var(--neutral-950);
+    --bg-surface: var(--neutral-900);
+    --bg-card: var(--neutral-850);
+    --bg-card-hover: var(--neutral-800);
+    --border: var(--neutral-700);
+    --text-primary: var(--neutral-100);
+    --text-secondary: var(--neutral-400);
+    --text-muted: var(--neutral-500);
+
+    /* spacing scale (4-base) */
+    --s-1: 4px;  --s-2: 8px;  --s-3: 12px;  --s-4: 16px;
+    --s-5: 20px; --s-6: 24px; --s-8: 32px;  --s-10: 40px;
+
+    /* typography */
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono: 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font-sans);
+    font-feature-settings: 'cv11', 'ss01';
+    background: var(--bg-app);
+    color: var(--text-primary);
+    min-height: 100vh;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── App grid ────────────────────────────────────────────── */
+  .app {
+    display: grid;
+    grid-template-columns: 232px 1fr;
+    grid-template-rows: 1fr auto;
+    grid-template-areas:
+      "sidebar main"
+      "sidebar chatbar";
+    height: 100vh;
+  }
+
+  /* ── Sidebar ─────────────────────────────────────────────── */
+  .sidebar {
+    grid-area: sidebar;
+    background: var(--bg-surface);
+    border-right: 1px solid var(--border);
+    padding: var(--s-6) var(--s-4);
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-6);
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    padding: var(--s-2) var(--s-3);
+    font-weight: 600;
+    font-size: 16px;
+  }
+  .logo-mark {
+    width: 28px; height: 28px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent-500), #4f46e5);
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-weight: 700; font-size: 14px;
+    box-shadow: 0 4px 14px var(--accent-glow);
+  }
+
+  .nav-section { display: flex; flex-direction: column; gap: var(--s-1); }
+  .nav-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding: 0 var(--s-3);
+    margin-bottom: var(--s-2);
+  }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    padding: var(--s-2) var(--s-3);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 120ms, color 120ms;
+    user-select: none;
+  }
+  .nav-item:hover { background: var(--bg-card); color: var(--text-primary); }
+  .nav-item.active {
+    background: var(--bg-card);
+    color: var(--text-primary);
+    box-shadow: inset 2px 0 0 var(--accent-500);
+  }
+  .nav-item .icon { font-size: 16px; width: 18px; text-align: center; }
+  .nav-item .badge-soon {
+    margin-left: auto;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: var(--neutral-800);
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+
+  .sidebar-footer {
+    margin-top: auto;
+    padding: var(--s-3);
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center; gap: var(--s-3);
+  }
+  .avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: linear-gradient(135deg, #ff6b9d, #c44569);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 600; font-size: 13px; color: white;
+  }
+  .user-name { font-size: 13px; font-weight: 500; }
+  .user-status { font-size: 11px; color: var(--text-muted); }
+
+  /* ── Main content area ──────────────────────────────────── */
+  .main {
+    grid-area: main;
+    overflow-y: auto;
+    padding: var(--s-8) var(--s-10);
+  }
+
+  .greeting { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: var(--s-8); }
+  .greeting h1 { font-size: 28px; font-weight: 600; letter-spacing: -0.01em; }
+  .greeting h1 .date { color: var(--text-muted); font-weight: 400; margin-left: var(--s-3); font-size: 18px; }
+  .greeting .quick-stats { display: flex; gap: var(--s-6); font-size: 13px; color: var(--text-secondary); }
+  .greeting .quick-stats strong { color: var(--text-primary); margin-left: var(--s-1); }
+
+  .tiles {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: var(--s-6);
+  }
+
+  .tile {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--s-6);
+    display: flex; flex-direction: column;
+    min-height: 360px;
+  }
+
+  .tile-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: var(--s-5);
+  }
+  .tile-title {
+    display: flex; align-items: center; gap: var(--s-2);
+    font-size: 15px; font-weight: 600;
+  }
+  .tile-title .emoji { font-size: 17px; }
+  .tile-meta { font-size: 12px; color: var(--text-muted); }
+  .tile-action {
+    background: transparent; border: 0; color: var(--text-secondary);
+    cursor: pointer; font-size: 13px; padding: var(--s-1) var(--s-2);
+    border-radius: var(--radius-sm);
+  }
+  .tile-action:hover { background: var(--bg-card-hover); color: var(--text-primary); }
+
+  /* ── Tasks rows ─────────────────────────────────────────── */
+  .row-list { display: flex; flex-direction: column; gap: var(--s-2); }
+  .task-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: var(--s-3);
+    align-items: center;
+    padding: var(--s-3);
+    border-radius: var(--radius-sm);
+    transition: background 120ms;
+  }
+  .task-row:hover { background: var(--bg-card-hover); }
+  .checkbox {
+    width: 16px; height: 16px;
+    border: 1.5px solid var(--neutral-600);
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  .task-text { font-size: 13px; color: var(--text-primary); }
+  .task-text .source {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-left: var(--s-2);
+    padding: 1px 6px;
+    background: var(--neutral-800);
+    border-radius: 4px;
+    text-transform: lowercase;
+  }
+  .task-due { font-size: 11px; color: var(--text-secondary); white-space: nowrap; }
+  .task-due.overdue { color: var(--red-500); }
+  .task-due.today { color: var(--amber-500); }
+
+  /* ── Agents rows ────────────────────────────────────────── */
+  .agent-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: var(--s-3);
+    align-items: center;
+    padding: var(--s-3);
+    border-radius: var(--radius-sm);
+    transition: background 120ms;
+  }
+  .agent-row:hover { background: var(--bg-card-hover); }
+  .health-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .health-dot.green { background: var(--green-500); box-shadow: 0 0 6px var(--green-500); }
+  .health-dot.amber { background: var(--amber-500); box-shadow: 0 0 6px var(--amber-500); }
+  .health-dot.red   { background: var(--red-500); box-shadow: 0 0 6px var(--red-500); }
+  .agent-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .agent-name { font-size: 13px; font-weight: 500; }
+  .agent-domain { font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); }
+  .agent-time { font-size: 11px; color: var(--text-secondary); white-space: nowrap; }
+
+  /* ── Events rows ────────────────────────────────────────── */
+  .event-row {
+    display: grid;
+    grid-template-columns: 56px 4px 1fr;
+    gap: var(--s-3);
+    align-items: center;
+    padding: var(--s-3);
+    border-radius: var(--radius-sm);
+  }
+  .event-row:hover { background: var(--bg-card-hover); }
+  .event-time {
+    font-size: 12px; color: var(--text-secondary);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .event-time .ampm { font-size: 10px; color: var(--text-muted); display: block; }
+  .event-bar {
+    width: 4px; height: 100%; min-height: 32px;
+    border-radius: 2px;
+  }
+  .event-bar.work { background: var(--accent-500); }
+  .event-bar.personal { background: var(--blue-500); }
+  .event-bar.family { background: var(--green-500); }
+  .event-info { display: flex; flex-direction: column; gap: 2px; }
+  .event-title { font-size: 13px; font-weight: 500; }
+  .event-cal { font-size: 11px; color: var(--text-muted); }
+
+  /* ── Chat bar ────────────────────────────────────────────── */
+  .chatbar {
+    grid-area: chatbar;
+    background: var(--bg-surface);
+    border-top: 1px solid var(--border);
+    padding: var(--s-4) var(--s-10);
+  }
+  .chat-input-wrap {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: var(--s-3) var(--s-4);
+    display: flex; align-items: center; gap: var(--s-3);
+    transition: border-color 120ms, box-shadow 120ms;
+  }
+  .chat-input-wrap:focus-within {
+    border-color: var(--accent-500);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+  .chat-icon { color: var(--text-muted); font-size: 18px; }
+  .chat-input {
+    flex: 1;
+    background: transparent;
+    border: 0;
+    color: var(--text-primary);
+    font-size: 14px;
+    font-family: var(--font-sans);
+    outline: none;
+  }
+  .chat-input::placeholder { color: var(--text-muted); }
+  .chat-send {
+    background: var(--accent-500);
+    color: white;
+    border: 0;
+    padding: var(--s-2) var(--s-4);
+    border-radius: var(--radius-md);
+    font-size: 13px; font-weight: 500;
+    cursor: pointer;
+    transition: background 120ms;
+  }
+  .chat-send:hover { background: var(--accent-400); }
+  .chat-hint {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: var(--s-2);
+    padding: 0 var(--s-2);
+  }
+  .chat-hint kbd {
+    background: var(--neutral-800);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ── Sidebar ──────────────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="logo">
+      <span class="logo-mark">A</span>
+      <span>Arshad.AI</span>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">Workspace</div>
+      <div class="nav-item active">
+        <span class="icon">▣</span> Dashboard
+      </div>
+      <div class="nav-item">
+        <span class="icon">$</span> Personal Finance
+        <span class="badge-soon">soon</span>
+      </div>
+      <div class="nav-item">
+        <span class="icon">↗</span> Stock Market
+        <span class="badge-soon">soon</span>
+      </div>
+      <div class="nav-item">
+        <span class="icon">◉</span> Shopify Store
+        <span class="badge-soon">soon</span>
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">Account</div>
+      <div class="nav-item"><span class="icon">⚙</span> Settings</div>
+      <div class="nav-item"><span class="icon">🔌</span> Integrations</div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="avatar">A</div>
+      <div>
+        <div class="user-name">Arshad</div>
+        <div class="user-status">Personal workspace</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Main ─────────────────────────────────────────────── -->
+  <main class="main">
+
+    <div class="greeting">
+      <h1>Good afternoon, Arshad <span class="date">· Saturday, 25 Apr</span></h1>
+      <div class="quick-stats">
+        <div>Tasks open <strong>7</strong></div>
+        <div>Agents healthy <strong>4 / 5</strong></div>
+        <div>Events today <strong>3</strong></div>
+      </div>
+    </div>
+
+    <div class="tiles">
+
+      <!-- Tile 1: Tasks -->
+      <section class="tile">
+        <div class="tile-header">
+          <div class="tile-title"><span class="emoji">✓</span> My Tasks</div>
+          <div class="tile-meta">7 open · 3 sources</div>
+        </div>
+        <div class="row-list">
+          <div class="task-row">
+            <div class="checkbox"></div>
+            <div class="task-text">Review PR #12: auto-pr workflow <span class="source">github</span></div>
+            <div class="task-due overdue">Yesterday</div>
+          </div>
+          <div class="task-row">
+            <div class="checkbox"></div>
+            <div class="task-text">Reply to Sarah re: Q3 launch <span class="source">gmail</span></div>
+            <div class="task-due today">Today, 4 pm</div>
+          </div>
+          <div class="task-row">
+            <div class="checkbox"></div>
+            <div class="task-text">Draft "AI assistant launch" doc <span class="source">notion</span></div>
+            <div class="task-due">Tomorrow</div>
+          </div>
+          <div class="task-row">
+            <div class="checkbox"></div>
+            <div class="task-text">Deploy backend to Render <span class="source">linear</span></div>
+            <div class="task-due">Mon, 28 Apr</div>
+          </div>
+          <div class="task-row">
+            <div class="checkbox"></div>
+            <div class="task-text">Set up Stripe test account <span class="source">github</span></div>
+            <div class="task-due">Wed, 30 Apr</div>
+          </div>
+        </div>
+        <button class="tile-action" style="margin-top: var(--s-3); align-self: flex-start;">View all 7 →</button>
+      </section>
+
+      <!-- Tile 2: Agents -->
+      <section class="tile">
+        <div class="tile-header">
+          <div class="tile-title"><span class="emoji">⚡</span> My Agents</div>
+          <div class="tile-meta">5 total · 4 healthy</div>
+        </div>
+        <div class="row-list">
+          <div class="agent-row">
+            <span class="health-dot green"></span>
+            <div class="agent-info">
+              <div class="agent-name">chat-orchestrator</div>
+              <div class="agent-domain">ai-core</div>
+            </div>
+            <div class="agent-time">2 min ago</div>
+          </div>
+          <div class="agent-row">
+            <span class="health-dot green"></span>
+            <div class="agent-info">
+              <div class="agent-name">calendar-ingestor</div>
+              <div class="agent-domain">data-pipeline</div>
+            </div>
+            <div class="agent-time">14 min ago</div>
+          </div>
+          <div class="agent-row">
+            <span class="health-dot amber"></span>
+            <div class="agent-info">
+              <div class="agent-name">email-summarizer</div>
+              <div class="agent-domain">email · slow</div>
+            </div>
+            <div class="agent-time">1 hr ago</div>
+          </div>
+          <div class="agent-row">
+            <span class="health-dot green"></span>
+            <div class="agent-info">
+              <div class="agent-name">github-ingestor</div>
+              <div class="agent-domain">data-pipeline</div>
+            </div>
+            <div class="agent-time">3 hr ago</div>
+          </div>
+          <div class="agent-row">
+            <span class="health-dot red"></span>
+            <div class="agent-info">
+              <div class="agent-name">analytics-processor</div>
+              <div class="agent-domain">data-pipeline · failed</div>
+            </div>
+            <div class="agent-time">5 hr ago</div>
+          </div>
+        </div>
+        <button class="tile-action" style="margin-top: var(--s-3); align-self: flex-start;">View all agents →</button>
+      </section>
+
+      <!-- Tile 3: Events -->
+      <section class="tile">
+        <div class="tile-header">
+          <div class="tile-title"><span class="emoji">📅</span> My Events</div>
+          <div class="tile-meta">today · 3 calendars synced</div>
+        </div>
+        <div class="row-list">
+          <div class="event-row">
+            <div class="event-time">10:00<span class="ampm">am</span></div>
+            <div class="event-bar work"></div>
+            <div class="event-info">
+              <div class="event-title">Standup — Engineering</div>
+              <div class="event-cal">Work · Google · 30 min</div>
+            </div>
+          </div>
+          <div class="event-row">
+            <div class="event-time">2:00<span class="ampm">pm</span></div>
+            <div class="event-bar work"></div>
+            <div class="event-info">
+              <div class="event-title">1:1 with Priya</div>
+              <div class="event-cal">Work · Google · 45 min</div>
+            </div>
+          </div>
+          <div class="event-row">
+            <div class="event-time">5:30<span class="ampm">pm</span></div>
+            <div class="event-bar personal"></div>
+            <div class="event-info">
+              <div class="event-title">Tennis at Cubbon Park</div>
+              <div class="event-cal">Personal · Apple · 1 hr</div>
+            </div>
+          </div>
+          <div class="event-row">
+            <div class="event-time">8:00<span class="ampm">pm</span></div>
+            <div class="event-bar family"></div>
+            <div class="event-info">
+              <div class="event-title">Dinner with parents</div>
+              <div class="event-cal">Family · Outlook · 1.5 hr</div>
+            </div>
+          </div>
+        </div>
+        <button class="tile-action" style="margin-top: var(--s-3); align-self: flex-start;">Open week view →</button>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- ── Chat bar ─────────────────────────────────────────── -->
+  <footer class="chatbar">
+    <div class="chat-input-wrap">
+      <span class="chat-icon">✶</span>
+      <input class="chat-input" type="text" placeholder="Ask Arshad.AI anything — try “summarise unread emails” or “what's on my calendar tomorrow?”" />
+      <button class="chat-send">Send</button>
+    </div>
+    <div class="chat-hint">
+      <kbd>⌘</kbd> + <kbd>K</kbd> to focus from anywhere · <kbd>⇧</kbd> + <kbd>↩</kbd> for newline · Powered by Claude
+    </div>
+  </footer>
+
+</div>
+</body>
+</html>
