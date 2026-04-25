@@ -6,7 +6,6 @@ already keys on, so seeded data remains URL-quotable and testable.
 """
 
 import uuid
-from datetime import datetime
 
 from sqlalchemy import (
     CheckConstraint,
@@ -14,13 +13,11 @@ from sqlalchemy import (
     Integer,
     SmallInteger,
     String,
-    func,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from .database import Base
-
+from .database import Base, TimestampedMixin
 
 # ── Enums ──────────────────────────────────────────────────────────
 SOURCE_VALUES = ("github", "gmail", "notion", "linear", "slack", "calendar")
@@ -39,16 +36,8 @@ PriorityEnum = Enum(*PRIORITY_VALUES, name="priority_enum")
 EventSourceEnum = Enum(*EVENT_SOURCE_VALUES, name="event_source_enum")
 
 
-# ── Mixin: created_at / updated_at ─────────────────────────────────
-class _TimestampedMixin:
-    created_at: Mapped[datetime] = mapped_column(default=func.now(), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(
-        default=func.now(), server_default=func.now(), onupdate=func.now()
-    )
-
-
 # ── Tasks ──────────────────────────────────────────────────────────
-class Task(_TimestampedMixin, Base):
+class Task(TimestampedMixin, Base):
     __tablename__ = "tasks"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
@@ -59,7 +48,7 @@ class Task(_TimestampedMixin, Base):
 
 
 # ── Events ─────────────────────────────────────────────────────────
-class Event(_TimestampedMixin, Base):
+class Event(TimestampedMixin, Base):
     __tablename__ = "events"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
@@ -71,11 +60,12 @@ class Event(_TimestampedMixin, Base):
 
 
 # ── Cross-domain agent roster ──────────────────────────────────────
-class AgentGlobal(_TimestampedMixin, Base):
+class AgentGlobal(TimestampedMixin, Base):
     """Top-level agent roster shown on the Dashboard's Agent Activity widget.
 
     Distinct from per-domain ``DomainAgent`` rows in ``models.domain``.
     """
+
     __tablename__ = "agents_global"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
@@ -89,7 +79,7 @@ class AgentGlobal(_TimestampedMixin, Base):
 
 
 # ── Decisions ──────────────────────────────────────────────────────
-class Decision(_TimestampedMixin, Base):
+class Decision(TimestampedMixin, Base):
     __tablename__ = "decisions"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
@@ -100,7 +90,7 @@ class Decision(_TimestampedMixin, Base):
 
 
 # ── Agent activity ticker ──────────────────────────────────────────
-class AgentTick(_TimestampedMixin, Base):
+class AgentTick(TimestampedMixin, Base):
     __tablename__ = "agent_activity"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
@@ -110,7 +100,7 @@ class AgentTick(_TimestampedMixin, Base):
 
 
 # ── Notifications ──────────────────────────────────────────────────
-class Notification(_TimestampedMixin, Base):
+class Notification(TimestampedMixin, Base):
     __tablename__ = "notifications"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
@@ -121,7 +111,7 @@ class Notification(_TimestampedMixin, Base):
 
 
 # ── News ───────────────────────────────────────────────────────────
-class NewsItem(_TimestampedMixin, Base):
+class NewsItem(TimestampedMixin, Base):
     __tablename__ = "news_items"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
@@ -130,20 +120,23 @@ class NewsItem(_TimestampedMixin, Base):
 
 
 # ── Knowledge suggestions ──────────────────────────────────────────
-class KnowledgeSuggestion(_TimestampedMixin, Base):
+class KnowledgeSuggestion(TimestampedMixin, Base):
     """Auto-generated suggestions for the knowledge-search widget.
 
     The frontend consumes only the text; UUIDs exist so re-seeds are
     idempotent and the rows are addressable from later admin tooling.
     """
+
     __tablename__ = "knowledge_suggestions"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     text: Mapped[str] = mapped_column(String(512))
 
 
 # ── Quick actions ──────────────────────────────────────────────────
-class QuickAction(_TimestampedMixin, Base):
+class QuickAction(TimestampedMixin, Base):
     __tablename__ = "quick_actions"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
@@ -152,8 +145,9 @@ class QuickAction(_TimestampedMixin, Base):
 
 
 # ── Health & habits ────────────────────────────────────────────────
-class HealthHabit(_TimestampedMixin, Base):
+class HealthHabit(TimestampedMixin, Base):
     """One row per habit. Frontend keys by name (``sleep``/``steps``/…)."""
+
     __tablename__ = "health_habits"
 
     name: Mapped[str] = mapped_column(String(64), primary_key=True)
@@ -162,7 +156,7 @@ class HealthHabit(_TimestampedMixin, Base):
 
 
 # ── Singletons (id == 1 enforced) ──────────────────────────────────
-class DailyBriefing(_TimestampedMixin, Base):
+class DailyBriefing(TimestampedMixin, Base):
     __tablename__ = "daily_briefing"
     __table_args__ = (CheckConstraint("id = 1", name="ck_daily_briefing_singleton"),)
 
@@ -172,7 +166,7 @@ class DailyBriefing(_TimestampedMixin, Base):
     summary: Mapped[str] = mapped_column(String(2048))
 
 
-class FocusBlock(_TimestampedMixin, Base):
+class FocusBlock(TimestampedMixin, Base):
     __tablename__ = "focus_now"
     __table_args__ = (CheckConstraint("id = 1", name="ck_focus_now_singleton"),)
 
@@ -183,7 +177,7 @@ class FocusBlock(_TimestampedMixin, Base):
     action: Mapped[str] = mapped_column(String(64))
 
 
-class Weather(_TimestampedMixin, Base):
+class Weather(TimestampedMixin, Base):
     __tablename__ = "weather"
     __table_args__ = (CheckConstraint("id = 1", name="ck_weather_singleton"),)
 
@@ -193,7 +187,7 @@ class Weather(_TimestampedMixin, Base):
     city: Mapped[str] = mapped_column(String(64))
 
 
-class Commute(_TimestampedMixin, Base):
+class Commute(TimestampedMixin, Base):
     __tablename__ = "commute"
     __table_args__ = (CheckConstraint("id = 1", name="ck_commute_singleton"),)
 

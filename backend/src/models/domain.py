@@ -10,29 +10,21 @@ for both groups.
 """
 
 import uuid
-from datetime import datetime
 
-from sqlalchemy import Enum, ForeignKey, Index, Integer, String, func
+from sqlalchemy import Enum, ForeignKey, Index, Integer, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from .database import Base
-from .dashboard import AGENT_HEALTH_VALUES, AgentHealthEnum  # reuse enum
+from .dashboard import AgentHealthEnum  # reuse the enum across model files
+from .database import Base, TimestampedMixin
 
 
 APPLICATION_STATUS_VALUES = ("live", "beta", "planned")
 ApplicationStatusEnum = Enum(*APPLICATION_STATUS_VALUES, name="application_status_enum")
 
 
-class _TimestampedMixin:
-    created_at: Mapped[datetime] = mapped_column(default=func.now(), server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(
-        default=func.now(), server_default=func.now(), onupdate=func.now()
-    )
-
-
 # ── Domain header ──────────────────────────────────────────────────
-class Domain(_TimestampedMixin, Base):
+class Domain(TimestampedMixin, Base):
     __tablename__ = "domains"
 
     slug: Mapped[str] = mapped_column(String(32), primary_key=True)
@@ -55,7 +47,7 @@ class Domain(_TimestampedMixin, Base):
 
 
 # ── Domain KPIs ────────────────────────────────────────────────────
-class DomainKPI(_TimestampedMixin, Base):
+class DomainKPI(TimestampedMixin, Base):
     __tablename__ = "domain_kpis"
     __table_args__ = (Index("ix_domain_kpis_domain_slug", "domain_slug"),)
 
@@ -72,7 +64,7 @@ class DomainKPI(_TimestampedMixin, Base):
 
 
 # ── Domain applications ────────────────────────────────────────────
-class DomainApplication(_TimestampedMixin, Base):
+class DomainApplication(TimestampedMixin, Base):
     __tablename__ = "domain_applications"
     __table_args__ = (Index("ix_domain_applications_domain_slug", "domain_slug"),)
 
@@ -88,7 +80,7 @@ class DomainApplication(_TimestampedMixin, Base):
 
 
 # ── Domain agents ──────────────────────────────────────────────────
-class DomainAgent(_TimestampedMixin, Base):
+class DomainAgent(TimestampedMixin, Base):
     """Per-domain agent display row.
 
     Distinct from ``AgentGlobal`` (the cross-domain roster shown on
@@ -114,7 +106,7 @@ class DomainAgent(_TimestampedMixin, Base):
 
 
 # ── Domain feed rows ───────────────────────────────────────────────
-class DomainFeedRow(_TimestampedMixin, Base):
+class DomainFeedRow(TimestampedMixin, Base):
     __tablename__ = "domain_feed_rows"
     __table_args__ = (Index("ix_domain_feed_rows_domain_slug", "domain_slug"),)
 
@@ -129,7 +121,7 @@ class DomainFeedRow(_TimestampedMixin, Base):
 
 
 # ── Sidebar nav ────────────────────────────────────────────────────
-class NavItem(_TimestampedMixin, Base):
+class NavItem(TimestampedMixin, Base):
     __tablename__ = "nav_items"
 
     path: Mapped[str] = mapped_column(String(64), primary_key=True)

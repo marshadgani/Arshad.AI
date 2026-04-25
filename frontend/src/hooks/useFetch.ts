@@ -15,11 +15,11 @@ export function useFetch<T>(url: string): UseFetchResult<T> {
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
     setIsLoading(true);
     setError(null);
 
-    fetch(url)
+    fetch(url, { signal: controller.signal })
       .then(async (res) => {
         if (!res.ok) {
           const body = await res.text();
@@ -28,18 +28,18 @@ export function useFetch<T>(url: string): UseFetchResult<T> {
         return res.json() as Promise<{ data: T }>;
       })
       .then((body) => {
-        if (!cancelled) setData(body.data);
+        if (!controller.signal.aborted) setData(body.data);
       })
       .catch((err: Error) => {
-        if (!cancelled) setError(err);
+        // AbortError is expected on URL change / unmount; not a real failure.
+        if (err.name === 'AbortError') return;
+        if (!controller.signal.aborted) setError(err);
       })
       .finally(() => {
-        if (!cancelled) setIsLoading(false);
+        if (!controller.signal.aborted) setIsLoading(false);
       });
 
-    return () => {
-      cancelled = true;
-    };
+    return () => controller.abort();
   }, [url]);
 
   return { data, isLoading, error };

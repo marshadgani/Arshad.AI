@@ -7,11 +7,9 @@ type imports continue to work after the rewire.
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import Field
 
-
-class _ORM(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+from . import ORMBase as _ORM
 
 
 # ── Tasks ──────────────────────────────────────────────────────────
