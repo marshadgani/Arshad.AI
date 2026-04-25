@@ -1,15 +1,33 @@
-FROM node:20-alpine
+# Multi-stage build.
+# Local dev (compose uses target=dev): hot-reload Vite server bound to 0.0.0.0:3000.
+# Production (target=prod): static assets served by nginx as a non-root user.
 
+FROM node:20-alpine AS deps
 WORKDIR /app
+COPY package.json package-lock.json* ./
+RUN npm ci --no-audit --no-fund
 
-COPY package.json .
-RUN npm install
-
-COPY public/ ./public/
-COPY src/ ./src/
-COPY tsconfig.json .
-
-ENV PORT=3000
+FROM node:20-alpine AS dev
+WORKDIR /app
+RUN addgroup -S app && adduser -S app -G app
+COPY --from=deps /app/node_modules ./node_modules
+COPY --chown=app:app . .
+USER app
 EXPOSE 3000
+CMD ["npm", "start", "--", "--host", "0.0.0.0"]
 
-CMD ["npm", "start"]
+FROM node:20-alpine AS build
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN npm run build
+
+FROM nginx:1.27-alpine AS prod
+RUN addgroup -S app && adduser -S app -G app \
+    && mkdir -p /tmp/nginx-body /tmp/nginx-proxy /tmp/nginx-fastcgi /tmp/nginx-uwsgi /tmp/nginx-scgi \
+    && chown -R app:app /var/cache/nginx /var/log/nginx /tmp/nginx-* /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/nginx.conf
+COPY --from=build --chown=app:app /app/dist /usr/share/nginx/html
+USER app
+EXPOSE 8080
+CMD ["nginx", "-g", "daemon off;"]

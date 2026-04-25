@@ -43,16 +43,17 @@ services:
     command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      target: dev
     ports:
       - "3000:3000"
     depends_on:
       - backend
     volumes:
       - ./frontend/src:/app/src
-      - ./frontend/public:/app/public
     environment:
-      - REACT_APP_API_URL=http://localhost:8000
+      - VITE_API_URL=http://localhost:8000
 
   airflow:
     image: apache/airflow:2.9.3
