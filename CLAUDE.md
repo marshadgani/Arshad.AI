@@ -281,10 +281,10 @@ cp .claude/settings.local.json.example .claude/settings.local.json
 
 ## 10. Git
 
-- **Active branch:** `claude/ai-personal-assistant-develop-AION`
+- **Source branches:** any non-main branch (e.g. `claude/ai-personal-assistant-develop-AION`, `feat/<x>`, `fix/<y>`). The `auto-pr.yml` workflow triggers on push to any branch except the merge target.
 - **Merge target:** `claude/ai-personal-assistant-main` (see §20)
 - **Remote:** `origin` → `marshadgani/Arshad.AI`
-- **Push command:** `git push -u origin claude/ai-personal-assistant-develop-AION`
+- **Push command:** `git push -u origin "$(git branch --show-current)"`
 - Commit message format: `type: short description` (feat / fix / docs / refactor / test)
 - Every commit message ends with the session URL
 
@@ -721,18 +721,24 @@ This applies to every "Merge to Main" trigger below.
 
 **Whenever the user says "Merge to Main"** (case-insensitive), execute this loop:
 
+> **Source branch is dynamic.** This trigger works from ANY branch except the merge target itself. In each step below, "the current branch" means whatever `git branch --show-current` returns. Capture it once at the top:
+>
+> ```bash
+> CURRENT_BRANCH=$(git branch --show-current)
+> ```
+
 **Step 0 — Squash-divergence repair (mandatory).**
-Squash-merging from develop to main creates a divergent history: develop keeps its individual commits, main gets a single squash commit. After the next push to develop, the auto-pr workflow's `gh pr merge` call returns **HTTP 405 "Pull Request has merge conflicts"** because git's 3-way merge can't reconcile the squash with the original individual commits.
+Squash-merging to main creates a divergent history: the source branch keeps its individual commits, main gets a single squash commit. On the next push to the source branch, the auto-pr workflow's merge call returns **HTTP 405 "Pull Request has merge conflicts"** because git's 3-way merge can't reconcile the squash with the original individual commits.
 
 **Always check before Step 1:**
 ```bash
 git fetch origin
 if ! git merge-base --is-ancestor origin/claude/ai-personal-assistant-main HEAD; then
   git merge origin/claude/ai-personal-assistant-main --strategy=ours \
-    -m "merge: keep develop aligned with main (squash-divergence repair)"
+    -m "merge: keep ${CURRENT_BRANCH} aligned with main (squash-divergence repair)"
 fi
 ```
-This adds main as an ancestor of develop without changing any file (`--strategy=ours` keeps develop's content). With main in develop's history, the next squash-merge on the main side has a clean diff to apply.
+`--strategy=ours` adds main as an ancestor of the current branch without changing any file. With main in the source branch's history, the next squash-merge has a clean diff to apply.
 
 **Symptom if you skip this step:** the workflow's `Auto-merge result` PR comment will show:
 ```
@@ -742,14 +748,18 @@ HTTP 405
 That message is unambiguous — when you see it, run Step 0 manually and re-trigger.
 
 **Step 1 — Run `/gate` (mandatory, no skipping, no shortcuts).**
-Spawn **all 6 agents** (`code-reviewer`, `security-auditor`, `debugger`, `test-writer`, `refactorer`, `doc-writer`) on the diff between `claude/ai-personal-assistant-develop-AION` and `claude/ai-personal-assistant-main`. Compile the master report from their actual outputs.
+Spawn **all 6 agents** (`code-reviewer`, `security-auditor`, `debugger`, `test-writer`, `refactorer`, `doc-writer`) on the diff between the **current branch** and `claude/ai-personal-assistant-main`:
+```bash
+git diff origin/claude/ai-personal-assistant-main..HEAD
+```
+Compile the master report from their actual outputs.
 
 **No focused-verification mode. No "trivial diff" exception. No "I authored this so reviewing is pointless" rationalisation.** Even one-line changes go through the 6-agent panel — that is the whole point of the gate. The user explicitly mandated this; do not relitigate.
 
 **Step 2 — If the gate has any Critical finding or FAIL gate → auto-fix loop.**
 - For each Critical finding, apply the smallest fix that resolves it.
 - Commit each fix atomically (one commit per finding).
-- Push to `claude/ai-personal-assistant-develop-AION`.
+- Push to **`${CURRENT_BRANCH}`** (the source branch you're working in).
 - Re-run `/gate`.
 - Repeat up to **3 iterations**. If criticals still remain, stop and present what's left to the user — do NOT proceed to merge.
 
@@ -760,9 +770,9 @@ The full master gate report (the same markdown that would otherwise be a PR comm
 
 If no fixes were needed, still write `tasks/last-gate-report.md` so the PR description reflects the gate verdict.
 
-**Step 4 — Push to develop-AION.**
-- Push the final state to `claude/ai-personal-assistant-develop-AION`.
-- The `.github/workflows/auto-pr.yml` workflow opens (or updates) a PR from `develop-AION` → `claude/ai-personal-assistant-main` and uses `tasks/last-gate-report.md` as the body.
+**Step 4 — Push to the current branch.**
+- Push the final state: `git push origin "${CURRENT_BRANCH}"`.
+- The `.github/workflows/auto-pr.yml` workflow opens (or updates) a PR from `${CURRENT_BRANCH}` → `claude/ai-personal-assistant-main` and uses `tasks/last-gate-report.md` as the body.
 - Report the PR URL and the gate verdict to the user. Example:
   > "✅ Gate passed. PR auto-opened and auto-merged: <URL>."
 

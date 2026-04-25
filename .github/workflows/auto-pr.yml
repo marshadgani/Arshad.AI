@@ -1,11 +1,13 @@
 name: Auto-open PR + auto-merge gate-finished commits
 
-# Triggered on every push to claude/ai-personal-assistant-develop-AION.
+# Triggered on every push to ANY branch except the merge target itself.
+# This makes the auto-PR / auto-merge chain work from arbitrary feature
+# branches, not just one hardcoded develop branch.
 #
 # Behaviour:
-#   1. Open (or update) a PR into claude/ai-personal-assistant-main.
-#      PR body comes from tasks/last-gate-report.md when present, else
-#      a generic template.
+#   1. Open (or update) a PR from the pushed branch into
+#      claude/ai-personal-assistant-main. PR body comes from
+#      tasks/last-gate-report.md when present, else a generic template.
 #   2. If THIS push contains a fresh gate report (HEAD commit modifies
 #      tasks/last-gate-report.md) AND the report's verdict is not
 #      "BLOCKED", squash-merge the PR automatically.
@@ -21,8 +23,9 @@ name: Auto-open PR + auto-merge gate-finished commits
 #     log-file auth.
 on:
   push:
-    branches:
-      - claude/ai-personal-assistant-develop-AION
+    branches-ignore:
+      - claude/ai-personal-assistant-main
+      - main
 
 permissions:
   contents: write
@@ -72,7 +75,7 @@ jobs:
             cat > "$OUT" <<EOF
           ## Summary
 
-          Auto-opened by \`auto-pr\` workflow from a push to \`claude/ai-personal-assistant-develop-AION\`.
+          Auto-opened by \`auto-pr\` workflow from a push to \`${GITHUB_REF_NAME}\`.
 
           No gate report was present (\`tasks/last-gate-report.md\` not committed). Trigger the gate by saying "Merge to Main" in Claude Code so the next push includes the report.
 
@@ -139,7 +142,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BASE: claude/ai-personal-assistant-main
-          HEAD: claude/ai-personal-assistant-develop-AION
+          HEAD: ${{ github.ref_name }}
           TITLE: ${{ steps.build.outputs.title }}
           BODY_FILE: ${{ steps.build.outputs.body_file }}
         run: |
@@ -244,7 +247,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BASE: claude/ai-personal-assistant-main
-          HEAD: claude/ai-personal-assistant-develop-AION
+          HEAD: ${{ github.ref_name }}
           RUN_ID: ${{ github.run_id }}
           REPO: ${{ github.repository }}
           JOB_STATUS: ${{ job.status }}
