@@ -179,6 +179,11 @@ Arshad.AI/
 | `DATABASE_URL` | Yes | `postgresql+asyncpg://postgres:postgres@localhost:5432/arshad_ai` |
 | `REDIS_URL` | Yes | `redis://localhost:6379` |
 | `SECRET_KEY` | Yes | App secret — must not be `change-me` in production |
+| `GOOGLE_OAUTH_CLIENT_ID` / `_SECRET` | Phase C+ | Google Cloud OAuth client (web app, redirect `/api/v1/auth/google/callback`) |
+| `GITHUB_OAUTH_CLIENT_ID` / `_SECRET` | Phase C+ | GitHub OAuth app (one per environment — GitHub allows only one callback URL per app) |
+| `OAUTH_ENCRYPTION_KEY` | Phase C+ | 32-byte URL-safe base64. Encrypts provider tokens at rest. Rotation locks all users out. |
+| `JWT_EXPIRY_HOURS` | Phase C+ | JWT lifetime; default 24 |
+| `BACKEND_URL` / `FRONTEND_URL` | Phase C+ | Public URLs — used to build provider redirect URIs and post-login frontend redirect |
 
 Never hard-code secrets. Always add new vars to `backend/.env.example`.
 

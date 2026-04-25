@@ -20,10 +20,17 @@ cp backend/.env.example backend/.env   # backend app vars: DATABASE_URL, REDIS_U
 # Generate a non-default SECRET_KEY (startup refuses the literal "change-me"):
 python3 -c 'import secrets; print("SECRET_KEY=" + secrets.token_urlsafe(32))' >> backend/.env
 
+# Generate a 32-byte OAUTH_ENCRYPTION_KEY (Phase C+ — encrypts OAuth tokens at rest):
+python3 -c 'import secrets, base64; print("OAUTH_ENCRYPTION_KEY=" + base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())' >> backend/.env
+
+# Phase C+: register OAuth apps and paste IDs/secrets into backend/.env
+#   Google: https://console.cloud.google.com (Credentials → Web app, redirect: /api/v1/auth/google/callback)
+#   GitHub: https://github.com/settings/developers (OAuth Apps, callback: /api/v1/auth/github/callback)
+
 # 2. Start all services
 docker compose up --build
 
-# 3. Open the app
+# 3. Open the app — you'll be redirected to /login
 open http://localhost:3000
 ```
 
