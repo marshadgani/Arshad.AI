@@ -1,0 +1,47 @@
+# email-labeler
+
+**Domain:** `email`
+**Branch:** `agent/email/email-labeler`
+
+## Purpose
+
+Applies, removes, or creates Gmail labels on threads
+
+## Structure
+
+```
+email-labeler/
+├── src/          ← implementation
+├── tests/        ← unit and integration tests
+├── config/       ← config.yaml and env templates
+└── README.md
+```
+
+## API Gateway
+
+All inter-agent communication goes exclusively through the API gateway.
+
+```
+POST /api/v1/email/email-labeler/<action>
+```
+
+No direct agent-to-agent calls permitted.
+
+## Branch Rules
+
+- All code changes for this agent live on `agent/email/email-labeler` only
+- PRs target `domain/email`, never `main` directly
+- Merge path: `agent/*` → `domain/email` → `develop` → `main`
+
+## Development
+
+```bash
+# Install dependencies
+pip install -r src/requirements.txt
+
+# Run tests
+pytest tests/ -v
+
+# Start agent (dev mode)
+uvicorn src.main:app --reload --port 8001
+```
