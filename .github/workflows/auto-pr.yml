@@ -208,20 +208,28 @@ jobs:
             exit 1
           fi
 
-          # Use temp files so we capture output even if gh exits oddly.
-          echo "- BEFORE gh pr merge" >> "$DIAG"
-          gh pr merge "$PR_NUMBER" --squash --delete-branch=false > /tmp/merge.out 2> /tmp/merge.err
+          # `gh pr merge` was terminating the shell mid-execution (see
+          # historical "BEFORE gh pr merge" without "AFTER" markers in
+          # earlier failure comments on this PR). Use the GitHub REST API
+          # directly via `gh api`, which doesn't trigger that path.
+          echo "- BEFORE gh api merge" >> "$DIAG"
+          gh api \
+            --method PUT \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/merge" \
+            -f merge_method=squash \
+            > /tmp/merge.out 2> /tmp/merge.err
           rc=$?
-          echo "- AFTER gh pr merge (rc=${rc})" >> "$DIAG"
+          echo "- AFTER gh api merge (rc=${rc})" >> "$DIAG"
 
           {
-            echo "- gh pr merge rc: \`${rc}\`"
-            echo "- gh pr merge stdout:"
+            echo "- gh api merge rc: \`${rc}\`"
+            echo "- gh api merge stdout:"
             echo
             echo '```'
             cat /tmp/merge.out 2>/dev/null || echo "(empty)"
             echo '```'
-            echo "- gh pr merge stderr:"
+            echo "- gh api merge stderr:"
             echo
             echo '```'
             cat /tmp/merge.err 2>/dev/null || echo "(empty)"
