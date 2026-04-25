@@ -1,25 +1,29 @@
-name: Auto-open PR to main
+name: Auto-open PR + auto-merge gate-finished commits
 
-# Opens (or updates) a PR from claude/ai-personal-assistant-develop-AION
-# into claude/ai-personal-assistant-main on every push.
+# Triggered on every push to claude/ai-personal-assistant-develop-AION.
 #
-# PR body source (in priority order):
-#   1. tasks/last-gate-report.md   ← written by Claude during "Merge to Main"
-#   2. fallback generic template    ← when no gate report is present
+# Behaviour:
+#   1. Open (or update) a PR into claude/ai-personal-assistant-main.
+#      PR body comes from tasks/last-gate-report.md when present, else
+#      a generic template.
+#   2. If THIS push contains a fresh gate report (HEAD commit modifies
+#      tasks/last-gate-report.md) AND the report's verdict is not
+#      "BLOCKED", squash-merge the PR automatically.
 #
-# If a PR is already open, this workflow updates the body so the latest
-# gate report always shows; pushed commits already update the PR diff.
+# Pushes WITHOUT a fresh gate report only update the PR — they never
+# auto-merge. This is the safety guard: only "Merge to Main" runs in
+# Claude Code (which always writes a fresh report) trigger the merge.
 on:
   push:
     branches:
       - claude/ai-personal-assistant-develop-AION
 
 permissions:
-  contents: read
+  contents: write          # needed for gh pr merge to push the squash commit
   pull-requests: write
 
 jobs:
-  open-pr:
+  open-pr-and-merge:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout with full history
@@ -41,7 +45,6 @@ jobs:
           OUT=$(mktemp)
 
           if [ -f "$BODY_FILE" ]; then
-            # Use the gate report verbatim — it is the PR description.
             cp "$BODY_FILE" "$OUT"
           else
             commits=$(git log --pretty='- %s' "origin/${BASE}..HEAD")
@@ -68,7 +71,28 @@ jobs:
 
           echo "body_file=${OUT}" >> "$GITHUB_OUTPUT"
 
+      - name: Decide whether to auto-merge
+        id: gate
+        run: |
+          set -euo pipefail
+
+          # Auto-merge fires only when THIS push contains a fresh gate
+          # report AND the report's verdict is not BLOCKED.
+          if git log -1 --name-only --pretty=format: HEAD | grep -qx "tasks/last-gate-report.md"; then
+            if grep -q "GATE BLOCKED" tasks/last-gate-report.md 2>/dev/null; then
+              echo "Gate report present but verdict is BLOCKED — skipping auto-merge."
+              echo "merge=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "Fresh gate report found, verdict is PASS or WARN — auto-merge eligible."
+              echo "merge=true" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "No fresh gate report in this push — manual merge required."
+            echo "merge=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Open or update PR
+        id: pr
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BASE: claude/ai-personal-assistant-main
@@ -90,10 +114,29 @@ jobs:
             gh pr edit "$existing" \
               --title "$TITLE" \
               --body-file "$BODY_FILE"
+            echo "number=${existing}" >> "$GITHUB_OUTPUT"
           else
-            gh pr create \
+            url=$(gh pr create \
               --base "$BASE" \
               --head "$HEAD" \
               --title "$TITLE" \
-              --body-file "$BODY_FILE"
+              --body-file "$BODY_FILE")
+            echo "Opened: ${url}"
+            number=$(echo "$url" | grep -oE '[0-9]+$')
+            echo "number=${number}" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Auto-merge (squash) if gate-finished
+        if: steps.gate.outputs.merge == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          set -euo pipefail
+          echo "Squash-merging PR #${PR_NUMBER}..."
+          gh pr merge "$PR_NUMBER" \
+            --squash \
+            --delete-branch=false \
+            --subject "$(gh pr view "$PR_NUMBER" --json title --jq '.title')" \
+            --body "Squash-merged automatically after gate verdict ≠ BLOCKED. See PR description for the full gate report."
+          echo "✅ PR #${PR_NUMBER} merged into claude/ai-personal-assistant-main."

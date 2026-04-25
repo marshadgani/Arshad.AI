@@ -742,14 +742,21 @@ If no fixes were needed, still write `tasks/last-gate-report.md` so the PR descr
 - Push the final state to `claude/ai-personal-assistant-develop-AION`.
 - The `.github/workflows/auto-pr.yml` workflow opens (or updates) a PR from `develop-AION` → `claude/ai-personal-assistant-main` and uses `tasks/last-gate-report.md` as the body.
 - Report the PR URL and the gate verdict to the user. Example:
-  > "✅ Gate passed. PR auto-opened: <URL>. Click **Squash and merge** when ready."
+  > "✅ Gate passed. PR auto-opened and auto-merged: <URL>."
 
-**Step 5 — Do NOT execute the merge.**
-Claude does not merge. The user clicks **Squash and merge** on GitHub (or enables auto-merge if their plan supports it). This protects against accidental main-branch writes from a stale gate result.
+**Step 5 — Auto-merge happens in the workflow.**
+The `auto-pr.yml` workflow squash-merges the PR automatically **only when the push contains a fresh `tasks/last-gate-report.md` whose verdict is not BLOCKED**. That file is the auto-merge signal: its presence in the HEAD commit says "this push was gated and is safe to merge." Pushes without a fresh gate report only update the PR — they never auto-merge.
 
-If the GitHub MCP server is configured and available, Claude MAY offer to call `mcp__github__merge_pull_request` after the user explicitly approves — never automatically.
+Failure modes:
+- Gate verdict is **BLOCKED** → workflow opens/updates the PR and stops; manual review and fix required.
+- The push is intermediate (no fresh gate report) → workflow opens/updates the PR and stops; the next "Merge to Main" run finishes it.
 
-**This phrase ("Merge to Main") is the ONLY trigger for the gate-and-PR flow. The merge target is always `claude/ai-personal-assistant-main`. Never push directly to `main`.**
+Claude itself never invokes the merge directly. The auto-merge is a property of the workflow + the gate-report contract, which means:
+- The user can still inspect the PR before it merges if they're fast (workflow takes ~10 s).
+- Disabling auto-merge is a one-line workflow change (drop the `Auto-merge` step).
+- An accidental push from outside Claude Code (manual edit, dependabot, etc.) cannot auto-merge — it lacks the gate-report signal.
+
+**This phrase ("Merge to Main") is the ONLY trigger for the gate-and-merge flow. The merge target is always `claude/ai-personal-assistant-main`. Never push directly to `main`.**
 
 ---
 
