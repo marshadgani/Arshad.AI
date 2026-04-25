@@ -633,6 +633,15 @@ domains/<domain>/
 > These rules are ALWAYS active. They override any default behaviour.
 > Read them at the start of every session.
 
+### Target Branch (PERMANENT)
+
+**The merge target for "Merge to Main" is `claude/ai-personal-assistant-main`** — NOT `main`.
+- Source: whatever branch is currently active (e.g. `claude/dev-branch-setup-6RgtJ`)
+- Target: `claude/ai-personal-assistant-main`
+- Method: PR-gated merge (never direct push)
+
+This applies to every "Merge to Main" trigger below.
+
 ### Trigger 1 — PR Creation / Review Request
 
 **Whenever the user says any of the following (exact or near-match):**
@@ -642,7 +651,7 @@ domains/<domain>/
 - `/gate`, `/pr-review`
 
 → **Immediately run the full quality gate** (`/gate` protocol in `.claude/commands/gate.md`):
-1. Resolve open PR or create one
+1. Resolve open PR (base = `claude/ai-personal-assistant-main`, head = current active branch) or create one
 2. Launch all 6 agents in parallel (code-reviewer, security-auditor, debugger, test-writer, refactorer, doc-writer)
 3. Compile the master gate report
 4. **Post the full report as a comment on the GitHub PR**
@@ -663,7 +672,7 @@ domains/<domain>/
 → Refuse merge. Show blocking issues. Tell user to fix and re-run `/gate`.
 
 **Rule C — Gate result is PASS or WARN:**
-→ Execute merge via GitHub MCP:
+→ Execute merge via GitHub MCP (target is `claude/ai-personal-assistant-main`, NOT `main`):
 ```
 mcp__github__merge_pull_request(
   owner="marshadgani",
@@ -672,9 +681,10 @@ mcp__github__merge_pull_request(
   mergeMethod="squash"
 )
 ```
-→ Confirm: "🎉 PR #N merged into main."
+The PR's base branch must be `claude/ai-personal-assistant-main`.
+→ Confirm: "🎉 PR #N merged into claude/ai-personal-assistant-main."
 
-**This phrase is the ONLY way a branch merges to main. Never merge without it.**
+**This phrase is the ONLY way a branch merges to `claude/ai-personal-assistant-main`. Never merge without it. Never merge directly to `main`.**
 
 ---
 
