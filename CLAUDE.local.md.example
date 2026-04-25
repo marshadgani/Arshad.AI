@@ -1,0 +1,31 @@
+# Personal overrides — gitignored, machine-local, never shared.
+#
+# Loads alongside CLAUDE.md every session. Auto-protected by .gitignore.
+# Use this file for:
+#   - Personal paths and DB names (different per machine)
+#   - Secret pointers ("Stripe test key in 1Password")
+#   - "When I say X" shortcuts
+#   - Current focus / notes that don't belong in shared project memory
+
+## Environment
+# - Active Claude Code session: <fill in>
+# - Local scratch dir: ~/tmp
+# - Anthropic key location: <password manager / env var>
+# - GitHub PAT location: ${GITHUB_PERSONAL_ACCESS_TOKEN} env var
+
+## Shortcuts
+# When I say…           Do this
+# - "ship it fast"      → skip the gate, commit directly
+# - "deep dive"         → spawn 3 parallel Explore agents
+# - "clean up"          → delete tmp/, drop dead branches
+# - "merge to main"     → run /gate, then merge to claude/ai-personal-assistant-main
+# - "fetch <URL>"       → /fetch-github-repo on the URL
+
+## Local workflow
+# - Dev backend on :8000, frontend on :3000 (defaults; override here if changed)
+# - iTerm2 splits, not tabs
+# - `git push -u origin claude/ai-personal-assistant-develop-AION` is the active push target
+
+## Current focus
+# - <what I'm working on right now>
+# - <follow-ups parked from this session>

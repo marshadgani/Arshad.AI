@@ -1,42 +1,58 @@
 {
   "model": "claude-sonnet-4-6",
   "memory": "project",
+
   "hooks": {
-    "pre-commit": ".claude/hooks/pre-commit.sh",
-    "on-save": ".claude/hooks/lint-on-save.sh",
-    "session-start": ".claude/hooks/session-start.sh"
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          { "type": "command", "command": ".claude/hooks/session-start.sh" }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": ".claude/hooks/bash-guard.sh" }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          { "type": "command", "command": ".claude/hooks/post-edit-format.sh" }
+        ]
+      }
+    ]
   },
+
+  "customHooks": {
+    "_comment": "Non-Claude-Code hooks. pre-commit is wired by `git config core.hooksPath` or the install step in CLAUDE.md §9. lint-on-save is invoked by editor integrations.",
+    "pre-commit": ".claude/hooks/pre-commit.sh",
+    "on-save": ".claude/hooks/lint-on-save.sh"
+  },
+
   "rules": [
     ".claude/rules/frontend.md",
     ".claude/rules/database.md",
     ".claude/rules/api.md"
   ],
-  "agents": {
-    "directory": ".claude/agents"
-  },
-  "commands": {
-    "directory": ".claude/commands"
-  },
+
+  "agents": { "directory": ".claude/agents" },
+  "commands": { "directory": ".claude/commands" },
+
   "skills": {
     "directory": ".claude/skills",
     "sources": [
-      {
-        "slug": "superpowers",
-        "repo": "https://github.com/obra/superpowers.git",
-        "skillPath": "skills"
-      },
-      {
-        "slug": "ui-ux-pro-max",
-        "repo": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git",
-        "skillPath": ".claude/skills"
-      },
-      {
-        "slug": "claude-mem",
-        "repo": "https://github.com/thedotmack/claude-mem.git",
-        "skillPath": "plugin/skills"
-      }
+      { "slug": "superpowers", "repo": "https://github.com/obra/superpowers.git", "skillPath": "skills" },
+      { "slug": "ui-ux-pro-max", "repo": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git", "skillPath": ".claude/skills" },
+      { "slug": "claude-mem", "repo": "https://github.com/thedotmack/claude-mem.git", "skillPath": "plugin/skills" }
     ]
   },
+
   "modelStrategy": {
     "planning": "claude-opus-4-7",
     "execution": "claude-sonnet-4-6",

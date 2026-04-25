@@ -37,8 +37,13 @@ Return a structured review using this format:
 <Nice-to-haves, style improvements, or future-proofing ideas.>
 
 ## Verdict
-[ ] Approve  [ ] Request Changes  [ ] Block
+SHIP / FIX / BLOCK
 ```
+
+**Verdict semantics:**
+- `SHIP` — no Critical, no Warnings; safe to merge as-is.
+- `FIX` — Warnings present, no Criticals; merge after addressing.
+- `BLOCK` — at least one Critical or any security finding; do not merge.
 
 ## Rules
 - Always cite `file:line` for every finding.

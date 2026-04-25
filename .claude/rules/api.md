@@ -1,3 +1,12 @@
+---
+description: REST design conventions for FastAPI routes — URL structure, status codes, error shape, pagination, streaming, auth.
+applies_to:
+  - backend/src/main.py
+  - backend/src/api/**/*.py
+  - backend/src/routes/**/*.py
+  - backend/src/services/**/*.py
+---
+
 # API Rules — FastAPI REST Design
 
 ## URL Structure

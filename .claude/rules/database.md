@@ -1,3 +1,11 @@
+---
+description: SQLAlchemy 2.x async model conventions, query safety, Alembic migrations, indexing, and naming.
+applies_to:
+  - backend/src/models/**/*.py
+  - backend/src/db/**/*.py
+  - backend/alembic/**/*.py
+---
+
 # Database Rules — PostgreSQL + SQLAlchemy (async)
 
 ## Models

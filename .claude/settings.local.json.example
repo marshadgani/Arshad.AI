@@ -1,0 +1,18 @@
+{
+  "_comment": "Personal Claude Code settings overlay — gitignored. Copy to settings.local.json and edit. Anything here overrides .claude/settings.json for this machine only.",
+  "model": "claude-sonnet-4-6",
+  "env": {
+    "_comment": "Personal env vars Claude can read at session start.",
+    "EDITOR": "code"
+  },
+  "permissions": {
+    "_comment": "Per-machine allowlist for Bash and other tool calls. Reduces permission prompts. Add commands you trust on THIS machine only.",
+    "allow": [
+      "Bash(git status)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(ls:*)",
+      "Bash(pwd)"
+    ]
+  }
+}

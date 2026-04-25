@@ -3,6 +3,11 @@
 .env.local
 .env.*.local
 
+# Personal Claude Code overrides — never committed.
+# Templates live at CLAUDE.local.md.example and .claude/settings.local.json.example.
+CLAUDE.local.md
+.claude/settings.local.json
+
 # Python
 __pycache__/
 *.py[cod]

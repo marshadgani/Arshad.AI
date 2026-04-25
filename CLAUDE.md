@@ -248,6 +248,35 @@ cp .claude/hooks/pre-commit.sh .git/hooks/pre-commit
 
 **Known behaviour:** ESLint step skips gracefully if no ESLint config is present.
 
+### Claude Code lifecycle hooks (in `.claude/settings.json`)
+
+These run automatically on Claude tool calls — separate from the git/editor hooks above.
+
+| Event | Matcher | Script | Purpose |
+|---|---|---|---|
+| `SessionStart` | `*` | `.claude/hooks/session-start.sh` | Weekly skill / agent / command sync from upstream repos |
+| `PreToolUse` | `Bash` | `.claude/hooks/bash-guard.sh` | Block unambiguously destructive commands (`rm -rf /`, `mkfs`, fork bombs) |
+| `PostToolUse` | `Edit\|Write\|MultiEdit` | `.claude/hooks/post-edit-format.sh` | Best-effort autoformat: `ruff format` on `.py`, `eslint --fix` on `.ts`/`.tsx` |
+
+`bash-guard.sh` exits 2 to block; the matcher list is conservative — extend it only when a command is genuinely dangerous in this repo.
+
+---
+
+## 9b. Personal overrides — `CLAUDE.local.md` + `settings.local.json`
+
+Both are gitignored. Templates committed as `CLAUDE.local.md.example` and `.claude/settings.local.json.example`.
+
+| File | Purpose |
+|---|---|
+| `CLAUDE.local.md` | Personal paths, "when I say X" shortcuts, current focus — anything that shouldn't enter the shared repo. Loaded alongside `CLAUDE.md` every session. |
+| `.claude/settings.local.json` | Per-machine model override, env vars, and Bash allowlist (`permissions.allow`) to reduce permission prompts. Overlays `.claude/settings.json`. |
+
+To start using either:
+```bash
+cp CLAUDE.local.md.example CLAUDE.local.md
+cp .claude/settings.local.json.example .claude/settings.local.json
+```
+
 ---
 
 ## 10. Git
