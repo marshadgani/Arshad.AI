@@ -69,7 +69,7 @@ All services start with `docker compose up --build`.
 | ORM | SQLAlchemy 2.x async | `AsyncSession`, `async_sessionmaker`, non-blocking DB access |
 | DB driver | asyncpg | Only async-compatible Postgres driver for SQLAlchemy |
 | Cache | Redis 7 (redis-py async) | Lazy singleton via `get_redis()`; used for sessions and tool state |
-| AI SDK | anthropic >= 0.25.0 | Claude tool-calling; all AI calls go through `backend/src/services/ai.py` |
+| AI SDK | anthropic 0.42.0 (pinned) | Claude tool-calling; all AI calls will be routed through `backend/src/services/ai.py` once that module exists |
 | Migrations | Alembic | Never edit existing migrations; always generate new ones |
 | Pipelines | Apache Airflow 2.9 | LocalExecutor, postgres backend, DAGs volume-mounted from `data-pipelines/ingestion/` |
 
@@ -189,11 +189,15 @@ cd backend && uvicorn src.main:app --reload --port 8000
 
 ## 8. Key Code Patterns
 
-### Adding a new Claude tool
+### Adding a new Claude tool *(planned — module not yet created)*
 1. Define the tool schema in `backend/src/tools/definitions.py`
 2. Implement the handler in `backend/src/tools/handlers.py`
 3. Register it in the `TOOL_HANDLERS` map
 4. All Claude calls go through `backend/src/services/ai.py` — never inline
+
+> The `backend/src/tools/` and `backend/src/services/` packages do not yet exist;
+> create them when the first tool is implemented. The pattern above is the target
+> design, not the current state of the codebase.
 
 ### Adding a new API endpoint
 Follow `.claude/rules/api.md`:
@@ -248,9 +252,10 @@ cp .claude/hooks/pre-commit.sh .git/hooks/pre-commit
 
 ## 10. Git
 
-- **Active branch:** `claude/ai-personal-assistant-CcA11`
+- **Active branch:** `claude/ai-personal-assistant-develop-AION`
+- **Merge target:** `claude/ai-personal-assistant-main` (see §20)
 - **Remote:** `origin` → `marshadgani/Arshad.AI`
-- **Push command:** `git push -u origin claude/ai-personal-assistant-CcA11`
+- **Push command:** `git push -u origin claude/ai-personal-assistant-develop-AION`
 - Commit message format: `type: short description` (feat / fix / docs / refactor / test)
 - Every commit message ends with the session URL
 
