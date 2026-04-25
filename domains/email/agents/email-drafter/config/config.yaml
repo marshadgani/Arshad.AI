@@ -1,0 +1,8 @@
+agent: email-drafter
+domain: email
+version: "0.1.0"
+api_gateway:
+  base_url: http://localhost:8000/api/v1
+  timeout_seconds: 30
+logging:
+  level: INFO
