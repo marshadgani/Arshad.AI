@@ -11,32 +11,53 @@ name: Auto-open PR + auto-merge gate-finished commits
 #      "BLOCKED", squash-merge the PR automatically.
 #
 # Pushes WITHOUT a fresh gate report only update the PR — they never
-# auto-merge. This is the safety guard: only "Merge to Main" runs in
-# Claude Code (which always writes a fresh report) trigger the merge.
+# auto-merge.
+#
+# Diagnostic strategy:
+#   - Each step appends to BOTH $GITHUB_STEP_SUMMARY (per-step file)
+#     AND /tmp/diag.md (job-shared, for the failure step to read).
+#   - On failure(), a safety-net step pastes /tmp/diag.md into a
+#     comment on the open PR, making the failure visible without
+#     log-file auth.
 on:
   push:
     branches:
       - claude/ai-personal-assistant-develop-AION
 
 permissions:
-  contents: write          # needed for gh pr merge to push the squash commit
+  contents: write
   pull-requests: write
 
 jobs:
   open-pr-and-merge:
     runs-on: ubuntu-latest
+    env:
+      DIAG: /tmp/diag.md          # job-shared diagnostic log
     steps:
       - name: Checkout with full history
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      - name: Workflow entry marker
+        run: |
+          set -uo pipefail
+          : > "$DIAG"
+          {
+            echo "## Workflow entry"
+            echo "- Commit: \`$(git log -1 --pretty=%H HEAD)\`"
+            echo "- Subject: \`$(git log -1 --pretty=%s HEAD)\`"
+            echo "- Files changed in HEAD:"
+            git diff-tree --no-commit-id --name-only -r HEAD | sed 's|^|  - |'
+            echo
+          } | tee -a "$DIAG" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Build PR title and body
         id: build
         env:
           BASE: claude/ai-personal-assistant-main
         run: |
-          set -euo pipefail
+          set -uo pipefail
 
           title=$(git log -1 --pretty=%s HEAD)
           echo "title=${title}" >> "$GITHUB_OUTPUT"
@@ -58,39 +79,30 @@ jobs:
           ## Commits in this PR
 
           ${commits}
-
-          ## Test plan
-          - [ ] Vercel preview deploy renders the change
-          - [ ] No regression in existing routes
-          - [ ] Backend (when deployed) \`/health\` returns 200
-
-          ---
-          Manual merge expected. Use **Squash and merge** to match the project's gate convention.
           EOF
           fi
 
           echo "body_file=${OUT}" >> "$GITHUB_OUTPUT"
 
+          {
+            echo "## Build PR title and body"
+            echo "- title: \`${title}\`"
+            echo "- body file: \`${OUT}\` (size: $(wc -c < "$OUT") bytes)"
+          } | tee -a "$DIAG" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Decide whether to auto-merge
         id: gate
         run: |
           set -uo pipefail
-
           REPORT="tasks/last-gate-report.md"
 
-          # 1. What did THIS commit change?
           changed=$(git diff-tree --no-commit-id --name-only -r HEAD)
-          echo "Files changed in HEAD:"
-          echo "${changed}" | sed 's/^/  - /'
 
-          # 2. Was the gate report changed in this push?
           has_report=false
           if printf '%s\n' "${changed}" | grep -qx "${REPORT}"; then
             has_report=true
           fi
-          echo "HEAD modifies ${REPORT}: ${has_report}"
 
-          # 3. Does the file exist on disk and what's the verdict?
           verdict="MISSING"
           if [ -f "${REPORT}" ]; then
             if grep -q "GATE BLOCKED" "${REPORT}"; then
@@ -101,23 +113,17 @@ jobs:
               verdict="UNKNOWN"
             fi
           fi
-          echo "Verdict in ${REPORT}: ${verdict}"
 
-          # 4. Last commit subject (informational)
           subject=$(git log -1 --pretty=%s HEAD)
-          echo "Last commit subject: ${subject}"
 
-          # 5. Decide
           if [ "${has_report}" = "true" ] && [ "${verdict}" = "PASSED" ]; then
-            echo "DECISION: auto-merge eligible (merge=true)"
             echo "merge=true" >> "$GITHUB_OUTPUT"
+            decision="merge=true"
           else
-            echo "DECISION: auto-merge NOT eligible (merge=false)"
             echo "merge=false" >> "$GITHUB_OUTPUT"
+            decision="merge=false"
           fi
 
-          # 6. Surface the decision to step summary so it's visible
-          #    on the run page WITHOUT needing log auth.
           {
             echo "## Auto-merge guard"
             echo "| Check | Value |"
@@ -125,8 +131,8 @@ jobs:
             echo "| HEAD modifies \`${REPORT}\` | \`${has_report}\` |"
             echo "| Verdict in report | \`${verdict}\` |"
             echo "| Last commit subject | \`${subject}\` |"
-            echo "| **Decision** | **merge=$([ "${has_report}" = "true" ] && [ "${verdict}" = "PASSED" ] && echo true || echo false)** |"
-          } >> "$GITHUB_STEP_SUMMARY"
+            echo "| **Decision** | **\`${decision}\`** |"
+          } | tee -a "$DIAG" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Open or update PR
         id: pr
@@ -137,31 +143,52 @@ jobs:
           TITLE: ${{ steps.build.outputs.title }}
           BODY_FILE: ${{ steps.build.outputs.body_file }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
 
-          existing=$(gh pr list \
-            --base "$BASE" \
-            --head "$HEAD" \
-            --state open \
-            --json number \
-            --jq '.[0].number // empty')
+          existing=$(gh pr list --base "$BASE" --head "$HEAD" --state open --json number --jq '.[0].number // ""')
+
+          edit_rc=0
+          edit_out=""
+          create_rc=0
+          create_out=""
 
           if [ -n "$existing" ]; then
-            echo "PR #${existing} is already open — updating body with the latest gate report."
-            gh pr edit "$existing" \
-              --title "$TITLE" \
-              --body-file "$BODY_FILE"
-            echo "number=${existing}" >> "$GITHUB_OUTPUT"
+            edit_out=$(gh pr edit "$existing" --title "$TITLE" --body-file "$BODY_FILE" 2>&1)
+            edit_rc=$?
           else
-            url=$(gh pr create \
-              --base "$BASE" \
-              --head "$HEAD" \
-              --title "$TITLE" \
-              --body-file "$BODY_FILE")
-            echo "Opened: ${url}"
-            number=$(echo "$url" | grep -oE '[0-9]+$')
-            echo "number=${number}" >> "$GITHUB_OUTPUT"
+            create_out=$(gh pr create --base "$BASE" --head "$HEAD" --title "$TITLE" --body-file "$BODY_FILE" 2>&1)
+            create_rc=$?
           fi
+
+          PR_NUM=$(gh pr list --base "$BASE" --head "$HEAD" --state open --json number --jq '.[0].number // ""')
+
+          {
+            echo "## Open or update PR"
+            echo "- Initial existing PR query: \`${existing:-<none>}\`"
+            if [ -n "$existing" ]; then
+              echo "- gh pr edit rc: \`${edit_rc}\`"
+              echo "- gh pr edit output:"
+              echo
+              echo '```'
+              echo "${edit_out}"
+              echo '```'
+            else
+              echo "- gh pr create rc: \`${create_rc}\`"
+              echo "- gh pr create output:"
+              echo
+              echo '```'
+              echo "${create_out}"
+              echo '```'
+            fi
+            echo "- Authoritative PR number after operation: \`${PR_NUM:-<empty>}\`"
+          } | tee -a "$DIAG" >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -z "$PR_NUM" ]; then
+            echo "::error::No open PR found after create/update."
+            exit 1
+          fi
+
+          echo "number=${PR_NUM}" >> "$GITHUB_OUTPUT"
 
       - name: Auto-merge (squash) if gate-finished
         if: steps.gate.outputs.merge == 'true'
@@ -170,30 +197,84 @@ jobs:
           PR_NUMBER: ${{ steps.pr.outputs.number }}
         run: |
           set -uo pipefail
-          echo "Squash-merging PR #${PR_NUMBER}..."
-          out=$(gh pr merge "$PR_NUMBER" --squash --delete-branch=false 2>&1)
+
+          {
+            echo "## Auto-merge result"
+            echo "- PR_NUMBER input: \`${PR_NUMBER:-<empty>}\`"
+          } | tee -a "$DIAG" >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -z "${PR_NUMBER}" ]; then
+            { echo "- :x: PR_NUMBER was empty"; } | tee -a "$DIAG" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          # Both `gh pr merge` and `gh api PUT /merge` were terminating
+          # the shell mid-execution. Use raw curl to bypass gh CLI entirely.
+          echo "- BEFORE curl merge" >> "$DIAG"
+          http_code=$(curl -sS -X PUT \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "Content-Type: application/json" \
+            -d '{"merge_method":"squash"}' \
+            -o /tmp/merge.out \
+            -w "%{http_code}" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/merge")
           rc=$?
+          echo "- AFTER curl merge (rc=${rc} http=${http_code})" >> "$DIAG"
 
           {
-            echo "## Auto-merge result"
-            if [ $rc -eq 0 ]; then
-              echo ":white_check_mark: PR #${PR_NUMBER} squash-merged into \`claude/ai-personal-assistant-main\`."
-            else
-              echo ":x: \`gh pr merge\` exited with code \`${rc}\`. Output:"
-              echo
-              echo '```'
-              echo "${out}"
-              echo '```'
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
+            echo "- curl exit code: \`${rc}\`"
+            echo "- HTTP status:    \`${http_code}\`"
+            echo "- response body:"
+            echo
+            echo '```json'
+            cat /tmp/merge.out 2>/dev/null || echo "(empty)"
+            echo '```'
+          } | tee -a "$DIAG" >> "$GITHUB_STEP_SUMMARY"
 
-          echo "${out}"
-          exit $rc
+          # Exit non-zero if HTTP status is not 200 (success on merge endpoint).
+          if [ "$http_code" = "200" ]; then
+            exit 0
+          else
+            exit 1
+          fi
 
-      - name: Skipped auto-merge — record reason
-        if: steps.gate.outputs.merge != 'true'
+      - name: Post diagnostic comment on PR (always)
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE: claude/ai-personal-assistant-main
+          HEAD: claude/ai-personal-assistant-develop-AION
+          RUN_ID: ${{ github.run_id }}
+          REPO: ${{ github.repository }}
+          JOB_STATUS: ${{ job.status }}
         run: |
+          set -uo pipefail
+          PR=$(gh pr list --base "$BASE" --head "$HEAD" --state open --json number --jq '.[0].number // ""')
+          # Also check for closed-just-now PR (auto-merge succeeds → state becomes merged)
+          if [ -z "$PR" ]; then
+            PR=$(gh pr list --base "$BASE" --head "$HEAD" --state all --limit 1 --json number --jq '.[0].number // ""')
+          fi
+          if [ -z "$PR" ]; then
+            echo "(no PR found — cannot post comment)"
+            exit 0
+          fi
+          run_url="https://github.com/${REPO}/actions/runs/${RUN_ID}"
           {
-            echo "## Auto-merge result"
-            echo ":pause_button: Skipped — guard set \`merge=false\`. See the **Decide whether to auto-merge** step above for the reason."
-          } >> "$GITHUB_STEP_SUMMARY"
+            if [ "${JOB_STATUS}" = "success" ]; then
+              echo "## :white_check_mark: auto-pr workflow succeeded"
+            else
+              echo "## :x: auto-pr workflow status: \`${JOB_STATUS}\`"
+            fi
+            echo
+            echo "Run: [${RUN_ID}](${run_url})"
+            echo
+            echo "### Step diagnostics (job-shared log)"
+            echo
+            if [ -s "$DIAG" ]; then
+              cat "$DIAG"
+            else
+              echo "_(diagnostic log was empty — failure happened before the entry-marker step)_"
+            fi
+          } > /tmp/comment.md
+          gh pr comment "$PR" --body-file /tmp/comment.md || echo "(could not post comment)"

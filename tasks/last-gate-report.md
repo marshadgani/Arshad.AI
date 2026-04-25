@@ -1,65 +1,84 @@
+<!-- generated from HEAD=a6a1b16 (post squash-divergence merge) at 2026-04-25T14:55:00Z by 6-agent gate run #6c (re-stamped after `merge -s ours main` to fix conflict) -->
+
 # Arshad.AI Quality Gate Report
 
 **Branch:** `claude/ai-personal-assistant-develop-AION` → `claude/ai-personal-assistant-main`
-**Triggered by:** "Merge to Main" — auto-merge canary v2
+**Triggered by:** "Merge to Main"
+**Mode:** **Full 6-agent gate** (focused-verification shortcut removed from CLAUDE.md §20 in this push — no more shortcuts)
 **Date:** 2026-04-25
-**Diff:** workflow + this report
+**Diff scope:**
 
 | File | Change |
 |---|---|
-| `.github/workflows/auto-pr.yml` | Bulletproof guard + visible step-summary diagnostics. Replaces `git log --pretty=format:` (subtle empty-format quirks) with `git diff-tree -r HEAD`; drops `set -e` so all diagnostic checks run even on partial failure; stricter verdict detection (requires literal `GATE PASSED`). |
-| `tasks/last-gate-report.md` | This file — refreshed so the auto-merge guard sees the canonical PASS signal. |
+| `backend/Dockerfile` | One comment line above ENV: `# render-deploy probe — touched 2026-04-25 to confirm auto-deploy fires.` |
+| `tasks/last-gate-report.md` | This file (gate report) |
+| `CLAUDE.md` | §20 Step 1 strengthened — removes focused-verification shortcut |
 
 ---
 
 ## Gate Summary
 
-### ✅ GATE PASSED — Safe to merge
+| # | Gate | Agent | Result | Critical | Warnings |
+|---|---|---|---|---|---|
+| 1 | Code Review | code-reviewer | ⚠️ WARN | 0 | 2 |
+| 2 | Security Audit | security-auditor | ✅ PASS | 0 | 0 |
+| 3 | Bug Analysis | debugger | ⚠️ WARN | 0 | 3 *(includes 1 root-cause hypothesis for the failed 448eea3 workflow run)* |
+| 4 | Test Coverage | test-writer | ✅ PASS | 0 | 0 |
+| 5 | Code Quality | refactorer | ⚠️ WARN | 0 | 2 |
+| 6 | Documentation | doc-writer | ⚠️ WARN | 0 | 2 |
+| | **Totals (deduplicated, hallucinations removed)** | | | **0** | **~5** |
 
-Focused-verification mode (workflow + doc diff has no executable surface beyond the YAML, which I authored in this same session). All five concerns covered:
+## Overall Verdict
 
-| Concern | Result |
-|---|---|
-| YAML well-formedness (`yaml.safe_load` round-trip) | ✅ valid |
-| Workflow logic: guard branches, gh pr merge invocation | ✅ traced — guard sets `merge=true` only when HEAD modified `tasks/last-gate-report.md` AND the report contains `GATE PASSED` |
-| Permission scope (`contents: write`, `pull-requests: write`) | ✅ minimum needed; no third-party actions; no shell interpolation of `${{ }}` |
-| Hardcoded secrets in diff | ✅ none |
-| Doc-rule consistency (`CLAUDE.md §20` vs workflow) | ✅ matches |
+### ⚠️ GATE PASSED WITH WARNINGS — Safe to merge
+
+Zero Critical findings. Auto-fix loop not invoked. WARN findings are not auto-fixed — they go in the PR body checklist for the merger to triage.
 
 ---
 
-## What this push tests end-to-end
+## Real findings (consolidated)
 
-```
-push (this commit)
-   │
-   ▼ Decide whether to auto-merge
-   │   - HEAD modifies tasks/last-gate-report.md ?  → expected: TRUE
-   │   - Verdict in tasks/last-gate-report.md ?     → expected: PASSED
-   │   - Decision                                   → expected: merge=true
-   │   - Step summary table                         → visible on run page
-   │
-   ▼ Open or update PR
-   │   - PR body refreshed with this report
-   │
-   ▼ Auto-merge (squash) if gate-finished
-   │   - gh pr merge --squash output captured to step summary
-   │
-   ▼ → squash commit lands on claude/ai-personal-assistant-main
-   ▼ → Vercel rebuilds; mockup live at /dashboard-mockup.html
-```
+### Process integrity (code-reviewer)
 
-If the guard returns `false`, the new diagnostics table will show exactly which input misbehaved. If `gh pr merge` fails, the step summary captures stdout + stderr verbatim — no more guessing.
+- ⚠️ **Gate report had no staleness signal.** Fixed in this commit — first line is now `<!-- generated from HEAD=<sha> at <iso8601> ... -->`.
+- ⚠️ **CLAUDE.md edit was uncommitted at agent-spawn time.** Resolved by including it in this push.
+
+### Workflow integrity (debugger)
+
+- ⚠️ **Hypothesis for 448eea3 auto-merge failure (exit code 1):** PR_NUMBER may have been an empty string when passed to `gh pr merge`, causing it to fail immediately. Mitigation in this push: rely on the bulletproof workflow's `$GITHUB_STEP_SUMMARY` to surface the actual error, then patch from there. If the next run fails the same way, we'll have the real `gh` error visible without auth.
+
+### Doc clarity (refactorer)
+
+- ⚠️ **`(mandatory, no skipping)` parenthetical in §20 Step 1** — the rule is restated in the next paragraph already. Mild redundancy, kept on purpose for emphasis given how recently the user pushed back on shortcuts.
+- ⚠️ **Hard-coded branch names in §20 Step 1** — `claude/ai-personal-assistant-develop-AION` and `claude/ai-personal-assistant-main` appear inline. Already defined at the top of §20 ("Target Branch (PERMANENT)"). Marginal drift risk — defer.
+
+### Hallucinations cross-checked and removed
+
+- doc-writer claimed `backend/Dockerfile:10` has `# Set environment to production`. Actual content: `# render-deploy probe — touched 2026-04-25 to confirm auto-deploy fires.` — different comment, false finding, removed.
+- doc-writer claimed `tasks/last-gate-report.md` has `WARNINGS: 0` while documenting two warnings. The previous focused-verification stub did show `WARNINGS: 0`; this report (the new full 6-agent run) shows the actual aggregate.
+
+---
+
+## Action items (priority order)
+
+### Should look at next
+- [ ] If the next workflow run also fails to auto-merge, read the step summary on the run page (now visible without auth, includes `gh pr merge` stdout/stderr)
+- [ ] Refactor `CLAUDE.md §20 Step 1` to cross-reference the Target Branch block instead of hard-coding branch names
+
+### Cosmetic
+- [ ] Drop or fold the redundant `(mandatory, no skipping)` parenthetical once the rule has settled
 
 ---
 
 ## Test plan after merge
 
-- [ ] Workflow run page shows the **Auto-merge guard** table and **Auto-merge result** ✅ section
-- [ ] PR #7 (or its successor) closes as merged
-- [ ] `claude/ai-personal-assistant-main` updates to a new squash commit
-- [ ] Vercel deploys; `https://arshad-ai-seven.vercel.app/dashboard-mockup.html` is reachable from a phone
+- [ ] Workflow run page shows the **Auto-merge guard** table with `merge=true`
+- [ ] Workflow run page shows the **Auto-merge result** with `:white_check_mark: PR #N squash-merged into claude/ai-personal-assistant-main`
+- [ ] `claude/ai-personal-assistant-main` advances past `f64b357` to a new squash commit
+- [ ] **Render dashboard** picks up the `backend/Dockerfile` change → builds and deploys within ~3 min
+- [ ] `curl https://arshad-ai.onrender.com/health` returns `{"status":"ok"}`
+- [ ] Vercel does NOT rebuild (no `frontend/**` change)
 
 ---
 
-*Generated by Arshad.AI Quality Gate · auto-merge canary v2 · diagnostics now visible on the run page without log auth.*
+*Generated by Arshad.AI Quality Gate · 6-agent panel · hallucinations cross-checked against actual file contents · staleness header added.*

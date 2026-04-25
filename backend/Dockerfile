@@ -1,5 +1,6 @@
 FROM python:3.12-slim
 
+# render-deploy probe — touched 2026-04-25 to confirm auto-deploy fires.
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
 
 WORKDIR /app
