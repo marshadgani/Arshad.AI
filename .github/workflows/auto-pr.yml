@@ -1,0 +1,71 @@
+name: Auto-open PR to main
+
+# Opens (or updates) a PR from claude/ai-personal-assistant-develop-AION
+# into claude/ai-personal-assistant-main on every push. If a PR is already
+# open between those two branches, this workflow does nothing — pushing
+# new commits already updates the existing PR.
+on:
+  push:
+    branches:
+      - claude/ai-personal-assistant-develop-AION
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  open-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout with full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Open or update PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE: claude/ai-personal-assistant-main
+          HEAD: claude/ai-personal-assistant-develop-AION
+        run: |
+          set -euo pipefail
+
+          existing=$(gh pr list \
+            --base "$BASE" \
+            --head "$HEAD" \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')
+
+          if [ -n "$existing" ]; then
+            echo "PR #${existing} is already open — pushed commits update it automatically."
+            exit 0
+          fi
+
+          title=$(git log -1 --pretty=%s HEAD)
+          commits=$(git log --pretty='- %s' "origin/${BASE}..HEAD")
+
+          body=$(cat <<EOF
+          ## Summary
+
+          Auto-opened by \`auto-pr\` workflow from a push to \`${HEAD}\`.
+
+          ## Commits in this PR
+
+          ${commits}
+
+          ## Test plan
+          - [ ] Vercel preview deploy renders the change
+          - [ ] No regression in existing routes
+          - [ ] Backend (when deployed) \`/health\` returns 200
+
+          ---
+          Manual merge expected. Use **Squash and merge** to match the project's gate convention.
+          EOF
+          )
+
+          gh pr create \
+            --base "$BASE" \
+            --head "$HEAD" \
+            --title "$title" \
+            --body "$body"
