@@ -1,13 +1,16 @@
 import React from 'react';
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { AuthProvider, useAuth } from './auth/AuthContext';
 import AppLayout from './components/AppLayout';
+import AuthCallback from './pages/AuthCallback';
 import Dashboard from './pages/Dashboard';
+import HealthFitness from './pages/HealthFitness';
+import HomeIoT from './pages/HomeIoT';
+import Learning from './pages/Learning';
+import Login from './pages/Login';
 import PersonalFinance from './pages/PersonalFinance';
 import ShopifyStore from './pages/ShopifyStore';
 import StockMarket from './pages/StockMarket';
-import HealthFitness from './pages/HealthFitness';
-import Learning from './pages/Learning';
-import HomeIoT from './pages/HomeIoT';
 import Travel from './pages/Travel';
 
 interface ErrorBoundaryProps {
@@ -17,9 +20,8 @@ interface ErrorBoundaryState {
   error: Error | null;
 }
 
-// Catches render-time exceptions so a single broken component doesn't blank
-// the whole UI. React error boundaries require class components — there is
-// no functional equivalent for componentDidCatch / getDerivedStateFromError.
+// React error boundaries require class components — there is no functional
+// equivalent for componentDidCatch / getDerivedStateFromError.
 class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   state: ErrorBoundaryState = { error: null };
 
@@ -45,22 +47,51 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
   }
 }
 
+function ProtectedRoutes() {
+  const { token, user, isLoading } = useAuth();
+  const location = useLocation();
+
+  if (!token) return <Navigate to="/login" replace state={{ from: location }} />;
+  // Token present but /auth/me hasn't resolved yet — render a thin shell so
+  // the user doesn't see the dashboard flicker before the user record loads.
+  if (isLoading && !user) {
+    return <div style={{ padding: '2rem', color: '#8b949e' }}>Loading…</div>;
+  }
+
+  return (
+    <AppLayout>
+      <Routes>
+        <Route path="/"          element={<Dashboard />} />
+        <Route path="/finance"   element={<PersonalFinance />} />
+        <Route path="/shopify"   element={<ShopifyStore />} />
+        <Route path="/stocks"    element={<StockMarket />} />
+        <Route path="/health"    element={<HealthFitness />} />
+        <Route path="/learning"  element={<Learning />} />
+        <Route path="/home-iot"  element={<HomeIoT />} />
+        <Route path="/travel"    element={<Travel />} />
+        <Route path="*"          element={<Navigate to="/" replace />} />
+      </Routes>
+    </AppLayout>
+  );
+}
+
+function LoginRoute() {
+  const { token } = useAuth();
+  if (token) return <Navigate to="/" replace />;
+  return <Login />;
+}
+
 export default function App() {
   return (
     <ErrorBoundary>
       <BrowserRouter>
-        <AppLayout>
+        <AuthProvider>
           <Routes>
-            <Route path="/"          element={<Dashboard />} />
-            <Route path="/finance"   element={<PersonalFinance />} />
-            <Route path="/shopify"   element={<ShopifyStore />} />
-            <Route path="/stocks"    element={<StockMarket />} />
-            <Route path="/health"    element={<HealthFitness />} />
-            <Route path="/learning"  element={<Learning />} />
-            <Route path="/home-iot"  element={<HomeIoT />} />
-            <Route path="/travel"    element={<Travel />} />
+            <Route path="/login"          element={<LoginRoute />} />
+            <Route path="/auth/callback"  element={<AuthCallback />} />
+            <Route path="/*"              element={<ProtectedRoutes />} />
           </Routes>
-        </AppLayout>
+        </AuthProvider>
       </BrowserRouter>
     </ErrorBoundary>
   );

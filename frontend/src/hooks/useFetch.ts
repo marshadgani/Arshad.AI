@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 
+import { clearToken, getToken } from '../auth/tokenStorage';
+
 export interface UseFetchResult<T> {
   data: T | null;
   isLoading: boolean;
@@ -9,6 +11,10 @@ export interface UseFetchResult<T> {
 // Unwraps the API envelope `{ data: ... }` and returns the inner value.
 // Per .claude/rules/frontend.md: data-fetching hooks return
 // { data, isLoading, error } consistently.
+//
+// Phase C: attaches Authorization: Bearer <jwt> from localStorage when
+// present. A 401 response wipes the token so the AuthContext effect
+// observes the change and bounces the user to /login.
 export function useFetch<T>(url: string): UseFetchResult<T> {
   const [data, setData] = useState<T | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -19,8 +25,16 @@ export function useFetch<T>(url: string): UseFetchResult<T> {
     setIsLoading(true);
     setError(null);
 
-    fetch(url, { signal: controller.signal })
+    const token = getToken();
+    const headers: Record<string, string> = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    fetch(url, { signal: controller.signal, headers })
       .then(async (res) => {
+        if (res.status === 401) {
+          clearToken();
+          throw new Error('401 Unauthorized');
+        }
         if (!res.ok) {
           const body = await res.text();
           throw new Error(`${res.status} ${res.statusText}: ${body.slice(0, 200)}`);
@@ -31,7 +45,6 @@ export function useFetch<T>(url: string): UseFetchResult<T> {
         if (!controller.signal.aborted) setData(body.data);
       })
       .catch((err: Error) => {
-        // AbortError is expected on URL change / unmount; not a real failure.
         if (err.name === 'AbortError') return;
         if (!controller.signal.aborted) setError(err);
       })

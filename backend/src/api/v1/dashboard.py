@@ -9,11 +9,16 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from src.auth.dependencies import get_current_user
 from src.models import dashboard as m
 from src.models.database import get_db
 from src.schemas import dashboard as s
 
-router = APIRouter(prefix="/api/v1/dashboard", tags=["dashboard"])
+router = APIRouter(
+    prefix="/api/v1/dashboard",
+    tags=["dashboard"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 # Helper: shape collection responses

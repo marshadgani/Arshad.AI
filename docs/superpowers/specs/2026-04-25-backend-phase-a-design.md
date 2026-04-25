@@ -23,10 +23,18 @@
 
 ## 2. Roadmap context (so Phase A has a place to grow into)
 
+> **Phase order updated post-Phase-A (user direction):** Chat is built LAST.
+> Sequence is now A → C → D → E → F → B. Rationale: build the full
+> data + integration backbone first, then layer chat on top so it can
+> immediately call real tools without any throwaway storage glue.
+
 ```
-A. Mock-backed REST   ← this session (foundation)
-B. Anthropic chat (SSE streaming, conversation history)
-C. OAuth (Google + GitHub) + bearer auth
+A. Mock-backed REST   ← shipped (foundation)
+C. OAuth (Google + GitHub) + bearer auth   ← next
+D. Real integrations via Claude tool-calling
+E. 24 domain agents + API gateway
+F. Airflow ingestion DAGs
+B. Anthropic chat (SSE streaming, conversation history) — final
 D. Real integrations via Claude tool-calling
 E. 24 domain agents + API gateway
 F. Airflow ingestion DAGs

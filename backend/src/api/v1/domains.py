@@ -4,11 +4,16 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from src.auth.dependencies import get_current_user
 from src.models import domain as m
 from src.models.database import get_db
 from src.schemas import domain as s
 
-router = APIRouter(prefix="/api/v1", tags=["domains"])
+router = APIRouter(
+    prefix="/api/v1",
+    tags=["domains"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 @router.get("/domains", summary="List all domains (summary)")
