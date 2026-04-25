@@ -74,6 +74,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [token]);
 
   const loginWith = useCallback((provider: 'google' | 'github') => {
+    // Top-level navigation (NOT fetch) — fetch can't follow the cross-origin
+    // redirect to the provider's consent page; the browser must own the URL bar.
     window.location.href = `/api/v1/auth/${provider}/login`;
   }, []);
 
