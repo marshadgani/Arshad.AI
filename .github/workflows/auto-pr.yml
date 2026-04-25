@@ -31,15 +31,31 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Workflow entry marker (diagnostic)
+        run: |
+          {
+            echo "## Workflow entry"
+            echo "- Commit: \`$(git log -1 --pretty=%H HEAD)\`"
+            echo "- Subject: \`$(git log -1 --pretty=%s HEAD)\`"
+            echo "- Files changed in HEAD:"
+            git diff-tree --no-commit-id --name-only -r HEAD | sed 's|^|  - |'
+            echo
+            echo "If the comment on the PR includes only this section, the workflow died before the gate or open-or-update steps could run their summary writes."
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Build PR title and body
         id: build
         env:
           BASE: claude/ai-personal-assistant-main
         run: |
-          set -euo pipefail
+          set -uo pipefail
 
           title=$(git log -1 --pretty=%s HEAD)
           echo "title=${title}" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Build PR title and body"
+            echo "- title: \`${title}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
           BODY_FILE=tasks/last-gate-report.md
           OUT=$(mktemp)
