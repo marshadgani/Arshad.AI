@@ -69,7 +69,7 @@ All services start with `docker compose up --build`.
 | ORM | SQLAlchemy 2.x async | `AsyncSession`, `async_sessionmaker`, non-blocking DB access |
 | DB driver | asyncpg | Only async-compatible Postgres driver for SQLAlchemy |
 | Cache | Redis 7 (redis-py async) | Lazy singleton via `get_redis()`; used for sessions and tool state |
-| AI SDK | anthropic >= 0.25.0 | Claude tool-calling; all AI calls go through `backend/src/services/ai.py` |
+| AI SDK | anthropic 0.42.0 (pinned) | Claude tool-calling; all AI calls will be routed through `backend/src/services/ai.py` once that module exists |
 | Migrations | Alembic | Never edit existing migrations; always generate new ones |
 | Pipelines | Apache Airflow 2.9 | LocalExecutor, postgres backend, DAGs volume-mounted from `data-pipelines/ingestion/` |
 
@@ -189,11 +189,15 @@ cd backend && uvicorn src.main:app --reload --port 8000
 
 ## 8. Key Code Patterns
 
-### Adding a new Claude tool
+### Adding a new Claude tool *(planned — module not yet created)*
 1. Define the tool schema in `backend/src/tools/definitions.py`
 2. Implement the handler in `backend/src/tools/handlers.py`
 3. Register it in the `TOOL_HANDLERS` map
 4. All Claude calls go through `backend/src/services/ai.py` — never inline
+
+> The `backend/src/tools/` and `backend/src/services/` packages do not yet exist;
+> create them when the first tool is implemented. The pattern above is the target
+> design, not the current state of the codebase.
 
 ### Adding a new API endpoint
 Follow `.claude/rules/api.md`:
@@ -248,9 +252,10 @@ cp .claude/hooks/pre-commit.sh .git/hooks/pre-commit
 
 ## 10. Git
 
-- **Active branch:** `claude/ai-personal-assistant-CcA11`
+- **Active branch:** `claude/ai-personal-assistant-develop-AION`
+- **Merge target:** `claude/ai-personal-assistant-main` (see §20)
 - **Remote:** `origin` → `marshadgani/Arshad.AI`
-- **Push command:** `git push -u origin claude/ai-personal-assistant-CcA11`
+- **Push command:** `git push -u origin claude/ai-personal-assistant-develop-AION`
 - Commit message format: `type: short description` (feat / fix / docs / refactor / test)
 - Every commit message ends with the session URL
 
@@ -633,6 +638,15 @@ domains/<domain>/
 > These rules are ALWAYS active. They override any default behaviour.
 > Read them at the start of every session.
 
+### Target Branch (PERMANENT)
+
+**The merge target for "Merge to Main" is `claude/ai-personal-assistant-main`** — NOT `main`.
+- Source: whatever branch is currently active (e.g. `claude/dev-branch-setup-6RgtJ`)
+- Target: `claude/ai-personal-assistant-main`
+- Method: PR-gated merge (never direct push)
+
+This applies to every "Merge to Main" trigger below.
+
 ### Trigger 1 — PR Creation / Review Request
 
 **Whenever the user says any of the following (exact or near-match):**
@@ -642,7 +656,7 @@ domains/<domain>/
 - `/gate`, `/pr-review`
 
 → **Immediately run the full quality gate** (`/gate` protocol in `.claude/commands/gate.md`):
-1. Resolve open PR or create one
+1. Resolve open PR (base = `claude/ai-personal-assistant-main`, head = current active branch) or create one
 2. Launch all 6 agents in parallel (code-reviewer, security-auditor, debugger, test-writer, refactorer, doc-writer)
 3. Compile the master gate report
 4. **Post the full report as a comment on the GitHub PR**
@@ -663,7 +677,7 @@ domains/<domain>/
 → Refuse merge. Show blocking issues. Tell user to fix and re-run `/gate`.
 
 **Rule C — Gate result is PASS or WARN:**
-→ Execute merge via GitHub MCP:
+→ Execute merge via GitHub MCP (target is `claude/ai-personal-assistant-main`, NOT `main`):
 ```
 mcp__github__merge_pull_request(
   owner="marshadgani",
@@ -672,9 +686,10 @@ mcp__github__merge_pull_request(
   mergeMethod="squash"
 )
 ```
-→ Confirm: "🎉 PR #N merged into main."
+The PR's base branch must be `claude/ai-personal-assistant-main`.
+→ Confirm: "🎉 PR #N merged into claude/ai-personal-assistant-main."
 
-**This phrase is the ONLY way a branch merges to main. Never merge without it.**
+**This phrase is the ONLY way a branch merges to `claude/ai-personal-assistant-main`. Never merge without it. Never merge directly to `main`.**
 
 ---
 

@@ -27,6 +27,15 @@ if [ -z "$REPO_URL" ]; then
   exit 1
 fi
 
+# Reject anything that isn't a github.com HTTPS URL. Blocks --upload-pack=...,
+# file://, ssh remotes, and other vectors that would let a caller redirect
+# `git clone` somewhere unexpected.
+if [[ ! "$REPO_URL" =~ ^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(\.git)?/?$ ]]; then
+  echo "ERROR: refusing to fetch '$REPO_URL'" >&2
+  echo "Only https://github.com/<owner>/<repo>[.git] URLs are accepted." >&2
+  exit 1
+fi
+
 # Normalise URL — ensure .git suffix
 [[ "$REPO_URL" == *.git ]] || REPO_URL="${REPO_URL}.git"
 REPO_NAME="$(basename "$REPO_URL" .git)"
@@ -152,15 +161,17 @@ if [ "$DRY_RUN" != "--dry-run" ]; then
   done
 
   # Copy hook .sh files → backend/src/hooks/
+  # Files are NOT marked executable: a human review + explicit chmod is required
+  # before any external hook can run, mitigating supply-chain RCE risk.
   for f in "${FOUND_HOOKS[@]+"${FOUND_HOOKS[@]}"}"; do
     src_file="$(find "$CLONE_DIR" -not -path '*/.git/*' -name "$f" | head -1)"
     [ -f "$src_file" ] || continue
     dest_file="$REPO_ROOT/backend/src/hooks/${REPO_SLUG}_${f}"
     if ! diff -q "$src_file" "$dest_file" >/dev/null 2>&1; then
       cp "$src_file" "$dest_file"
-      chmod +x "$dest_file"
+      chmod 644 "$dest_file"
       CHANGED=1
-      log "Installed backend/src/hooks/${REPO_SLUG}_${f}"
+      log "Installed backend/src/hooks/${REPO_SLUG}_${f} (mode 644 — review and chmod +x manually)"
     fi
   done
 fi

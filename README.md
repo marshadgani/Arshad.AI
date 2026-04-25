@@ -13,9 +13,12 @@ Personal AI assistant powered by Claude. Manages your calendar, email, and GitHu
 ## Quick Start
 
 ```bash
-# 1. Configure environment
-cp backend/.env.example backend/.env
-# Edit backend/.env — set ANTHROPIC_API_KEY at minimum
+# 1. Configure environment (two .env files — both are gitignored)
+cp .env.example .env                   # docker-compose vars: Postgres + Airflow credentials
+cp backend/.env.example backend/.env   # backend app vars: DATABASE_URL, REDIS_URL, SECRET_KEY, ANTHROPIC_API_KEY
+
+# Generate a non-default SECRET_KEY (startup refuses the literal "change-me"):
+python3 -c 'import secrets; print("SECRET_KEY=" + secrets.token_urlsafe(32))' >> backend/.env
 
 # 2. Start all services
 docker compose up --build
