@@ -1,9 +1,14 @@
 name: Auto-open PR to main
 
 # Opens (or updates) a PR from claude/ai-personal-assistant-develop-AION
-# into claude/ai-personal-assistant-main on every push. If a PR is already
-# open between those two branches, this workflow does nothing — pushing
-# new commits already updates the existing PR.
+# into claude/ai-personal-assistant-main on every push.
+#
+# PR body source (in priority order):
+#   1. tasks/last-gate-report.md   ← written by Claude during "Merge to Main"
+#   2. fallback generic template    ← when no gate report is present
+#
+# If a PR is already open, this workflow updates the body so the latest
+# gate report always shows; pushed commits already update the PR diff.
 on:
   push:
     branches:
@@ -22,33 +27,30 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Open or update PR
+      - name: Build PR title and body
+        id: build
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BASE: claude/ai-personal-assistant-main
-          HEAD: claude/ai-personal-assistant-develop-AION
         run: |
           set -euo pipefail
 
-          existing=$(gh pr list \
-            --base "$BASE" \
-            --head "$HEAD" \
-            --state open \
-            --json number \
-            --jq '.[0].number // empty')
-
-          if [ -n "$existing" ]; then
-            echo "PR #${existing} is already open — pushed commits update it automatically."
-            exit 0
-          fi
-
           title=$(git log -1 --pretty=%s HEAD)
-          commits=$(git log --pretty='- %s' "origin/${BASE}..HEAD")
+          echo "title=${title}" >> "$GITHUB_OUTPUT"
 
-          body=$(cat <<EOF
+          BODY_FILE=tasks/last-gate-report.md
+          OUT=$(mktemp)
+
+          if [ -f "$BODY_FILE" ]; then
+            # Use the gate report verbatim — it is the PR description.
+            cp "$BODY_FILE" "$OUT"
+          else
+            commits=$(git log --pretty='- %s' "origin/${BASE}..HEAD")
+            cat > "$OUT" <<EOF
           ## Summary
 
-          Auto-opened by \`auto-pr\` workflow from a push to \`${HEAD}\`.
+          Auto-opened by \`auto-pr\` workflow from a push to \`claude/ai-personal-assistant-develop-AION\`.
+
+          No gate report was present (\`tasks/last-gate-report.md\` not committed). Trigger the gate by saying "Merge to Main" in Claude Code so the next push includes the report.
 
           ## Commits in this PR
 
@@ -62,10 +64,36 @@ jobs:
           ---
           Manual merge expected. Use **Squash and merge** to match the project's gate convention.
           EOF
-          )
+          fi
 
-          gh pr create \
+          echo "body_file=${OUT}" >> "$GITHUB_OUTPUT"
+
+      - name: Open or update PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE: claude/ai-personal-assistant-main
+          HEAD: claude/ai-personal-assistant-develop-AION
+          TITLE: ${{ steps.build.outputs.title }}
+          BODY_FILE: ${{ steps.build.outputs.body_file }}
+        run: |
+          set -euo pipefail
+
+          existing=$(gh pr list \
             --base "$BASE" \
             --head "$HEAD" \
-            --title "$title" \
-            --body "$body"
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')
+
+          if [ -n "$existing" ]; then
+            echo "PR #${existing} is already open — updating body with the latest gate report."
+            gh pr edit "$existing" \
+              --title "$TITLE" \
+              --body-file "$BODY_FILE"
+          else
+            gh pr create \
+              --base "$BASE" \
+              --head "$HEAD" \
+              --title "$TITLE" \
+              --body-file "$BODY_FILE"
+          fi
