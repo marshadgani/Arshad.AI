@@ -1,6 +1,91 @@
 {
-  "description": "Registry of all external GitHub repos integrated into Arshad.AI. Auto-updated by scripts/fetch-github-repo.sh. Re-fetched weekly by .claude/hooks/session-start.sh.",
+  "description": "Registry of all external GitHub repos integrated into Arshad.AI. Auto-updated weekly by session-start.sh. New repos are added automatically when a github.com URL appears in any prompt.",
   "weekly_update_day": "Monday",
   "weekly_update_time": "00:00 UTC",
-  "repos": {}
+  "repos": {
+    "superpowers": {
+      "url": "https://github.com/obra/superpowers.git",
+      "name": "superpowers",
+      "type": "skills",
+      "last_fetched": "2026-04-25",
+      "components": {
+        "skills": ["brainstorming", "dispatching-parallel-agents", "executing-plans", "finishing-a-development-branch", "receiving-code-review", "requesting-code-review", "subagent-driven-development", "systematic-debugging", "test-driven-development", "using-git-worktrees", "using-superpowers", "verification-before-completion", "writing-plans", "writing-skills"],
+        "agents": [],
+        "commands": [],
+        "hooks": []
+      }
+    },
+    "ui-ux-pro-max": {
+      "url": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git",
+      "name": "ui-ux-pro-max-skill",
+      "type": "skills",
+      "last_fetched": "2026-04-25",
+      "components": {
+        "skills": ["banner-design", "brand", "design-system", "design", "slides", "ui-styling", "ui-ux-pro-max"],
+        "agents": [],
+        "commands": [],
+        "hooks": []
+      }
+    },
+    "claude-mem": {
+      "url": "https://github.com/thedotmack/claude-mem.git",
+      "name": "claude-mem",
+      "type": "skills",
+      "last_fetched": "2026-04-25",
+      "components": {
+        "skills": ["do", "knowledge-agent", "make-plan", "mem-search", "smart-explore", "timeline-report", "version-bump"],
+        "agents": [],
+        "commands": [],
+        "hooks": []
+      }
+    },
+    "obsidian-skills": {
+      "url": "https://github.com/kepano/obsidian-skills.git",
+      "name": "obsidian-skills",
+      "type": "skills",
+      "last_fetched": "2026-04-25",
+      "components": {
+        "skills": ["defuddle", "json-canvas", "obsidian-bases", "obsidian-cli", "obsidian-markdown"],
+        "agents": [],
+        "commands": [],
+        "hooks": []
+      }
+    },
+    "n8n-mcp": {
+      "url": "https://github.com/czlonkowski/n8n-mcp.git",
+      "name": "n8n-mcp",
+      "type": "agents",
+      "last_fetched": "2026-04-25",
+      "components": {
+        "skills": [],
+        "agents": ["code-reviewer", "context-manager", "debugger", "deployment-engineer", "mcp-backend-engineer", "n8n-mcp-tester", "technical-researcher", "test-automator"],
+        "commands": [],
+        "hooks": []
+      }
+    },
+    "get-shit-done": {
+      "url": "https://github.com/gsd-build/get-shit-done.git",
+      "name": "get-shit-done",
+      "type": "agents",
+      "last_fetched": "2026-04-25",
+      "components": {
+        "skills": [],
+        "agents": ["gsd-advisor-researcher", "gsd-ai-researcher", "gsd-assumptions-analyzer", "gsd-code-fixer", "gsd-code-reviewer", "gsd-codebase-mapper", "gsd-debug-session-manager", "gsd-debugger", "gsd-doc-classifier", "gsd-doc-synthesizer", "gsd-doc-verifier", "gsd-doc-writer", "gsd-domain-researcher", "gsd-eval-auditor", "gsd-eval-planner", "gsd-executor", "gsd-framework-selector", "gsd-integration-checker", "gsd-intel-updater", "gsd-nyquist-auditor", "gsd-pattern-mapper", "gsd-phase-researcher", "gsd-plan-checker", "gsd-planner", "gsd-project-researcher", "gsd-research-synthesizer", "gsd-roadmapper", "gsd-security-auditor", "gsd-ui-auditor", "gsd-ui-checker", "gsd-ui-researcher", "gsd-user-profiler", "gsd-verifier"],
+        "commands": [],
+        "hooks": []
+      }
+    },
+    "awesome-claude-code": {
+      "url": "https://github.com/hesreallyhim/awesome-claude-code.git",
+      "name": "awesome-claude-code",
+      "type": "commands",
+      "last_fetched": "2026-04-25",
+      "components": {
+        "skills": [],
+        "agents": [],
+        "commands": ["evaluate-repository"],
+        "hooks": []
+      }
+    }
+  }
 }

@@ -341,13 +341,27 @@ Skills from these GitHub repos are synced into `.claude/skills/` every 7 days.
 The update runs **async in the background** at session start — no delay to your first prompt.
 A git commit is created automatically when any skill file changes.
 
-### Active Sources
+### Active Sources — Skills
 
-| Slug | Repo | Skills installed |
+| Slug | Repo | Skills |
 |---|---|---|
-| `superpowers` | https://github.com/obra/superpowers.git | brainstorming, dispatching-parallel-agents, executing-plans, finishing-a-development-branch, receiving-code-review, requesting-code-review, subagent-driven-development, systematic-debugging, test-driven-development, using-git-worktrees, verification-before-completion, writing-plans, writing-skills |
-| `ui-ux-pro-max` | https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git | banner-design, brand, design-system, design, slides, ui-styling, ui-ux-pro-max |
-| `claude-mem` | https://github.com/thedotmack/claude-mem.git | do, knowledge-agent, make-plan, mem-search, smart-explore, timeline-report, version-bump |
+| `superpowers` | https://github.com/obra/superpowers.git | brainstorming, dispatching-parallel-agents, executing-plans, finishing-a-development-branch, receiving-code-review, requesting-code-review, subagent-driven-development, systematic-debugging, test-driven-development, using-git-worktrees, verification-before-completion, writing-plans, writing-skills (13) |
+| `ui-ux-pro-max` | https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git | banner-design, brand, design-system, design, slides, ui-styling, ui-ux-pro-max (7) |
+| `claude-mem` | https://github.com/thedotmack/claude-mem.git | do, knowledge-agent, make-plan, mem-search, smart-explore, timeline-report, version-bump (7) |
+| `obsidian-skills` | https://github.com/kepano/obsidian-skills.git | defuddle, json-canvas, obsidian-bases, obsidian-cli, obsidian-markdown (5) |
+
+### Active Sources — Agents
+
+| Slug | Repo | Agents |
+|---|---|---|
+| `n8n-mcp` | https://github.com/czlonkowski/n8n-mcp.git | code-reviewer, context-manager, debugger, deployment-engineer, mcp-backend-engineer, n8n-mcp-tester, technical-researcher, test-automator (8) |
+| `get-shit-done` | https://github.com/gsd-build/get-shit-done.git | gsd-planner, gsd-debugger, gsd-code-reviewer, gsd-executor, gsd-roadmapper, gsd-security-auditor, gsd-verifier + 26 more (33 total) |
+
+### Active Sources — Commands
+
+| Slug | Repo | Commands |
+|---|---|---|
+| `awesome-claude-code` | https://github.com/hesreallyhim/awesome-claude-code.git | evaluate-repository (1) |
 
 ### How It Works
 
@@ -370,25 +384,22 @@ SKILL_PATHS["my-slug"]="path/to/skills"
 ```
 That's it — it will be cloned, diffed, and committed on the next weekly run.
 
-### Skill Directory Layout
+### Directory Layout
 
 ```
-.claude/skills/
-├── .last-updated          ← Unix timestamp of last successful update
-├── .update-log            ← Running log of all update runs
-├── superpowers/           ← obra/superpowers skills
-│   ├── brainstorming/
-│   ├── systematic-debugging/
-│   ├── test-driven-development/
-│   └── ... (13 skills total)
-├── ui-ux-pro-max/         ← nextlevelbuilder/ui-ux-pro-max-skill skills
-│   ├── brand/
-│   ├── design-system/
-│   └── ... (7 skills total)
-└── claude-mem/            ← thedotmack/claude-mem skills
-    ├── mem-search/
-    ├── smart-explore/
-    └── ... (7 skills + context rule)
+.claude/
+├── skills/
+│   ├── .last-updated          ← Unix timestamp of last successful update
+│   ├── .update-log            ← Running log of all update runs
+│   ├── superpowers/           ← obra/superpowers — 13 skills
+│   ├── ui-ux-pro-max/         ← nextlevelbuilder — 7 skills
+│   ├── claude-mem/            ← thedotmack — 7 skills
+│   └── obsidian-skills/       ← kepano — 5 skills
+│
+└── agents/
+    ├── (project agents)       ← code-reviewer, debugger, planner, etc.
+    ├── n8n-mcp/               ← czlonkowski/n8n-mcp — 8 agents
+    └── get-shit-done/         ← gsd-build/get-shit-done — 33 agents
 ```
 
 ## 16. Core Principles
@@ -444,8 +455,14 @@ This registry is the source of truth for weekly auto-updates.
 
 ### Registered Repos
 
-| Slug | URL | Purpose | Last Fetched |
-|---|---|---|---|
-| *(none yet — paste a GitHub URL to add the first one)* | | | |
+| Slug | URL | Type | Components | Last Fetched |
+|---|---|---|---|---|
+| `superpowers` | https://github.com/obra/superpowers.git | skills | 13 skills | 2026-04-25 |
+| `ui-ux-pro-max` | https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git | skills | 7 skills | 2026-04-25 |
+| `claude-mem` | https://github.com/thedotmack/claude-mem.git | skills | 7 skills | 2026-04-25 |
+| `obsidian-skills` | https://github.com/kepano/obsidian-skills.git | skills | 5 skills | 2026-04-25 |
+| `n8n-mcp` | https://github.com/czlonkowski/n8n-mcp.git | agents | 8 agents | 2026-04-25 |
+| `get-shit-done` | https://github.com/gsd-build/get-shit-done.git | agents | 33 agents | 2026-04-25 |
+| `awesome-claude-code` | https://github.com/hesreallyhim/awesome-claude-code.git | commands | 1 command | 2026-04-25 |
 
 > This table is updated automatically by `scripts/fetch-github-repo.sh` when a new repo is integrated.
