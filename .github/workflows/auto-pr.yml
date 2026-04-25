@@ -137,31 +137,50 @@ jobs:
           TITLE: ${{ steps.build.outputs.title }}
           BODY_FILE: ${{ steps.build.outputs.body_file }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
 
           existing=$(gh pr list \
             --base "$BASE" \
             --head "$HEAD" \
             --state open \
             --json number \
-            --jq '.[0].number // empty')
+            --jq '.[0].number // ""')
+          echo "Initial gh pr list result: '${existing}'"
 
           if [ -n "$existing" ]; then
             echo "PR #${existing} is already open — updating body with the latest gate report."
-            gh pr edit "$existing" \
-              --title "$TITLE" \
-              --body-file "$BODY_FILE"
-            echo "number=${existing}" >> "$GITHUB_OUTPUT"
+            edit_out=$(gh pr edit "$existing" --title "$TITLE" --body-file "$BODY_FILE" 2>&1)
+            edit_rc=$?
+            echo "gh pr edit rc=${edit_rc} out=${edit_out}"
           else
-            url=$(gh pr create \
-              --base "$BASE" \
-              --head "$HEAD" \
-              --title "$TITLE" \
-              --body-file "$BODY_FILE")
-            echo "Opened: ${url}"
-            number=$(echo "$url" | grep -oE '[0-9]+$')
-            echo "number=${number}" >> "$GITHUB_OUTPUT"
+            create_out=$(gh pr create --base "$BASE" --head "$HEAD" --title "$TITLE" --body-file "$BODY_FILE" 2>&1)
+            create_rc=$?
+            echo "gh pr create rc=${create_rc} out=${create_out}"
           fi
+
+          # AUTHORITATIVE re-query — ignore output parsing entirely.
+          PR_NUM=$(gh pr list \
+            --base "$BASE" \
+            --head "$HEAD" \
+            --state open \
+            --json number \
+            --jq '.[0].number // ""')
+          echo "Authoritative PR number: '${PR_NUM}'"
+
+          if [ -z "$PR_NUM" ]; then
+            echo "::error::No open PR found after create/update."
+            {
+              echo "## Open or update PR — FAILED"
+              echo "No open PR for \`${HEAD}\` → \`${BASE}\` after create/update step."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          echo "number=${PR_NUM}" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Open or update PR"
+            echo "PR #\`${PR_NUM}\` ready."
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Auto-merge (squash) if gate-finished
         if: steps.gate.outputs.merge == 'true'
@@ -211,9 +230,30 @@ jobs:
           exit $rc
 
       - name: Skipped auto-merge — record reason
-        if: steps.gate.outputs.merge != 'true'
+        if: steps.gate.outputs.merge != 'true' && steps.pr.conclusion == 'success'
         run: |
           {
             echo "## Auto-merge result"
             echo ":pause_button: Skipped — guard set \`merge=false\`. See the **Decide whether to auto-merge** step above for the reason."
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Post failure diagnostic comment on PR (always-on safety net)
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BASE: claude/ai-personal-assistant-main
+          HEAD: claude/ai-personal-assistant-develop-AION
+          RUN_ID: ${{ github.run_id }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -uo pipefail
+          # Find the PR (best-effort; might fail if open-or-update step itself failed before
+          # creating the PR).
+          PR=$(gh pr list --base "$BASE" --head "$HEAD" --state open --json number --jq '.[0].number // ""')
+          if [ -z "$PR" ]; then
+            echo "(no open PR — cannot post diagnostic comment)"
+            exit 0
+          fi
+          run_url="https://github.com/${REPO}/actions/runs/${RUN_ID}"
+          comment=$(printf '## :x: auto-pr workflow failed\n\nThe \`open-pr-and-merge\` job failed at run [%s](%s). Open the run page to see which step exited non-zero. Common causes: empty PR_NUMBER, gh permissions, branch protection, gh CLI version mismatch.\n' "$RUN_ID" "$run_url")
+          gh pr comment "$PR" --body "$comment" || echo "(could not post diagnostic comment — likely a token-permission issue)"
