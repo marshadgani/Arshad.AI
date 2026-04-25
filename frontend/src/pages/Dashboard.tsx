@@ -194,8 +194,8 @@ export default function Dashboard(_: DashboardProps) {
             />
           </div>
           <div className={styles.searchSuggest}>
-            {knowledgeSuggestions.map((s, i) => (
-              <button key={i} className={styles.suggestion}>{s}</button>
+            {knowledgeSuggestions.map((s) => (
+              <button key={s} className={styles.suggestion}>{s}</button>
             ))}
           </div>
         </section>

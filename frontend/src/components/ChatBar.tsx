@@ -19,7 +19,9 @@ export default function ChatBar(_: ChatBarProps) {
         />
         <button
           className={styles.send}
+          disabled={!value.trim()}
           onClick={() => {
+            if (!value.trim()) return;
             // mock — wired to Anthropic SDK in a future session
             console.log('chat:', value);
             setValue('');
