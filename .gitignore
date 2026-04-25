@@ -51,3 +51,4 @@ redis-data/
 *.swp
 *.swo
 .DS_Store
+frontend/tsconfig.tsbuildinfo

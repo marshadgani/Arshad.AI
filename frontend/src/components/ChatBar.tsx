@@ -15,7 +15,7 @@ export default function ChatBar(_: ChatBarProps) {
           type="text"
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          placeholder='Ask Arshad.AI — try "summarise unread emails" or "what\'s on my calendar tomorrow?"'
+          placeholder={`Ask Arshad.AI — try "summarise unread emails" or "what's on my calendar tomorrow?"`}
         />
         <button
           className={styles.send}
