@@ -1,6 +1,6 @@
 ---
 name: test-writer
-description: Writes unit and integration tests for Python (pytest) and TypeScript/React (React Testing Library + Jest). Covers happy paths, edge cases, and error conditions.
+description: Writes unit and integration tests for Python (pytest) and TypeScript/React (RTL + Vitest). Covers happy paths, edge cases, and error conditions. **Use to add tests for specific code that already exists.** Do NOT use to scaffold greenfield CI / containers / E2E infrastructure — use `test-automator` (n8n-mcp) for that. Do NOT use to ASSESS coverage — when asked to assess, return findings only; do not create test files.
 tools:
   - read
   - write

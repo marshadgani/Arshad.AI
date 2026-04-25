@@ -358,6 +358,28 @@ TypeScript 5 treats `moduleResolution: "node"` (node10) as deprecated and will r
 
 ---
 
+## 13b. Skill / Agent Routing — read this before picking a tool
+
+The repo carries 77 skills (across 6 sources) and 49 agents (across 4 sources). Most overlap. The default routing is:
+
+**Agents — prefer first-party.** Reach for vendored agents only for these specific niches:
+- `deployment-engineer` (n8n-mcp) — new CI/CD, Dockerfiles, Kubernetes
+- `mcp-backend-engineer` (n8n-mcp) — anything in `mcp/` or MCP protocol changes
+- `technical-researcher` (n8n-mcp) — multi-source framework / vuln evaluation
+- `context-manager` (n8n-mcp) — coordinating ≥3 agents across a long task
+- `docs-researcher` (context7) — single-library doc fetch with isolated context
+- `gsd-*` agents — **only** when running their orchestrating slash command (e.g. `/gsd-plan-phase`). Do not spawn individually.
+
+**Skills — most are nested two levels deep and not auto-surfaced.** Check `.claude/skills/INDEX.md` for the full map. For a skill that the `Skill` tool doesn't list, you can still `Read` the SKILL.md at the path shown in the index and apply its workflow.
+
+Detailed routing tables:
+- `.claude/agents/INDEX.md` — task-type → agent
+- `.claude/skills/INDEX.md` — task-type → skill, plus inventory by source
+
+When a skill or agent is genuinely useful but invisible, **promote it** by copying the SKILL.md (or agent .md) one directory up so Claude Code discovers it.
+
+---
+
 ## 14. Task Management
 
 1. **Plan First** — Write plan to `tasks/todo.md` with checkable items

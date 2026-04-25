@@ -1,6 +1,6 @@
 ---
 name: planner
-description: Opus-powered planning agent. Invoked before any non-trivial task to produce a detailed, unambiguous implementation plan. Returns a structured spec that Sonnet executes step by step.
+description: Opus-powered planning agent. **Use before any non-trivial task (3+ steps, architectural decisions, ambiguous approach).** Returns a structured spec that Sonnet executes step by step. Do NOT use `gsd-planner` (needs the `/gsd-plan-phase` orchestrator and writes PLAN.md). Do NOT use for single-line fixes, renames, or config tweaks — go direct.
 tools:
   - read
   - bash
