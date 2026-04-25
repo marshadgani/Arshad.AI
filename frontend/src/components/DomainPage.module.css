@@ -1,0 +1,141 @@
+.page { display: flex; flex-direction: column; gap: var(--s-6); }
+
+/* ── Domain header + KPIs ───────────────────────────────────────── */
+.header {
+  background: linear-gradient(135deg, var(--bg-panel), var(--bg-elevated));
+  border: 1px solid var(--border-faint);
+  border-radius: var(--radius-xl);
+  padding: var(--s-6) var(--s-8);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--s-6);
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+}
+.header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at top right, var(--accent-faint), transparent 70%);
+  pointer-events: none;
+}
+
+.headerEmoji {
+  font-size: 48px;
+  line-height: 1;
+}
+
+.headerText { display: flex; flex-direction: column; gap: var(--s-1); }
+.headerKicker { font-family: var(--font-mono); font-size: 10px; color: var(--accent); letter-spacing: 0.12em; text-transform: uppercase; }
+.headerTitle { font-size: 28px; }
+.headerTagline { color: var(--text-secondary); font-size: 13px; }
+
+.kpis {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--s-3);
+  margin-top: var(--s-4);
+}
+.kpi { background: var(--bg-deep); border: 1px solid var(--border-faint); border-radius: var(--radius-md); padding: var(--s-3) var(--s-4); }
+.kpiLabel { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.kpiValue { font-size: 22px; font-weight: 600; margin-top: 2px; }
+.kpiDelta { font-family: var(--font-mono); font-size: 10px; color: var(--accent-soft); margin-top: 2px; }
+
+/* ── Sections (Applications, Agents, Activity) ──────────────────── */
+.section {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-faint);
+  border-radius: var(--radius-lg);
+  padding: var(--s-6);
+}
+
+.sectionHead { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--s-4); }
+.sectionTitle { font-size: 14px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-secondary); display: flex; align-items: center; gap: var(--s-2); }
+.sectionTitle::before { content: ''; width: 3px; height: 14px; background: var(--accent); display: inline-block; }
+.sectionMeta { font-size: 10px; color: var(--text-muted); font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.08em; }
+
+/* Applications grid */
+.appGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s-4); }
+.app {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-faint);
+  border-radius: var(--radius-md);
+  padding: var(--s-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  transition: border-color 120ms, box-shadow 120ms;
+}
+.app:hover { border-color: var(--accent); box-shadow: var(--glow-cyan-soft); }
+.appName { font-size: 14px; font-weight: 600; }
+.appDesc { font-size: 12px; color: var(--text-secondary); flex: 1; }
+.appFoot { display: flex; align-items: center; justify-content: space-between; margin-top: var(--s-2); }
+.appOpen {
+  background: var(--accent);
+  color: var(--bg-deep);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.appOpen:hover { filter: brightness(1.1); }
+.statusTag { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; padding: 2px 6px; border-radius: 3px; }
+.live { color: var(--status-ok); background: rgba(0, 255, 156, 0.1); border: 1px solid rgba(0, 255, 156, 0.2); }
+.beta { color: var(--accent); background: var(--accent-faint); border: 1px solid var(--accent-faint); }
+.planned { color: var(--text-muted); background: var(--bg-deep); border: 1px solid var(--border-faint); }
+
+/* Agents */
+.agents { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-4); }
+.agent {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-faint);
+  border-radius: var(--radius-md);
+  padding: var(--s-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  position: relative;
+}
+.agentHead { display: flex; align-items: center; gap: var(--s-2); }
+.healthDot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.healthHealthy  { background: var(--status-ok);    box-shadow: 0 0 6px var(--status-ok); }
+.healthDegraded { background: var(--status-warn);  box-shadow: 0 0 6px var(--status-warn); }
+.healthOffline  { background: var(--status-danger); box-shadow: 0 0 6px var(--status-danger); }
+.healthTraining { background: var(--accent);       box-shadow: 0 0 6px var(--accent); }
+.agentName { font-family: var(--font-mono); font-size: 13px; }
+.agentDesc { font-size: 12px; color: var(--text-secondary); }
+
+.agentMetrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-2);
+  border-top: 1px dashed var(--border-faint);
+  padding-top: var(--s-2);
+}
+.metric { display: flex; flex-direction: column; }
+.metricLabel { font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.metricValue { font-family: var(--font-mono); font-size: 12px; color: var(--text-primary); }
+
+.agentLast { font-size: 11px; color: var(--text-muted); margin-top: var(--s-1); }
+.agentFoot { display: flex; align-items: center; justify-content: space-between; margin-top: var(--s-2); font-family: var(--font-mono); font-size: 10px; }
+.agentRun { color: var(--text-muted); }
+.agentConfig { color: var(--accent); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+
+/* Activity feed */
+.feed { display: flex; flex-direction: column; }
+.feedRow {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--s-3);
+  padding: var(--s-2) var(--s-3);
+  font-size: 12px;
+  border-bottom: 1px dashed var(--border-faint);
+}
+.feedRow:last-child { border-bottom: 0; }
+.feedTime { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); white-space: nowrap; }
+.feedMsg { color: var(--text-secondary); }
