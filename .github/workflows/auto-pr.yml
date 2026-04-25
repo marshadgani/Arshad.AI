@@ -204,20 +204,27 @@ jobs:
           } | tee -a "$DIAG" >> "$GITHUB_STEP_SUMMARY"
 
           if [ -z "${PR_NUMBER}" ]; then
-            echo "PR_NUMBER empty — cannot merge"
             { echo "- :x: PR_NUMBER was empty"; } | tee -a "$DIAG" >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
 
-          out=$(gh pr merge "$PR_NUMBER" --squash --delete-branch=false 2>&1)
+          # Use temp files so we capture output even if gh exits oddly.
+          echo "- BEFORE gh pr merge" >> "$DIAG"
+          gh pr merge "$PR_NUMBER" --squash --delete-branch=false > /tmp/merge.out 2> /tmp/merge.err
           rc=$?
+          echo "- AFTER gh pr merge (rc=${rc})" >> "$DIAG"
 
           {
             echo "- gh pr merge rc: \`${rc}\`"
-            echo "- gh pr merge output:"
+            echo "- gh pr merge stdout:"
             echo
             echo '```'
-            echo "${out}"
+            cat /tmp/merge.out 2>/dev/null || echo "(empty)"
+            echo '```'
+            echo "- gh pr merge stderr:"
+            echo
+            echo '```'
+            cat /tmp/merge.err 2>/dev/null || echo "(empty)"
             echo '```'
           } | tee -a "$DIAG" >> "$GITHUB_STEP_SUMMARY"
 
