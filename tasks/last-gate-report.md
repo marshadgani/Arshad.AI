@@ -1,4 +1,4 @@
-<!-- generated from HEAD=1b27004 (and pending +1 commit) at 2026-04-25T14:50:00Z by 6-agent gate run #6c (re-stamped, curl direct merge) -->
+<!-- generated from HEAD=a6a1b16 (post squash-divergence merge) at 2026-04-25T14:55:00Z by 6-agent gate run #6c (re-stamped after `merge -s ours main` to fix conflict) -->
 
 # Arshad.AI Quality Gate Report
 
