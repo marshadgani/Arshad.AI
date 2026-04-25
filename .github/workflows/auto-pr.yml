@@ -170,6 +170,17 @@ jobs:
           PR_NUMBER: ${{ steps.pr.outputs.number }}
         run: |
           set -uo pipefail
+          echo "PR_NUMBER='${PR_NUMBER}'"
+
+          if [ -z "${PR_NUMBER}" ]; then
+            echo "::error::PR_NUMBER is empty — open-or-update step did not emit it."
+            {
+              echo "## Auto-merge result"
+              echo ":x: \`PR_NUMBER\` was empty — cannot merge."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
           echo "Squash-merging PR #${PR_NUMBER}..."
           out=$(gh pr merge "$PR_NUMBER" --squash --delete-branch=false 2>&1)
           rc=$?
@@ -188,6 +199,15 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           echo "${out}"
+
+          # If the merge failed, also post the error as a PR comment so it's
+          # visible publicly (PR comments are scrapable without auth on a
+          # public repo, unlike step summaries which are JS-rendered).
+          if [ $rc -ne 0 ] && [ -n "${PR_NUMBER}" ]; then
+            comment=$(printf '## :x: auto-merge failed\n\n`gh pr merge` exited with code `%s`. Output:\n\n```\n%s\n```\n' "$rc" "$out")
+            gh pr comment "$PR_NUMBER" --body "$comment" || echo "(could not post diagnostic comment)"
+          fi
+
           exit $rc
 
       - name: Skipped auto-merge — record reason
