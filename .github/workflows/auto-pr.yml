@@ -74,22 +74,59 @@ jobs:
       - name: Decide whether to auto-merge
         id: gate
         run: |
-          set -euo pipefail
+          set -uo pipefail
 
-          # Auto-merge fires only when THIS push contains a fresh gate
-          # report AND the report's verdict is not BLOCKED.
-          if git log -1 --name-only --pretty=format: HEAD | grep -qx "tasks/last-gate-report.md"; then
-            if grep -q "GATE BLOCKED" tasks/last-gate-report.md 2>/dev/null; then
-              echo "Gate report present but verdict is BLOCKED — skipping auto-merge."
-              echo "merge=false" >> "$GITHUB_OUTPUT"
+          REPORT="tasks/last-gate-report.md"
+
+          # 1. What did THIS commit change?
+          changed=$(git diff-tree --no-commit-id --name-only -r HEAD)
+          echo "Files changed in HEAD:"
+          echo "${changed}" | sed 's/^/  - /'
+
+          # 2. Was the gate report changed in this push?
+          has_report=false
+          if printf '%s\n' "${changed}" | grep -qx "${REPORT}"; then
+            has_report=true
+          fi
+          echo "HEAD modifies ${REPORT}: ${has_report}"
+
+          # 3. Does the file exist on disk and what's the verdict?
+          verdict="MISSING"
+          if [ -f "${REPORT}" ]; then
+            if grep -q "GATE BLOCKED" "${REPORT}"; then
+              verdict="BLOCKED"
+            elif grep -qE "GATE PASSED" "${REPORT}"; then
+              verdict="PASSED"
             else
-              echo "Fresh gate report found, verdict is PASS or WARN — auto-merge eligible."
-              echo "merge=true" >> "$GITHUB_OUTPUT"
+              verdict="UNKNOWN"
             fi
+          fi
+          echo "Verdict in ${REPORT}: ${verdict}"
+
+          # 4. Last commit subject (informational)
+          subject=$(git log -1 --pretty=%s HEAD)
+          echo "Last commit subject: ${subject}"
+
+          # 5. Decide
+          if [ "${has_report}" = "true" ] && [ "${verdict}" = "PASSED" ]; then
+            echo "DECISION: auto-merge eligible (merge=true)"
+            echo "merge=true" >> "$GITHUB_OUTPUT"
           else
-            echo "No fresh gate report in this push — manual merge required."
+            echo "DECISION: auto-merge NOT eligible (merge=false)"
             echo "merge=false" >> "$GITHUB_OUTPUT"
           fi
+
+          # 6. Surface the decision to step summary so it's visible
+          #    on the run page WITHOUT needing log auth.
+          {
+            echo "## Auto-merge guard"
+            echo "| Check | Value |"
+            echo "|---|---|"
+            echo "| HEAD modifies \`${REPORT}\` | \`${has_report}\` |"
+            echo "| Verdict in report | \`${verdict}\` |"
+            echo "| Last commit subject | \`${subject}\` |"
+            echo "| **Decision** | **merge=$([ "${has_report}" = "true" ] && [ "${verdict}" = "PASSED" ] && echo true || echo false)** |"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Open or update PR
         id: pr
@@ -132,11 +169,31 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ steps.pr.outputs.number }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
           echo "Squash-merging PR #${PR_NUMBER}..."
-          gh pr merge "$PR_NUMBER" \
-            --squash \
-            --delete-branch=false \
-            --subject "$(gh pr view "$PR_NUMBER" --json title --jq '.title')" \
-            --body "Squash-merged automatically after gate verdict ≠ BLOCKED. See PR description for the full gate report."
-          echo "✅ PR #${PR_NUMBER} merged into claude/ai-personal-assistant-main."
+          out=$(gh pr merge "$PR_NUMBER" --squash --delete-branch=false 2>&1)
+          rc=$?
+
+          {
+            echo "## Auto-merge result"
+            if [ $rc -eq 0 ]; then
+              echo ":white_check_mark: PR #${PR_NUMBER} squash-merged into \`claude/ai-personal-assistant-main\`."
+            else
+              echo ":x: \`gh pr merge\` exited with code \`${rc}\`. Output:"
+              echo
+              echo '```'
+              echo "${out}"
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "${out}"
+          exit $rc
+
+      - name: Skipped auto-merge — record reason
+        if: steps.gate.outputs.merge != 'true'
+        run: |
+          {
+            echo "## Auto-merge result"
+            echo ":pause_button: Skipped — guard set \`merge=false\`. See the **Decide whether to auto-merge** step above for the reason."
+          } >> "$GITHUB_STEP_SUMMARY"
