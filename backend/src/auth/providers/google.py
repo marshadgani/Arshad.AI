@@ -13,13 +13,12 @@ consent ever — re-auths after that omit it, which silently breaks Phase D.
 
 from __future__ import annotations
 
-import os
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 
 import httpx
 
-from .base import OAuthProvider, OAuthTokenBundle, OAuthUserInfo
+from .base import OAuthProvider, OAuthTokenBundle, OAuthUserInfo, required_env
 
 _AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 _TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -40,9 +39,9 @@ class GoogleOAuthProvider(OAuthProvider):
     scopes = _SCOPES
 
     def __init__(self) -> None:
-        self.client_id = _required("GOOGLE_OAUTH_CLIENT_ID")
-        self.client_secret = _required("GOOGLE_OAUTH_CLIENT_SECRET")
-        backend_url = _required("BACKEND_URL").rstrip("/")
+        self.client_id = required_env("GOOGLE_OAUTH_CLIENT_ID")
+        self.client_secret = required_env("GOOGLE_OAUTH_CLIENT_SECRET")
+        backend_url = required_env("BACKEND_URL").rstrip("/")
         self.redirect_uri = f"{backend_url}/api/v1/auth/google/callback"
 
     def authorization_url(self, state: str) -> str:
@@ -100,10 +99,3 @@ class GoogleOAuthProvider(OAuthProvider):
             name=data.get("name"),
             avatar_url=data.get("picture"),
         )
-
-
-def _required(var: str) -> str:
-    val = os.getenv(var)
-    if not val or val.startswith("your-"):
-        raise RuntimeError(f"{var} is unset or still a placeholder")
-    return val

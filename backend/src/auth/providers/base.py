@@ -10,9 +10,34 @@ The router orchestrates state -> redirect -> exchange -> user-info -> upsert.
 
 from __future__ import annotations
 
+import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
+
+
+class OAuthError(Exception):
+    """Raised when a provider rejects the auth flow for a non-network reason
+    (e.g. GitHub returns no verified primary email, Google omits a refresh
+    token on a re-consent). Routers map this to a 400/502 envelope.
+    """
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+
+
+def required_env(var: str) -> str:
+    """Read an env var, refusing placeholders.
+
+    Lifted out of google.py / github.py — both providers had character-
+    identical copies that silently drift when the placeholder pattern changes.
+    """
+    val = os.getenv(var)
+    if not val or val.startswith("your-"):
+        raise RuntimeError(f"{var} is unset or still a placeholder")
+    return val
 
 
 @dataclass(frozen=True)

@@ -40,12 +40,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     const controller = new AbortController();
+    let active = true;
     setIsLoading(true);
     fetch('/api/v1/auth/me', {
       headers: { Authorization: `Bearer ${token}` },
       signal: controller.signal,
     })
       .then(async (res) => {
+        if (!active) return;
         if (!res.ok) {
           clearToken();
           setTokenState(null);
@@ -53,16 +55,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
         const body = await res.json();
-        setUser(body.data as AuthUser);
+        if (active) setUser(body.data as AuthUser);
       })
       .catch((err) => {
         if (err?.name === 'AbortError') return;
+        if (!active) return;
         clearToken();
         setTokenState(null);
         setUser(null);
       })
-      .finally(() => setIsLoading(false));
-    return () => controller.abort();
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+    return () => {
+      active = false;
+      controller.abort();
+    };
   }, [token]);
 
   const loginWith = useCallback((provider: 'google' | 'github') => {

@@ -1,7 +1,9 @@
 """/api/v1/auth/* — login, callback, me, logout.
 
 State is stored in Redis (``oauth_state:<state> = "<provider>"``, 5-min TTL).
-The callback validates and consumes it, defending against CSRF.
+The callback uses ``GETDEL`` to validate-and-consume atomically — a plain
+``GET`` then ``DELETE`` would leave a millisecond-wide replay window where
+two concurrent callbacks with the same code could both pass validation.
 
 Logout is a stateless 204 — the frontend wipes its localStorage entry.
 A real revocation list would require Redis lookups on every authenticated
@@ -13,6 +15,7 @@ from __future__ import annotations
 import os
 import secrets
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,6 +26,7 @@ from ..models.user import User
 from .dependencies import get_current_user
 from .jwt import encode_jwt
 from .providers import GitHubOAuthProvider, GoogleOAuthProvider, OAuthProvider
+from .providers.base import OAuthError
 from .service import upsert_user_from_oauth
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
@@ -51,6 +55,13 @@ def _provider(name: str) -> OAuthProvider:
     )
 
 
+def _envelope(status_code: int, code: str, message: str) -> HTTPException:
+    return HTTPException(
+        status_code=status_code,
+        detail={"error": {"code": code, "message": message, "details": {}}},
+    )
+
+
 async def _start_login(provider_name: str) -> RedirectResponse:
     provider = _provider(provider_name)
     state = secrets.token_urlsafe(32)
@@ -66,23 +77,33 @@ async def _handle_callback(
     db: AsyncSession,
 ) -> RedirectResponse:
     redis = await get_redis()
-    stored = await redis.get(f"oauth_state:{state}")
+    stored = await redis.getdel(f"oauth_state:{state}")
     if stored != provider_name:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "error": {
-                    "code": "invalid_state",
-                    "message": "OAuth state is missing, expired, or does not match.",
-                    "details": {},
-                }
-            },
+        raise _envelope(
+            status.HTTP_400_BAD_REQUEST,
+            "invalid_state",
+            "OAuth state is missing, expired, already used, or does not match.",
         )
-    await redis.delete(f"oauth_state:{state}")
 
     provider = _provider(provider_name)
-    bundle = await provider.exchange_code(code)
-    info = await provider.fetch_user_info(bundle.access_token)
+    try:
+        bundle = await provider.exchange_code(code)
+        info = await provider.fetch_user_info(bundle.access_token)
+    except OAuthError as exc:
+        raise _envelope(status.HTTP_400_BAD_REQUEST, exc.code, exc.message)
+    except httpx.HTTPStatusError as exc:
+        raise _envelope(
+            status.HTTP_502_BAD_GATEWAY,
+            "oauth_provider_http_error",
+            f"{provider_name} returned {exc.response.status_code} during OAuth.",
+        )
+    except httpx.RequestError as exc:
+        raise _envelope(
+            status.HTTP_502_BAD_GATEWAY,
+            "oauth_provider_unreachable",
+            f"Could not reach {provider_name}: {type(exc).__name__}.",
+        )
+
     user = await upsert_user_from_oauth(
         db, provider=provider_name, info=info, bundle=bundle
     )

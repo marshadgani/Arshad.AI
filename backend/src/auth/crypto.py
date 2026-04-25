@@ -10,7 +10,16 @@ Rotating the key without re-encrypting all rows locks every user out.
 import base64
 import os
 
+from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+
+class TokenDecryptError(Exception):
+    """Raised when stored ciphertext is corrupted, truncated, or signed
+    with a different key. Surfaces as a 500 ``token_decryption_failed``
+    so callers (Phase D) can prompt re-auth instead of silently 200ing.
+    """
+
 
 _NONCE_LEN = 12
 
@@ -43,8 +52,11 @@ def encrypt(plaintext: str) -> bytes:
 
 def decrypt(blob: bytes) -> str:
     if len(blob) <= _NONCE_LEN:
-        raise ValueError("ciphertext shorter than nonce length")
+        raise TokenDecryptError("ciphertext shorter than nonce length")
     aesgcm = AESGCM(_load_key())
     nonce, ct = blob[:_NONCE_LEN], blob[_NONCE_LEN:]
-    pt = aesgcm.decrypt(nonce, ct, associated_data=None)
+    try:
+        pt = aesgcm.decrypt(nonce, ct, associated_data=None)
+    except InvalidTag as exc:
+        raise TokenDecryptError("ciphertext failed AES-GCM authentication") from exc
     return pt.decode("utf-8")

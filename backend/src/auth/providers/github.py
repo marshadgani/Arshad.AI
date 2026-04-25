@@ -11,12 +11,17 @@ primary email. Falling back to /user/emails picks the verified primary.
 
 from __future__ import annotations
 
-import os
 from urllib.parse import urlencode
 
 import httpx
 
-from .base import OAuthProvider, OAuthTokenBundle, OAuthUserInfo
+from .base import (
+    OAuthError,
+    OAuthProvider,
+    OAuthTokenBundle,
+    OAuthUserInfo,
+    required_env,
+)
 
 _AUTH_URL = "https://github.com/login/oauth/authorize"
 _TOKEN_URL = "https://github.com/login/oauth/access_token"
@@ -31,9 +36,9 @@ class GitHubOAuthProvider(OAuthProvider):
     scopes = _SCOPES
 
     def __init__(self) -> None:
-        self.client_id = _required("GITHUB_OAUTH_CLIENT_ID")
-        self.client_secret = _required("GITHUB_OAUTH_CLIENT_SECRET")
-        backend_url = _required("BACKEND_URL").rstrip("/")
+        self.client_id = required_env("GITHUB_OAUTH_CLIENT_ID")
+        self.client_secret = required_env("GITHUB_OAUTH_CLIENT_SECRET")
+        backend_url = required_env("BACKEND_URL").rstrip("/")
         self.redirect_uri = f"{backend_url}/api/v1/auth/github/callback"
 
     def authorization_url(self, state: str) -> str:
@@ -61,7 +66,10 @@ class GitHubOAuthProvider(OAuthProvider):
         resp.raise_for_status()
         data = resp.json()
         if "access_token" not in data:
-            raise RuntimeError(f"GitHub token exchange failed: {data}")
+            raise OAuthError(
+                "github_token_exchange_failed",
+                f"GitHub did not return an access token: {data.get('error', 'unknown')}",
+            )
         return OAuthTokenBundle(
             access_token=data["access_token"],
             refresh_token=None,
@@ -94,7 +102,11 @@ class GitHubOAuthProvider(OAuthProvider):
                     None,
                 )
                 if not primary:
-                    raise RuntimeError("GitHub returned no primary verified email")
+                    raise OAuthError(
+                        "github_no_verified_email",
+                        "GitHub account has no verified primary email. "
+                        "Add and verify one at https://github.com/settings/emails.",
+                    )
                 email = primary["email"]
         return OAuthUserInfo(
             provider_user_id=str(user["id"]),
@@ -102,10 +114,3 @@ class GitHubOAuthProvider(OAuthProvider):
             name=user.get("name") or user.get("login"),
             avatar_url=user.get("avatar_url"),
         )
-
-
-def _required(var: str) -> str:
-    val = os.getenv(var)
-    if not val or val.startswith("your-"):
-        raise RuntimeError(f"{var} is unset or still a placeholder")
-    return val

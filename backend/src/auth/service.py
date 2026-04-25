@@ -3,11 +3,18 @@
 This is the only place that knows the user/account/token co-ordination.
 Routers call ``upsert_user_from_oauth`` and get back a User row ready
 for JWT issuance.
+
+Concurrency: two simultaneous OAuth callbacks for the same identity
+(rapid double-click on "Continue with Google", or Google + GitHub for
+the same email landing within milliseconds) race on the SELECT-then-
+INSERT pattern. We retry once on IntegrityError — the second pass sees
+the row the first one inserted and goes down the update branch.
 """
 
 from __future__ import annotations
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.oauth_account import OAuthAccount
@@ -30,6 +37,22 @@ async def upsert_user_from_oauth(
     user. Else if a user with the same lowered email exists -> link to that
     user (multi-provider for one human). Else -> create a new user row.
     """
+    try:
+        return await _upsert_once(db, provider=provider, info=info, bundle=bundle)
+    except IntegrityError:
+        await db.rollback()
+        # Second pass: the row we lost the race to is now visible. The
+        # account/user SELECT branches will hit existing rows.
+        return await _upsert_once(db, provider=provider, info=info, bundle=bundle)
+
+
+async def _upsert_once(
+    db: AsyncSession,
+    *,
+    provider: str,
+    info: OAuthUserInfo,
+    bundle: OAuthTokenBundle,
+) -> User:
     account = await db.scalar(
         select(OAuthAccount).where(
             OAuthAccount.provider == provider,
