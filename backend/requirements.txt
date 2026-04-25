@@ -13,3 +13,8 @@ pydantic==2.10.4
 pydantic-settings==2.7.1
 alembic==1.14.0
 httpx==0.28.1
+
+# Phase C — OAuth + JWT auth
+authlib==1.3.2
+cryptography==43.0.3
+pyjwt==2.10.1
