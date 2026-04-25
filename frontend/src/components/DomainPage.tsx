@@ -1,8 +1,9 @@
 import { type DomainConfig, type Application, type DomainAgent, type AgentHealth } from '../data/mockData';
+import { useFetch } from '../hooks/useFetch';
 import styles from './DomainPage.module.css';
 
 export interface DomainPageProps {
-  domain: DomainConfig;
+  slug: string;
 }
 
 const healthClass: Record<AgentHealth, string> = {
@@ -18,7 +19,12 @@ const statusClass: Record<Application['status'], string> = {
   planned: styles.planned,
 };
 
-export default function DomainPage({ domain }: DomainPageProps) {
+export default function DomainPage({ slug }: DomainPageProps) {
+  const { data: domain, isLoading, error } = useFetch<DomainConfig>(`/api/v1/domains/${slug}`);
+
+  if (error) return <div className={styles.page}>Failed to load domain "{slug}": {error.message}</div>;
+  if (isLoading || !domain) return <div className={styles.page}>Loading {slug}…</div>;
+
   return (
     <div className={styles.page}>
       {/* ── Header + KPIs ──────────────────────────────────── */}
