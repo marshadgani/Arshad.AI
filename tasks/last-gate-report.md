@@ -1,69 +1,84 @@
+<!-- generated from HEAD=448eea3 (and pending +1 commit) at 2026-04-25T14:26:38Z by 6-agent gate run #6c -->
+
 # Arshad.AI Quality Gate Report
 
 **Branch:** `claude/ai-personal-assistant-develop-AION` → `claude/ai-personal-assistant-main`
-**Triggered by:** "Merge to Main" — render-deploy probe
+**Triggered by:** "Merge to Main"
+**Mode:** **Full 6-agent gate** (focused-verification shortcut removed from CLAUDE.md §20 in this push — no more shortcuts)
 **Date:** 2026-04-25
-**Diff:** 2 files
+**Diff scope:**
 
 | File | Change |
 |---|---|
-| `backend/Dockerfile` | One-line comment added above the `ENV` line. No logic, no layer reordering, no command change. |
-| `tasks/last-gate-report.md` | This file — refreshed so the auto-merge guard sees the canonical PASS signal. |
+| `backend/Dockerfile` | One comment line above ENV: `# render-deploy probe — touched 2026-04-25 to confirm auto-deploy fires.` |
+| `tasks/last-gate-report.md` | This file (gate report) |
+| `CLAUDE.md` | §20 Step 1 strengthened — removes focused-verification shortcut |
 
 ---
 
 ## Gate Summary
 
-### ✅ GATE PASSED — Safe to merge
+| # | Gate | Agent | Result | Critical | Warnings |
+|---|---|---|---|---|---|
+| 1 | Code Review | code-reviewer | ⚠️ WARN | 0 | 2 |
+| 2 | Security Audit | security-auditor | ✅ PASS | 0 | 0 |
+| 3 | Bug Analysis | debugger | ⚠️ WARN | 0 | 3 *(includes 1 root-cause hypothesis for the failed 448eea3 workflow run)* |
+| 4 | Test Coverage | test-writer | ✅ PASS | 0 | 0 |
+| 5 | Code Quality | refactorer | ⚠️ WARN | 0 | 2 |
+| 6 | Documentation | doc-writer | ⚠️ WARN | 0 | 2 |
+| | **Totals (deduplicated, hallucinations removed)** | | | **0** | **~5** |
 
-Focused-verification mode. The diff is one comment-only line in `backend/Dockerfile` plus this report. No code paths or runtime behaviour changed.
+## Overall Verdict
 
-| Concern | Result |
-|---|---|
-| Dockerfile syntax (`docker buildx --check` not available locally; visual review) | ✅ valid — comment line in standard `# ...` form |
-| Layer cache impact | ⚠️ minor — the new comment line invalidates the cache from that point down. Render will rebuild fully. **That is the entire point of this push** (the goal is to confirm auto-deploy fires). |
-| Hardcoded secrets in diff | ✅ none |
-| Behaviour preservation | ✅ identical — comments don't affect the running container |
-| Test coverage | ⏭ N/A (Dockerfile comment) |
+### ⚠️ GATE PASSED WITH WARNINGS — Safe to merge
+
+Zero Critical findings. Auto-fix loop not invoked. WARN findings are not auto-fixed — they go in the PR body checklist for the merger to triage.
 
 ---
 
-## What this push tests
+## Real findings (consolidated)
 
-```
-push (this commit)
-   │
-   ▼ auto-pr.yml workflow runs
-   │   - Decide gate: HEAD modifies last-gate-report.md=true · verdict=PASSED → merge=true
-   │   - Open or update PR
-   │   - Auto-merge (squash) → main updated
-   │
-   ▼ main has new commit touching backend/Dockerfile
-   │
-   ▼ Render's "Connected branch" hook fires
-   │   - Builds the image (full rebuild because cache invalidated at the new comment)
-   │   - Deploys the new image
-   │   - /health returns 200
-   │
-   ▼ Vercel sees no frontend/ change → skips (correct)
-```
+### Process integrity (code-reviewer)
+
+- ⚠️ **Gate report had no staleness signal.** Fixed in this commit — first line is now `<!-- generated from HEAD=<sha> at <iso8601> ... -->`.
+- ⚠️ **CLAUDE.md edit was uncommitted at agent-spawn time.** Resolved by including it in this push.
+
+### Workflow integrity (debugger)
+
+- ⚠️ **Hypothesis for 448eea3 auto-merge failure (exit code 1):** PR_NUMBER may have been an empty string when passed to `gh pr merge`, causing it to fail immediately. Mitigation in this push: rely on the bulletproof workflow's `$GITHUB_STEP_SUMMARY` to surface the actual error, then patch from there. If the next run fails the same way, we'll have the real `gh` error visible without auth.
+
+### Doc clarity (refactorer)
+
+- ⚠️ **`(mandatory, no skipping)` parenthetical in §20 Step 1** — the rule is restated in the next paragraph already. Mild redundancy, kept on purpose for emphasis given how recently the user pushed back on shortcuts.
+- ⚠️ **Hard-coded branch names in §20 Step 1** — `claude/ai-personal-assistant-develop-AION` and `claude/ai-personal-assistant-main` appear inline. Already defined at the top of §20 ("Target Branch (PERMANENT)"). Marginal drift risk — defer.
+
+### Hallucinations cross-checked and removed
+
+- doc-writer claimed `backend/Dockerfile:10` has `# Set environment to production`. Actual content: `# render-deploy probe — touched 2026-04-25 to confirm auto-deploy fires.` — different comment, false finding, removed.
+- doc-writer claimed `tasks/last-gate-report.md` has `WARNINGS: 0` while documenting two warnings. The previous focused-verification stub did show `WARNINGS: 0`; this report (the new full 6-agent run) shows the actual aggregate.
+
+---
+
+## Action items (priority order)
+
+### Should look at next
+- [ ] If the next workflow run also fails to auto-merge, read the step summary on the run page (now visible without auth, includes `gh pr merge` stdout/stderr)
+- [ ] Refactor `CLAUDE.md §20 Step 1` to cross-reference the Target Branch block instead of hard-coding branch names
+
+### Cosmetic
+- [ ] Drop or fold the redundant `(mandatory, no skipping)` parenthetical once the rule has settled
 
 ---
 
 ## Test plan after merge
 
-- [ ] Auto-merge fires on this push (visible on the workflow run page's Step Summary)
-- [ ] `claude/ai-personal-assistant-main` updates to a new squash commit
-- [ ] Render dashboard shows a new deploy in progress within ~30 s
-- [ ] After ~3 min, Render dashboard shows the new commit SHA as Live
+- [ ] Workflow run page shows the **Auto-merge guard** table with `merge=true`
+- [ ] Workflow run page shows the **Auto-merge result** with `:white_check_mark: PR #N squash-merged into claude/ai-personal-assistant-main`
+- [ ] `claude/ai-personal-assistant-main` advances past `f64b357` to a new squash commit
+- [ ] **Render dashboard** picks up the `backend/Dockerfile` change → builds and deploys within ~3 min
 - [ ] `curl https://arshad-ai.onrender.com/health` returns `{"status":"ok"}`
-- [ ] Vercel does NOT trigger (no `frontend/**` change in this diff)
-
-If Render does NOT pick up this push, the most likely causes are:
-1. Render's auto-deploy is paused (check Settings → Build & Deploy)
-2. Render's branch setting drifted (should be `claude/ai-personal-assistant-main`)
-3. Render's "Build Filters" is set to a path that excludes `backend/Dockerfile` (unlikely — Dockerfile is the most important backend file)
+- [ ] Vercel does NOT rebuild (no `frontend/**` change)
 
 ---
 
-*Generated by Arshad.AI Quality Gate · render-deploy probe · zero behavioural change to the container.*
+*Generated by Arshad.AI Quality Gate · 6-agent panel · hallucinations cross-checked against actual file contents · staleness header added.*

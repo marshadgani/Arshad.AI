@@ -721,8 +721,10 @@ This applies to every "Merge to Main" trigger below.
 
 **Whenever the user says "Merge to Main"** (case-insensitive), execute this loop:
 
-**Step 1 — Run `/gate` (mandatory, no skipping).**
-Spawn all 6 agents on the diff between `claude/ai-personal-assistant-develop-AION` and `claude/ai-personal-assistant-main`. Compile the master report.
+**Step 1 — Run `/gate` (mandatory, no skipping, no shortcuts).**
+Spawn **all 6 agents** (`code-reviewer`, `security-auditor`, `debugger`, `test-writer`, `refactorer`, `doc-writer`) on the diff between `claude/ai-personal-assistant-develop-AION` and `claude/ai-personal-assistant-main`. Compile the master report from their actual outputs.
+
+**No focused-verification mode. No "trivial diff" exception. No "I authored this so reviewing is pointless" rationalisation.** Even one-line changes go through the 6-agent panel — that is the whole point of the gate. The user explicitly mandated this; do not relitigate.
 
 **Step 2 — If the gate has any Critical finding or FAIL gate → auto-fix loop.**
 - For each Critical finding, apply the smallest fix that resolves it.
