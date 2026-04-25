@@ -48,7 +48,7 @@ Arshad.AI is a personal AI assistant powered by Claude. It lets the user manage 
 
 ```
 frontend/        React 18 + TypeScript (Vite 5) — chat UI + sidebar
-backend/         FastAPI — chat API, Claude tool orchestration, REST helpers
+backend/         FastAPI — versioned REST API (/api/v1/*), chat (Phase B), Claude tool orchestration (Phase D)
 postgres         Persistent storage: conversation history, user preferences
 redis            Session cache + short-lived tool-call state
 airflow          Data pipeline scheduler (Apache Airflow 2.9)
@@ -120,16 +120,27 @@ Arshad.AI/
 │   └── skills/                        ← empty; ready for future skills
 │
 ├── backend/
-│   ├── Dockerfile                     ← python:3.12-slim, uvicorn --reload
+│   ├── Dockerfile                     ← python:3.12-slim, uvicorn --reload, COPY src + alembic + scripts
 │   ├── .env.example                   ← template; copy to .env and fill in secrets
 │   ├── requirements.txt               ← fastapi, uvicorn, sqlalchemy[asyncio], asyncpg, redis, anthropic, alembic, httpx
+│   ├── alembic.ini
+│   ├── alembic/                       ← async-aware env.py, versions/
+│   │   └── versions/                  ← initial dashboard schema migration (20 tables)
+│   ├── scripts/
+│   │   └── seed_from_mock.py          ← idempotent seed run by db-init compose service
 │   └── src/
-│       ├── main.py                    ← FastAPI app + CORS (localhost:3000) + /health
+│       ├── main.py                    ← FastAPI app + CORS + /health + custom HTTPException handler
+│       ├── api/v1/
+│       │   ├── dashboard.py           ← 14 GET endpoints under /api/v1/dashboard/*
+│       │   └── domains.py             ← /api/v1/domains, /api/v1/domains/{slug}, /api/v1/nav
+│       ├── schemas/                   ← Pydantic v2 response shapes (ORMBase + dashboard.py + domain.py)
 │       ├── middleware/
 │       │   └── cache.py               ← Redis singleton; get_redis() / close_redis()
 │       └── models/
-│           ├── __init__.py
-│           └── database.py            ← async engine, AsyncSessionLocal, Base, get_db()
+│           ├── __init__.py            ← imports dashboard + domain so Base.metadata sees every table
+│           ├── database.py            ← async engine, AsyncSessionLocal, Base, TimestampedMixin, get_db()
+│           ├── dashboard.py           ← 14 dashboard widget tables
+│           └── domain.py              ← 6 domain catalogue tables (FK → domains.slug)
 │
 ├── frontend/
 │   ├── Dockerfile                     ← node:20-alpine, npm start
@@ -138,8 +149,13 @@ Arshad.AI/
 │   ├── package.json                   ← react 18, react-dom, react-router-dom v6, vite 5, typescript 5
 │   ├── tsconfig.json                  ← strict, moduleResolution: bundler, noEmit: true
 │   └── src/
-│       ├── index.tsx                  ← ReactDOM.createRoot
-│       └── App.tsx                    ← BrowserRouter + Route "/" → Dashboard placeholder
+│       ├── index.tsx                  ← ReactDOM.createRoot, imports tokens.css + globals.css
+│       ├── App.tsx                    ← ErrorBoundary + BrowserRouter + 8 routes (Dashboard + 7 domain pages)
+│       ├── components/                ← AppLayout, Sidebar, TopBar, ChatBar, DomainPage
+│       ├── pages/                     ← Dashboard.tsx + 7 domain page wrappers
+│       ├── hooks/useFetch.ts          ← generic { data, isLoading, error } with AbortController
+│       ├── data/mockData.ts           ← TypeScript shape contracts (now type-only — runtime data is in Postgres)
+│       └── styles/                    ← tokens.css (Jarvis design tokens) + globals.css
 │
 ├── data-pipelines/
 │   ├── requirements.txt               ← apache-airflow==2.9.3, providers (postgres, redis, http), anthropic, pandas

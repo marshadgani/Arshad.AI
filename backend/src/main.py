@@ -1,9 +1,12 @@
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
+from src.api.v1.dashboard import router as dashboard_router
+from src.api.v1.domains import router as domains_router
 from src.middleware.cache import close_redis
 
 SECRET_KEY = os.getenv("SECRET_KEY")
@@ -37,6 +40,23 @@ app.add_middleware(
 )
 
 
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+    """Unwrap the FastAPI ``{"detail": ...}`` envelope when handlers
+    already raise with the project's error shape ``{"error": {...}}``
+    (per .claude/rules/api.md). Plain-string details fall back to the
+    standard envelope so 401/403/422 from FastAPI's own machinery still
+    work.
+    """
+    if isinstance(exc.detail, dict) and "error" in exc.detail:
+        return JSONResponse(status_code=exc.status_code, content=exc.detail)
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
+
 @app.get("/health", summary="Liveness probe")
 async def health():
     return {"status": "ok"}
+
+
+app.include_router(dashboard_router)
+app.include_router(domains_router)

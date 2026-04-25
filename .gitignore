@@ -52,3 +52,4 @@ redis-data/
 *.swo
 .DS_Store
 frontend/tsconfig.tsbuildinfo
+backend/.venv/

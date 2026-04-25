@@ -1,10 +1,13 @@
 import { NavLink } from 'react-router-dom';
-import { navItems } from '../data/mockData';
+import type { NavItem } from '../data/mockData';
+import { useFetch } from '../hooks/useFetch';
 import styles from './Sidebar.module.css';
 
 export interface SidebarProps {}
 
 export default function Sidebar(_: SidebarProps) {
+  const { data: navItems } = useFetch<NavItem[]>('/api/v1/nav');
+
   return (
     <aside className={styles.sidebar}>
       <div className={styles.brand}>
@@ -17,7 +20,7 @@ export default function Sidebar(_: SidebarProps) {
 
       <div className={styles.section}>
         <div className={styles.label}>Workspace</div>
-        {navItems.map((n) => (
+        {(navItems ?? []).map((n) => (
           <NavLink
             key={n.to}
             to={n.to}

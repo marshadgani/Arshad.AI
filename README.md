@@ -27,6 +27,12 @@ docker compose up --build
 open http://localhost:3000
 ```
 
+The first run takes a minute longer than subsequent ones — a one-shot
+`db-init` service runs Alembic migrations and seeds the dashboard mock
+data into Postgres before the backend starts. The backend won't begin
+serving until that completes successfully, so the dashboard always
+sees a populated DB.
+
 ## Services at a Glance
 
 | Service      | Port | Tech                          |
@@ -62,15 +68,26 @@ Arshad.AI/
 ├── docker-compose.yml         ← all 5 services wired together
 │
 ├── backend/                   ← FastAPI + SQLAlchemy + Redis + Anthropic SDK
+│   ├── alembic/               ← migrations (versions/ contains the initial schema)
+│   ├── alembic.ini
+│   ├── scripts/
+│   │   └── seed_from_mock.py  ← idempotent seed; run by db-init compose service
 │   └── src/
 │       ├── main.py
+│       ├── api/v1/            ← versioned REST endpoints (dashboard.py, domains.py)
+│       ├── schemas/           ← Pydantic v2 response shapes
 │       ├── middleware/cache.py
-│       └── models/database.py
+│       └── models/            ← SQLAlchemy models (database.py + dashboard.py + domain.py)
 │
 ├── frontend/                  ← React 18 + TypeScript + Vite
 │   └── src/
 │       ├── index.tsx
-│       └── App.tsx
+│       ├── App.tsx
+│       ├── components/        ← AppLayout, Sidebar, TopBar, ChatBar, DomainPage
+│       ├── pages/             ← Dashboard + 7 domain pages
+│       ├── hooks/useFetch.ts  ← generic { data, isLoading, error } hook
+│       ├── data/mockData.ts   ← TypeScript shape contracts (now type-only)
+│       └── styles/            ← Jarvis design tokens + globals
 │
 ├── data-pipelines/            ← Apache Airflow 2.9
 │   ├── config/airflow.cfg
