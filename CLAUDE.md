@@ -349,6 +349,8 @@ A git commit is created automatically when any skill file changes.
 | `ui-ux-pro-max` | https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git | banner-design, brand, design-system, design, slides, ui-styling, ui-ux-pro-max (7) |
 | `claude-mem` | https://github.com/thedotmack/claude-mem.git | do, knowledge-agent, make-plan, mem-search, smart-explore, timeline-report, version-bump (7) |
 | `obsidian-skills` | https://github.com/kepano/obsidian-skills.git | defuddle, json-canvas, obsidian-bases, obsidian-cli, obsidian-markdown (5) |
+| `context7` | https://github.com/upstash/context7.git | context7-cli, context7-mcp, find-docs (3) |
+| `everything-claude-code` | https://github.com/affaan-m/everything-claude-code.git | agent-introspection-debugging, agent-sort, api-design, article-writing, backend-patterns, brand-voice, bun-runtime, claude-api, coding-standards, content-engine, crosspost, deep-research, dmux-workflows, documentation-lookup, e2e-testing, eval-harness, exa-search, fal-ai-media, frontend-design, frontend-patterns, frontend-slides, investor-materials, investor-outreach, market-research, mcp-server-patterns, nextjs-turbopack, product-capability, security-review, strategic-compact, tdd-workflow, verification-loop, video-editing, x-api (34) |
 
 ### Active Sources — Agents
 
@@ -356,12 +358,14 @@ A git commit is created automatically when any skill file changes.
 |---|---|---|
 | `n8n-mcp` | https://github.com/czlonkowski/n8n-mcp.git | code-reviewer, context-manager, debugger, deployment-engineer, mcp-backend-engineer, n8n-mcp-tester, technical-researcher, test-automator (8) |
 | `get-shit-done` | https://github.com/gsd-build/get-shit-done.git | gsd-planner, gsd-debugger, gsd-code-reviewer, gsd-executor, gsd-roadmapper, gsd-security-auditor, gsd-verifier + 26 more (33 total) |
+| `context7` | https://github.com/upstash/context7.git | docs-researcher (1) |
 
 ### Active Sources — Commands
 
 | Slug | Repo | Commands |
 |---|---|---|
 | `awesome-claude-code` | https://github.com/hesreallyhim/awesome-claude-code.git | evaluate-repository (1) |
+| `context7` | https://github.com/upstash/context7.git | docs — `/context7:docs <library> [query]` (1) |
 
 ### How It Works
 
@@ -394,12 +398,15 @@ That's it — it will be cloned, diffed, and committed on the next weekly run.
 │   ├── superpowers/           ← obra/superpowers — 13 skills
 │   ├── ui-ux-pro-max/         ← nextlevelbuilder — 7 skills
 │   ├── claude-mem/            ← thedotmack — 7 skills
-│   └── obsidian-skills/       ← kepano — 5 skills
+│   ├── obsidian-skills/       ← kepano — 5 skills
+│   ├── context7/              ← upstash/context7 — 3 skills
+│   └── everything-claude-code/ ← affaan-m — 34 skills
 │
 └── agents/
     ├── (project agents)       ← code-reviewer, debugger, planner, etc.
     ├── n8n-mcp/               ← czlonkowski/n8n-mcp — 8 agents
-    └── get-shit-done/         ← gsd-build/get-shit-done — 33 agents
+    ├── get-shit-done/         ← gsd-build/get-shit-done — 33 agents
+    └── context7/              ← upstash/context7 — 1 agent (docs-researcher)
 ```
 
 ## 16. Core Principles
@@ -464,5 +471,7 @@ This registry is the source of truth for weekly auto-updates.
 | `n8n-mcp` | https://github.com/czlonkowski/n8n-mcp.git | agents | 8 agents | 2026-04-25 |
 | `get-shit-done` | https://github.com/gsd-build/get-shit-done.git | agents | 33 agents | 2026-04-25 |
 | `awesome-claude-code` | https://github.com/hesreallyhim/awesome-claude-code.git | commands | 1 command | 2026-04-25 |
+| `context7` | https://github.com/upstash/context7.git | skills+agents+commands | 3 skills, 1 agent, 1 command | 2026-04-25 |
+| `everything-claude-code` | https://github.com/affaan-m/everything-claude-code.git | skills | 34 skills | 2026-04-25 |
 
 > This table is updated automatically by `scripts/fetch-github-repo.sh` when a new repo is integrated.

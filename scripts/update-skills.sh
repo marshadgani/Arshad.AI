@@ -25,12 +25,16 @@ declare -A SKILL_SOURCES=(
   ["ui-ux-pro-max"]="https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git"
   ["claude-mem"]="https://github.com/thedotmack/claude-mem.git"
   ["obsidian-skills"]="https://github.com/kepano/obsidian-skills.git"
+  ["context7"]="https://github.com/upstash/context7.git"
+  ["everything-claude-code"]="https://github.com/affaan-m/everything-claude-code.git"
 )
 declare -A SKILL_PATHS=(
   ["superpowers"]="skills"
   ["ui-ux-pro-max"]=".claude/skills"
   ["claude-mem"]="plugin/skills"
   ["obsidian-skills"]="skills"
+  ["context7"]="skills"
+  ["everything-claude-code"]=".agents/skills"
 )
 # Extra files to copy per skill source (space-separated, relative to repo root)
 declare -A SKILL_EXTRAS=(
@@ -38,6 +42,8 @@ declare -A SKILL_EXTRAS=(
   ["ui-ux-pro-max"]=""
   ["claude-mem"]=".agent/rules/claude-mem-context.md"
   ["obsidian-skills"]=""
+  ["context7"]=""
+  ["everything-claude-code"]=""
 )
 
 # ── Agent Sources (agent .md file repos) ──────────────────────────────────────
@@ -45,19 +51,23 @@ declare -A SKILL_EXTRAS=(
 declare -A AGENT_SOURCES=(
   ["n8n-mcp"]="https://github.com/czlonkowski/n8n-mcp.git"
   ["get-shit-done"]="https://github.com/gsd-build/get-shit-done.git"
+  ["context7"]="https://github.com/upstash/context7.git"
 )
 declare -A AGENT_PATHS=(
   ["n8n-mcp"]=".claude/agents"
   ["get-shit-done"]="agents"
+  ["context7"]="plugins/claude/context7/agents"
 )
 
 # ── Command Sources (slash command .md repos) ──────────────────────────────────
 # Commands are merged directly into .claude/commands/ (prefixed with slug_)
 declare -A COMMAND_SOURCES=(
   ["awesome-claude-code"]="https://github.com/hesreallyhim/awesome-claude-code.git"
+  ["context7"]="https://github.com/upstash/context7.git"
 )
 declare -A COMMAND_PATHS=(
   ["awesome-claude-code"]=".claude/commands"
+  ["context7"]="plugins/claude/context7/commands"
 )
 
 # ── Helper: sync a directory ───────────────────────────────────────────────────
