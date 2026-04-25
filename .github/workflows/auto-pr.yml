@@ -208,35 +208,36 @@ jobs:
             exit 1
           fi
 
-          # `gh pr merge` was terminating the shell mid-execution (see
-          # historical "BEFORE gh pr merge" without "AFTER" markers in
-          # earlier failure comments on this PR). Use the GitHub REST API
-          # directly via `gh api`, which doesn't trigger that path.
-          echo "- BEFORE gh api merge" >> "$DIAG"
-          gh api \
-            --method PUT \
+          # Both `gh pr merge` and `gh api PUT /merge` were terminating
+          # the shell mid-execution. Use raw curl to bypass gh CLI entirely.
+          echo "- BEFORE curl merge" >> "$DIAG"
+          http_code=$(curl -sS -X PUT \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
             -H "Accept: application/vnd.github+json" \
-            "/repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/merge" \
-            -f merge_method=squash \
-            > /tmp/merge.out 2> /tmp/merge.err
+            -H "Content-Type: application/json" \
+            -d '{"merge_method":"squash"}' \
+            -o /tmp/merge.out \
+            -w "%{http_code}" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/merge")
           rc=$?
-          echo "- AFTER gh api merge (rc=${rc})" >> "$DIAG"
+          echo "- AFTER curl merge (rc=${rc} http=${http_code})" >> "$DIAG"
 
           {
-            echo "- gh api merge rc: \`${rc}\`"
-            echo "- gh api merge stdout:"
+            echo "- curl exit code: \`${rc}\`"
+            echo "- HTTP status:    \`${http_code}\`"
+            echo "- response body:"
             echo
-            echo '```'
+            echo '```json'
             cat /tmp/merge.out 2>/dev/null || echo "(empty)"
-            echo '```'
-            echo "- gh api merge stderr:"
-            echo
-            echo '```'
-            cat /tmp/merge.err 2>/dev/null || echo "(empty)"
             echo '```'
           } | tee -a "$DIAG" >> "$GITHUB_STEP_SUMMARY"
 
-          exit $rc
+          # Exit non-zero if HTTP status is not 200 (success on merge endpoint).
+          if [ "$http_code" = "200" ]; then
+            exit 0
+          else
+            exit 1
+          fi
 
       - name: Post diagnostic comment on PR (always)
         if: always()
