@@ -1,0 +1,31 @@
+# Render Blueprint for Arshad.AI backend.
+#
+# preDeployCommand runs against the live Postgres BEFORE the new instance
+# is swapped in — so a failed migration leaves the previous version serving.
+#
+# `seed_from_mock` is idempotent (UPSERT on slug). Safe to re-run every deploy.
+# Remove the seed half of the chain when Phase D lands real ingestion.
+
+services:
+  - type: web
+    name: arshad-ai-backend
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /health
+    autoDeploy: true
+    preDeployCommand: "alembic upgrade head && python -m scripts.seed_from_mock"
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: PYTHONUNBUFFERED
+        value: "1"
