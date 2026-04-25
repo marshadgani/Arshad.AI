@@ -2,5 +2,5 @@
 with ``Base.metadata`` so Alembic autogenerate sees them.
 """
 
-from . import dashboard, domain, user  # noqa: F401
+from . import dashboard, domain, oauth_account, user  # noqa: F401
 from .database import AsyncSessionLocal, Base, engine, get_db  # noqa: F401
