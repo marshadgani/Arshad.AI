@@ -1,1 +1,6 @@
-from . import event_creator, event_updater, meeting_suggester  # noqa: F401
+from . import (  # noqa: F401
+    event_creator,
+    event_updater,
+    meeting_suggester,
+    schedule_analyzer,
+)
