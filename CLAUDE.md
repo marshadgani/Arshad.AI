@@ -664,8 +664,12 @@ This registry is the source of truth for weekly auto-updates.
 | `awesome-claude-code` | https://github.com/hesreallyhim/awesome-claude-code.git | commands | 1 command | 2026-04-25 |
 | `context7` | https://github.com/upstash/context7.git | skills+agents+commands | 3 skills, 1 agent, 1 command | 2026-04-25 |
 | `everything-claude-code` | https://github.com/affaan-m/everything-claude-code.git | skills | 34 skills | 2026-04-25 |
+| `browser-use` | https://github.com/browser-use/browser-use.git | skills | 4 skills | 2026-04-26 |
+| `marketingskills` | https://github.com/coreyhaines31/marketingskills.git | skills | 40 skills | 2026-04-26 |
+| `web-asset-generator` | https://github.com/alonw0/web-asset-generator.git | skills | 1 skill (favicons + OG images) | 2026-04-26 |
+| `Deep-Research-skills` | https://github.com/Weizhena/Deep-Research-skills.git | skills+agents | 24 skills, 7 agents (slug `-eep--esearch-skills` due to fetcher bug) | 2026-04-26 |
 
-> This table is updated automatically by `scripts/fetch-github-repo.sh` when a new repo is integrated.
+> This table should be updated alongside `scripts/fetch-github-repo.sh` runs. Keep in sync with `.claude/github-repos.json`.
 
 ---
 
