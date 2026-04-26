@@ -91,5 +91,6 @@ async def health():
 app.include_router(auth_router)
 app.include_router(tools_router)
 app.include_router(agents_router)
+app.include_router(chat_router)
 app.include_router(dashboard_router)
 app.include_router(domains_router)
