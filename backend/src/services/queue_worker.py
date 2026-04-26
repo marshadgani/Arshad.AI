@@ -100,21 +100,34 @@ async def _process(row_id, dag_id: str, user_id, payload: dict, attempt: int) ->
 
 
 async def run_worker(stop_event: asyncio.Event) -> None:
-    interval = _poll_interval()
-    _log.info("queue worker started poll_interval=%s", interval)
+    base_interval = _poll_interval()
+    backoff = base_interval
+    _log.info("queue worker started poll_interval=%s", base_interval)
     while not stop_event.is_set():
+        claim_failed = False
         try:
             row = await _claim_one()
         except Exception as exc:  # noqa: BLE001 — DB transient errors should retry
-            _log.warning("queue worker claim failed err=%r", exc)
+            _log.warning("queue worker claim failed err=%r backoff=%s", exc, backoff)
             row = None
+            claim_failed = True
 
         if row is not None:
+            backoff = base_interval  # successful claim resets backoff
             await _process(row.id, row.dag_id, row.user_id, row.payload, row.attempt)
             continue  # loop hot — there may be more work
 
+        # If the claim itself failed (DB connection drop, etc.), grow backoff
+        # exponentially up to 5 minutes so a sick DB doesn't get hammered.
+        # Successful empty-queue polls keep base_interval.
+        if claim_failed:
+            backoff = min(backoff * 2, 300)
+            wait_for = backoff
+        else:
+            wait_for = base_interval
+
         try:
-            await asyncio.wait_for(stop_event.wait(), timeout=interval)
+            await asyncio.wait_for(stop_event.wait(), timeout=wait_for)
         except asyncio.TimeoutError:
             pass
     _log.info("queue worker stopped")
