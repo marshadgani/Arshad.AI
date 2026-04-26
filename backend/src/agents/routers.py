@@ -18,10 +18,14 @@ so AGENT_REGISTRY is populated before the first request arrives.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+import uuid
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..auth.dependencies import get_current_user
+from ..models.dag_trigger import DagTriggerQueue
 from ..models.database import get_db
 from ..models.user import User
 from ..services.gateway import GatewayError, dispatch, list_agents
@@ -52,10 +56,70 @@ def _envelope(status_code: int, code: str, message: str) -> HTTPException:
     )
 
 
+def _serialize_run(row: DagTriggerQueue) -> dict:
+    return {
+        "run_id": str(row.id),
+        "dag_id": row.dag_id,
+        "user_id": str(row.user_id),
+        "status": row.status,
+        "payload": row.payload,
+        "requested_at": row.requested_at.isoformat() if row.requested_at else None,
+        "picked_at": row.picked_at.isoformat() if row.picked_at else None,
+        "completed_at": row.completed_at.isoformat() if row.completed_at else None,
+        "error_text": row.error_text,
+        "attempt": row.attempt,
+    }
+
+
 @router.get("", summary="List registered agents")
 async def list_endpoint() -> dict:
     agents = list_agents()
     return {"data": agents, "total": len(agents)}
+
+
+@router.get(
+    "/data_pipeline/runs/{run_id}",
+    summary="Get a single ingestion run by id",
+)
+async def get_run(
+    run_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    row = await db.scalar(
+        select(DagTriggerQueue).where(
+            DagTriggerQueue.id == run_id, DagTriggerQueue.user_id == user.id
+        )
+    )
+    if row is None:
+        raise _envelope(
+            status.HTTP_404_NOT_FOUND,
+            "run_not_found",
+            f"No ingestion run with id {run_id}.",
+        )
+    return {"data": _serialize_run(row)}
+
+
+@router.get("/data_pipeline/runs", summary="List the user's recent ingestion runs")
+async def list_runs(
+    status_filter: str | None = Query(default=None, alias="status"),
+    limit: int = Query(default=20, ge=1, le=100),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    stmt = (
+        select(DagTriggerQueue)
+        .where(DagTriggerQueue.user_id == user.id)
+        .order_by(DagTriggerQueue.requested_at.desc())
+        .limit(limit)
+    )
+    if status_filter:
+        stmt = stmt.where(DagTriggerQueue.status == status_filter)
+    rows = (await db.scalars(stmt)).all()
+    return {
+        "data": [_serialize_run(r) for r in rows],
+        "total": len(rows),
+    }
 
 
 @router.post("/{domain}/{agent}/run", summary="Execute an agent")
