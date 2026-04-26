@@ -210,15 +210,27 @@ cd backend && uvicorn src.main:app --reload --port 8000
 
 ## 8. Key Code Patterns
 
-### Adding a new Claude tool *(planned — module not yet created)*
-1. Define the tool schema in `backend/src/tools/definitions.py`
-2. Implement the handler in `backend/src/tools/handlers.py`
-3. Register it in the `TOOL_HANDLERS` map
-4. All Claude calls go through `backend/src/services/ai.py` — never inline
+### Adding a new Claude tool *(Phase D — implemented)*
 
-> The `backend/src/tools/` and `backend/src/services/` packages do not yet exist;
-> create them when the first tool is implemented. The pattern above is the target
-> design, not the current state of the codebase.
+Tool layout (per Phase D spec at `docs/superpowers/specs/2026-04-26-backend-phase-d-design.md`):
+
+```
+backend/src/tools/
+├── base.py            ← Tool ABC + ToolError / ProviderNotLinked / ProviderReauthRequired
+├── registry.py        ← TOOL_REGISTRY + @register decorator
+├── token_service.py   ← get_access_token + refresh_google_token
+├── clients/           ← google_calendar, gmail, github HTTP wrappers
+├── calendar/ gmail/ github/   ← one module per tool
+└── routers.py         ← POST /api/v1/tools/{name}
+```
+
+To add a tool:
+1. Pick the provider directory (`tools/<provider>/`).
+2. Create a module with `Input` / `Output` Pydantic schemas (output MUST have `data` + `summary`) and a class subclassing `Tool` with `@register` decorator.
+3. Import the module in the provider's `__init__.py` so `@register` runs at app startup.
+4. The REST endpoint `POST /api/v1/tools/{name}` and the `TOOL_REGISTRY` map both pick it up automatically.
+
+Phase B chat will eventually call tools directly via `TOOL_REGISTRY[name](user=..., db=..., payload=...)` — no HTTP round-trip needed.
 
 ### Adding a new API endpoint
 Follow `.claude/rules/api.md`:

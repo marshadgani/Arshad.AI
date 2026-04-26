@@ -115,5 +115,17 @@ Arshad.AI/
 ## API Docs
 Interactive Swagger UI at http://localhost:8000/docs when backend is running.
 
+### Tools (Phase D)
+Twelve OAuth-backed tools live under `/api/v1/tools/{name}`:
+
+| Provider | Tools |
+|---|---|
+| Calendar | `calendar_list_events` · `calendar_create_event` · `calendar_update_event` · `calendar_find_free_slots` |
+| Gmail | `gmail_search_threads` · `gmail_get_thread` · `gmail_create_draft` · `gmail_apply_label` |
+| GitHub | `github_list_issues` · `github_create_issue` · `github_update_issue` · `github_list_prs` |
+
+Discovery: `GET /api/v1/tools` returns each tool's name, description, and input JSON-schema.
+Each tool returns `{data: <raw provider JSON>, summary: <normalized fields>}`. Auth-gated by JWT bearer.
+
 ## Airflow UI
 Dashboard at http://localhost:8080 — login: `admin` / `admin`.
