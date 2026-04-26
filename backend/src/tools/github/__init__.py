@@ -1,3 +1,9 @@
 """GitHub tools — register on import."""
 
-from . import create_issue, list_issues, list_prs, update_issue  # noqa: F401
+from . import (  # noqa: F401
+    create_issue,
+    get_pr,
+    list_issues,
+    list_prs,
+    update_issue,
+)
