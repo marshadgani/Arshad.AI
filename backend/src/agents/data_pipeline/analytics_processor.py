@@ -1,24 +1,32 @@
-"""data_pipeline/analytics_processor — placeholder; needs ingested data first."""
+"""data_pipeline/analytics_processor — INSERTs a row into dag_trigger_queue."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ...models.dag_trigger import DagTriggerQueue
 from ...models.user import User
-from ..base import Agent, AgentNotImplemented
+from ..base import Agent
 from ..registry import register
 
 
 class AnalyticsProcessorInput(BaseModel):
-    window_days: int = 7
+    window_days: int = Field(default=7, ge=1, le=365)
+
+
+class AnalyticsProcessorSummary(BaseModel):
+    run_id: str
+    status: str
+    dag_id: str
+    window_days: int
 
 
 class AnalyticsProcessorOutput(BaseModel):
     data: dict[str, Any]
-    summary: dict[str, Any]
+    summary: AnalyticsProcessorSummary
 
 
 @register
@@ -26,8 +34,8 @@ class AnalyticsProcessorAgent(Agent):
     domain = "data_pipeline"
     name = "analytics_processor"
     description = (
-        "Aggregates ingested Calendar/Gmail/GitHub data into summary tables. "
-        "Phase E: not implemented — needs data ingested first (Phase F)."
+        "Triggers async aggregation of ingested_* tables into "
+        "ingested_analytics_summary for the given window. Returns a run_id."
     )
     input_schema = AnalyticsProcessorInput
     output_schema = AnalyticsProcessorOutput
@@ -36,4 +44,26 @@ class AnalyticsProcessorAgent(Agent):
     async def run(
         self, *, user: User, db: AsyncSession, payload: BaseModel
     ) -> AnalyticsProcessorOutput:
-        raise AgentNotImplemented(slug=self.slug, owning_phase="Phase F")
+        assert isinstance(payload, AnalyticsProcessorInput)
+        row = DagTriggerQueue(
+            dag_id="analytics_processor",
+            user_id=user.id,
+            payload=payload.model_dump(),
+            status="pending",
+        )
+        db.add(row)
+        await db.commit()
+        return AnalyticsProcessorOutput(
+            data={
+                "run_id": str(row.id),
+                "status": row.status,
+                "dag_id": row.dag_id,
+                "window_days": payload.window_days,
+            },
+            summary=AnalyticsProcessorSummary(
+                run_id=str(row.id),
+                status=row.status,
+                dag_id=row.dag_id,
+                window_days=payload.window_days,
+            ),
+        )
