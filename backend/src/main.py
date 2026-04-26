@@ -88,8 +88,10 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Catch-all so a misconfigured backend (missing Redis, missing env var,
     DB unreachable, etc.) returns a readable JSON envelope instead of a
-    blank 500 the user can't diagnose. Exception details are logged
-    server-side at ERROR level — never leaked to the response.
+    blank 500 the user can't diagnose. Full traceback is logged server-side
+    at ERROR level. The response includes a truncated str(exc) so connection
+    failures (host:port) are visible without needing log access — acceptable
+    for the single-user MVP; revisit if/when multi-tenant.
     """
     _log.exception("Unhandled exception on %s %s", request.method, request.url.path)
     return JSONResponse(
@@ -97,11 +99,11 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
         content={
             "error": {
                 "code": "internal_error",
-                "message": (
-                    f"Backend hit an unhandled {type(exc).__name__}. "
-                    "Check Render logs for the traceback."
-                ),
-                "details": {"path": request.url.path},
+                "message": f"Backend hit an unhandled {type(exc).__name__}.",
+                "details": {
+                    "path": request.url.path,
+                    "exception": str(exc)[:300],
+                },
             }
         },
     )
