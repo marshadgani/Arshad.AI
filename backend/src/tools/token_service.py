@@ -73,9 +73,16 @@ async def refresh_google_token(
 
     Raises ProviderReauthRequired('google') if Google rejects the refresh
     (refresh token revoked, scope removed, account deleted, etc.).
+
+    Concurrency: SELECT...FOR UPDATE serialises concurrent refreshes for
+    the same account. Without it, two coroutines that both observe an
+    expired token would both POST to Google, both persist different new
+    tokens, and the second commit would clobber the first's expiry.
     """
     token_row = await db.scalar(
-        select(OAuthToken).where(OAuthToken.oauth_account_id == oauth_account_id)
+        select(OAuthToken)
+        .where(OAuthToken.oauth_account_id == oauth_account_id)
+        .with_for_update()
     )
     if token_row is None or token_row.encrypted_refresh_token is None:
         raise ProviderReauthRequired("google")
