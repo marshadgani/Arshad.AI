@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-route
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import AppLayout from './components/AppLayout';
 import AuthCallback from './pages/AuthCallback';
+import Chat from './pages/Chat';
 import Dashboard from './pages/Dashboard';
 import HealthFitness from './pages/HealthFitness';
 import HomeIoT from './pages/HomeIoT';
@@ -61,15 +62,17 @@ function ProtectedRoutes() {
   return (
     <AppLayout>
       <Routes>
-        <Route path="/"          element={<Dashboard />} />
-        <Route path="/finance"   element={<PersonalFinance />} />
-        <Route path="/shopify"   element={<ShopifyStore />} />
-        <Route path="/stocks"    element={<StockMarket />} />
-        <Route path="/health"    element={<HealthFitness />} />
-        <Route path="/learning"  element={<Learning />} />
-        <Route path="/home-iot"  element={<HomeIoT />} />
-        <Route path="/travel"    element={<Travel />} />
-        <Route path="*"          element={<Navigate to="/" replace />} />
+        <Route path="/"                   element={<Dashboard />} />
+        <Route path="/chat"               element={<Chat />} />
+        <Route path="/chat/:sessionId"    element={<Chat />} />
+        <Route path="/finance"            element={<PersonalFinance />} />
+        <Route path="/shopify"            element={<ShopifyStore />} />
+        <Route path="/stocks"             element={<StockMarket />} />
+        <Route path="/health"             element={<HealthFitness />} />
+        <Route path="/learning"           element={<Learning />} />
+        <Route path="/home-iot"           element={<HomeIoT />} />
+        <Route path="/travel"             element={<Travel />} />
+        <Route path="*"                   element={<Navigate to="/" replace />} />
       </Routes>
     </AppLayout>
   );
