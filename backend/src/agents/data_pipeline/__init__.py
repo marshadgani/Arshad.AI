@@ -1,1 +1,1 @@
-from . import calendar_ingestor  # noqa: F401
+from . import calendar_ingestor, email_ingestor  # noqa: F401
