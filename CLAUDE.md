@@ -184,6 +184,9 @@ Arshad.AI/
 | `OAUTH_ENCRYPTION_KEY` | Phase C+ | 32-byte URL-safe base64. Encrypts provider tokens at rest. Rotation locks all users out. |
 | `JWT_EXPIRY_HOURS` | Phase C+ | JWT lifetime; default 24 |
 | `BACKEND_URL` / `FRONTEND_URL` | Phase C+ | Public URLs — used to build provider redirect URIs and post-login frontend redirect |
+| `ENABLE_INPROCESS_WORKER` | Phase F+ | `true` to start the queue worker on FastAPI lifespan (Render). Leave `false` in docker-compose where Airflow handles it. |
+| `QUEUE_POLL_INTERVAL_SECONDS` | Phase F+ | Worker poll interval; default `5`. |
+| `MAX_INGEST_BATCH_SIZE` | Phase F+ | Per-DAG row limit per run; default `100`. |
 
 Never hard-code secrets. Always add new vars to `backend/.env.example`.
 
@@ -255,7 +258,39 @@ To add an agent:
 
 Inter-agent calls (rule §19.4): never call another agent's `run()` directly — call `gateway.dispatch(...)` so cross-cutting concerns (auth, error mapping) stay in one place.
 
-LLM-bound agents (chat orchestration, summarisation, code review) raise `AgentNotImplemented(slug, owning_phase="Phase B")` from `run()` until Phase B replaces with real Claude calls. Same for data-pipeline agents (Phase F).
+LLM-bound agents (chat orchestration, summarisation, code review) raise `AgentNotImplemented(slug, owning_phase="Phase B")` from `run()` until Phase B replaces with real Claude calls.
+
+### Adding a new ingestion DAG *(Phase F — implemented)*
+
+Layout (per Phase F spec at `docs/superpowers/specs/2026-04-26-backend-phase-f-design.md`):
+
+```
+backend/src/services/ingestion/
+├── runner.py            ← run(dag_id, user_id, payload, db) — single dispatch point
+├── calendar.py          ← per-DAG ingestion logic (called by runner)
+├── email.py
+├── github.py
+└── analytics.py
+
+backend/src/services/queue_worker.py  ← in-process FastAPI worker (Render)
+backend/src/models/dag_trigger.py     ← DagTriggerQueue ORM model
+backend/src/models/ingested.py        ← 4 ingested_* tables
+
+data-pipelines/ingestion/
+├── _ingestion_helpers.py   ← shared claim_one / run_ingest_for_row / mark_done
+├── calendar_dag.py         ← thin Airflow wrapper (sensor → ingest → mark_done)
+├── email_dag.py
+├── github_dag.py
+└── analytics_dag.py
+```
+
+To add a new ingestion DAG:
+1. Write a new module in `backend/src/services/ingestion/<name>.py` exposing `async def ingest(*, user, db, payload) -> dict`.
+2. Wire it into `runner.py`'s dispatch.
+3. Replace the corresponding `data_pipeline/<name>_ingestor.py` agent's `AgentNotImplemented` with a real INSERT-queue body.
+4. Copy one of the existing `*_dag.py` files in `data-pipelines/ingestion/` and change the `DAG_ID` string.
+
+Both Airflow (docker-compose dev) and the in-process queue worker (Render prod via `ENABLE_INPROCESS_WORKER=true`) consume the same `dag_trigger_queue` table with `SELECT ... FOR UPDATE SKIP LOCKED LIMIT 1`. Same logic, two execution environments.
 
 ### Adding a new API endpoint
 Follow `.claude/rules/api.md`:

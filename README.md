@@ -136,11 +136,24 @@ Each tool returns `{data: <raw provider JSON>, summary: <normalized fields>}`. A
 | `email` | `email_searcher` · `email_drafter` · `email_labeler` · `email_summarizer` (heuristic) |
 | `github` | `issue_manager` (verb-routed) · `pr_reviewer` (heuristic) · `code_summarizer` (placeholder) · `repo_monitor` |
 | `ai_core` | `chat_orchestrator` (placeholder) · `tool_dispatcher` · `context_manager` (placeholder) · `response_streamer` (placeholder) |
-| `data_pipeline` | `calendar_ingestor` · `email_ingestor` · `github_ingestor` · `analytics_processor` (all placeholders — Phase F lands real DAGs) |
+| `data_pipeline` | `calendar_ingestor` · `email_ingestor` · `github_ingestor` · `analytics_processor` (Phase F — real ingestion via DB queue + Airflow / in-process worker) |
 | `infrastructure` | `api_gateway` (self-ref) · `auth_manager` · `cache_manager` · `health_monitor` |
 
 Discovery: `GET /api/v1/agents` returns each agent's domain/name/description/input_schema/tool_dependencies.
 Placeholder agents return 501 `not_yet_implemented` with the owning_phase (B or F) so the frontend knows which roadmap item lights them up.
+
+### Ingestion (Phase F)
+The 4 `data_pipeline` agents are now real INSERT-queue triggers. Each call inserts a row into `dag_trigger_queue` and returns a `run_id`; the actual ingestion happens in either Airflow (local docker-compose) or an in-process FastAPI worker (Render prod) — same `services/ingestion/runner.py` code path either way.
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /api/v1/agents/data_pipeline/{calendar_ingestor,email_ingestor,github_ingestor,analytics_processor}/run` | Enqueues an ingestion run; returns `run_id` |
+| `GET /api/v1/agents/data_pipeline/runs/{run_id}` | Status of a single run (pending / picked / completed / failed) |
+| `GET /api/v1/agents/data_pipeline/runs?status=...&limit=20` | Recent runs for the calling user |
+
+Ingested data lands in `ingested_calendar_events`, `ingested_gmail_threads`, `ingested_github_activity`, `ingested_analytics_summary` — hybrid storage with typed `user_id` / `occurred_at` / `provider_id` columns + `raw jsonb`. Ingestors publish `events.<provider>.ingested` to Redis pub/sub on each successful run.
+
+**Render prod**: set `ENABLE_INPROCESS_WORKER=true` to start the queue worker alongside FastAPI (no Airflow needed). **Local docker-compose**: leave it `false` — Airflow handles the queue.
 
 ## Airflow UI
 Dashboard at http://localhost:8080 — login: `admin` / `admin`.
