@@ -89,7 +89,7 @@ def _tool_subset(intent: str) -> tuple[list[str], list[str]]:
             tool_names,
             ["github_pr_reviewer", "github_code_summarizer", "github_repo_monitor"],
         )
-    return ([], [])
+    return ([], ["ai_core_council_chairman"])
 
 
 def _build_tool_schemas(
