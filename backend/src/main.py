@@ -8,6 +8,7 @@ from src.api.v1.dashboard import router as dashboard_router
 from src.api.v1.domains import router as domains_router
 from src.auth.routers import router as auth_router
 from src.middleware.cache import close_redis
+from src.tools.routers import router as tools_router
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 if not SECRET_KEY or SECRET_KEY == "change-me":
@@ -59,5 +60,6 @@ async def health():
 
 
 app.include_router(auth_router)
+app.include_router(tools_router)
 app.include_router(dashboard_router)
 app.include_router(domains_router)
