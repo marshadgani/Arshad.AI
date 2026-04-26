@@ -126,13 +126,14 @@ async def get_messages(
 @router.delete(
     "/sessions/{session_id}",
     status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
     summary="Delete a session (cascades to messages)",
 )
 async def delete_session(
     session_id: uuid.UUID,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> None:
+) -> Response:
     session = await db.scalar(
         select(ConversationSession).where(
             ConversationSession.id == session_id,
@@ -147,7 +148,7 @@ async def delete_session(
         )
     await db.delete(session)
     await db.commit()
-    return None
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post(
