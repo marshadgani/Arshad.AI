@@ -1,1 +1,6 @@
-from . import code_summarizer, issue_manager, pr_reviewer  # noqa: F401
+from . import (  # noqa: F401
+    code_summarizer,
+    issue_manager,
+    pr_reviewer,
+    repo_monitor,
+)
