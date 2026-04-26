@@ -259,6 +259,34 @@
           "search.py"
         ]
       }
+    },
+    "browser-use": {
+      "url": "https://github.com/browser-use/browser-use.git",
+      "name": "browser-use",
+      "last_fetched": "2026-04-26 15:48 UTC",
+      "components": {
+        "skills": [
+          "open-source",
+          "browser-use",
+          "cloud",
+          "remote-browser"
+        ],
+        "agents": [],
+        "commands": [],
+        "hooks": [],
+        "token_optimization": [
+          "views.py",
+          "service.py",
+          "chat_bedrock.py",
+          "chat_anthropic.py",
+          "chat.py",
+          "chat.py",
+          "chat.py",
+          "chat.py",
+          "chat.py",
+          "chat.py"
+        ]
+      }
     }
   }
 }
