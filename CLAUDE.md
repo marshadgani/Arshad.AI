@@ -187,6 +187,9 @@ Arshad.AI/
 | `ENABLE_INPROCESS_WORKER` | Phase F+ | `true` to start the queue worker on FastAPI lifespan (Render). Leave `false` in docker-compose where Airflow handles it. |
 | `QUEUE_POLL_INTERVAL_SECONDS` | Phase F+ | Worker poll interval; default `5`. |
 | `MAX_INGEST_BATCH_SIZE` | Phase F+ | Per-DAG row limit per run; default `100`. |
+| `ANTHROPIC_MODEL_DEFAULT` | Phase B+ | Default model name; defaults to `claude-haiku-4-5-20251001`. |
+| `CHAT_MAX_TOKENS` | Phase B+ | Max output tokens per chat turn; default `2048`. |
+| `CHAT_HISTORY_TOKEN_BUDGET` | Phase B+ | Drop oldest user/assistant pairs once history exceeds this; default `8000`. |
 
 Never hard-code secrets. Always add new vars to `backend/.env.example`.
 
@@ -291,6 +294,32 @@ To add a new ingestion DAG:
 4. Copy one of the existing `*_dag.py` files in `data-pipelines/ingestion/` and change the `DAG_ID` string.
 
 Both Airflow (docker-compose dev) and the in-process queue worker (Render prod via `ENABLE_INPROCESS_WORKER=true`) consume the same `dag_trigger_queue` table with `SELECT ... FOR UPDATE SKIP LOCKED LIMIT 1`. Same logic, two execution environments.
+
+### Adding chat features *(Phase B — implemented; final phase)*
+
+Layout (per Phase B spec at `docs/superpowers/specs/2026-04-26-backend-phase-b-design.md`):
+
+```
+backend/src/
+├── services/
+│   ├── ai.py                  ← Anthropic SDK wrapper (call + stream)
+│   ├── intent_classifier.py   ← stage-1 Haiku call: domain picker
+│   └── chat.py                ← agentic loop + SSE event yielding
+├── api/v1/chat.py             ← /api/v1/chat sessions + SSE messages
+└── models/conversation.py     ← ConversationSession + ConversationMessage
+```
+
+Key invariants:
+- **All SDK calls go through `services/ai.py`** — never `anthropic.AsyncAnthropic` inline.
+- **SSE event protocol** is defined in the `response_streamer` agent — `delta` / `tool_use` / `tool_result` / `intent` / `error` + `[DONE]` terminator.
+- **Two-stage routing**: stage-1 keyword fast-path or Haiku classifier picks domain; stage-2 Haiku call gets only that domain's tools (calendar / email / github / general). Tool subset is computed in `services.chat._tool_subset(intent)`.
+- **History is reconstructed** from `conversation_messages` rows on every turn so the SDK call sees the canonical Anthropic-API-shaped messages array. Token-budget compression drops oldest user/assistant turns until under `CHAT_HISTORY_TOKEN_BUDGET`.
+- **Inter-agent calls inside the agentic loop** still go through the gateway — `services.chat._dispatch_tool` validates input + runs via `Tool()(...)` or `Agent.run(...)`.
+- **Claude tool use exposes agents** via `agent_<slug>` prefix; `_dispatch_tool` strips the prefix and dispatches.
+
+To add a new chat-relevant tool or agent:
+1. Build it under Phase D (tool) or Phase E (agent) per their existing patterns.
+2. Add it to `services.chat._tool_subset` for the appropriate intent so Claude can pick it.
 
 ### Adding a new API endpoint
 Follow `.claude/rules/api.md`:

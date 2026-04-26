@@ -155,5 +155,22 @@ Ingested data lands in `ingested_calendar_events`, `ingested_gmail_threads`, `in
 
 **Render prod**: set `ENABLE_INPROCESS_WORKER=true` to start the queue worker alongside FastAPI (no Airflow needed). **Local docker-compose**: leave it `false` — Airflow handles the queue.
 
+### Chat (Phase B — final phase)
+Anthropic SDK + persistent conversation memory + SSE streaming. Two-stage routing: a Haiku classifier picks a domain, then a second Haiku call runs with only that domain's tool subset.
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /api/v1/chat/sessions` | Create a chat session |
+| `GET /api/v1/chat/sessions` | List sessions ordered by `updated_at desc` |
+| `GET /api/v1/chat/sessions/{id}/messages` | Full message history |
+| `POST /api/v1/chat/sessions/{id}/messages` | Send message; returns SSE stream of the assistant's reply |
+| `DELETE /api/v1/chat/sessions/{id}` | Delete a session (cascades to messages) |
+
+SSE event types: `intent`, `delta`, `tool_use`, `tool_result`, `error`. Terminator: `data: [DONE]\n\n`.
+
+Conversation memory lives in `conversation_sessions` + `conversation_messages` (JSONB content per role: user / assistant / tool_use / tool_result). History reconstruction + token-budget compression are in `services/chat.py`.
+
+The 6 LLM-bound Phase E agents (`chat_orchestrator`, `context_manager`, `response_streamer`, `email_summarizer`, `pr_reviewer`, `code_summarizer`) are now real Claude calls — `is_heuristic` flag is `false` on summarizers, the placeholders are gone.
+
 ## Airflow UI
 Dashboard at http://localhost:8080 — login: `admin` / `admin`.
