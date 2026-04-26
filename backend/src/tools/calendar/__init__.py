@@ -5,4 +5,4 @@ package is imported. Adding a new calendar tool: write the module,
 import it here.
 """
 
-from . import list_events  # noqa: F401
+from . import create_event, list_events  # noqa: F401
