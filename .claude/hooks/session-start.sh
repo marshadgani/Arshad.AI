@@ -13,6 +13,19 @@ REGISTRY="$REPO_ROOT/.claude/github-repos.json"
 LOG="$REPO_ROOT/.claude/skills/.update-log"
 SEVEN_DAYS=604800
 
+# ── Surface tasks/handoff.md to Claude (the /session-end half of the cycle) ──
+# /session-end overwrites tasks/handoff.md at the end of every session with a
+# tight "where we are / what's next / watch out for" snapshot. Printing it
+# here folds the snapshot into Claude's session context so the next session
+# starts in flow within seconds — the whole point of the pattern.
+HANDOFF_FILE="$REPO_ROOT/tasks/handoff.md"
+if [ -f "$HANDOFF_FILE" ]; then
+  echo "[session-start] reading tasks/handoff.md (run /session-end at session end to refresh):"
+  echo "----"
+  cat "$HANDOFF_FILE"
+  echo "----"
+fi
+
 # ── Check if weekly update is due ─────────────────────────────────────────────
 if [ -f "$TIMESTAMP_FILE" ]; then
   LAST_UPDATED=$(cat "$TIMESTAMP_FILE")

@@ -511,6 +511,19 @@ When a skill or agent is genuinely useful but invisible, **promote it** by copyi
 5. **Document Results** — Add a review section to `tasks/todo.md` when done
 6. **Capture Lessons** — Update `tasks/lessons.md` after every correction
 
+### Session lifecycle — `/session-end` + `tasks/handoff.md` + `tasks/dev-log.md`
+
+The repo runs a session-end cycle that keeps Claude productive across sessions:
+
+| File | Behaviour | Read when |
+|---|---|---|
+| `tasks/handoff.md` | **Overwritten** every session by `/session-end`. Single tight "where we are / what's next / watch out for" snapshot, kept under 60 lines. | Auto-surfaced by `.claude/hooks/session-start.sh` so every new session starts with it in context. |
+| `tasks/dev-log.md` | **Append-only** chronological history. New entries go at the top. Past entries are immutable — corrections become new entries. | On demand when historical context is needed (decisions, pivots, skipped work). |
+| `tasks/lessons.md` | **Append-only** corrections + rules-going-forward. | Reviewed at session start; durable across sessions. |
+| `tasks/last-gate-report.md` | Most-recent gate verdict. Drives the auto-pr workflow's squash-merge. | Read before any "Merge to Main" trigger. |
+
+**At session end, run `/session-end`** (slash command at `.claude/commands/session-end.md`). It writes the handoff, appends the dev log entry, commits both files, and asks before pushing (private by default per the original pattern). **At session start**, the SessionStart hook prints `tasks/handoff.md` so whichever Claude is loaded sees it without being told.
+
 ---
 
 ## 15. External Skill Sources (Auto-Updated Weekly)
@@ -651,8 +664,12 @@ This registry is the source of truth for weekly auto-updates.
 | `awesome-claude-code` | https://github.com/hesreallyhim/awesome-claude-code.git | commands | 1 command | 2026-04-25 |
 | `context7` | https://github.com/upstash/context7.git | skills+agents+commands | 3 skills, 1 agent, 1 command | 2026-04-25 |
 | `everything-claude-code` | https://github.com/affaan-m/everything-claude-code.git | skills | 34 skills | 2026-04-25 |
+| `browser-use` | https://github.com/browser-use/browser-use.git | skills | 4 skills | 2026-04-26 |
+| `marketingskills` | https://github.com/coreyhaines31/marketingskills.git | skills | 40 skills | 2026-04-26 |
+| `web-asset-generator` | https://github.com/alonw0/web-asset-generator.git | skills | 1 skill (favicons + OG images) | 2026-04-26 |
+| `Deep-Research-skills` | https://github.com/Weizhena/Deep-Research-skills.git | skills+agents | 24 skills, 7 agents (slug `-eep--esearch-skills` due to fetcher bug) | 2026-04-26 |
 
-> This table is updated automatically by `scripts/fetch-github-repo.sh` when a new repo is integrated.
+> This table should be updated alongside `scripts/fetch-github-repo.sh` runs. Keep in sync with `.claude/github-repos.json`.
 
 ---
 
