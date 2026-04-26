@@ -1,9 +1,8 @@
-"""email/email_summarizer — heuristic thread summary; Phase B replaces with Claude.
+"""email/email_summarizer — Claude-summarized Gmail thread (Phase B real impl).
 
-Phase E heuristic: returns first 200 chars of the latest message's plain
-body + sender + subject. No actual summarisation. Phase B replaces with
-a real Claude call that reads the thread and produces an action-oriented
-summary.
+Phase E heuristic returned the first 200 chars of the latest message.
+Phase B fetches the thread, formats sender/subject/body for each
+message, and calls Haiku with a tight 2-sentence-summary prompt.
 """
 
 from __future__ import annotations
@@ -14,12 +13,16 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...models.user import User
-from ...tools.gmail.get_thread import (
-    GetThreadInput,
-    GmailGetThread,
-)
+from ...services import ai
+from ...tools.gmail.get_thread import GetThreadInput, GmailGetThread
 from ..base import Agent
 from ..registry import register
+
+_SYSTEM_PROMPT = """\
+Summarize this Gmail thread in 1-2 short sentences focused on action items
+or open questions for the recipient. Output plain text only — no JSON, no
+markdown. If there's nothing actionable, say so in one sentence.
+"""
 
 
 class EmailSummarizerInput(BaseModel):
@@ -30,12 +33,9 @@ class EmailSummary(BaseModel):
     thread_id: str
     latest_subject: str | None
     latest_from: str | None
-    latest_excerpt: str | None
+    summary_text: str | None
     message_count: int
-    is_heuristic: bool = Field(
-        default=True,
-        description="Phase E flag: this summary is a 200-char prefix, not real summarisation. Phase B replaces with Claude.",
-    )
+    is_heuristic: bool = False
 
 
 class EmailSummarizerOutput(BaseModel):
@@ -43,7 +43,7 @@ class EmailSummarizerOutput(BaseModel):
     summary: EmailSummary
 
 
-_EXCERPT_LEN = 200
+_TRANSCRIPT_CHAR_CAP = 16000
 
 
 @register
@@ -51,8 +51,8 @@ class EmailSummarizerAgent(Agent):
     domain = "email"
     name = "email_summarizer"
     description = (
-        "Returns a thread excerpt (first 200 chars of the latest message). "
-        "Phase E: heuristic only — Phase B replaces with Claude summarisation."
+        "Summarizes a Gmail thread with a Haiku call focused on action items. "
+        "Phase B: real Claude summarisation. is_heuristic flag now false."
     )
     input_schema = EmailSummarizerInput
     output_schema = EmailSummarizerOutput
@@ -62,21 +62,44 @@ class EmailSummarizerAgent(Agent):
         self, *, user: User, db: AsyncSession, payload: BaseModel
     ) -> EmailSummarizerOutput:
         assert isinstance(payload, EmailSummarizerInput)
-        result = await GmailGetThread()(
+        thread = await GmailGetThread()(
             user=user, db=db, payload=GetThreadInput(thread_id=payload.thread_id)
         )
-        messages = result.summary.messages
+        messages = thread.summary.messages
         latest = messages[-1] if messages else None
-        excerpt = None
-        if latest and latest.body_plain:
-            excerpt = latest.body_plain.strip()[:_EXCERPT_LEN]
+
+        transcript_parts: list[str] = []
+        for m in messages:
+            transcript_parts.append(
+                f"From: {m.from_addr or '(unknown)'}\n"
+                f"Date: {m.date or '(unknown)'}\n"
+                f"Subject: {m.subject or '(no subject)'}\n"
+                f"---\n"
+                f"{(m.body_plain or '(no plain body)')[:2000]}"
+            )
+        transcript = "\n\n=====\n\n".join(transcript_parts)[:_TRANSCRIPT_CHAR_CAP]
+
+        summary_text: str | None = None
+        if transcript.strip():
+            msg = await ai.call(
+                system=_SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": transcript}],
+                max_tokens=200,
+            )
+            summary_text = "".join(
+                block.get("text", "")
+                for block in msg.get("content", [])
+                if block.get("type") == "text"
+            ).strip()
+
         return EmailSummarizerOutput(
-            data=result.data,
+            data=thread.data,
             summary=EmailSummary(
                 thread_id=payload.thread_id,
                 latest_subject=latest.subject if latest else None,
                 latest_from=latest.from_addr if latest else None,
-                latest_excerpt=excerpt,
+                summary_text=summary_text,
                 message_count=len(messages),
+                is_heuristic=False,
             ),
         )
