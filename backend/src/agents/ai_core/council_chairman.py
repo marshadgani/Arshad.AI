@@ -67,7 +67,11 @@ _CHAIRMAN_SYSTEM = (
 
 class CouncilInput(BaseModel):
     question: str = Field(min_length=1, max_length=8000)
-    panel_models: list[str] = Field(default_factory=lambda: list(_DEFAULT_PANEL))
+    panel_models: list[str] = Field(
+        default_factory=lambda: list(_DEFAULT_PANEL),
+        min_length=1,
+        max_length=10,
+    )
     chairman_model: str = Field(default=_DEFAULT_CHAIRMAN)
     enable_review: bool = Field(
         default=True,
@@ -105,7 +109,15 @@ class CouncilOutput(BaseModel):
 
 
 def _label_for(idx: int) -> str:
-    return chr(ord("A") + idx)
+    return chr(ord("A") + idx) if 0 <= idx < 26 else f"P{idx}"
+
+
+def _extract_text(msg: dict[str, Any]) -> str:
+    return "".join(
+        block.get("text", "")
+        for block in msg.get("content", [])
+        if block.get("type") == "text"
+    )
 
 
 async def _panelist_call(
@@ -119,11 +131,7 @@ async def _panelist_call(
             messages=[{"role": "user", "content": question}],
             max_tokens=max_tokens,
         )
-        text = "".join(
-            block.get("text", "")
-            for block in msg.get("content", [])
-            if block.get("type") == "text"
-        )
+        text = _extract_text(msg)
         return text or "(empty response)", None
     except Exception as exc:  # noqa: BLE001 — surface as panel failure, don't abort
         return "", f"{type(exc).__name__}: {exc}"
@@ -149,11 +157,7 @@ async def _reviewer_call(
             messages=[{"role": "user", "content": user_prompt}],
             max_tokens=max_tokens,
         )
-        text = "".join(
-            block.get("text", "")
-            for block in msg.get("content", [])
-            if block.get("type") == "text"
-        )
+        text = _extract_text(msg)
         import json as _json
 
         start = text.find("{")
@@ -231,11 +235,7 @@ async def _chairman_call(
         messages=[{"role": "user", "content": prompt}],
         max_tokens=max_tokens,
     )
-    text = "".join(
-        block.get("text", "")
-        for block in msg.get("content", [])
-        if block.get("type") == "text"
-    )
+    text = _extract_text(msg)
     return text or "(chairman returned empty)"
 
 
@@ -287,6 +287,13 @@ class CouncilChairmanAgent(Agent):
             PanelOpinion(model=panel[i], label=_label_for(i), response=text, error=err)
             for i, (text, err) in enumerate(stage1)
         ]
+
+        if all(op.error for op in opinions):
+            errs = "; ".join(f"{op.model}: {op.error}" for op in opinions)
+            raise AgentError(
+                "all_panelists_failed",
+                f"Every panelist failed; refusing to synthesise. Errors: {errs}",
+            )
 
         # ── Stage 2: parallel cross-rankings (optional) ──────────────────
         rankings: list[PanelRanking] = []

@@ -758,6 +758,7 @@ agent/<domain>/<agent-name>
 | `tool-dispatcher` | `agent/ai-core/tool-dispatcher` | Resolves and invokes Claude tool calls |
 | `context-manager` | `agent/ai-core/context-manager` | Manages conversation history and context compression |
 | `response-streamer` | `agent/ai-core/response-streamer` | Handles SSE streaming of Claude responses to frontend |
+| `council-chairman` | (in-process, no branch) | Multi-model LLM panel: 3 Claude models answer in parallel, anonymously rank each other, chairman synthesises. Wired to `general` chat intent + REST `POST /api/v1/agents/ai_core/council_chairman/run`. |
 
 #### data-pipeline domain
 | Agent | Branch | Purpose |
