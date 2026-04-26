@@ -287,6 +287,59 @@
           "chat.py"
         ]
       }
+    },
+    "marketingskills": {
+      "url": "https://github.com/coreyhaines31/marketingskills.git",
+      "name": "marketingskills",
+      "last_fetched": "2026-04-26 15:55 UTC",
+      "components": {
+        "skills": [
+          "free-tool-strategy",
+          "email-sequence",
+          "copy-editing",
+          "revops",
+          "social-content",
+          "launch-strategy",
+          "site-architecture",
+          "form-cro",
+          "programmatic-seo",
+          "marketing-ideas",
+          "pricing-strategy",
+          "ai-seo",
+          "seo-audit",
+          "ad-creative",
+          "copywriting",
+          "image",
+          "analytics-tracking",
+          "aso-audit",
+          "churn-prevention",
+          "schema-markup",
+          "community-marketing",
+          "onboarding-cro",
+          "signup-flow-cro",
+          "ab-test-setup",
+          "marketing-psychology",
+          "popup-cro",
+          "directory-submissions",
+          "competitor-profiling",
+          "page-cro",
+          "sales-enablement",
+          "paywall-upgrade-cro",
+          "paid-ads",
+          "cold-email",
+          "video",
+          "lead-magnets",
+          "referral-program",
+          "customer-research",
+          "content-strategy",
+          "competitor-alternatives",
+          "product-marketing-context"
+        ],
+        "agents": [],
+        "commands": [],
+        "hooks": [],
+        "token_optimization": []
+      }
     }
   }
 }
