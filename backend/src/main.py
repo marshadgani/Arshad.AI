@@ -84,6 +84,29 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
 
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Catch-all so a misconfigured backend (missing Redis, missing env var,
+    DB unreachable, etc.) returns a readable JSON envelope instead of a
+    blank 500 the user can't diagnose. Exception details are logged
+    server-side at ERROR level — never leaked to the response.
+    """
+    _log.exception("Unhandled exception on %s %s", request.method, request.url.path)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": {
+                "code": "internal_error",
+                "message": (
+                    f"Backend hit an unhandled {type(exc).__name__}. "
+                    "Check Render logs for the traceback."
+                ),
+                "details": {"path": request.url.path},
+            }
+        },
+    )
+
+
 @app.get("/health", summary="Liveness probe")
 async def health():
     return {"status": "ok"}
