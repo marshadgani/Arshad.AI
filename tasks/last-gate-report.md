@@ -1,4 +1,4 @@
-<!-- generated from HEAD=31ce745 at 2026-04-26T07:00:00Z; self-review only (sandbox agent reliability documented in Phase D + E + F reports) -->
+<!-- generated from HEAD=9dcb8e3 at 2026-04-26T07:30:00Z; Merge-to-Main consolidation — covers Phases D + E + F + B together -->
 
 # Gate Report — Backend Phase B (Anthropic Chat + SSE + Conversation Memory)
 
