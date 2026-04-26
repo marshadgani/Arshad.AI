@@ -51,6 +51,41 @@
   color: var(--text-muted);
   padding: var(--s-3) var(--s-3) var(--s-1);
 }
+.labelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-right: var(--s-3);
+}
+.newChat {
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--border-subtle, #30363d);
+  color: var(--text-muted);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.newChat:hover {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+.emptyHint {
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 4px 12px 8px;
+  font-style: italic;
+}
+.sessionTitle {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
 
 .item {
   display: flex;

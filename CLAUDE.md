@@ -184,6 +184,12 @@ Arshad.AI/
 | `OAUTH_ENCRYPTION_KEY` | Phase C+ | 32-byte URL-safe base64. Encrypts provider tokens at rest. Rotation locks all users out. |
 | `JWT_EXPIRY_HOURS` | Phase C+ | JWT lifetime; default 24 |
 | `BACKEND_URL` / `FRONTEND_URL` | Phase C+ | Public URLs — used to build provider redirect URIs and post-login frontend redirect |
+| `ENABLE_INPROCESS_WORKER` | Phase F+ | `true` to start the queue worker on FastAPI lifespan (Render). Leave `false` in docker-compose where Airflow handles it. |
+| `QUEUE_POLL_INTERVAL_SECONDS` | Phase F+ | Worker poll interval; default `5`. |
+| `MAX_INGEST_BATCH_SIZE` | Phase F+ | Per-DAG row limit per run; default `100`. |
+| `ANTHROPIC_MODEL_DEFAULT` | Phase B+ | Default model name; defaults to `claude-haiku-4-5-20251001`. |
+| `CHAT_MAX_TOKENS` | Phase B+ | Max output tokens per chat turn; default `2048`. |
+| `CHAT_HISTORY_TOKEN_BUDGET` | Phase B+ | Drop oldest user/assistant pairs once history exceeds this; default `8000`. |
 
 Never hard-code secrets. Always add new vars to `backend/.env.example`.
 
@@ -210,15 +216,110 @@ cd backend && uvicorn src.main:app --reload --port 8000
 
 ## 8. Key Code Patterns
 
-### Adding a new Claude tool *(planned — module not yet created)*
-1. Define the tool schema in `backend/src/tools/definitions.py`
-2. Implement the handler in `backend/src/tools/handlers.py`
-3. Register it in the `TOOL_HANDLERS` map
-4. All Claude calls go through `backend/src/services/ai.py` — never inline
+### Adding a new Claude tool *(Phase D — implemented)*
 
-> The `backend/src/tools/` and `backend/src/services/` packages do not yet exist;
-> create them when the first tool is implemented. The pattern above is the target
-> design, not the current state of the codebase.
+Tool layout (per Phase D spec at `docs/superpowers/specs/2026-04-26-backend-phase-d-design.md`):
+
+```
+backend/src/tools/
+├── base.py            ← Tool ABC + ToolError / ProviderNotLinked / ProviderReauthRequired
+├── registry.py        ← TOOL_REGISTRY + @register decorator
+├── token_service.py   ← get_access_token + refresh_google_token
+├── clients/           ← google_calendar, gmail, github HTTP wrappers
+├── calendar/ gmail/ github/   ← one module per tool
+└── routers.py         ← POST /api/v1/tools/{name}
+```
+
+To add a tool:
+1. Pick the provider directory (`tools/<provider>/`).
+2. Create a module with `Input` / `Output` Pydantic schemas (output MUST have `data` + `summary`) and a class subclassing `Tool` with `@register` decorator.
+3. Import the module in the provider's `__init__.py` so `@register` runs at app startup.
+4. The REST endpoint `POST /api/v1/tools/{name}` and the `TOOL_REGISTRY` map both pick it up automatically.
+
+Phase B chat will eventually call tools directly via `TOOL_REGISTRY[name](user=..., db=..., payload=...)` — no HTTP round-trip needed.
+
+### Adding a new domain agent *(Phase E — implemented)*
+
+Agent layout (per Phase E spec at `docs/superpowers/specs/2026-04-26-backend-phase-e-design.md`):
+
+```
+backend/src/agents/
+├── base.py            ← Agent ABC + AgentError + AgentNotImplemented
+├── registry.py        ← AGENT_REGISTRY + @register decorator
+├── routers.py         ← POST /api/v1/agents/{domain}/{agent}/run + GET /api/v1/agents
+├── calendar/ email/ github/ ai_core/ data_pipeline/ infrastructure/   ← one module per agent
+
+backend/src/services/
+└── gateway.py         ← dispatch(domain, agent, user, db, payload) — single in-process entry point
+```
+
+To add an agent:
+1. Pick the domain directory (`agents/<domain>/`).
+2. Create a module with `Input`/`Output` Pydantic schemas (output MUST have `data` + `summary`) and a class subclassing `Agent` with `@register` decorator. Set `domain`, `name`, `description`, `tool_dependencies` (Phase D tool slugs).
+3. Import the module in the domain's `__init__.py` so `@register` runs at app startup.
+4. The REST endpoint and `AGENT_REGISTRY` map both pick it up automatically. The gateway routes by `(domain, name)` slug.
+
+Inter-agent calls (rule §19.4): never call another agent's `run()` directly — call `gateway.dispatch(...)` so cross-cutting concerns (auth, error mapping) stay in one place.
+
+LLM-bound agents (chat orchestration, summarisation, code review) raise `AgentNotImplemented(slug, owning_phase="Phase B")` from `run()` until Phase B replaces with real Claude calls.
+
+### Adding a new ingestion DAG *(Phase F — implemented)*
+
+Layout (per Phase F spec at `docs/superpowers/specs/2026-04-26-backend-phase-f-design.md`):
+
+```
+backend/src/services/ingestion/
+├── runner.py            ← run(dag_id, user_id, payload, db) — single dispatch point
+├── calendar.py          ← per-DAG ingestion logic (called by runner)
+├── email.py
+├── github.py
+└── analytics.py
+
+backend/src/services/queue_worker.py  ← in-process FastAPI worker (Render)
+backend/src/models/dag_trigger.py     ← DagTriggerQueue ORM model
+backend/src/models/ingested.py        ← 4 ingested_* tables
+
+data-pipelines/ingestion/
+├── _ingestion_helpers.py   ← shared claim_one / run_ingest_for_row / mark_done
+├── calendar_dag.py         ← thin Airflow wrapper (sensor → ingest → mark_done)
+├── email_dag.py
+├── github_dag.py
+└── analytics_dag.py
+```
+
+To add a new ingestion DAG:
+1. Write a new module in `backend/src/services/ingestion/<name>.py` exposing `async def ingest(*, user, db, payload) -> dict`.
+2. Wire it into `runner.py`'s dispatch.
+3. Replace the corresponding `data_pipeline/<name>_ingestor.py` agent's `AgentNotImplemented` with a real INSERT-queue body.
+4. Copy one of the existing `*_dag.py` files in `data-pipelines/ingestion/` and change the `DAG_ID` string.
+
+Both Airflow (docker-compose dev) and the in-process queue worker (Render prod via `ENABLE_INPROCESS_WORKER=true`) consume the same `dag_trigger_queue` table with `SELECT ... FOR UPDATE SKIP LOCKED LIMIT 1`. Same logic, two execution environments.
+
+### Adding chat features *(Phase B — implemented; final phase)*
+
+Layout (per Phase B spec at `docs/superpowers/specs/2026-04-26-backend-phase-b-design.md`):
+
+```
+backend/src/
+├── services/
+│   ├── ai.py                  ← Anthropic SDK wrapper (call + stream)
+│   ├── intent_classifier.py   ← stage-1 Haiku call: domain picker
+│   └── chat.py                ← agentic loop + SSE event yielding
+├── api/v1/chat.py             ← /api/v1/chat sessions + SSE messages
+└── models/conversation.py     ← ConversationSession + ConversationMessage
+```
+
+Key invariants:
+- **All SDK calls go through `services/ai.py`** — never `anthropic.AsyncAnthropic` inline.
+- **SSE event protocol** is defined in the `response_streamer` agent — `delta` / `tool_use` / `tool_result` / `intent` / `error` + `[DONE]` terminator.
+- **Two-stage routing**: stage-1 keyword fast-path or Haiku classifier picks domain; stage-2 Haiku call gets only that domain's tools (calendar / email / github / general). Tool subset is computed in `services.chat._tool_subset(intent)`.
+- **History is reconstructed** from `conversation_messages` rows on every turn so the SDK call sees the canonical Anthropic-API-shaped messages array. Token-budget compression drops oldest user/assistant turns until under `CHAT_HISTORY_TOKEN_BUDGET`.
+- **Inter-agent calls inside the agentic loop** still go through the gateway — `services.chat._dispatch_tool` validates input + runs via `Tool()(...)` or `Agent.run(...)`.
+- **Claude tool use exposes agents** via `agent_<slug>` prefix; `_dispatch_tool` strips the prefix and dispatches.
+
+To add a new chat-relevant tool or agent:
+1. Build it under Phase D (tool) or Phase E (agent) per their existing patterns.
+2. Add it to `services.chat._tool_subset` for the appropriate intent so Claude can pick it.
 
 ### Adding a new API endpoint
 Follow `.claude/rules/api.md`:

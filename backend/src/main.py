@@ -1,13 +1,20 @@
+import asyncio
+import logging
 import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from src.agents.routers import router as agents_router
 from src.api.v1.dashboard import router as dashboard_router
 from src.api.v1.domains import router as domains_router
 from src.auth.routers import router as auth_router
 from src.middleware.cache import close_redis
+from src.services import queue_worker
+from src.tools.routers import router as tools_router
+
+_log = logging.getLogger(__name__)
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 if not SECRET_KEY or SECRET_KEY == "change-me":
@@ -25,8 +32,31 @@ CORS_ORIGINS = [
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    yield
-    await close_redis()
+    # Phase F: optional in-process queue worker. Gated on
+    # ENABLE_INPROCESS_WORKER=true so docker-compose-Airflow setups don't
+    # double-process; SELECT...FOR UPDATE SKIP LOCKED makes simultaneous
+    # operation safe-but-wasteful even if both are accidentally enabled.
+    worker_task: asyncio.Task | None = None
+    stop_event: asyncio.Event | None = None
+    if queue_worker.is_enabled():
+        stop_event = asyncio.Event()
+        worker_task = asyncio.create_task(queue_worker.run_worker(stop_event))
+        _log.info("ENABLE_INPROCESS_WORKER=true; queue worker started")
+
+    try:
+        yield
+    finally:
+        if worker_task is not None and stop_event is not None:
+            stop_event.set()
+            try:
+                await asyncio.wait_for(worker_task, timeout=10.0)
+            except asyncio.TimeoutError:
+                worker_task.cancel()
+                try:
+                    await worker_task
+                except asyncio.CancelledError:
+                    pass
+        await close_redis()
 
 
 app = FastAPI(title="Arshad.AI Backend", version="0.1.0", lifespan=lifespan)
@@ -59,5 +89,8 @@ async def health():
 
 
 app.include_router(auth_router)
+app.include_router(tools_router)
+app.include_router(agents_router)
+app.include_router(chat_router)
 app.include_router(dashboard_router)
 app.include_router(domains_router)
