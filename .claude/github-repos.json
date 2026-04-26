@@ -354,6 +354,51 @@
         "hooks": [],
         "token_optimization": []
       }
+    },
+    "-eep--esearch-skills": {
+      "url": "https://github.com/Weizhena/Deep-Research-skills.git",
+      "name": "Deep-Research-skills",
+      "last_fetched": "2026-04-26 16:01 UTC",
+      "components": {
+        "skills": [
+          "research",
+          "research-add-items",
+          "research-report",
+          "research-add-fields",
+          "research-deep",
+          "research",
+          "research-add-items",
+          "research-report",
+          "research-add-fields",
+          "research-deep",
+          "research",
+          "research-add-items",
+          "research-report",
+          "research-add-fields",
+          "research-deep",
+          "research",
+          "research-add-items",
+          "research-report",
+          "research-add-fields",
+          "research-deep",
+          "research-codex-en",
+          "research-codex-zh",
+          "research-en",
+          "research-zh"
+        ],
+        "agents": [
+          "general-web",
+          "academic-papers",
+          "chinese-tech",
+          "stackoverflow",
+          "github-debug",
+          "web-search-opencode",
+          "web-search-agent"
+        ],
+        "commands": [],
+        "hooks": [],
+        "token_optimization": []
+      }
     }
   }
 }
