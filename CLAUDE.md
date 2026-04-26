@@ -232,6 +232,31 @@ To add a tool:
 
 Phase B chat will eventually call tools directly via `TOOL_REGISTRY[name](user=..., db=..., payload=...)` — no HTTP round-trip needed.
 
+### Adding a new domain agent *(Phase E — implemented)*
+
+Agent layout (per Phase E spec at `docs/superpowers/specs/2026-04-26-backend-phase-e-design.md`):
+
+```
+backend/src/agents/
+├── base.py            ← Agent ABC + AgentError + AgentNotImplemented
+├── registry.py        ← AGENT_REGISTRY + @register decorator
+├── routers.py         ← POST /api/v1/agents/{domain}/{agent}/run + GET /api/v1/agents
+├── calendar/ email/ github/ ai_core/ data_pipeline/ infrastructure/   ← one module per agent
+
+backend/src/services/
+└── gateway.py         ← dispatch(domain, agent, user, db, payload) — single in-process entry point
+```
+
+To add an agent:
+1. Pick the domain directory (`agents/<domain>/`).
+2. Create a module with `Input`/`Output` Pydantic schemas (output MUST have `data` + `summary`) and a class subclassing `Agent` with `@register` decorator. Set `domain`, `name`, `description`, `tool_dependencies` (Phase D tool slugs).
+3. Import the module in the domain's `__init__.py` so `@register` runs at app startup.
+4. The REST endpoint and `AGENT_REGISTRY` map both pick it up automatically. The gateway routes by `(domain, name)` slug.
+
+Inter-agent calls (rule §19.4): never call another agent's `run()` directly — call `gateway.dispatch(...)` so cross-cutting concerns (auth, error mapping) stay in one place.
+
+LLM-bound agents (chat orchestration, summarisation, code review) raise `AgentNotImplemented(slug, owning_phase="Phase B")` from `run()` until Phase B replaces with real Claude calls. Same for data-pipeline agents (Phase F).
+
 ### Adding a new API endpoint
 Follow `.claude/rules/api.md`:
 - Plural noun resource names, kebab-case URLs

@@ -127,5 +127,20 @@ Twelve OAuth-backed tools live under `/api/v1/tools/{name}`:
 Discovery: `GET /api/v1/tools` returns each tool's name, description, and input JSON-schema.
 Each tool returns `{data: <raw provider JSON>, summary: <normalized fields>}`. Auth-gated by JWT bearer.
 
+### Agents (Phase E)
+24 domain agents compose Phase D tools through the in-process gateway at `services/gateway.py`. Endpoint: `POST /api/v1/agents/{domain}/{agent}/run`.
+
+| Domain | Agents |
+|---|---|
+| `calendar` | `event_creator` · `event_updater` · `meeting_suggester` · `schedule_analyzer` |
+| `email` | `email_searcher` · `email_drafter` · `email_labeler` · `email_summarizer` (heuristic) |
+| `github` | `issue_manager` (verb-routed) · `pr_reviewer` (heuristic) · `code_summarizer` (placeholder) · `repo_monitor` |
+| `ai_core` | `chat_orchestrator` (placeholder) · `tool_dispatcher` · `context_manager` (placeholder) · `response_streamer` (placeholder) |
+| `data_pipeline` | `calendar_ingestor` · `email_ingestor` · `github_ingestor` · `analytics_processor` (all placeholders — Phase F lands real DAGs) |
+| `infrastructure` | `api_gateway` (self-ref) · `auth_manager` · `cache_manager` · `health_monitor` |
+
+Discovery: `GET /api/v1/agents` returns each agent's domain/name/description/input_schema/tool_dependencies.
+Placeholder agents return 501 `not_yet_implemented` with the owning_phase (B or F) so the frontend knows which roadmap item lights them up.
+
 ## Airflow UI
 Dashboard at http://localhost:8080 — login: `admin` / `admin`.
