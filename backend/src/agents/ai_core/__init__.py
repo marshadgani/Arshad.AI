@@ -1,1 +1,1 @@
-from . import chat_orchestrator  # noqa: F401
+from . import chat_orchestrator, tool_dispatcher  # noqa: F401
