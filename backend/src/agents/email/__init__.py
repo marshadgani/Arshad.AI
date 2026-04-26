@@ -1,1 +1,6 @@
-from . import email_drafter, email_labeler, email_searcher  # noqa: F401
+from . import (  # noqa: F401
+    email_drafter,
+    email_labeler,
+    email_searcher,
+    email_summarizer,
+)
