@@ -340,6 +340,20 @@
         "hooks": [],
         "token_optimization": []
       }
+    },
+    "web-asset-generator": {
+      "url": "https://github.com/alonw0/web-asset-generator.git",
+      "name": "web-asset-generator",
+      "last_fetched": "2026-04-26 16:00 UTC",
+      "components": {
+        "skills": [
+          "web-asset-generator"
+        ],
+        "agents": [],
+        "commands": [],
+        "hooks": [],
+        "token_optimization": []
+      }
     }
   }
 }
