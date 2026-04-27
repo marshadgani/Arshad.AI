@@ -21,8 +21,14 @@ from .personal import google_youtube as _p_yt  # noqa: F401
 from .personal import oauth_providers as _p_oauth  # noqa: F401
 from .personal import openweathermap as _p_owm  # noqa: F401
 
+# Wave 4 — Stack Overflow, Plaid, Upstox, Zerodha
+from .personal import plaid as _p_plaid  # noqa: F401
+from .personal import stack_overflow as _p_so  # noqa: F401
+
 # Static (no-credentials): Hacker News, Open-Meteo
 from .personal import static_providers as _p_static  # noqa: F401
+from .personal import upstox as _p_upstox  # noqa: F401
+from .personal import zerodha_kite as _p_kite  # noqa: F401
 
 # Bulk providers via factory (Notion, Slack, Todoist, Upstash, Cloudflare,
 # Stripe, Sentry, Anthropic, OpenAI, News API)
