@@ -43,6 +43,33 @@ class Integration(Base, TimestampedMixin):
     config: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
 
 
+class IntegrationOAuthToken(Base, TimestampedMixin):
+    """OAuth tokens for a Phase-H integration. Stored encrypted (AES-GCM)
+    using the same OAUTH_ENCRYPTION_KEY as oauth_tokens.
+
+    One per integration. Refresh-token rotation rewrites the row in place.
+    """
+
+    __tablename__ = "integration_oauth_tokens"
+    __table_args__ = (
+        UniqueConstraint("integration_id", name="uq_int_oauth_one_per_integration"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    integration_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("integrations.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    encrypted_access_token: Mapped[bytes] = mapped_column(BYTEA, nullable=False)
+    encrypted_refresh_token: Mapped[bytes | None] = mapped_column(BYTEA, nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    scopes: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, default=list)
+    extra: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+
+
 class ApiKeyCredential(Base, TimestampedMixin):
     __tablename__ = "api_key_credentials"
     __table_args__ = (
