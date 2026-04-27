@@ -19,4 +19,8 @@ USER app
 EXPOSE 8000
 
 # --reload is enabled in docker-compose for local dev; production runs without it.
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Migrations run on every container start so Render free tier (no Pre-Deploy
+# Command available) still gets a migrated DB. alembic upgrade is idempotent —
+# already-applied revisions are skipped. Seed is idempotent (UPSERT) but
+# non-fatal — if it fails (e.g., transient DB hiccup) we still serve traffic.
+CMD ["sh", "-c", "alembic upgrade head && (python -m scripts.seed_from_mock || echo '[startup] seed skipped/failed — non-fatal') && exec uvicorn src.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
