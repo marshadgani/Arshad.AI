@@ -159,6 +159,20 @@
   word-break: break-all;
 }
 
+.comingSoonReason {
+  font-size: 0.72rem;
+  background: rgba(137, 87, 229, 0.1);
+  border: 1px solid rgba(137, 87, 229, 0.3);
+  color: #b78cf3;
+  padding: 0.4rem 0.55rem;
+  border-radius: 4px;
+  line-height: 1.4;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
 .errBanner {
   font-size: 0.75rem;
   background: rgba(248, 81, 73, 0.08);

@@ -24,8 +24,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..models.integration import Integration
 from ..models.user import User
 
-IntegrationKind = Literal["personal_oauth", "project_apikey"]
-IntegrationStatus = Literal["connected", "disconnected", "error", "expired"]
+IntegrationKind = Literal[
+    "personal_oauth", "personal_apikey", "project_apikey", "static"
+]
+IntegrationStatus = Literal[
+    "connected", "disconnected", "error", "expired", "coming_soon"
+]
 
 
 class IntegrationError(Exception):
@@ -71,6 +75,8 @@ class IntegrationProvider(ABC):
     description: ClassVar[str]
     docs_url: ClassVar[str | None] = None
     icon: ClassVar[str] = ""  # short identifier the frontend maps to a glyph
+    coming_soon: ClassVar[bool] = False
+    coming_soon_reason: ClassVar[str | None] = None
 
     @abstractmethod
     async def connect(

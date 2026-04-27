@@ -3,32 +3,39 @@ import { useEffect, useMemo, useState } from 'react';
 import { getToken } from '../auth/tokenStorage';
 import styles from './Integrations.module.css';
 
+type IntegrationKind = 'personal_oauth' | 'personal_apikey' | 'project_apikey' | 'static';
+type IntegrationStatus = 'connected' | 'disconnected' | 'error' | 'expired' | 'coming_soon';
+
 interface IntegrationItem {
   slug: string;
-  kind: 'personal_oauth' | 'project_apikey';
+  kind: IntegrationKind;
   display_name: string;
   category: string;
   description: string;
   docs_url: string | null;
   icon: string;
-  status: 'connected' | 'disconnected' | 'error' | 'expired';
+  status: IntegrationStatus;
   last_synced_at: string | null;
   last_error: string | null;
   extra: Record<string, unknown>;
+  coming_soon: boolean;
+  coming_soon_reason: string | null;
 }
 
-const STATUS_DOT: Record<IntegrationItem['status'], string> = {
+const STATUS_DOT: Record<IntegrationStatus, string> = {
   connected: '#3fb950',
   disconnected: '#6e7681',
   error: '#f85149',
   expired: '#d29922',
+  coming_soon: '#8957e5',
 };
 
-const STATUS_LABEL: Record<IntegrationItem['status'], string> = {
+const STATUS_LABEL: Record<IntegrationStatus, string> = {
   connected: 'Connected',
   disconnected: 'Not connected',
   error: 'Error',
   expired: 'Re-auth required',
+  coming_soon: 'Coming soon',
 };
 
 function timeAgo(iso: string | null): string {
@@ -255,8 +262,18 @@ export default function Integrations() {
                   </div>
                 )}
 
+                {it.coming_soon && it.coming_soon_reason && (
+                  <div className={styles.comingSoonReason} title={it.coming_soon_reason}>
+                    {it.coming_soon_reason}
+                  </div>
+                )}
+
                 <div className={styles.actions}>
-                  {it.status === 'connected' ? (
+                  {it.coming_soon ? (
+                    <button type="button" disabled title={it.coming_soon_reason ?? ''}>
+                      Coming soon
+                    </button>
+                  ) : it.status === 'connected' ? (
                     <>
                       <button
                         type="button"
