@@ -3,6 +3,7 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
+import src.integrations  # noqa: F401 — package __init__ triggers @register side-effects
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -14,6 +15,9 @@ from src.auth.routers import router as auth_router
 from src.middleware.cache import close_redis
 from src.services import queue_worker
 from src.tools.routers import router as tools_router
+
+# `import src.integrations` (line 6) triggers @register side-effects.
+# `integrations_router` is consumed below in app.include_router().
 
 _log = logging.getLogger(__name__)
 
@@ -114,9 +118,12 @@ async def health():
     return {"status": "ok"}
 
 
+from src.integrations.routers import router as integrations_router  # noqa: E402
+
 app.include_router(auth_router)
 app.include_router(tools_router)
 app.include_router(agents_router)
 app.include_router(chat_router)
 app.include_router(dashboard_router)
 app.include_router(domains_router)
+app.include_router(integrations_router)

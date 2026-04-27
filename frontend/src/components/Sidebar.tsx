@@ -103,7 +103,14 @@ export default function Sidebar(_: SidebarProps) {
       <div className={styles.section}>
         <div className={styles.label}>Account</div>
         <a className={styles.item} href="#"><span className={styles.icon}>⚙</span>Settings</a>
-        <a className={styles.item} href="#"><span className={styles.icon}>⌗</span>Integrations</a>
+        <NavLink
+          to="/integrations"
+          className={({ isActive }) =>
+            isActive ? `${styles.item} ${styles.itemActive}` : styles.item
+          }
+        >
+          <span className={styles.icon}>⌗</span>Integrations
+        </NavLink>
         <a className={styles.item} href="#"><span className={styles.icon}>📜</span>Activity log</a>
       </div>
 

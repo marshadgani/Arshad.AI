@@ -7,6 +7,7 @@ import Chat from './pages/Chat';
 import Dashboard from './pages/Dashboard';
 import HealthFitness from './pages/HealthFitness';
 import HomeIoT from './pages/HomeIoT';
+import Integrations from './pages/Integrations';
 import Learning from './pages/Learning';
 import Login from './pages/Login';
 import PersonalFinance from './pages/PersonalFinance';
@@ -72,6 +73,7 @@ function ProtectedRoutes() {
         <Route path="/learning"           element={<Learning />} />
         <Route path="/home-iot"           element={<HomeIoT />} />
         <Route path="/travel"             element={<Travel />} />
+        <Route path="/integrations"       element={<Integrations />} />
         <Route path="*"                   element={<Navigate to="/" replace />} />
       </Routes>
     </AppLayout>
