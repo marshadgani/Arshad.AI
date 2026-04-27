@@ -44,6 +44,8 @@ def _provider_descriptor(p: IntegrationProvider) -> dict[str, Any]:
         "description": p.description,
         "docs_url": p.docs_url,
         "icon": p.icon,
+        "coming_soon": p.coming_soon,
+        "coming_soon_reason": p.coming_soon_reason,
     }
 
 
