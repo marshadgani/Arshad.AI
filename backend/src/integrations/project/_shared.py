@@ -39,19 +39,22 @@ async def store_api_key(
     api_key: str,
     extra: dict[str, Any] | None = None,
     scopes: list[str] | None = None,
+    user_id: Any = None,
+    kind: str = "project_apikey",
 ) -> ConnectResult:
-    """Project_apikey integrations are global to the deployment (user_id null).
-    Replace any existing row for the slug."""
-    integration = await db.scalar(
-        select(Integration).where(
-            Integration.user_id.is_(None), Integration.slug == slug
-        )
-    )
+    """Store an API-key-based integration. Pass user_id for personal_apikey
+    (per-user, e.g. Notion, Linear), leave None for project_apikey
+    (deployment-wide, e.g. Render, Vercel)."""
+    if user_id is None:
+        clause = (Integration.user_id.is_(None)) & (Integration.slug == slug)
+    else:
+        clause = (Integration.user_id == user_id) & (Integration.slug == slug)
+    integration = await db.scalar(select(Integration).where(clause))
     if integration is None:
         integration = Integration(
-            user_id=None,
+            user_id=user_id,
             slug=slug,
-            kind="project_apikey",
+            kind=kind,
             status="connected",
             config={},
         )
