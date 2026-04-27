@@ -14,6 +14,10 @@ from .personal import gmail as _p_gmail  # noqa: F401
 from .personal import google_calendar as _p_calendar  # noqa: F401
 from .personal import google_drive as _p_drive  # noqa: F401
 from .personal import google_tasks as _p_tasks  # noqa: F401
+
+# OAuth providers (Phase H): Spotify, Strava, Oura, Fitbit, Coinbase,
+# Discord, Reddit, Linear
+from .personal import oauth_providers as _p_oauth  # noqa: F401
 from .personal import openweathermap as _p_owm  # noqa: F401
 
 # Static (no-credentials): Hacker News, Open-Meteo

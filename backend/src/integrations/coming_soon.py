@@ -80,82 +80,8 @@ _OAUTH_REASON = (
 
 
 # ── OAuth-only providers (need /integrations/oauth/{provider}/callback) ──
-
-
-@register
-class _SpotifyStub(
-    _make_coming_soon(
-        slug="spotify",
-        display_name="Spotify",
-        category="Lifestyle",
-        description="Recently played, top artists, playlists.",
-        docs_url="https://developer.spotify.com/documentation/web-api",
-        icon="spotify",
-        reason=_OAUTH_REASON,
-    )
-):
-    pass
-
-
-@register
-class _FitbitStub(
-    _make_coming_soon(
-        slug="fitbit",
-        display_name="Fitbit",
-        category="Health",
-        description="Daily activity, heart rate, sleep stages.",
-        docs_url="https://dev.fitbit.com/build/reference/web-api/",
-        icon="fitbit",
-        reason=_OAUTH_REASON,
-    )
-):
-    pass
-
-
-@register
-class _OuraStub(
-    _make_coming_soon(
-        slug="oura",
-        display_name="Oura Ring",
-        category="Health",
-        description="Sleep, readiness, activity scores.",
-        docs_url="https://cloud.ouraring.com/v2/docs",
-        icon="oura",
-        reason=_OAUTH_REASON
-        + " Personal access tokens supported — likely the first OAuth callback in Phase H.",
-    )
-):
-    pass
-
-
-@register
-class _StravaStub(
-    _make_coming_soon(
-        slug="strava",
-        display_name="Strava",
-        category="Health",
-        description="Activities, segments, gear.",
-        docs_url="https://developers.strava.com/docs/reference/",
-        icon="strava",
-        reason=_OAUTH_REASON,
-    )
-):
-    pass
-
-
-@register
-class _CoinbaseStub(
-    _make_coming_soon(
-        slug="coinbase",
-        display_name="Coinbase",
-        category="Finance",
-        description="Crypto holdings, transactions, prices.",
-        docs_url="https://docs.cdp.coinbase.com/sign-in-with-coinbase/docs/welcome",
-        icon="coinbase",
-        reason=_OAUTH_REASON,
-    )
-):
-    pass
+# Spotify, Fitbit, Oura, Strava, Coinbase, Discord, Reddit, Linear are now
+# REAL providers in personal/oauth_providers.py — Phase H promoted them.
 
 
 @register
@@ -204,21 +130,6 @@ class _ZerodhaKiteStub(
 
 
 @register
-class _LinearStub(
-    _make_coming_soon(
-        slug="linear",
-        display_name="Linear",
-        category="Productivity",
-        description="Issues, projects, cycles via GraphQL.",
-        docs_url="https://developers.linear.app/docs/graphql/working-with-the-graphql-api",
-        icon="linear",
-        reason="Linear's API is GraphQL-only (POST). Needs a custom provider rather than the GET-with-headers factory.",
-    )
-):
-    pass
-
-
-@register
 class _YouTubeStub(
     _make_coming_soon(
         slug="youtube",
@@ -228,21 +139,6 @@ class _YouTubeStub(
         docs_url="https://developers.google.com/youtube/v3",
         icon="youtube",
         reason="Shares Google OAuth but requires additional scopes (youtube.readonly). Phase H will widen the Google login scope set.",
-    )
-):
-    pass
-
-
-@register
-class _DiscordStub(
-    _make_coming_soon(
-        slug="discord",
-        display_name="Discord",
-        category="Communication",
-        description="Server messages, DMs, member roles.",
-        docs_url="https://discord.com/developers/docs/intro",
-        icon="discord",
-        reason=_OAUTH_REASON,
     )
 ):
     pass
@@ -273,22 +169,6 @@ class _StackOverflowStub(
         docs_url="https://api.stackexchange.com/docs",
         icon="stackoverflow",
         reason="Needs OAuth or read-only key + filter ID. Phase H+.",
-    )
-):
-    pass
-
-
-@register
-class _RedditStub(
-    _make_coming_soon(
-        slug="reddit",
-        display_name="Reddit",
-        category="Lifestyle",
-        description="Saved posts, subreddits, comments.",
-        docs_url="https://www.reddit.com/dev/api",
-        icon="reddit",
-        reason=_OAUTH_REASON
-        + " Reddit's API has been rate-limited heavily since 2023.",
     )
 ):
     pass
