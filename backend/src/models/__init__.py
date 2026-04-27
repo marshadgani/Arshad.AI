@@ -8,6 +8,7 @@ from . import (  # noqa: F401
     dashboard,
     domain,
     ingested,
+    integration,
     oauth_account,
     oauth_token,
     user,
