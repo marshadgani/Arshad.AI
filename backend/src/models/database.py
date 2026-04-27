@@ -11,7 +11,18 @@ if not DATABASE_URL:
         "DATABASE_URL is not set. Copy backend/.env.example to backend/.env and fill it in."
     )
 
-engine = create_async_engine(DATABASE_URL, echo=False, pool_pre_ping=True)
+# Supabase / pgbouncer compatibility: when DATABASE_URL points at a pooler
+# (any pgbouncer in transaction or session mode), asyncpg's automatic prepared
+# statements break because each query may land on a different upstream
+# connection. Disable the statement cache when we detect a pooler host.
+_engine_kwargs: dict = {"echo": False, "pool_pre_ping": True}
+if "pooler.supabase.com" in DATABASE_URL or "pgbouncer" in DATABASE_URL:
+    _engine_kwargs["connect_args"] = {
+        "statement_cache_size": 0,
+        "prepared_statement_cache_size": 0,
+    }
+
+engine = create_async_engine(DATABASE_URL, **_engine_kwargs)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 
