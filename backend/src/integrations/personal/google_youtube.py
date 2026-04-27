@@ -1,9 +1,6 @@
-"""Google Drive — personal OAuth, shares the user's existing Google grant.
+"""YouTube — personal OAuth, shares the user's existing Google grant.
 
-Uses the access token already stored in oauth_tokens (granted at login).
-If the token doesn't have drive.metadata.readonly (existing users from
-before the scope widening), Google returns 403 — caught and surfaced as
-"Re-auth required".
+Reads subscriptions and recent activity using youtube.readonly scope.
 """
 
 from __future__ import annotations
@@ -13,6 +10,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 import httpx
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...models.integration import Integration
@@ -34,14 +32,14 @@ from ._shared import (
 
 
 @register
-class GoogleDriveIntegration(IntegrationProvider):
-    slug = "google_drive"
+class YouTubeIntegration(IntegrationProvider):
+    slug = "youtube"
     kind = "personal_oauth"
-    display_name = "Google Drive"
-    category = "Productivity"
-    description = "Files, folders, search across your Drive."
-    docs_url = "https://developers.google.com/drive"
-    icon = "google-drive"
+    display_name = "YouTube"
+    category = "Lifestyle"
+    description = "Subscriptions, channel info, recent uploads."
+    docs_url = "https://developers.google.com/youtube/v3"
+    icon = "youtube"
 
     async def connect(
         self, *, user: User | None, db: AsyncSession, payload: dict[str, Any]
@@ -53,18 +51,12 @@ class GoogleDriveIntegration(IntegrationProvider):
         )
 
     async def sync(self, *, integration: Integration, db: AsyncSession) -> SyncResult:
-        from sqlalchemy import select as _select
-
-        from ...models.user import User as UserModel
-
         started = time.perf_counter()
-        user = await db.scalar(
-            _select(UserModel).where(UserModel.id == integration.user_id)
-        )
+        user = await db.scalar(select(User).where(User.id == integration.user_id))
         if user is None:
             raise IntegrationError("user_missing", "Owning user not found.")
         try:
-            access_token, _account = await get_access_token(db, user, "google")
+            access_token, _ = await get_access_token(db, user, "google")
         except ProviderNotLinked:
             integration.status = "expired"
             integration.last_error = "Google OAuth account not linked."
@@ -73,25 +65,22 @@ class GoogleDriveIntegration(IntegrationProvider):
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
                 resp = await client.get(
-                    "https://www.googleapis.com/drive/v3/files",
-                    params={
-                        "pageSize": 20,
-                        "fields": "files(id,name,mimeType,modifiedTime)",
-                    },
+                    "https://www.googleapis.com/youtube/v3/subscriptions",
+                    params={"part": "snippet", "mine": "true", "maxResults": 20},
                     headers={"Authorization": f"Bearer {access_token}"},
                 )
             if resp.status_code == 403:
                 integration.status = "expired"
                 integration.last_error = (
-                    "Drive scope not granted. Log out + log back in to re-consent."
+                    "YouTube scope not granted. Log out + log back in to re-consent."
                 )
                 await db.commit()
                 raise IntegrationError(
                     "scope_missing",
-                    "Drive scope not on your token. Log out + log in again to grant it.",
+                    "YouTube scope not on your token. Re-login required.",
                 )
             resp.raise_for_status()
-            files = (resp.json() or {}).get("files", [])
+            subs = (resp.json() or {}).get("items", [])
         except IntegrationError:
             raise
         except Exception as exc:  # noqa: BLE001
@@ -100,10 +89,15 @@ class GoogleDriveIntegration(IntegrationProvider):
             await db.commit()
             raise IntegrationError("sync_failed", f"{type(exc).__name__}: {exc}")
         integration.config = {
-            "file_count": len(files),
-            "files": [
-                {"id": f.get("id"), "name": f.get("name"), "mime": f.get("mimeType")}
-                for f in files[:10]
+            "subscription_count": len(subs),
+            "subscriptions": [
+                {
+                    "title": (s.get("snippet") or {}).get("title"),
+                    "channel_id": (
+                        (s.get("snippet") or {}).get("resourceId") or {}
+                    ).get("channelId"),
+                }
+                for s in subs[:10]
             ],
         }
         integration.last_synced_at = datetime.now(timezone.utc)
@@ -112,7 +106,7 @@ class GoogleDriveIntegration(IntegrationProvider):
         await db.commit()
         return SyncResult(
             rows_written=0,
-            summary=f"Drive: {len(files)} recent files cached.",
+            summary=f"YouTube: {len(subs)} subscriptions cached.",
             duration_ms=int((time.perf_counter() - started) * 1000),
         )
 

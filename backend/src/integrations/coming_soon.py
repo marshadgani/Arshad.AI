@@ -130,36 +130,6 @@ class _ZerodhaKiteStub(
 
 
 @register
-class _YouTubeStub(
-    _make_coming_soon(
-        slug="youtube",
-        display_name="YouTube",
-        category="Lifestyle",
-        description="Subscriptions, watch history, playlists.",
-        docs_url="https://developers.google.com/youtube/v3",
-        icon="youtube",
-        reason="Shares Google OAuth but requires additional scopes (youtube.readonly). Phase H will widen the Google login scope set.",
-    )
-):
-    pass
-
-
-@register
-class _GoogleMapsStub(
-    _make_coming_soon(
-        slug="google_maps",
-        display_name="Google Maps Places",
-        category="Lifestyle",
-        description="Place lookups, directions, geocoding.",
-        docs_url="https://developers.google.com/maps/documentation",
-        icon="google-maps",
-        reason="API key + per-feature billing setup. Coming alongside the location-aware briefing widget.",
-    )
-):
-    pass
-
-
-@register
 class _StackOverflowStub(
     _make_coming_soon(
         slug="stack_overflow",

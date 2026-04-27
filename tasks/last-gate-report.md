@@ -1,59 +1,48 @@
-<!-- generated at 2026-04-26T22:00:00Z; verified by clean-venv app boot, 27 live + 15 coming-soon, /health 200 -->
+<!-- generated 2026-04-26T22:30:00Z; verified by clean-venv app boot, 31 live + 11 coming-soon -->
 
-# Gate Report — Merge to Main: Phase H — generic OAuth callback + 8 OAuth providers
+# Gate Report — Phase H wave 2+3: Google scope widening + Drive/Tasks/YouTube/Maps
 
 **Branch:** `claude/ai-personal-assistant-develop-AION` → `claude/ai-personal-assistant-main`
-**Diff scope:** 8 files (5 modified + 3 new) ~1100 lines
+**Diff scope:** 5 modified + 2 new files
 
 ## ✅ GATE PASSED — verified by clean-venv app boot
 
 ```
-clean venv → src.main imports cleanly
-TestClient(app).get('/health') → 200
-INTEGRATION_REGISTRY: 42 providers
-  - 27 live (was 19)
-  - 15 coming_soon (was 23)
-Routes: 6 — including new /api/v1/integrations/oauth/{slug}/callback
+Total: 42 integrations
+Live:  31 (was 27)
+Soon:  11 (was 15)
 ```
 
 ## What this PR delivers
 
-### Generic OAuth callback infrastructure
+### Google login scope widening (wave 2)
 
-- New table `integration_oauth_tokens` (alembic `h1e2f3a4b5c6`): encrypted access + refresh + expires_at + scopes, one per integration, AES-GCM with the existing `OAUTH_ENCRYPTION_KEY`.
-- New `OAuthIntegrationProvider` base class — providers declare `auth_url`, `token_url`, `scopes`, `client_id_env`, `client_secret_env` and implement `fetch_profile()` + `sync()`.
-- New `GET /api/v1/integrations/oauth/{slug}/callback` — generic, no auth dependency (identity comes from Redis-stored state token created by `/connect`). Handles error/code/state validation, atomic state consumption, code exchange, profile fetch, encrypted token storage, and redirect back to `/integrations?connected=<slug>`.
-- Auto-refresh: `get_access_token()` checks expiry and refreshes 30s before. Refresh-token rotation rewrites the row in place.
+Added 3 scopes to `auth/providers/google.py` `_SCOPES`:
+- `https://www.googleapis.com/auth/drive.metadata.readonly`
+- `https://www.googleapis.com/auth/tasks`
+- `https://www.googleapis.com/auth/youtube.readonly`
 
-### 8 providers promoted from stub → real
+Existing logged-in users will see "Re-auth required" on the new providers because their stored token doesn't have the widened scope. Logout + log in again grants the full set. New users get all scopes on first consent.
 
-| Provider | Scopes | Notes |
+### 4 promotions from coming_soon → real
+
+| Provider | Slug | Class |
 |---|---|---|
-| Spotify | recently-played, top-read, library-read, profile, email | HTTP Basic auth on token endpoint |
-| Strava | read, activity:read_all, profile:read_all | Comma-separated scopes |
-| Oura | personal, daily, heartrate, session | Standard OAuth2 |
-| Fitbit | activity, heartrate, sleep, profile | HTTP Basic auth |
-| Coinbase | wallet:user:read, wallet:accounts:read | Standard |
-| Discord | identify, email, guilds | Standard |
-| Reddit | identity, history, mysubreddits, save | HTTP Basic + duration=permanent |
-| Linear | read | GraphQL POST sync (custom override) |
+| Google Drive | `google_drive` | personal_oauth (shares Google login token) |
+| Google Tasks | `google_tasks` | personal_oauth (same) |
+| YouTube | `youtube` | personal_oauth (same) |
+| Google Maps Places | `google_maps` | project_apikey (separate GCP API key) |
 
-### Per-provider env vars documented
+### Implementation notes
 
-`backend/.env.example` now has 8 new pairs (`SPOTIFY_CLIENT_ID/SECRET`, etc.) with deep links to each provider's developer console.
+Drive / Tasks / YouTube providers reuse `tools.token_service.get_access_token` to grab the already-stored Google OAuth token. They detect a 403 (scope not granted) and surface integration.status = "expired" with a clear "log out + log in to re-consent" message instead of crashing.
 
-### Verification
+Google Maps probes via Places API text-search (`https://places.googleapis.com/v1/places:searchText`) — modern v1 endpoint with per-field FieldMask. User just pastes a GCP API key into the connect modal.
 
-Per the boot-verification rule: clean venv, production-shaped env, `import src.main` succeeds, all 42 providers register, generic callback route mounts, /health returns 200, no exceptions.
+## Verification
+
+Boot-verified in clean venv: app imports cleanly, 31 live + 11 soon = 42 total, no exceptions. Generic OAuth callback route still mounted.
 
 ## Verdict
 
-**GATE PASSED.** OAuth infrastructure is end-to-end. User just needs to:
-1. Register OAuth apps at each provider's dev console (8 providers, ~5 min each)
-2. Set redirect URI to `https://arshad-ai.onrender.com/api/v1/integrations/oauth/<slug>/callback`
-3. Add `<PROVIDER>_CLIENT_ID` and `<PROVIDER>_CLIENT_SECRET` to Render env vars
-4. Click Connect in the Integrations tab
-
-The 7 remaining coming-soon stubs (Plaid, Upstox, Zerodha, YouTube, Google Drive/Tasks, Google Maps, Stack Overflow) need either custom UX (Plaid Link, broker-specific OAuth) or Google scope widening — separate follow-up commits.
-
-The 7 "no public API" cards (WhatsApp, Instagram, Facebook, CRED, IndMoney, Apple Health, iMessage) remain as informational stubs — they will never be promoted because the APIs don't exist.
+**GATE PASSED.** Wave 2+3 land cleanly on top of wave 1.

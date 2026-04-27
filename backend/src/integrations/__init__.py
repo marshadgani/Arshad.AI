@@ -14,6 +14,7 @@ from .personal import gmail as _p_gmail  # noqa: F401
 from .personal import google_calendar as _p_calendar  # noqa: F401
 from .personal import google_drive as _p_drive  # noqa: F401
 from .personal import google_tasks as _p_tasks  # noqa: F401
+from .personal import google_youtube as _p_yt  # noqa: F401
 
 # OAuth providers (Phase H): Spotify, Strava, Oura, Fitbit, Coinbase,
 # Discord, Reddit, Linear
@@ -28,6 +29,7 @@ from .personal import static_providers as _p_static  # noqa: F401
 from .project import bulk_providers as _bulk  # noqa: F401
 
 # Project / infrastructure (API key)
+from .project import google_maps as _proj_gmaps  # noqa: F401
 from .project import render as _proj_render  # noqa: F401
 from .project import supabase as _proj_supabase  # noqa: F401
 from .project import vercel as _proj_vercel  # noqa: F401
