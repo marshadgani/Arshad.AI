@@ -4,18 +4,20 @@ import sys
 from logging.config import fileConfig
 from pathlib import Path
 
+from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
-
-from alembic import context
 
 # Make backend/src importable so we can pull Base + all models for autogenerate.
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND_ROOT))
 
+from src.models import (  # noqa: F401, E402  — register models with Base.metadata
+    dashboard,
+    domain,
+)
 from src.models.database import Base  # noqa: E402
-from src.models import dashboard, domain  # noqa: F401, E402  — register models with Base.metadata
 
 config = context.config
 
@@ -45,10 +47,20 @@ def do_run_migrations(connection: Connection) -> None:
 
 
 async def run_async_migrations() -> None:
+    section = config.get_section(config.config_ini_section, {})
+    # Supabase/pgbouncer compat — match the runtime engine config in
+    # backend/src/models/database.py.
+    connect_args: dict = {}
+    if "pooler.supabase.com" in database_url or "pgbouncer" in database_url:
+        connect_args = {
+            "statement_cache_size": 0,
+            "prepared_statement_cache_size": 0,
+        }
     connectable = async_engine_from_config(
-        config.get_section(config.config_ini_section, {}),
+        section,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args=connect_args,
     )
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)
