@@ -959,3 +959,61 @@ The full report is **always posted to the GitHub PR as a comment**, regardless o
 Format: see `.claude/commands/gate.md § Step 2`.
 The report includes: agent-by-agent results table, detailed findings per agent, and a prioritised action-item checklist.
 
+
+---
+
+## 21. AI Dev Team Auto-Trigger (PERMANENT)
+
+**Whenever the user prompt is a feature requirement** — phrased as 'build / add / implement / create / develop X', or describes new functionality with multi-step nature — automatically invoke the 9-agent dev-team pipeline.
+
+### Trigger detection
+
+Use `backend/src/dev_team/intent_classifier.classify(prompt)` to decide. Heuristic-first, Haiku 4.5 fallback on ambiguous. Returns `feature_requirement | not_feature | ambiguous`.
+
+User escape hatches:
+- Prefix `@build` → force trigger (bypass classifier)
+- Prefix `@chat` → force skip (always treat as conversation)
+
+### Do NOT trigger on
+
+- Diagnostic prompts ("why is X failing", "investigate Y", "the deploy is broken")
+- Questions ("how does X work", "what are my options")
+- Single-line edits / typos
+- Conversational chatter ("yes", "ok", "continue")
+- Ambiguous one-word prompts
+- Explicit `@chat` prefix
+
+### Flow when classifier returns `feature_requirement`
+
+1. **Confirm interpretation** (Q4=a, always confirm). Reflect back:
+   - The requirement summary in your own words
+   - The next `FEAT-NNN` ID that will be issued
+   - Ask: "Confirm or correct?"
+2. **On confirmation**, invoke the pipeline:
+   ```bash
+   python -m src.dev_team.cli "<requirement text>"
+   ```
+   Run via Bash tool with `run_in_background` only if the pipeline is expected to take >2 min. Otherwise foreground so progress streams.
+3. **Stream agent progress** as the CLI prints milestone lines (`▸ BA → ...`, `▸ EA pre-build ...`, etc.). Relay key events back to the user, don't dump the whole output.
+4. **On completion**, report:
+   - Feature ID
+   - Generated branch name (`dev-team/feat-NNN-<slug>`)
+   - Bug-fix iterations used
+   - EA post-build decision
+   - Path to each artifact (BA, EA pre/post, SA, Dev, PO, TSW, Tester runs, BugFixer iterations)
+5. **On halt**, report the halt reason and the last successful step. Do NOT attempt to fix the pipeline yourself — let the user decide.
+
+### Pipeline guarantees
+
+- Always creates a fresh git branch `dev-team/<feat-id>-<slug>` for live writes (Q2=b safety net)
+- Path denylist enforced before any write (see `agents/developer.py`)
+- Bug-fix loop hard-capped at 5 iterations (`MAX_ITERATIONS`)
+- EA post-build runs even if bug-fix loop hits the cap
+- `tasks/process-hierarchy.md` updated atomically (tmp + os.replace), never recreated
+- Every agent output written to `tasks/agent-outputs/<agent>/<FEAT-NNN>_<ts>.json`
+- One row appended to `tasks/pipeline-runs.md` per invocation
+
+### Cancellation
+
+If the user says "stop" / "cancel" while the pipeline is running, terminate the background process. Partial artifacts persist on disk; the run logs as `halted`.
+
