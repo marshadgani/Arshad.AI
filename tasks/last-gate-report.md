@@ -1,48 +1,63 @@
-<!-- generated 2026-04-26T22:30:00Z; verified by clean-venv app boot, 31 live + 11 coming-soon -->
+<!-- generated 2026-04-26T23:00:00Z; verified by clean-venv app boot, 35 live + 7 coming-soon (informational only) -->
 
-# Gate Report — Phase H wave 2+3: Google scope widening + Drive/Tasks/YouTube/Maps
+# Gate Report — Phase H wave 4: Stack Overflow + Plaid + Upstox + Zerodha Kite
 
 **Branch:** `claude/ai-personal-assistant-develop-AION` → `claude/ai-personal-assistant-main`
-**Diff scope:** 5 modified + 2 new files
+**Diff scope:** 3 modified + 4 new files
 
 ## ✅ GATE PASSED — verified by clean-venv app boot
 
 ```
 Total: 42 integrations
-Live:  31 (was 27)
-Soon:  11 (was 15)
+Live:  35 (was 31)
+Soon:   7 (was 11) — all "no public API" informational cards
 ```
 
 ## What this PR delivers
 
-### Google login scope widening (wave 2)
+### 4 new real providers
 
-Added 3 scopes to `auth/providers/google.py` `_SCOPES`:
-- `https://www.googleapis.com/auth/drive.metadata.readonly`
-- `https://www.googleapis.com/auth/tasks`
-- `https://www.googleapis.com/auth/youtube.readonly`
+| Provider | Slug | Class | Notes |
+|---|---|---|---|
+| Stack Overflow | `stack_overflow` | personal_apikey | Stack Exchange API v2.3, paste-access-token flow |
+| Plaid | `plaid` | personal_apikey | US banking — accepts public_token (Link exchange) OR direct access_token |
+| Upstox | `upstox` | personal_oauth | Indian broker — uses Phase H OAuth callback |
+| Zerodha Kite | `zerodha_kite` | personal_oauth | Indian broker — custom token exchange (SHA256 checksum); paid Kite Connect required |
 
-Existing logged-in users will see "Re-auth required" on the new providers because their stored token doesn't have the widened scope. Logout + log in again grants the full set. New users get all scopes on first consent.
+### Implementation highlights
 
-### 4 promotions from coming_soon → real
+- **Plaid**: dual-mode connect — `{public_token}` triggers /item/public_token/exchange, `{api_key}` stores a sandbox access_token directly. Sync calls /accounts/get and caches account list + balances. Frontend Link button arrives in Phase J.
+- **Zerodha Kite**: Kite Connect's auth flow is non-standard — auth URL takes `api_key=` not `client_id=`, token endpoint requires `SHA256(api_key + request_token + api_secret)` as the checksum. The provider overrides `connect()` and `exchange_code()` to handle this, then falls back into the standard OAuthIntegrationProvider flow.
+- **Upstox**: Standard OAuth2 via the Phase H base class. No scope param (Upstox doesn't use it).
+- **Stack Overflow**: Public API supports a per-user access token. Uses the personal_apikey kind so each user pastes their own token.
 
-| Provider | Slug | Class |
-|---|---|---|
-| Google Drive | `google_drive` | personal_oauth (shares Google login token) |
-| Google Tasks | `google_tasks` | personal_oauth (same) |
-| YouTube | `youtube` | personal_oauth (same) |
-| Google Maps Places | `google_maps` | project_apikey (separate GCP API key) |
+### Coming-soon list reduced to 7
 
-### Implementation notes
+All remaining coming-soon cards are "No public API" informational ones:
+- WhatsApp (personal), Instagram (personal), Facebook (personal)
+- CRED, IndMoney
+- Apple Health (web), iMessage
 
-Drive / Tasks / YouTube providers reuse `tools.token_service.get_access_token` to grab the already-stored Google OAuth token. They detect a 403 (scope not granted) and surface integration.status = "expired" with a clear "log out + log in to re-consent" message instead of crashing.
+These will never be promoted because the APIs don't exist for personal/consumer use.
 
-Google Maps probes via Places API text-search (`https://places.googleapis.com/v1/places:searchText`) — modern v1 endpoint with per-field FieldMask. User just pastes a GCP API key into the connect modal.
+### Per-provider env vars added to .env.example
+
+```
+UPSTOX_CLIENT_ID / UPSTOX_CLIENT_SECRET
+ZERODHA_KITE_CLIENT_ID / ZERODHA_KITE_CLIENT_SECRET
+PLAID_CLIENT_ID / PLAID_SECRET / PLAID_ENV (sandbox/development/production)
+```
 
 ## Verification
 
-Boot-verified in clean venv: app imports cleanly, 31 live + 11 soon = 42 total, no exceptions. Generic OAuth callback route still mounted.
+Boot-verified in clean venv: app imports cleanly, all 35 live + 7 coming-soon = 42 total registered, generic OAuth callback route mounts, /health returns 200.
 
 ## Verdict
 
-**GATE PASSED.** Wave 2+3 land cleanly on top of wave 1.
+**GATE PASSED.** Phase H is functionally complete. The remaining 7 cards are intentional placeholders for services without public APIs.
+
+## Next phases (optional)
+
+- **Phase I — frontend Plaid Link** (1-click bank connection instead of paste-public-token)
+- **Phase J — Apple Health iOS Shortcuts webhook** (the only viable workaround)
+- **Phase K — RAG over ingested_* tables** (cross-source semantic search)

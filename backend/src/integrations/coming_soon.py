@@ -84,66 +84,6 @@ _OAUTH_REASON = (
 # REAL providers in personal/oauth_providers.py — Phase H promoted them.
 
 
-@register
-class _PlaidStub(
-    _make_coming_soon(
-        slug="plaid",
-        display_name="Plaid (US Banking)",
-        category="Finance",
-        description="US bank accounts, transactions, balances via Plaid Link.",
-        docs_url="https://plaid.com/docs/",
-        icon="plaid",
-        reason="Plaid Link requires a frontend SDK + dedicated webhook handler. Larger Phase H+ effort.",
-    )
-):
-    pass
-
-
-@register
-class _UpstoxStub(
-    _make_coming_soon(
-        slug="upstox",
-        display_name="Upstox (India)",
-        category="Finance",
-        description="Indian stock holdings, orders, market data.",
-        docs_url="https://upstox.com/developer/api-documentation",
-        icon="upstox",
-        reason=_OAUTH_REASON + " Free Upstox developer account required.",
-    )
-):
-    pass
-
-
-@register
-class _ZerodhaKiteStub(
-    _make_coming_soon(
-        slug="zerodha_kite",
-        display_name="Zerodha Kite (India)",
-        category="Finance",
-        description="Indian stock holdings, orders.",
-        docs_url="https://kite.trade/docs/connect/v3/",
-        icon="kite",
-        reason="Requires paid Kite Connect plan (~₹2000/mo) + OAuth callback. Phase H+ once a paid plan is provisioned.",
-    )
-):
-    pass
-
-
-@register
-class _StackOverflowStub(
-    _make_coming_soon(
-        slug="stack_overflow",
-        display_name="Stack Overflow",
-        category="Code",
-        description="Reputation, questions, answers.",
-        docs_url="https://api.stackexchange.com/docs",
-        icon="stackoverflow",
-        reason="Needs OAuth or read-only key + filter ID. Phase H+.",
-    )
-):
-    pass
-
-
 # ── Explicit "not available — no public API" cards ──────────────────────
 
 _NO_API = "No public consumer API exists for this service. Cannot be integrated."
