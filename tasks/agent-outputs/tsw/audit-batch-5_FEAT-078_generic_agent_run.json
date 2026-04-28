@@ -1,0 +1,19 @@
+{
+  "audit_run_id": "audit-2026-04-26",
+  "feature_id": "FEAT-078",
+  "feature_name": "Generic Agent Run Endpoint",
+  "primary_files": ["backend/src/agents/routers.py", "backend/src/services/gateway.py", "backend/src/agents/base.py"],
+  "script_count": 9,
+  "test_cases": [
+    {"test_id":"TC-078-01","name":"Happy path","input":"POST /api/v1/agents/calendar/event_creator/run {valid payload}","expected":"200; result.model_dump(mode='json'); auth required"},
+    {"test_id":"TC-078-02","name":"Auth-gated","input":"POST without JWT","expected":"401 from router-level Depends(get_current_user)"},
+    {"test_id":"TC-078-03","name":"Unknown agent","input":"POST /api/v1/agents/nope/nope/run {}","expected":"GatewayError → 404 envelope {code:'unknown_agent'}"},
+    {"test_id":"TC-078-04","name":"Invalid input","input":"POST with payload missing required field","expected":"GatewayError → 400 {code:'invalid_input'}"},
+    {"test_id":"TC-078-05","name":"AgentNotImplemented","input":"Call placeholder agent","expected":"501 envelope {code:'not_yet_implemented'}"},
+    {"test_id":"TC-078-06","name":"ProviderReauthRequired","input":"Agent calls tool that raises","expected":"401 envelope with provider-specific code"},
+    {"test_id":"TC-078-07","name":"ProviderNotLinked","input":"Agent calls tool with no oauth_account","expected":"400 envelope {code:'oauth_account_not_linked'}"},
+    {"test_id":"TC-078-08","name":"AgentError generic","input":"Agent raises AgentError(code='custom')","expected":"400 envelope with code='custom'"},
+    {"test_id":"TC-078-09","name":"ToolError(provider_http_error)","input":"Tool raises 5xx","expected":"502 envelope"}
+  ],
+  "rtm_coverage": "AC-078-01..06 (auth, dispatch, validation, error mapping for all 5 exception classes)"
+}

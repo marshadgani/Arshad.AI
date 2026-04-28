@@ -1,0 +1,16 @@
+{
+  "audit_run_id": "audit-2026-04-26",
+  "feature_id": "FEAT-081",
+  "tester_iteration": 0,
+  "verdict": "PASS",
+  "summary": "7 TCs reviewed; 0 real defects. Auth via per-handler Depends(get_current_user) line 73. User isolation via WHERE user_id == user.id OR IS NULL (line 79). provider.status() wrapped in try/except (lines 90-99) — individual provider error doesn't abort the entire list. Sort by (category, display_name) at line 107. _provider_descriptor returns all 9 fields (lines 50-61).",
+  "defects": [
+    {"defect_id":"DEF-081-01","test_id":"TC-081-02","severity":"medium","description":"untestable_in_static_review — needs DB + provider mock.","expected":"Status enrichment","actual":"Logic verified at lines 89-95","file_hint":"backend/src/integrations/routers.py:89"}
+  ],
+  "total_defects_critical": 0,
+  "total_defects_high": 0,
+  "total_defects_medium": 1,
+  "total_defects_low": 0,
+  "real_defects_requiring_fix": 0,
+  "bug_fixer_required": false
+}

@@ -1,0 +1,16 @@
+{
+  "audit_run_id": "audit-2026-04-26",
+  "feature_id": "FEAT-078",
+  "tester_iteration": 0,
+  "verdict": "PASS",
+  "summary": "9 TCs reviewed; 0 real defects. Auth at router level (line 48). dispatch routes via gateway (line 134). Exception ladder covers 5 classes in correct order: GatewayError → custom status (135-136); AgentNotImplemented → 501 (137-138); ProviderReauthRequired → 401 (139-140); ProviderNotLinked → 400 (141-142); AgentError|ToolError → 502 if provider_http_error else 400 (143-149). All envelope payloads consistent shape.",
+  "defects": [
+    {"defect_id":"DEF-078-01","test_id":"TC-078-01","severity":"medium","description":"untestable_in_static_review — needs registered agent + DB.","expected":"200 with agent output","actual":"Logic verified at lines 125-151","file_hint":"backend/src/agents/routers.py:125"}
+  ],
+  "total_defects_critical": 0,
+  "total_defects_high": 0,
+  "total_defects_medium": 1,
+  "total_defects_low": 0,
+  "real_defects_requiring_fix": 0,
+  "bug_fixer_required": false
+}
