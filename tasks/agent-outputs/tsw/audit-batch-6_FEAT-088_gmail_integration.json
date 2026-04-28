@@ -1,0 +1,15 @@
+{
+  "audit_run_id": "audit-2026-04-26",
+  "feature_id": "FEAT-088",
+  "feature_name": "Gmail (personal integration)",
+  "primary_files": ["backend/src/integrations/personal/gmail.py", "backend/src/integrations/personal/_shared.py"],
+  "script_count": 5,
+  "test_cases": [
+    {"test_id":"TC-088-01","name":"Connect with existing Google account","input":"User has google oauth_account","expected":"Promotes; redirect_url=None; integration_id non-empty"},
+    {"test_id":"TC-088-02","name":"Connect without Google account","input":"No google account","expected":"redirect_url='{FRONTEND}/login?reason=missing_google_scope'"},
+    {"test_id":"TC-088-03","name":"Connect, no user","input":"user=None","expected":"PermissionError"},
+    {"test_id":"TC-088-04","name":"Sync enqueues email_ingestor","input":"connect+sync","expected":"DagTriggerQueue row with dag_id='email_ingestor'"},
+    {"test_id":"TC-088-05","name":"Status from google oauth_account","input":"connected","expected":"status from integration; extra.account_email"}
+  ],
+  "rtm_coverage": "AC-088-01..03"
+}
