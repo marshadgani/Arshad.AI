@@ -1,0 +1,18 @@
+{
+  "audit_run_id": "audit-2026-04-26",
+  "feature_id": "FEAT-061",
+  "feature_name": "Chat Orchestrator Agent",
+  "primary_files": ["backend/src/agents/ai_core/chat_orchestrator.py", "backend/src/services/chat.py"],
+  "script_count": 8,
+  "test_cases": [
+    {"test_id":"TC-061-01","name":"New session created when session_id None","input":"{text:'hello', session_id:None}","expected":"ConversationSession created with title='New chat'; refresh populates id"},
+    {"test_id":"TC-061-02","name":"Existing session_id resolved","input":"{text:'hi', session_id:<existing UUID>}","expected":"Loads ConversationSession; uses it"},
+    {"test_id":"TC-061-03","name":"Cross-user session_id 404","input":"valid UUID for another user's session","expected":"AgentError('session_not_found') — query filters by user_id"},
+    {"test_id":"TC-061-04","name":"Malformed session_id","input":"session_id='not-a-uuid'","expected":"AgentError('invalid_session_id')"},
+    {"test_id":"TC-061-05","name":"text min_length validation","input":"text=''","expected":"Pydantic ValidationError"},
+    {"test_id":"TC-061-06","name":"text max_length 100_000","input":"text='x'*100_001","expected":"Pydantic ValidationError"},
+    {"test_id":"TC-061-07","name":"SSE accumulator","input":"chat_turn yields intent + delta + tool_use + [DONE]","expected":"Summary has intent set, assistant_text concatenated, tool_calls populated, [DONE] line skipped"},
+    {"test_id":"TC-061-08","name":"Malformed SSE line skipped","input":"chat_turn yields a non-JSON SSE line","expected":"_parse_sse_payload returns None; line silently skipped"}
+  ],
+  "rtm_coverage": "AC-061-01..05 (sync wrapper around chat_turn; session lifecycle; error envelope)"
+}
