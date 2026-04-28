@@ -1,0 +1,17 @@
+{
+  "audit_run_id": "audit-2026-04-26",
+  "feature_id": "FEAT-039",
+  "tester_iteration": 0,
+  "verdict": "PASS",
+  "summary": "8 TCs reviewed; 0 real defects. PII protection holds — CreateDraftSummary exposes ONLY {draft_id, message_id, thread_id}; no body/subject/recipients leak. RFC 5322 MIME built via stdlib EmailMessage + base64 urlsafe encode (lines 40-49). EmailStr validation on every entry of `to` (and cc/bcc); to has min_length=1; subject has max_length=998 (RFC 5322 §2.1.1). in_reply_to_thread_id attached to message.threadId when present.",
+  "defects": [
+    {"defect_id":"DEF-039-01","test_id":"TC-039-03","severity":"medium","description":"untestable_in_static_review — DB linkage check.","expected":"ProviderNotLinked when oauth_account missing","actual":"Inherits get_access_token","file_hint":"backend/src/tools/token_service.py:56"},
+    {"defect_id":"DEF-039-02","test_id":"TC-039-04","severity":"medium","description":"untestable_in_static_review — needs httpx mock for refresh.","expected":"401 → refresh → retry","actual":"Inherits gmail.request","file_hint":"backend/src/tools/clients/gmail.py:40"}
+  ],
+  "total_defects_critical": 0,
+  "total_defects_high": 0,
+  "total_defects_medium": 2,
+  "total_defects_low": 0,
+  "real_defects_requiring_fix": 0,
+  "bug_fixer_required": false
+}

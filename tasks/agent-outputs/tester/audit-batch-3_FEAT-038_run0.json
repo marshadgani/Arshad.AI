@@ -1,0 +1,20 @@
+{
+  "audit_run_id": "audit-2026-04-26",
+  "feature_id": "FEAT-038",
+  "tester_iteration": 0,
+  "verdict": "PASS",
+  "summary": "8 TCs reviewed; 0 real defects. Headers parsed via case-insensitive _header(); _walk_for_plain DFS picks first text/plain in nested MIME tree (line 48-67); body_plain INTENTIONALLY exposed in summary — Phase D §2.5 marks this read-endpoint as the documented PII boundary (chat layer must redact for non-trusted display). thread_id Field(min_length=1) enforced. format='full' requested.",
+  "defects": [
+    {"defect_id":"DEF-038-01","test_id":"TC-038-03","severity":"medium","description":"untestable_in_static_review — DB linkage check.","expected":"ProviderNotLinked when oauth_account missing","actual":"Inherits get_access_token","file_hint":"backend/src/tools/token_service.py:56"},
+    {"defect_id":"DEF-038-02","test_id":"TC-038-04","severity":"medium","description":"untestable_in_static_review — refresh path needs httpx mock.","expected":"401 → refresh → retry → ProviderReauthRequired on second 401","actual":"Inherits gmail.request","file_hint":"backend/src/tools/clients/gmail.py:40"}
+  ],
+  "total_defects_critical": 0,
+  "total_defects_high": 0,
+  "total_defects_medium": 2,
+  "total_defects_low": 0,
+  "real_defects_requiring_fix": 0,
+  "bug_fixer_required": false,
+  "notes": [
+    "PII boundary documented: body_plain SHOULD appear in summary on this read-only endpoint per Phase D §2.5; the redaction responsibility lives at the chat surfacing layer (services/chat.py), not the tool. This is by design; not a defect."
+  ]
+}

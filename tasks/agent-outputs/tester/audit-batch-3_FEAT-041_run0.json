@@ -1,0 +1,16 @@
+{
+  "audit_run_id": "audit-2026-04-26",
+  "feature_id": "FEAT-041",
+  "tester_iteration": 0,
+  "verdict": "PASS",
+  "summary": "8 TCs reviewed; 0 real defects. Happy path POSTs /repos/{owner}/{repo}/issues; repo Field(pattern=r'^[\\w.-]+/[\\w.-]+$') validates owner/repo shape; title min/max_length 1/256 enforced; body/labels/assignees only sent when truthy; github.request raises ProviderReauthRequired('github') on 401 (NO refresh — Phase C decision; matches TSW assertion); 403 mapped to ToolError('github_forbidden') with verbatim text for rate-limit + scope cases; 4xx → ToolError('provider_request_failed').",
+  "defects": [
+    {"defect_id":"DEF-041-01","test_id":"TC-041-02","severity":"medium","description":"untestable_in_static_review — DB linkage check.","expected":"ProviderNotLinked('github') when oauth_account row absent","actual":"Inherits get_access_token (token_service.py:56)","file_hint":"backend/src/tools/token_service.py:56"}
+  ],
+  "total_defects_critical": 0,
+  "total_defects_high": 0,
+  "total_defects_medium": 1,
+  "total_defects_low": 0,
+  "real_defects_requiring_fix": 0,
+  "bug_fixer_required": false
+}
