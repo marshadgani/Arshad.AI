@@ -1,0 +1,19 @@
+{
+  "audit_run_id": "audit-2026-04-26",
+  "feature_ids": ["FEAT-075","FEAT-076","FEAT-077","FEAT-079","FEAT-080"],
+  "scope": "Cache/Health agents + List Agents endpoint + liveness probe + global error handler",
+  "primary_files": [
+    "backend/src/agents/infrastructure/cache_manager.py",
+    "backend/src/agents/infrastructure/health_monitor.py",
+    "backend/src/agents/routers.py:74-77",
+    "backend/src/main.py:78-118"
+  ],
+  "total_scripts": 27,
+  "feature_test_scripts": [
+    {"feature_id":"FEAT-075","feature_name":"Cache Manager Agent","script_count":7,"scripts_summary":"Per-user namespacing 'agent_cache:{user_id}:{key}'; action Literal[get,set,delete]; key min/max 1/128; ttl 1-86400 capped at 24h; model_validator enforces value when action='set'; get hit boolean; delete hit=bool(removed); summary surfaces normalised key (without prefix)"},
+    {"feature_id":"FEAT-076","feature_name":"Health Monitor Agent","script_count":6,"scripts_summary":"3 components: postgres SELECT 1, redis PING, anthropic env var presence (no remote call); each catches Exception → ok=False; aggregated summary ok = AND of all; placeholder 'your-' prefix detected as not-set"},
+    {"feature_id":"FEAT-077","feature_name":"List Agents Endpoint","script_count":4,"scripts_summary":"GET /api/v1/agents returns {data:[...], total} via list_agents() helper from gateway; auth-gated"},
+    {"feature_id":"FEAT-079","feature_name":"Liveness Probe","script_count":4,"scripts_summary":"GET /health returns {status:'ok'}; no auth; 200 always; main.py:117"},
+    {"feature_id":"FEAT-080","feature_name":"Global Error Envelope Handler","script_count":6,"scripts_summary":"HTTPException with dict detail{error:...} pass-through; otherwise wraps in {detail}; unhandled Exception → 500 with {error:{code:'internal_error', details:{path, exception:str(exc)[:300]}}}; logs full traceback server-side"}
+  ]
+}
