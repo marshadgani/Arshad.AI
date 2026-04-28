@@ -148,16 +148,25 @@ class OuraIntegration(OAuthIntegrationProvider):
             "age": body.get("age"),
         }
 
-    sync = make_oauth_sync_via_api(
-        sync_url="https://api.ouraring.com/v2/usercollection/daily_readiness?start_date=2026-04-20",
-        parse_sync=lambda body: {
-            "readiness_count": len((body or {}).get("data", [])),
-            "latest_readiness_score": (
-                ((body or {}).get("data", []) or [{}])[-1].get("score")
-            ),
-        },
-        summary_fmt="Oura: readiness refreshed",
-    )
+    async def sync(self, *, integration, db):  # type: ignore[override]
+        # Rolling 7-day window — was hardcoded start_date='2026-04-20' which would
+        # grow unboundedly over time and eventually return months of data per sync.
+        from datetime import date, timedelta
+
+        start_date = (date.today() - timedelta(days=7)).isoformat()
+        # Build a temporary factory call with the dynamic URL.
+        runner = make_oauth_sync_via_api(
+            sync_url=f"https://api.ouraring.com/v2/usercollection/daily_readiness?start_date={start_date}",
+            parse_sync=lambda body: {
+                "readiness_count": len((body or {}).get("data", [])),
+                "latest_readiness_score": (
+                    ((body or {}).get("data", []) or [{}])[-1].get("score")
+                ),
+                "window_start": start_date,
+            },
+            summary_fmt="Oura: readiness refreshed",
+        )
+        return await runner(self, integration=integration, db=db)
 
 
 # ── Fitbit ───────────────────────────────────────────────────────────────
