@@ -1,0 +1,15 @@
+{
+  "audit_run_id": "audit-2026-04-26",
+  "feature_id": "FEAT-102",
+  "feature_name": "Coinbase (personal integration)",
+  "primary_files": ["backend/src/integrations/personal/oauth_providers.py:205-250"],
+  "script_count": 5,
+  "test_cases": [
+    {"test_id":"TC-102-01","name":"Scopes","input":"connect","expected":"['wallet:user:read','wallet:accounts:read'] space-joined"},
+    {"test_id":"TC-102-02","name":"fetch_profile","input":"access_token","expected":"GET /v2/user; body.data.{id,name,email} → {coinbase_id, name, email}"},
+    {"test_id":"TC-102-03","name":"Sync accounts","input":"connected","expected":"GET /v2/accounts; integration.config.account_count + first 10 accounts"},
+    {"test_id":"TC-102-04","name":"Account shape","input":"sync","expected":"each account has {currency: code, balance: amount}"},
+    {"test_id":"TC-102-05","name":"Refresh on expiry","input":"token expired + refresh_token","expected":"Base class _refresh; standard form-encoded body (no Basic Auth — use_basic_auth_for_token defaults False)"}
+  ],
+  "rtm_coverage": "AC-102-01..03"
+}

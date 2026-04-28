@@ -1,0 +1,22 @@
+{
+  "audit_run_id": "audit-2026-04-26",
+  "feature_id": "FEAT-112",
+  "feature_name": "Bulk Project API-Key Providers",
+  "primary_files": ["backend/src/integrations/project/bulk_providers.py", "backend/src/integrations/project/_factory.py"],
+  "script_count": 12,
+  "test_cases": [
+    {"test_id":"TC-112-01","name":"Upstash registered","input":"INTEGRATION_REGISTRY","expected":"slug='upstash' present; probe_url=api.upstash.com/v2/redis/databases; bearer auth"},
+    {"test_id":"TC-112-02","name":"Cloudflare registered","input":"REGISTRY","expected":"slug='cloudflare'; probe=client/v4/user/tokens/verify; bearer"},
+    {"test_id":"TC-112-03","name":"Stripe registered","input":"REGISTRY","expected":"slug='stripe'; probe=v1/balance; bearer; scopes=balance:read"},
+    {"test_id":"TC-112-04","name":"Sentry registered","input":"REGISTRY","expected":"slug='sentry'; probe=organizations/; bearer"},
+    {"test_id":"TC-112-05","name":"Anthropic custom auth","input":"REGISTRY","expected":"slug='anthropic'; auth_header sets x-api-key + anthropic-version: 2023-06-01"},
+    {"test_id":"TC-112-06","name":"OpenAI registered","input":"REGISTRY","expected":"slug='openai'; probe=v1/models; bearer; scopes=models:read"},
+    {"test_id":"TC-112-07","name":"Notion auth","input":"REGISTRY","expected":"slug='notion'; auth_header sets bearer + Notion-Version: 2022-06-28; per_user=True"},
+    {"test_id":"TC-112-08","name":"Slack auth.test parse","input":"slack auth_test response with ok=False","expected":"parse_probe RAISES Exception with body.error (the (_ for _ in ()).throw idiom)"},
+    {"test_id":"TC-112-09","name":"Todoist registered","input":"REGISTRY","expected":"slug='todoist'; probe=rest/v2/projects; bearer; per_user=True"},
+    {"test_id":"TC-112-10","name":"News API X-Api-Key","input":"REGISTRY","expected":"slug='news_api'; auth_header={'X-Api-Key': key} (not Bearer); per_user=True"},
+    {"test_id":"TC-112-11","name":"per_user flag honoured","input":"connect","expected":"Personal providers (notion, slack, todoist, news_api) require user_id; project providers (upstash, ...) attach to NULL user_id"},
+    {"test_id":"TC-112-12","name":"Probe persists status","input":"connect with valid api_key","expected":"_factory.connect calls probe_url; parse_probe stored in integration.config; status='connected'"}
+  ],
+  "rtm_coverage": "AC-112-01..06 (10 declarative providers, factory pattern, mixed personal/project)"
+}
