@@ -1,0 +1,20 @@
+{
+  "audit_run_id": "audit-2026-04-26",
+  "feature_id": "FEAT-048",
+  "feature_name": "OAuth Token Service (auto-refresh)",
+  "primary_files": ["backend/src/tools/token_service.py", "backend/src/auth/crypto.py"],
+  "script_count": 10,
+  "test_cases": [
+    {"test_id":"TC-048-01","name":"get_access_token happy","input":"User has oauth_account + token row","expected":"Returns (decrypted_access_token, account); decrypts via auth.crypto.decrypt"},
+    {"test_id":"TC-048-02","name":"get_access_token no account","input":"No oauth_accounts row","expected":"ProviderNotLinked(provider) raised"},
+    {"test_id":"TC-048-03","name":"get_access_token no token","input":"oauth_account exists but token row missing","expected":"ProviderNotLinked(provider) raised (defensive — both rows required)"},
+    {"test_id":"TC-048-04","name":"refresh_google_token happy","input":"Valid refresh_token, Google 200","expected":"New encrypted access_token + token_expires_at persisted; plaintext returned"},
+    {"test_id":"TC-048-05","name":"refresh_google_token concurrent","input":"Two coroutines for same account","expected":"with_for_update() serialises; second waits for first"},
+    {"test_id":"TC-048-06","name":"refresh_google_token no refresh_token","input":"token_row.encrypted_refresh_token is None","expected":"ProviderReauthRequired('google') raised"},
+    {"test_id":"TC-048-07","name":"Google 400/401 on refresh","input":"Google rejects refresh (revoked)","expected":"ProviderReauthRequired('google') raised"},
+    {"test_id":"TC-048-08","name":"Google rotates refresh_token","input":"Response includes new refresh_token","expected":"New refresh_token also encrypted + persisted"},
+    {"test_id":"TC-048-09","name":"Missing GOOGLE_OAUTH_CLIENT_ID","input":"env var unset","expected":"required_env raises (not silently uses empty string)"},
+    {"test_id":"TC-048-10","name":"GitHub 401 path bypasses service","input":"GitHub client raises ProviderReauthRequired directly","expected":"refresh_google_token never invoked for GitHub (Phase C decision)"}
+  ],
+  "rtm_coverage": "AC-048-01..04 (decrypt + refresh + persist + concurrency safety)"
+}

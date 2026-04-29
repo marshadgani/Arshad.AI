@@ -1,0 +1,15 @@
+{
+  "audit_run_id": "audit-2026-04-26",
+  "feature_id": "FEAT-100",
+  "feature_name": "Oura Ring (personal integration)",
+  "primary_files": ["backend/src/integrations/personal/oauth_providers.py:120-160"],
+  "script_count": 5,
+  "test_cases": [
+    {"test_id":"TC-100-01","name":"Standard OAuth","input":"valid user","expected":"connect from base; scopes=['personal','daily','heartrate','session'] space-joined"},
+    {"test_id":"TC-100-02","name":"fetch_profile","input":"access_token","expected":"GET /v2/usercollection/personal_info; returns {oura_id, email, age}"},
+    {"test_id":"TC-100-03","name":"Sync readiness","input":"connected","expected":"GET /v2/usercollection/daily_readiness?start_date=2026-04-20; integration.config has readiness_count + latest_readiness_score"},
+    {"test_id":"TC-100-04","name":"Empty readiness array","input":"sync returns data=[]","expected":"latest_readiness_score=None (the [{}] fallback chain doesn't crash)"},
+    {"test_id":"TC-100-05","name":"Latest readiness from last entry","input":"data=[{score:80},{score:85}]","expected":"latest_readiness_score=85 ([-1].score)"}
+  ],
+  "rtm_coverage": "AC-100-01..03"
+}

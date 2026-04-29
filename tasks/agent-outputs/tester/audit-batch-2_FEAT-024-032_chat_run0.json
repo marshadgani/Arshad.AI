@@ -1,0 +1,29 @@
+{
+  "audit_run_id": "audit-2026-04-26",
+  "batch": 2,
+  "tester_iteration": 0,
+  "verdict": "WARN — 2 real medium defects + 2 untestable-in-static-review",
+  "feature_defects": [
+    {"feature_id": "FEAT-024", "summary": "PASS — handler creates session with default 'New chat' title; ownership filter via user_id; FK ON DELETE CASCADE present in conversation.py:70.", "defects": []},
+    {"feature_id": "FEAT-026", "summary": "PASS — ownership-checked query (chat.py:104-109) returns 404 cross-user; messages ordered by created_at ASC; malformed UUID auto-422.", "defects": [
+      {"defect_id": "DEF-026-01", "test_id": "TC-026-08", "severity": "medium", "description": "untestable_in_static_review (250-msg pagination requires live DB seed)", "file_hint": "backend/src/api/v1/chat.py:116-122"}
+    ]},
+    {"feature_id": "FEAT-028", "summary": "PASS with one real defect — _MAX_AGENTIC_HOPS enforced; protocol ordering correct; cross-user 404 (no user-id leak); SSE headers present. Real concern: partial assistant_text loss on disconnect.", "defects": [
+      {"defect_id": "DEF-028-01", "test_id": "TC-028-07", "severity": "medium", "description": "Partial assistant_text NOT persisted on mid-stream client disconnect. User message commits at chat.py:277 before streaming, but the assistant ConversationMessage row only commits at chat.py:395 AFTER the stream loop completes. If the client disconnects, FastAPI cancels the generator and the final db.commit() never runs — only the user row survives.", "expected": "Partial assistant_text persists across disconnect", "actual": "Only user row survives; assistant row is rolled back on cancellation", "file_hint": "backend/src/services/chat.py:383-395"},
+      {"defect_id": "DEF-028-02", "test_id": "TC-028-09", "severity": "medium", "description": "untestable_in_static_review (live SSE header inspection)", "file_hint": "backend/src/api/v1/chat.py:183-187"}
+    ]},
+    {"feature_id": "FEAT-029", "summary": "PASS — keyword fast-path at intent_classifier.py:79-81 runs before any ai.call; Haiku fallback uses max_tokens=8; history capped at last 4; invalid candidate defaults to 'general'.", "defects": []},
+    {"feature_id": "FEAT-030", "summary": "PASS — _client() raises RuntimeError on unset OR 'your-' placeholder; default model claude-haiku-4-5-20251001; stream yields exact tagged tuples; tool_use input assembled from input_json_delta + try/except → empty dict.", "defects": [
+      {"defect_id": "DEF-030-01", "test_id": "TC-030-09", "severity": "medium", "description": "untestable_in_static_review (SDK error propagation needs mock harness)", "file_hint": "backend/src/services/ai.py:69-70"}
+    ]},
+    {"feature_id": "FEAT-032", "summary": "PASS with one real defect — slug lists exactly match spec, agent_<slug> prefix applied, missing tools/agents silently skipped. Real concern: general intent inconsistency.", "defects": [
+      {"defect_id": "DEF-032-01", "test_id": "TC-032-05", "severity": "medium", "description": "_tool_subset('general') returns ([], ['ai_core_council_chairman']) at chat.py:92, but chat_turn at chat.py:286-288 forces tool_schemas=None for intent=='general', bypassing _build_tool_schemas entirely. Council chairman is therefore never exposed to Claude on general intent — internal contradiction.", "expected": "Council chairman available on general intent", "actual": "Tool schemas suppressed entirely; council_chairman never exposed", "file_hint": "backend/src/services/chat.py:286-288"}
+    ]}
+  ],
+  "total_defects_critical": 0,
+  "total_defects_high": 0,
+  "total_defects_medium": 4,
+  "total_defects_low": 0,
+  "real_defects_requiring_fix": 2,
+  "bug_fixer_required": true
+}

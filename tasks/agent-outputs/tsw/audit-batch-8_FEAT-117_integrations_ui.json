@@ -1,0 +1,22 @@
+{
+  "audit_run_id": "audit-2026-04-26",
+  "feature_id": "FEAT-117",
+  "feature_name": "Integrations Frontend Page",
+  "primary_files": ["frontend/src/pages/Integrations.tsx", "frontend/src/pages/Integrations.module.css"],
+  "script_count": 12,
+  "test_cases": [
+    {"test_id":"TC-117-01","name":"Initial fetch","input":"mount","expected":"GET /api/v1/integrations with Bearer; setItems(body.data); loading=false"},
+    {"test_id":"TC-117-02","name":"No token","input":"getToken=null","expected":"fetchAll early-returns; loading stays true"},
+    {"test_id":"TC-117-03","name":"Group by category","input":"items with mixed categories","expected":"useMemo groups + sorts by category alphabetically"},
+    {"test_id":"TC-117-04","name":"OAuth connect → redirect","input":"click Connect on personal_oauth item","expected":"POST /connect; window.location.href = body.data.redirect_url; no fetchAll"},
+    {"test_id":"TC-117-05","name":"OAuth connect → no redirect","input":"backend returns redirect_url=null","expected":"flashToast 'X connected'; fetchAll re-runs"},
+    {"test_id":"TC-117-06","name":"API key modal","input":"click Connect on project_apikey","expected":"setApiKeyModal(item); modal opens with empty draft"},
+    {"test_id":"TC-117-07","name":"API key submit empty","input":"submit with empty draft","expected":"apiKeyErr='API key required'; no fetch"},
+    {"test_id":"TC-117-08","name":"API key submit happy","input":"valid draft","expected":"POST /connect with {api_key: draft}; modal closes; fetchAll"},
+    {"test_id":"TC-117-09","name":"Sync action","input":"click Sync","expected":"POST /sync; flashToast(body.data.summary or 'Synced'); fetchAll"},
+    {"test_id":"TC-117-10","name":"Disconnect with confirm","input":"click Disconnect → confirm","expected":"POST /disconnect; flashToast 'X disconnected'; fetchAll"},
+    {"test_id":"TC-117-11","name":"Disconnect cancel","input":"click Disconnect → cancel","expected":"No fetch; nothing happens"},
+    {"test_id":"TC-117-12","name":"Status dot/label","input":"items with each status","expected":"STATUS_DOT[status] colour + STATUS_LABEL[status] text rendered"}
+  ],
+  "rtm_coverage": "AC-117-01..06 (list, connect-OAuth, connect-API-key modal, sync, disconnect, status badge)"
+}

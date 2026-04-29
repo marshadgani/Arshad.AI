@@ -1,0 +1,21 @@
+{
+  "audit_run_id": "audit-2026-04-26",
+  "feature_id": "FEAT-112",
+  "tester_iteration": 0,
+  "verdict": "FAIL",
+  "summary": "12 TCs reviewed; 1 real LOW-severity defect: factory's sync() REPLACES integration.config rather than merging. Connect-time probe data is overwritten on first sync. Inconsistent with personal-provider behaviour. All 10 declarative providers verified — slugs, probe_urls, auth_header functions, scopes, per_user flags correct. Slack's Exception-on-error idiom (line 233-235) using `(_ for _ in ()).throw(...)` is unusual but functionally correct.",
+  "defects": [
+    {"defect_id":"DEF-112-01","test_id":"TC-112-12","severity":"low","description":"Factory sync replaces integration.config entirely (line 114-116 in _factory.py) instead of merging. Connect-time probe data and any extra fields are lost on first sync.","expected":"`integration.config = {**(integration.config or {}), **(spec.parse_sync(body) if ...)}` to merge","actual":"`integration.config = (spec.parse_sync(body) if spec.parse_sync else {'ok': True})` — full replacement","file_hint":"backend/src/integrations/project/_factory.py:114"},
+    {"defect_id":"DEF-112-02","test_id":"TC-112-08","severity":"low","description":"Slack parse_probe uses generator-throw idiom for raising — unusual but functional.","expected":"Inline raise","actual":"`(_ for _ in ()).throw(Exception(...))` — works because lambda can't `raise`","file_hint":"backend/src/integrations/project/bulk_providers.py:233-235"}
+  ],
+  "total_defects_critical": 0,
+  "total_defects_high": 0,
+  "total_defects_medium": 0,
+  "total_defects_low": 2,
+  "real_defects_requiring_fix": 1,
+  "bug_fixer_required": false,
+  "notes": [
+    "DEF-112-01 will be batched into the audit-fixup commit at end of campaign.",
+    "DEF-112-02 is style — Python lambdas can't have statements, so generator-throw is a known workaround. Not a defect."
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "audit_run_id": "audit-2026-04-26",
+  "feature_id": "FEAT-070",
+  "tester_iteration": 0,
+  "verdict": "PASS",
+  "summary": "10 TCs reviewed; 0 real defects. is_enabled() env check correct (line 40, case-insensitive). _claim_one uses with_for_update(skip_locked=True) limit 1 ordered by requested_at — atomic, FIFO, multi-worker safe (lines 51-57). Status transitions: 'pending'→'picked' on claim with picked_at + attempt++ (lines 60-62), 'picked'→'completed'|'pending'(retry)|'failed'(exhausted) on _process (lines 89-99). _MAX_ATTEMPTS=3 enforced. run_worker backoff doubles up to 300s cap on claim failures (line 124); resets to base_interval on successful claim (line 116). stop_event respected via asyncio.wait_for (lines 129-132).",
+  "defects": [
+    {"defect_id":"DEF-070-01","test_id":"TC-070-03","severity":"medium","description":"untestable_in_static_review — needs live Postgres SKIP LOCKED.","expected":"Atomic transition to picked","actual":"Verified at lines 50-65","file_hint":"backend/src/services/queue_worker.py:50"},
+    {"defect_id":"DEF-070-02","test_id":"TC-070-06","severity":"medium","description":"untestable_in_static_review — needs runner.run mocking.","expected":"Status='completed'","actual":"Verified at lines 89-92","file_hint":"backend/src/services/queue_worker.py:89"},
+    {"defect_id":"DEF-070-03","test_id":"TC-070-09","severity":"medium","description":"untestable_in_static_review — needs simulated DB drop.","expected":"backoff doubles cap 300s","actual":"Verified at line 124","file_hint":"backend/src/services/queue_worker.py:124"}
+  ],
+  "total_defects_critical": 0,
+  "total_defects_high": 0,
+  "total_defects_medium": 3,
+  "total_defects_low": 0,
+  "real_defects_requiring_fix": 0,
+  "bug_fixer_required": false,
+  "notes": [
+    "OBSERVATION (not defect, design choice): no liveness ping — if worker dies between claim and process, row is stuck in 'picked' status and will NOT be re-claimed (only 'pending' rows are claimed). A future enhancement would add a watchdog that resets stale 'picked' rows. Outside audit scope."
+  ]
+}

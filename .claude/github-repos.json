@@ -399,6 +399,20 @@
         "hooks": [],
         "token_optimization": []
       }
+    },
+    "andrej-karpathy-skills": {
+      "url": "https://github.com/forrestchang/andrej-karpathy-skills.git",
+      "name": "andrej-karpathy-skills",
+      "last_fetched": "2026-04-28 23:28 UTC",
+      "components": {
+        "skills": [
+          "karpathy-guidelines"
+        ],
+        "agents": [],
+        "commands": [],
+        "hooks": [],
+        "token_optimization": []
+      }
     }
   }
 }

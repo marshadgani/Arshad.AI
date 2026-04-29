@@ -1,0 +1,16 @@
+{
+  "audit_run_id": "audit-2026-04-26",
+  "feature_id": "FEAT-098",
+  "feature_name": "Spotify (personal integration)",
+  "primary_files": ["backend/src/integrations/personal/oauth_providers.py:23-67"],
+  "script_count": 6,
+  "test_cases": [
+    {"test_id":"TC-098-01","name":"Standard OAuth2 flow","input":"valid user","expected":"connect from base class with auth_url=accounts.spotify.com/authorize, scopes=user-read-recently-played + 4 more"},
+    {"test_id":"TC-098-02","name":"use_basic_auth_for_token=True","input":"exchange_code","expected":"Basic Auth header on POST /api/token (not body params); base class line 148-150"},
+    {"test_id":"TC-098-03","name":"Scope separator ' '","input":"connect","expected":"5 scopes joined with space"},
+    {"test_id":"TC-098-04","name":"fetch_profile","input":"access_token","expected":"GET /v1/me Bearer; returns {spotify_id, display_name, email}"},
+    {"test_id":"TC-098-05","name":"Sync top artists","input":"connected","expected":"GET /v1/me/top/artists?limit=10; integration.config.top_artists = list of names"},
+    {"test_id":"TC-098-06","name":"Refresh on expiry","input":"token expired + refresh_token present","expected":"Base class _refresh called; new access_token persisted"}
+  ],
+  "rtm_coverage": "AC-098-01..03"
+}

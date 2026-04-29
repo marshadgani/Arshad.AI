@@ -1,0 +1,16 @@
+{
+  "audit_run_id": "audit-2026-04-26",
+  "feature_id": "FEAT-042",
+  "tester_iteration": 0,
+  "verdict": "PASS",
+  "summary": "8 TCs reviewed; 0 real defects. PATCH body built only from `is not None` fields (lines 66-77); empty patch yields {} body; labels=[] correctly distinguishable from labels=None (None means 'unchanged', [] means 'replace with empty' — replacement semantics, not additive — matches TSW spec); repo regex validates owner/repo; number Field(gt=0) enforced; state Literal['open','closed']; state_reason Literal three-value; 401 → ProviderReauthRequired (no refresh); 4xx → ToolError(provider_request_failed).",
+  "defects": [
+    {"defect_id":"DEF-042-01","test_id":"TC-042-03","severity":"medium","description":"untestable_in_static_review — DB linkage check.","expected":"ProviderNotLinked('github') when oauth_account row absent","actual":"Inherits get_access_token","file_hint":"backend/src/tools/token_service.py:56"}
+  ],
+  "total_defects_critical": 0,
+  "total_defects_high": 0,
+  "total_defects_medium": 1,
+  "total_defects_low": 0,
+  "real_defects_requiring_fix": 0,
+  "bug_fixer_required": false
+}

@@ -1,0 +1,17 @@
+{
+  "audit_run_id": "audit-2026-04-26",
+  "feature_id": "FEAT-037",
+  "tester_iteration": 0,
+  "verdict": "PASS",
+  "summary": "8 TCs reviewed; 0 real defects. PII protection holds — ThreadSummary exposes only {thread_id, snippet, history_id}; no body/headers/recipients leak. max_results Field(default=20, ge=1, le=100) enforces bounds. label_ids forwarded only when truthy. gmail.request mirrors google_calendar.request for refresh-on-401 + reauth-on-second-401.",
+  "defects": [
+    {"defect_id":"DEF-037-01","test_id":"TC-037-03","severity":"medium","description":"untestable_in_static_review — provider linkage check needs DB.","expected":"ProviderNotLinked('google') when oauth_account row absent","actual":"Inherits get_access_token; verified","file_hint":"backend/src/tools/token_service.py:56"},
+    {"defect_id":"DEF-037-02","test_id":"TC-037-04","severity":"medium","description":"untestable_in_static_review — needs httpx mock.","expected":"401 → refresh → retry","actual":"gmail.request lines 40-44 implement","file_hint":"backend/src/tools/clients/gmail.py:40"}
+  ],
+  "total_defects_critical": 0,
+  "total_defects_high": 0,
+  "total_defects_medium": 2,
+  "total_defects_low": 0,
+  "real_defects_requiring_fix": 0,
+  "bug_fixer_required": false
+}

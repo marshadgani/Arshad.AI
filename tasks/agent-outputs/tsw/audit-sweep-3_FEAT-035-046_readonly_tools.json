@@ -1,0 +1,24 @@
+{
+  "audit_run_id": "audit-2026-04-26",
+  "feature_ids": ["FEAT-035","FEAT-036","FEAT-040","FEAT-043","FEAT-044","FEAT-045","FEAT-046"],
+  "scope": "Read-only tools across Calendar / Gmail / GitHub providers",
+  "primary_files": [
+    "backend/src/tools/calendar/list_events.py",
+    "backend/src/tools/calendar/find_free_slots.py",
+    "backend/src/tools/gmail/apply_label.py",
+    "backend/src/tools/github/list_issues.py",
+    "backend/src/tools/github/list_prs.py",
+    "backend/src/tools/github/get_pr.py",
+    "backend/src/tools/github/get_commit.py"
+  ],
+  "total_scripts": 49,
+  "feature_test_scripts": [
+    {"feature_id":"FEAT-035","feature_name":"Calendar.list_events","script_count":7,"scripts_summary":"GET /calendars/{cid}/events with timeMin/Max/maxResults; singleEvents=true; orderBy=startTime; max_results bounds 1-250; default 20; refresh-on-401; PII safe (only id/title/start/end/location/attendees/html_link); _summarize handles all-day events (.date fallback when no .dateTime)"},
+    {"feature_id":"FEAT-036","feature_name":"Calendar.find_free_slots","script_count":8,"scripts_summary":"POST /freeBusy with calendar_ids; merges busy across calendars sorted by start; walks intervals subtracting busy; duration_minutes 5-1440; max_results 1-50; non-dict response → ToolError(provider_unexpected_response); cursor advances on overlapping busy; final tail-slot if window remains"},
+    {"feature_id":"FEAT-040","feature_name":"Gmail.apply_label","script_count":6,"scripts_summary":"POST /threads/{id}/modify with addLabelIds/removeLabelIds; model_validator enforces at least one non-empty list; thread_id min_length=1; summary unions labelIds across messages; sorted; system + custom labels both accepted"},
+    {"feature_id":"FEAT-043","feature_name":"GitHub.list_issues","script_count":7,"scripts_summary":"GET /repos/{owner}/{repo}/issues with state/labels/assignee/per_page; filters PRs out (GitHub returns PRs in issues endpoint); state Literal['open','closed','all']; labels list AND-joined as ','; max_results 1-100"},
+    {"feature_id":"FEAT-044","feature_name":"GitHub.list_prs","script_count":7,"scripts_summary":"GET /repos/{repo}/pulls with state/base/head; ordered most-recently-updated; draft flag in summary; max_results 1-100"},
+    {"feature_id":"FEAT-045","feature_name":"GitHub.get_pr","script_count":7,"scripts_summary":"GET /pulls/{n} for JSON + GET /pulls/{n}.diff for unified diff (separate request); diff_excerpt truncated at _DIFF_EXCERPT_LEN=12000; number > 0; additions/deletions/changed_files surfaced"},
+    {"feature_id":"FEAT-046","feature_name":"GitHub.get_commit","script_count":7,"scripts_summary":"GET /commits/{sha}; sha 7-40 chars; per-file patch_excerpt capped at 4000 chars; total cap 16000 chars; files_changed/additions/deletions surfaced"}
+  ]
+}

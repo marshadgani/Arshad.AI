@@ -668,6 +668,7 @@ This registry is the source of truth for weekly auto-updates.
 | `marketingskills` | https://github.com/coreyhaines31/marketingskills.git | skills | 40 skills | 2026-04-26 |
 | `web-asset-generator` | https://github.com/alonw0/web-asset-generator.git | skills | 1 skill (favicons + OG images) | 2026-04-26 |
 | `Deep-Research-skills` | https://github.com/Weizhena/Deep-Research-skills.git | skills+agents | 24 skills, 7 agents (slug `-eep--esearch-skills` due to fetcher bug) | 2026-04-26 |
+| `andrej-karpathy-skills` | https://github.com/forrestchang/andrej-karpathy-skills.git | skills | 1 skill (karpathy-guidelines: anti-overcomplication, surgical changes, surface assumptions) | 2026-04-28 |
 
 > This table should be updated alongside `scripts/fetch-github-repo.sh` runs. Keep in sync with `.claude/github-repos.json`.
 
@@ -964,14 +965,21 @@ The report includes: agent-by-agent results table, detailed findings per agent, 
 
 ## 21. AI Dev Team Auto-Trigger (PERMANENT)
 
-**Whenever the user prompt is a feature requirement** — phrased as 'build / add / implement / create / develop X', or describes new functionality with multi-step nature — automatically invoke the 9-agent dev-team pipeline.
+**Whenever the user prompt is a feature requirement** — phrased as 'build / add / implement / create / develop X', or describes new functionality with multi-step nature — automatically invoke the `/dev-team` slash command.
 
-### Trigger detection
+### Cost model
 
-Use `backend/src/dev_team/intent_classifier.classify(prompt)` to decide. Heuristic-first, Haiku 4.5 fallback on ambiguous. Returns `feature_requirement | not_feature | ambiguous`.
+The dev-team is a Claude-Code-native agent set. Each role lives at `.claude/agents/dev-team/<role>.md` and runs as a `Task()` subagent in this session. **No `ANTHROPIC_API_KEY` consumption.** Same billing model as `code-reviewer`, `debugger`, etc.
+
+### Trigger detection (heuristics — done in your own context)
+
+Treat the prompt as a feature requirement if:
+- Starts with build / add / implement / create / develop / design / make
+- Length ≥ 6 words
+- Not in the do-NOT-trigger list below
 
 User escape hatches:
-- Prefix `@build` → force trigger (bypass classifier)
+- Prefix `@build` → force trigger
 - Prefix `@chat` → force skip (always treat as conversation)
 
 ### Do NOT trigger on
@@ -979,41 +987,28 @@ User escape hatches:
 - Diagnostic prompts ("why is X failing", "investigate Y", "the deploy is broken")
 - Questions ("how does X work", "what are my options")
 - Single-line edits / typos
-- Conversational chatter ("yes", "ok", "continue")
+- Conversational chatter ("yes", "ok", "continue", "stop", "cancel")
 - Ambiguous one-word prompts
 - Explicit `@chat` prefix
 
-### Flow when classifier returns `feature_requirement`
+### Flow when triggered
 
-1. **Confirm interpretation** (Q4=a, always confirm). Reflect back:
-   - The requirement summary in your own words
-   - The next `FEAT-NNN` ID that will be issued
-   - Ask: "Confirm or correct?"
-2. **On confirmation**, invoke the pipeline:
-   ```bash
-   python -m src.dev_team.cli "<requirement text>"
-   ```
-   Run via Bash tool with `run_in_background` only if the pipeline is expected to take >2 min. Otherwise foreground so progress streams.
-3. **Stream agent progress** as the CLI prints milestone lines (`▸ BA → ...`, `▸ EA pre-build ...`, etc.). Relay key events back to the user, don't dump the whole output.
-4. **On completion**, report:
-   - Feature ID
-   - Generated branch name (`dev-team/feat-NNN-<slug>`)
-   - Bug-fix iterations used
-   - EA post-build decision
-   - Path to each artifact (BA, EA pre/post, SA, Dev, PO, TSW, Tester runs, BugFixer iterations)
-5. **On halt**, report the halt reason and the last successful step. Do NOT attempt to fix the pipeline yourself — let the user decide.
+1. **Confirm interpretation**. Reflect back: requirement summary, the next `FEAT-NNN`, ask "Confirm or correct?"
+2. **On confirmation**, invoke the orchestrator: follow the recipe in `.claude/commands/dev-team.md`. Each agent stage is a `Task(subagent_type="<role>", ...)` call where `<role>` ∈ `business-analyst | enterprise-architect | solution-architect | developer | process-organiser | test-script-writer | tester | bug-fixer`.
+3. **Stream stage completions** to the user — one short line per agent (`▸ BA: 4 reqs, domain=Workspace ✅`).
+4. **On completion**, report: Feature ID, generated branch name, bug-fix iterations used, EA post-build decision, paths to each artifact.
+5. **On halt**, report the halt reason and the last successful stage.
 
 ### Pipeline guarantees
 
-- Always creates a fresh git branch `dev-team/<feat-id>-<slug>` for live writes (Q2=b safety net)
-- Path denylist enforced before any write (see `agents/developer.py`)
-- Bug-fix loop hard-capped at 5 iterations (`MAX_ITERATIONS`)
-- EA post-build runs even if bug-fix loop hits the cap
-- `tasks/process-hierarchy.md` updated atomically (tmp + os.replace), never recreated
-- Every agent output written to `tasks/agent-outputs/<agent>/<FEAT-NNN>_<ts>.json`
+- 9 stages: BA → EA-pre → SA → Dev → PO → TSW → Tester → [BugFixer ↔ Tester loop, cap 5] → EA-post (always runs, even after cap)
+- Path denylist enforced before any Write (`backend/src/main.py`, `backend/src/auth/*`, `backend/alembic/env.py`, `.github/workflows/*`, `render.yaml`, `vercel.json`, `Dockerfile*`, `CLAUDE.md`, `tasks/process-hierarchy.md`, `tasks/last-gate-report.md`, `tasks/lessons.md`, `tasks/.feature-counter`, any `..` paths)
+- Live writes go to a fresh `dev-team/<feat-id>-<slug>` branch — never `develop-AION` or `main` directly
+- `tasks/process-hierarchy.md` updated via Edit (or atomic Write+mv) — never recreated
+- Every agent output written to `tasks/agent-outputs/<role>/<FEAT-NNN>_<ts>.json`
 - One row appended to `tasks/pipeline-runs.md` per invocation
 
 ### Cancellation
 
-If the user says "stop" / "cancel" while the pipeline is running, terminate the background process. Partial artifacts persist on disk; the run logs as `halted`.
+If the user says "stop" / "cancel" between stages, halt the pipeline at the last completed stage. Partial artifacts persist; the run logs as `halted`.
 

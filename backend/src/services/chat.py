@@ -283,9 +283,15 @@ async def chat_turn(
     yield _sse({"intent": intent})
 
     tool_names, agent_slugs = _tool_subset(intent)
-    tool_schemas = (
-        _build_tool_schemas(tool_names, agent_slugs) if intent != "general" else None
-    )
+    # Build tool schemas regardless of intent — `general` carries the
+    # `ai_core_council_chairman` agent in agent_slugs, which the prior code
+    # suppressed by short-circuiting on intent=="general". Now we only fall
+    # back to None when both lists are empty, which is the actual signal
+    # for "no tools at all".
+    if not tool_names and not agent_slugs:
+        tool_schemas = None
+    else:
+        tool_schemas = _build_tool_schemas(tool_names, agent_slugs)
 
     assistant_text = ""
     final_usage = {"input_tokens": 0, "output_tokens": 0}
@@ -380,18 +386,54 @@ async def chat_turn(
         if not ran_a_tool:
             break  # Claude returned a final text answer; we're done
 
-    if assistant_text:
-        db.add(
-            ConversationMessage(
-                session_id=session.id,
-                role="assistant",
-                content={"text": assistant_text},
-                model=os.getenv("ANTHROPIC_MODEL_DEFAULT", "claude-haiku-4-5-20251001"),
-                usage_input_tokens=final_usage.get("input_tokens"),
-                usage_output_tokens=final_usage.get("output_tokens"),
+    # Persist the assistant text even if the client disconnects mid-stream.
+    # We wrap the final commit in a try/finally so the generator's GeneratorExit
+    # (raised by FastAPI when the SSE consumer drops) still triggers persistence.
+    # Without this, the user message commits at line 277 but partial assistant
+    # text is lost — DEF-028-01 from the audit.
+    try:
+        if assistant_text:
+            db.add(
+                ConversationMessage(
+                    session_id=session.id,
+                    role="assistant",
+                    content={"text": assistant_text},
+                    model=os.getenv(
+                        "ANTHROPIC_MODEL_DEFAULT", "claude-haiku-4-5-20251001"
+                    ),
+                    usage_input_tokens=final_usage.get("input_tokens"),
+                    usage_output_tokens=final_usage.get("output_tokens"),
+                )
             )
-        )
-    session.updated_at = datetime.now(timezone.utc)
-    await db.commit()
-
-    yield _sse("[DONE]")
+        session.updated_at = datetime.now(timezone.utc)
+        await db.commit()
+        yield _sse("[DONE]")
+    except GeneratorExit:
+        # Client disconnected mid-stream. Commit whatever we have so far so
+        # the partial assistant_text survives. Re-raise so FastAPI cleans up
+        # the response cleanly.
+        if assistant_text and session.id is not None:
+            try:
+                db.add(
+                    ConversationMessage(
+                        session_id=session.id,
+                        role="assistant",
+                        content={"text": assistant_text, "_partial": True},
+                        model=os.getenv(
+                            "ANTHROPIC_MODEL_DEFAULT", "claude-haiku-4-5-20251001"
+                        ),
+                        usage_input_tokens=final_usage.get("input_tokens"),
+                        usage_output_tokens=final_usage.get("output_tokens"),
+                    )
+                )
+                await db.commit()
+            except Exception:
+                # Best-effort persistence on disconnect; don't mask the
+                # original GeneratorExit by raising a different exception.
+                # Roll back so the AsyncSession's dirty state doesn't leak
+                # into the next request via connection-pool reuse.
+                try:
+                    await db.rollback()
+                except Exception:
+                    pass
+        raise

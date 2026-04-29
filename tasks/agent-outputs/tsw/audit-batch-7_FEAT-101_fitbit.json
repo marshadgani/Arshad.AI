@@ -1,0 +1,15 @@
+{
+  "audit_run_id": "audit-2026-04-26",
+  "feature_id": "FEAT-101",
+  "feature_name": "Fitbit (personal integration)",
+  "primary_files": ["backend/src/integrations/personal/oauth_providers.py:163-202"],
+  "script_count": 5,
+  "test_cases": [
+    {"test_id":"TC-101-01","name":"use_basic_auth_for_token=True","input":"exchange_code","expected":"Basic Auth header on POST /oauth2/token (Fitbit requirement)"},
+    {"test_id":"TC-101-02","name":"Scopes","input":"connect","expected":"['activity','heartrate','sleep','profile'] space-joined"},
+    {"test_id":"TC-101-03","name":"fetch_profile","input":"access_token","expected":"GET /1/user/-/profile.json; nested body.user.encodedId → fitbit_id; body.user.displayName → display_name"},
+    {"test_id":"TC-101-04","name":"Sync profile-as-summary","input":"connected","expected":"Same /profile.json endpoint reused; integration.config has display_name + average_daily_steps"},
+    {"test_id":"TC-101-05","name":"Refresh on expiry","input":"token expired","expected":"Base class _refresh handles via Basic Auth (use_basic_auth_for_token honoured)"}
+  ],
+  "rtm_coverage": "AC-101-01..03"
+}
