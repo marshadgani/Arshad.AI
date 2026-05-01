@@ -275,21 +275,24 @@
     "context7": {
       "url": "https://github.com/upstash/context7.git",
       "name": "context7",
-      "type": "skills",
-      "last_fetched": "2026-04-25",
+      "last_fetched": "2026-05-01 12:32 UTC",
       "components": {
         "skills": [
-          "context7-cli",
           "context7-mcp",
-          "find-docs"
+          "context7-cli",
+          "find-docs",
+          "context7-mcp",
+          "context7-mcp"
         ],
         "agents": [
+          "docs-researcher",
           "docs-researcher"
         ],
         "commands": [
           "docs"
         ],
-        "hooks": []
+        "hooks": [],
+        "token_optimization": []
       }
     },
     "everything-claude-code": {
