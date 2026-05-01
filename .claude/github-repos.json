@@ -1273,7 +1273,7 @@
     "browser-use": {
       "url": "https://github.com/browser-use/browser-use.git",
       "name": "browser-use",
-      "last_fetched": "2026-04-26 15:48 UTC",
+      "last_fetched": "2026-05-01 12:32 UTC",
       "components": {
         "skills": [
           "open-source",
@@ -1301,7 +1301,7 @@
     "marketingskills": {
       "url": "https://github.com/coreyhaines31/marketingskills.git",
       "name": "marketingskills",
-      "last_fetched": "2026-04-26 15:55 UTC",
+      "last_fetched": "2026-05-01 12:32 UTC",
       "components": {
         "skills": [
           "free-tool-strategy",
@@ -1354,7 +1354,7 @@
     "web-asset-generator": {
       "url": "https://github.com/alonw0/web-asset-generator.git",
       "name": "web-asset-generator",
-      "last_fetched": "2026-04-26 16:00 UTC",
+      "last_fetched": "2026-05-01 12:32 UTC",
       "components": {
         "skills": [
           "web-asset-generator"
@@ -1368,7 +1368,7 @@
     "-eep--esearch-skills": {
       "url": "https://github.com/Weizhena/Deep-Research-skills.git",
       "name": "Deep-Research-skills",
-      "last_fetched": "2026-04-26 16:01 UTC",
+      "last_fetched": "2026-05-01 12:32 UTC",
       "components": {
         "skills": [
           "research",
@@ -1413,7 +1413,7 @@
     "andrej-karpathy-skills": {
       "url": "https://github.com/forrestchang/andrej-karpathy-skills.git",
       "name": "andrej-karpathy-skills",
-      "last_fetched": "2026-04-28 23:28 UTC",
+      "last_fetched": "2026-05-01 12:32 UTC",
       "components": {
         "skills": [
           "karpathy-guidelines"
