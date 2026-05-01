@@ -56,8 +56,19 @@ DANGEROUS=(
   'cat[[:space:]]+\.env[[:space:]]*\|[[:space:]]*(curl|nc|wget)'  # cat .env | curl|nc|wget
 )
 
+# Strip heredoc bodies + quoted-string content from $CMD before matching.
+# Without this, a commit message that QUOTES a dangerous pattern in a
+# heredoc trips the guard even though no dangerous command runs. The
+# helper script (.claude/hooks/_sanitize_bash.py) handles both heredocs
+# and ' '/" " quoted argument bodies. Falls back to raw $CMD if the
+# helper is missing or python3 is unavailable — fail-closed on the
+# dangerous-pattern check, fail-open on the sanitizer.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SANITIZED=$(printf '%s' "$CMD" | python3 "$SCRIPT_DIR/_sanitize_bash.py" 2>/dev/null) \
+  || SANITIZED="$CMD"
+
 for pattern in "${DANGEROUS[@]}"; do
-  if echo "$CMD" | grep -qE "$pattern"; then
+  if echo "$SANITIZED" | grep -qE "$pattern"; then
     echo "bash-guard: BLOCKED — command matches '$pattern'" >&2
     echo "Command: $CMD" >&2
     exit 2
