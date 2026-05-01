@@ -13,10 +13,15 @@ CMD=$(printf '%s' "$INPUT" | python3 -c \
 # Each entry is a regex matched against the joined Bash command string.
 DANGEROUS=(
   # ── Filesystem destruction ─────────────────────────────────────────
-  'rm[[:space:]]+-rf?[[:space:]]+/[[:space:]]*$'              # rm -rf /
-  'rm[[:space:]]+-rf?[[:space:]]+~[[:space:]]*$'              # rm -rf ~
-  'rm[[:space:]]+-rf?[[:space:]]+\$HOME'                      # rm -rf $HOME
-  'rm[[:space:]]+-rf?[[:space:]]+/\*'                         # rm -rf /*
+  # Combined-flag forms: rm -rf, rm -fr.
+  'rm[[:space:]]+-[rf][rf][[:space:]]+/[[:space:]]*$'         # rm -rf / / rm -fr /
+  'rm[[:space:]]+-[rf][rf][[:space:]]+~[[:space:]]*$'         # rm -rf ~
+  'rm[[:space:]]+-[rf][rf][[:space:]]+\$HOME'                 # rm -rf $HOME
+  'rm[[:space:]]+-[rf][rf][[:space:]]+/\*'                    # rm -rf /*
+  # Split-flag forms: rm -r -f / etc — both flags present in any order.
+  'rm[[:space:]]+(-r[[:space:]]+-f|-f[[:space:]]+-r)[[:space:]]+/[[:space:]]*$'
+  'rm[[:space:]]+(-r[[:space:]]+-f|-f[[:space:]]+-r)[[:space:]]+~[[:space:]]*$'
+  'rm[[:space:]]+(-r[[:space:]]+-f|-f[[:space:]]+-r)[[:space:]]+\$HOME'
   'find[[:space:]]+/[[:space:]]+.*-delete'                    # find / ... -delete
   'find[[:space:]]+/[a-z]+[[:space:]]+.*-delete'              # find /etc ... -delete
 
