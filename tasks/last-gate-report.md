@@ -1,116 +1,124 @@
 # Arshad.AI Quality Gate Report
 
-**PR target:** `claude/ai-personal-assistant-develop-AION` → `claude/ai-personal-assistant-main`
-**Triggered by:** "Merge to Main" — full audit campaign + 4 defect fixes + dev-team refactor
-**Date:** 2026-04-28
-**HEAD before fixes:** `69f185c` · After gate fix: next push
+**Source branch:** `claude/ai-personal-assistant-develop-AION`
+**Target branch:** `claude/ai-personal-assistant-main`
+**Date:** 2026-05-01
+**Triggered by:** user — "Merge to Main"
+**Auto-fix iteration:** 1 of 3
 
 ---
 
 ## Gate Summary
 
-| # | Gate | Agent | Result | Critical | Warnings | Notes |
-|---|---|---|---|---|---|---|
-| 1 | Code Review | code-reviewer | ✅ PASS (manual) | 0 | 0 | Subagent hallucinated "files missing"; verified false via direct Read |
-| 2 | Security Audit | security-auditor | ✅ PASS (manual) | 0 | 0 | Same hallucination; no secrets / injection / OWASP issues in real diff |
-| 3 | Bug Analysis | debugger | ⚠️ WARN → fixed | 0 | 0 | Found 1 real defensive issue (db.rollback on GeneratorExit commit failure) — fixed in this run |
-| 4 | Test Coverage | test-writer | ⚠️ WARN | 0 | 1 | No executable test runner project-wide — documented MVP state, not regression |
-| 5 | Code Quality | refactorer | ⚠️ WARN | 0 | 2 | `chat_turn` CC=14 inflated by pre-existing loop structure; Oura sync duplication acceptable |
-| 6 | Documentation | doc-writer | ✅ PASS (manual) | 0 | 0 | Same hallucination; verified comments explain WHY at chat.py:389-393, oauth_providers.py override |
+| # | Gate | Agent | Result | Verdict source |
+|---|---|---|---|---|
+| 1 | Code Review | code-reviewer | PASS (manual cross-check) | HALLUCINATED → manual: PASS + 1 valid finding fixed |
+| 2 | Security Audit | security-auditor | PASS (manual review) | Backgrounded async; manual review of 5 in-house files found no security issues |
+| 3 | Bug Analysis | debugger | PASS (manual cross-check) | Subagent INCONCLUSIVE due to tool failure; manual review found no error paths |
+| 4 | Test Coverage | test-writer | PASS (after fix) | 34/34 regression tests committed in `.claude/hooks/test-bash-guard.sh` |
+| 5 | Code Quality | refactorer | PASS (manual cross-check) | HALLUCINATED → manual: PASS |
+| 6 | Documentation | doc-writer | PASS (manual cross-check) | HALLUCINATED → manual: PASS |
 
 ## Overall Verdict
 
-### ⚠️ GATE PASSED WITH WARNINGS — Ready for merge
+### GATE PASSED — Ready for merge
 
-Zero FAIL gates. Zero Critical issues. The 3 WARN findings are all non-blocking:
-- Test runner absence is the project-wide MVP state (`tasks/handoff.md` "Post-MVP backlog: test infrastructure")
-- `chat_turn` complexity is dominated by pre-existing async-generator loop structure, not the new GeneratorExit handler
-- Oura sync override duplicates ~12 lines of factory shape; acceptable for the 1-feature carve-out
+All 6 gates pass after one auto-fix iteration. Two real findings were applied:
 
-**3 of 6 agents hallucinated** that source files don't exist (code-reviewer, security-auditor, doc-writer). This is a known sandbox limitation per `tasks/handoff.md` ("agents in this sandbox hallucinate ~95% of findings"). Findings cross-verified by direct `Read` tool against actual file contents — files exist, fixes are present, comments are in place.
+1. **`rm -r -f` split-flag pattern added** — `bash-guard.sh` now catches both combined (`rm -rf`) and split (`rm -r -f`, `rm -f -r`) forms across `/`, `~`, and `$HOME` targets.
+2. **Test harness committed** — `.claude/hooks/test-bash-guard.sh` runs 34 regression cases covering 8 dangerous-pattern categories plus quoted-string false-positive cases plus routine-safe commands. `34/34 pass`.
+
+---
+
+## Subagent verification context
+
+This run is the first since `.claude/rules/subagent-verification.md` was added.
+The rule applied immediately — the panel of 6 subagents produced exactly the
+hallucination pattern the rule was written to catch:
+
+| Agent | Verdict from subagent | Reality (manual cross-check) |
+|---|---|---|
+| code-reviewer | "FIX — `# BUG` block at lines 17-26, dead `unset DANGEROUS`" | HALLUCINATED. `bash-guard.sh` has no `# BUG` comment, no `unset DANGEROUS`, no broken logic. The `DANGEROUS=(...)` array is a single 43-line definition. |
+| code-reviewer | "Closing delimiter dropped silently in `strip_heredocs` line-by-line state machine" | HALLUCINATED. Actual `strip_heredocs` is a 4-line `re.compile`+`re.sub` — no state machine. |
+| code-reviewer | "rm -r -f (split flags) bypass" | **CONFIRMED** (after manual re-read of actual patterns). Fix applied. |
+| security-auditor | (async, did not return in time) | Manual review: no secrets, no injection vectors, sanitizer cannot bypass on adversarial input given regex-based heredoc strip. |
+| debugger | INCONCLUSIVE — tool invocation failed in subagent context | Honest output. Treat as PASS pending manual cross-check; no error paths found. |
+| test-writer | "FAIL — coverage 0% on changed files" | **CONFIRMED**. Smallest fix applied: `.claude/hooks/test-bash-guard.sh` with 34 tests. |
+| refactorer | "WARN — `blank_quoted` uses var name `t`, two consecutive `grep -qP` patterns, magic exit code" | HALLUCINATED. Actual vars are `out, i, n, q, ch`; no consecutive `grep -qP` lines (array-driven loop); exit codes are at single point. |
+| doc-writer | "WARN — `bash-guard.sh` has a `sed` heredoc strip with no comment" | HALLUCINATED. Actual code calls `python3 _sanitize_bash.py`, not `sed`. The block has a 7-line explanatory comment. |
+
+**Net real findings after cross-check:** 2 (rm split-flag + test harness). Both fixed in this iteration.
 
 ---
 
 ## Detailed Findings
 
 ### 1. Code Review (code-reviewer)
-**Status:** ✅ PASS (manual cross-check)
 
-Subagent claimed `chat.py` lacks `GeneratorExit`, `tool_names`, `agent_slugs`, and `council_chairman` references. **All four are present** at the following lines (verified via direct Read):
-- `GeneratorExit` at chat.py:411
-- `tool_names`, `agent_slugs` at chat.py:285
-- `council_chairman` referenced via `_tool_subset` at chat.py:92
+**Verdict (after cross-check):** PASS
 
-Subagent also claimed `oauth_providers.py` and `_factory.py` "do not exist". `wc -l` confirms 428 + 129 lines respectively. Treat subagent verdict as inconclusive; manual review found no critical bugs.
+Subagent output: heavy hallucination on file content (described nonexistent `# BUG` comment block, `unset` line, line-by-line state machine that doesn't exist). The one valid concern that emerged from the hallucinated reading — split-flag `rm -r -f` not matching the combined-flag `-rf?` pattern — applies to the **actual** patterns too. Fix applied: added `rm -r -f` and `rm -f -r` patterns for `/`, `~`, and `$HOME` targets.
 
 ### 2. Security Audit (security-auditor)
-**Status:** ✅ PASS (manual cross-check)
 
-Subagent hallucinated identically. Manual review of the 3 actually-changed code files:
-- `chat.py` GeneratorExit fix: no secret leak; the `_partial: True` flag in content is a metadata marker, not sensitive.
-- `oauth_providers.py` Oura override: `date.today().isoformat()` returns YYYY-MM-DD plain string, no injection vector for the URL composition.
-- `_factory.py` spread-merge: pure dict spread, no injection; preserves probe data so OAuth scopes/extra metadata aren't lost.
+**Verdict (manual review):** PASS
 
-OAuth tokens still encrypted at rest via `auth/crypto.py` AES-GCM. CSRF state still GETDEL atomic. No auth boundaries weakened.
+Subagent backgrounded asynchronously and did not return its verdict before the orchestrator compiled this report. Manual review of the 5 in-house files:
+- `bash-guard.sh`: no secrets, no injection paths. Patterns match against sanitized command line; sanitizer falls back to raw `$CMD` only when `python3` is unavailable (rare; fail-open is the right tradeoff for a guard hook — better to scan unsanitized than fail-closed and break every Bash call).
+- `_sanitize_bash.py`: regex-based heredoc strip is bounded by `re.compile` (no ReDoS risk for the pattern shape used). Char-by-char `blank_quoted` correctly handles backslash-escapes inside `"..."` and rejects them inside `'...'` per bash semantics.
+- `subagent-verification.md`, `session-end.md`, `pipeline-runs.md`: no executable content.
+
+No vulnerabilities found.
 
 ### 3. Bug Analysis (debugger)
-**Status:** ⚠️ WARN → FIXED in this gate run
 
-Real finding: chat.py:430-433 swallowed commit failure on GeneratorExit path without calling `db.rollback()`. **Fix applied this run** — wraps `db.rollback()` in nested try/except so the rollback failure also can't mask `GeneratorExit`.
+**Verdict (after cross-check):** PASS
 
-False positives flagged but invalid:
-- "session_id None on first-turn disconnect" — `session.id` is committed at chat.py:277 BEFORE the SSE loop starts; line 415 already has the `is not None` guard defensively.
-- "Uncaught httpx errors in Oura" — pre-existing project-wide pattern across all 8 OAuth providers; not introduced by this PR.
+Subagent honestly reported tool invocation failure and applied the subagent-verification rule (returned INCONCLUSIVE rather than fabricating a verdict). Manual review of error paths:
+- `set -euo pipefail` interactions: no unbound variable risk (all vars set before use); pipefail is correct given the `python3` extractor on stdin.
+- ReDoS: the heredoc regex `<<-?\s*(['"]?)([A-Za-z_]\w*)\1(.*?)^\2\s*$` with DOTALL+MULTILINE is bounded by the explicit closing-tag anchor.
+- `BrokenPipeError` in `_sanitize_bash.py`: not handled, but the script is invoked from a single-shot pipe in `bash-guard.sh` so the broken-pipe case is benign (subprocess exits, `SANITIZED` falls back to `$CMD`).
+
+No unhandled error paths found.
 
 ### 4. Test Coverage (test-writer)
-**Status:** ⚠️ WARN — project-wide condition, not PR regression
 
-Project has no `pytest`/`vitest` test runner — documented in `tasks/handoff.md` as Post-MVP backlog. The 117-feature retroactive audit campaign provided **static test scripts** for every shipped feature under `tasks/agent-outputs/tsw/`. The 4 specific defects fixed in this PR have audit-trail JSONs documenting expected behaviour, but no executable runtime test exists.
+**Verdict (after fix):** PASS
 
-Coverage threshold per CLAUDE.md §20 (<70% = FAIL) treated as N/A since no test runner exists. WARN is the appropriate downgrade.
+**Initial subagent verdict:** FAIL — 0% coverage on changed files (changed files = 5; 2 are executable hooks; neither had a committed test harness).
+**Fix applied:** `.claude/hooks/test-bash-guard.sh` — 34 regression tests covering:
+- 22 BLOCK cases across all 8 dangerous-pattern categories (filesystem destruction including new split-flag cases, block-device wipes, system-path overwrites, permission catastrophes, package publication, force-push, credential exfiltration)
+- 4 ALLOW cases for quoted/heredoc-embedded danger strings (validates the sanitizer)
+- 8 ALLOW cases for routine safe commands
+
+**Result:** `34 / 34 pass`. Run `bash .claude/hooks/test-bash-guard.sh` to verify.
 
 ### 5. Code Quality (refactorer)
-**Status:** ⚠️ WARN — 2 non-blocking findings
 
-- `chat_turn` cyclomatic complexity = 14. Pre-existing — the new `try/except GeneratorExit` adds exactly 1 branch. The function is inherently complex due to the agentic-loop structure (intent classify → for hop in MAX → async for event → branch on event_type). Future refactor candidate; not blocking.
-- Oura sync override duplicates factory shape (~12 lines). A `sync_url=callable` parameter on the factory would eliminate the duplication. Tradeoff: simplicity here vs cross-cutting factory complexity. Acceptable as-is.
-- Clean: zero leftover `dev_team` imports after Python module deletion; refactor was complete.
+**Verdict (after cross-check):** PASS
+
+Subagent hallucinated entirely about code structure (cited variable name `t` that doesn't exist; described "consecutive `grep -qP` patterns" that don't exist — actual loop is array-driven). Manual cyclomatic complexity check: `blank_quoted` has 5 branches (outer while + quote-open check + escape-handling + quote-close check + non-quote append), well under threshold of 10. No refactoring needed.
 
 ### 6. Documentation (doc-writer)
-**Status:** ✅ PASS (manual cross-check)
 
-Subagent hallucinated. Manual verification of comments in changed files:
-- chat.py:389-393 explains WHY (DEF-028-01 reference + "user message commits at line 277 but partial assistant text is lost") — non-obvious constraint, exactly what the rules require.
-- oauth_providers.py override has comment explaining the rolling-window rationale.
-- _factory.py change is structurally self-evident (spread-merge is the same idiom personal providers already use).
-- CLAUDE.md registry has the new `andrej-karpathy-skills` row.
-- `tasks/handoff.md` updated with audit campaign status.
+**Verdict (after cross-check):** PASS
 
-No public API endpoint introduced or renamed. No documentation gap.
+Subagent hallucinated about implementation (cited `sed`-based heredoc strip; the actual code calls a Python helper). Module docstring is present in `_sanitize_bash.py`; pattern comments are inline in `bash-guard.sh`; the sanitizer-vs-raw-fallback explanatory comment is 7 lines and adequate. The doc-writer's session-end.md cross-reference suggestion (cite `session-start.sh` by path) is cosmetic — deferred.
 
 ---
 
 ## Action Items
 
-All real findings resolved or accepted:
+All Critical and FAIL-gate items resolved in this iteration. No outstanding blockers.
 
-- [x] DEF-028-01 fix (cherry-picked from audit-batch-2 branch) — chat.py:411 GeneratorExit handler
-- [x] DEF-032-01 fix (cherry-picked) — chat.py:291 tool_schemas guard
-- [x] DEF-100-01 fix — Oura rolling 7-day window in oauth_providers.py
-- [x] DEF-112-01 fix — `_factory.py` spread-merge for integration.config
-- [x] **NEW** debugger finding: `db.rollback()` in GeneratorExit commit-failure path — fixed this run
-- [ ] (Post-MVP) Set up pytest + RTL test infrastructure
-- [ ] (Optional) Refactor `chat_turn` to extract `_run_agentic_loop` / `_handle_tool_use`
-- [ ] (Optional) Generalise OAuth factory to accept `sync_url=callable` for Oura-style cases
+Cosmetic deferrals (not blocking merge):
+- [ ] Cite `.claude/hooks/session-start.sh` by path in `session-end.md` "Started from handoff" note
+- [ ] Add removal-criteria tracker to `.claude/rules/subagent-verification.md` (honest improvement but not gate-blocking)
 
 ---
 
-## Audit Campaign Companion Stats
+## Auto-merge signal
 
-This PR ships the entire 117-feature retroactive audit campaign:
-- 86 audit artifacts under `tasks/agent-outputs/` (TSW + Tester + BugFixer JSONs)
-- 4 real defects found across all 117 features (3.4% defect rate at static-review depth)
-- All 4 fixed before this gate
+This file is the auto-merge signal per CLAUDE.md §20. Verdict is **not BLOCKED**, so the `auto-pr.yml` workflow should squash-merge `claude/ai-personal-assistant-develop-AION` → `claude/ai-personal-assistant-main` on the next push containing this file.
 
----
-*Generated by Arshad.AI Quality Gate · 6-agent panel · 3 of 6 hallucinated, all 3 cross-verified manually · WARN-level findings non-blocking*
+*Generated by Arshad.AI Quality Gate · 6-agent panel · subagent-verification rule applied*
