@@ -73,6 +73,7 @@ This is append-only. Insert a new entry at the **top** of the file (newest first
 
 **HEAD at end of session:** `<short SHA>`
 **Branch:** `<branch>`
+**Started from handoff:** `<short SHA of the handoff commit this session was resumed from>` — see `git log tasks/handoff.md` to walk the chain backward.
 
 ### Built
 - Bullets of what shipped this session. Cite commit SHAs where useful.
@@ -94,6 +95,14 @@ This is append-only. Insert a new entry at the **top** of the file (newest first
 ```
 
 The `---` separator goes between entries.
+
+**Why "Started from handoff":** every dev-log entry forms one link in a backward-walkable chain. Future-you can reconstruct any past state by following `Started from handoff` → that commit → its handoff content → its referenced "Started from" → and so on. The chain is the project's git-native equivalent of a session journal.
+
+To find the prior handoff SHA at the start of step 3:
+```bash
+git log -1 --format='%h' tasks/handoff.md
+```
+That's the SHA of the handoff commit Claude Code resumed from at session start (before this session's overwrite).
 
 ### 4. Commit
 
@@ -141,3 +150,4 @@ Done.
 - **Never edit past dev log entries.** They're a historical record. If a previous decision was wrong, write a new entry that corrects it.
 - **Keep handoff.md under 60 lines.** Tight is the whole point.
 - **Don't include secrets, tokens, or full env values in either file.** Branch names, file paths, SHAs only.
+- **Always cite "Started from handoff: <SHA>" in dev-log entries.** This is the chain link that lets `git log tasks/handoff.md` reconstruct any past project state. A dev-log entry without this field is a snapped link.
