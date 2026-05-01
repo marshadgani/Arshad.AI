@@ -98,40 +98,44 @@
     "obsidian-skills": {
       "url": "https://github.com/kepano/obsidian-skills.git",
       "name": "obsidian-skills",
-      "type": "skills",
-      "last_fetched": "2026-04-25",
+      "last_fetched": "2026-05-01 12:31 UTC",
       "components": {
         "skills": [
-          "defuddle",
-          "json-canvas",
-          "obsidian-bases",
           "obsidian-cli",
+          "obsidian-bases",
+          "json-canvas",
+          "defuddle",
           "obsidian-markdown"
         ],
         "agents": [],
         "commands": [],
-        "hooks": []
+        "hooks": [],
+        "token_optimization": []
       }
     },
     "n8n-mcp": {
       "url": "https://github.com/czlonkowski/n8n-mcp.git",
       "name": "n8n-mcp",
-      "type": "agents",
-      "last_fetched": "2026-04-25",
+      "last_fetched": "2026-05-01 12:31 UTC",
       "components": {
         "skills": [],
         "agents": [
-          "code-reviewer",
+          "technical-researcher",
+          "deployment-engineer",
+          "n8n-mcp-tester",
+          "mcp-backend-engineer",
           "context-manager",
           "debugger",
-          "deployment-engineer",
-          "mcp-backend-engineer",
-          "n8n-mcp-tester",
-          "technical-researcher",
+          "code-reviewer",
           "test-automator"
         ],
         "commands": [],
-        "hooks": []
+        "hooks": [],
+        "token_optimization": [
+          "competitive-analysis-may-2026.md",
+          "N8N_AI_WORKFLOW_BUILDER_ANALYSIS.md",
+          "context-manager.md"
+        ]
       }
     },
     "get-shit-done": {
