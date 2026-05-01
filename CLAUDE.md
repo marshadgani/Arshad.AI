@@ -552,6 +552,7 @@ A git commit is created automatically when any skill file changes.
 | `obsidian-skills` | https://github.com/kepano/obsidian-skills.git | defuddle, json-canvas, obsidian-bases, obsidian-cli, obsidian-markdown (5) |
 | `context7` | https://github.com/upstash/context7.git | context7-cli, context7-mcp, find-docs (3) |
 | `everything-claude-code` | https://github.com/affaan-m/everything-claude-code.git | agent-introspection-debugging, agent-sort, api-design, article-writing, backend-patterns, brand-voice, bun-runtime, claude-api, coding-standards, content-engine, crosspost, deep-research, dmux-workflows, documentation-lookup, e2e-testing, eval-harness, exa-search, fal-ai-media, frontend-design, frontend-patterns, frontend-slides, investor-materials, investor-outreach, market-research, mcp-server-patterns, nextjs-turbopack, product-capability, security-review, strategic-compact, tdd-workflow, verification-loop, video-editing, x-api (34) |
+| `gstack` | https://github.com/garrytan/gstack.git | gstack (root meta-skill), browse, qa, review, ship, careful, guard, freeze, unfreeze, learn, codex, retro, canary, scrape, autoplan, skillify, investigate, health, pair-agent, plan-tune, plan-design-review, plan-eng-review, plan-ceo-review, plan-devex-review, devex-review, design-review, design-shotgun, design-html, design-consultation, document-release, gstack-upgrade, land-and-deploy, landing-report, setup-deploy, setup-browser-cookies, setup-gbrain, open-gstack-browser, office-hours, context-save, context-restore, qa-only, cso, make-pdf, benchmark, benchmark-models, hackernews-frontpage, gstack-openclaw-ceo-review, gstack-openclaw-investigate, gstack-openclaw-retro, gstack-openclaw-office-hours (50) |
 
 ### Active Sources — Agents
 
@@ -679,6 +680,7 @@ This registry is the source of truth for weekly auto-updates.
 | `web-asset-generator` | https://github.com/alonw0/web-asset-generator.git | skills | 1 skill (favicons + OG images) | 2026-04-26 |
 | `Deep-Research-skills` | https://github.com/Weizhena/Deep-Research-skills.git | skills+agents | 24 skills, 7 agents (slug `-eep--esearch-skills` due to fetcher bug) | 2026-04-26 |
 | `andrej-karpathy-skills` | https://github.com/forrestchang/andrej-karpathy-skills.git | skills | 1 skill (karpathy-guidelines: anti-overcomplication, surgical changes, surface assumptions) | 2026-04-28 |
+| `gstack` | https://github.com/garrytan/gstack.git | skills | 50 skills (browser dogfooding, design/eng/ceo/devex review tracks, plan-tune, ship, careful, guard, freeze/unfreeze, openclaw variants — see §15 for full list). Note: gstack uses **flat layout** (skills at repo root), so `fetch-github-repo.sh` did not auto-copy — skills were copied manually. Patch the script if more flat-layout repos are added. | 2026-05-01 |
 
 > This table should be updated alongside `scripts/fetch-github-repo.sh` runs. Keep in sync with `.claude/github-repos.json`.
 
