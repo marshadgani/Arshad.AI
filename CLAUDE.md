@@ -10,12 +10,19 @@ No need for the user to type the command — detect the URL and trigger the fetc
 
 ## Model Strategy (Read First)
 
-| Phase | Model | When |
-|---|---|---|
-| **Planning** | `claude-opus-4-7` | Any task with 3+ steps, architectural decisions, ambiguous requirements |
-| **Execution** | `claude-sonnet-4-6` | All regular prompts, all agent runs, all code writing |
+Three tiers. Pick by **cost-of-being-wrong**, not task length.
 
-**Rule:** Before writing a single line of code on any non-trivial task, invoke the `planner` agent (Opus) via `/plan <description>`. Opus thinks, Sonnet builds.
+| Tier | Model ID | When |
+|---|---|---|
+| **Cheap** | `claude-haiku-4-5-20251001` | Mechanical, near-deterministic, output verifiable in one read. Classification, intent routing, file lookups, single-line fixes, renames, config tweaks, lint cleanups, structured-extraction agents (BA, process-organiser), grep-style search. |
+| **Default** | `claude-sonnet-4-6` | Code writing, normal investigation, agent execution. The workhorse for every task that needs understanding but not deep reasoning. |
+| **Premium** | `claude-opus-4-7` | Planning, architecture, quality gates, hard debugging, security audit. Anything where wrong decisions cascade. |
+
+**Routing rule:** Haiku for verifiable mechanical work → Sonnet for default execution → Opus for high-leverage thinking. Most prompts land on Sonnet.
+
+**Planning rule (unchanged):** Before writing a line of code on any non-trivial task, invoke the `planner` agent (Opus) via `/plan <description>`. Opus thinks, Sonnet builds, Haiku tidies.
+
+**Escalation rule:** If a task fails on its assigned tier, **escalate one level** — never retry on the same tier. Haiku confused → Sonnet. Sonnet stuck after 1 attempt → Opus. The escalation path is the real quality guarantee.
 
 **Never skip planning for:**
 - New features touching multiple files or layers
@@ -23,11 +30,14 @@ No need for the user to type the command — detect the URL and trigger the fetc
 - Database schema changes
 - Any task where the approach is unclear
 
-**Skip planning for:**
+**Skip planning (route directly to Haiku) for:**
 - Single-line fixes
 - Config value changes
 - Renames
 - Adding a single test
+- Status / lookup questions
+
+**Per-call override:** When the orchestrator knows better than an agent's frontmatter default, pass `Task(model="haiku" | "sonnet" | "opus")`. Resolution order: per-call > frontmatter > project default > inherited.
 
 ---
 
