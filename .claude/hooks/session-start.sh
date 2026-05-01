@@ -73,5 +73,10 @@ for slug, data in reg.get('repos', {}).items():
 
   echo "[session-start] Weekly update complete" >> "$LOG"
 } &
+BG_PID=$!
+# Detach from the parent shell's job table so the harness doesn't count
+# this as a tracked child process (avoids a phantom "1 agent running"
+# indicator while the weekly skill refresh runs).
+disown "$BG_PID" 2>/dev/null || true
 
-echo "[session-start] Background update started (PID $!) — check .claude/skills/.update-log for progress"
+echo "[session-start] Background update started (PID $BG_PID) — check .claude/skills/.update-log for progress"
