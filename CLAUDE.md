@@ -680,7 +680,7 @@ This registry is the source of truth for weekly auto-updates.
 | `web-asset-generator` | https://github.com/alonw0/web-asset-generator.git | skills | 1 skill (favicons + OG images) | 2026-04-26 |
 | `Deep-Research-skills` | https://github.com/Weizhena/Deep-Research-skills.git | skills+agents | 24 skills, 7 agents (slug `-eep--esearch-skills` due to fetcher bug) | 2026-04-26 |
 | `andrej-karpathy-skills` | https://github.com/forrestchang/andrej-karpathy-skills.git | skills | 1 skill (karpathy-guidelines: anti-overcomplication, surgical changes, surface assumptions) | 2026-04-28 |
-| `gstack` | https://github.com/garrytan/gstack.git | skills | 50 skills (browser dogfooding, design/eng/ceo/devex review tracks, plan-tune, ship, careful, guard, freeze/unfreeze, openclaw variants — see §15 for full list). Note: gstack uses **flat layout** (skills at repo root), so `fetch-github-repo.sh` did not auto-copy — skills were copied manually. Patch the script if more flat-layout repos are added. | 2026-05-01 |
+| `gstack` | https://github.com/garrytan/gstack.git | skills | 50 skills (browser dogfooding, design/eng/ceo/devex review tracks, plan-tune, ship, careful, guard, freeze/unfreeze, openclaw variants — see §15 for full list). gstack uses a **flat layout** (skills at repo root); fetch script handles this since 2026-05-02 + a 5MB-per-file cap and a `test/`/`tests/`/`node_modules/`/`dist/`/`build/` prune so test fixtures don't bloat the vendored copy. | 2026-05-01 |
 
 > This table should be updated alongside `scripts/fetch-github-repo.sh` runs. Keep in sync with `.claude/github-repos.json`.
 
