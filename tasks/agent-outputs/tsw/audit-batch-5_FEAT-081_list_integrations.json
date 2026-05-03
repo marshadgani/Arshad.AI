@@ -1,0 +1,17 @@
+{
+  "audit_run_id": "audit-2026-04-26",
+  "feature_id": "FEAT-081",
+  "feature_name": "List Integrations + Per-User Status",
+  "primary_files": ["backend/src/integrations/routers.py", "backend/src/integrations/registry.py", "backend/src/integrations/base.py"],
+  "script_count": 7,
+  "test_cases": [
+    {"test_id":"TC-081-01","name":"Auth required","input":"GET /api/v1/integrations no JWT","expected":"401"},
+    {"test_id":"TC-081-02","name":"Connected provider status","input":"User has Integration row for slug X","expected":"meta has status, last_synced_at, last_error, extra from provider.status()"},
+    {"test_id":"TC-081-03","name":"Disconnected provider","input":"No Integration row for slug","expected":"status='disconnected', last_synced_at=None, last_error=None"},
+    {"test_id":"TC-081-04","name":"Provider.status raises","input":"provider.status raises any exception","expected":"meta.status='error', last_error contains type+message; loop continues to next provider"},
+    {"test_id":"TC-081-05","name":"User isolation","input":"user A queries; user B has separate Integration","expected":"only user A's rows + project-wide (user_id IS NULL) returned"},
+    {"test_id":"TC-081-06","name":"Sort order","input":"any","expected":"items sorted by (category, display_name)"},
+    {"test_id":"TC-081-07","name":"Descriptor shape","input":"any","expected":"each item has slug, kind, display_name, category, description, docs_url, icon, coming_soon, coming_soon_reason"}
+  ],
+  "rtm_coverage": "AC-081-01..04 (auth, status enrichment, isolation, deterministic order)"
+}

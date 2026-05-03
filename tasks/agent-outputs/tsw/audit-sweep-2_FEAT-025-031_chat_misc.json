@@ -1,0 +1,12 @@
+{
+  "audit_run_id": "audit-2026-04-26",
+  "feature_ids": ["FEAT-025","FEAT-027","FEAT-031"],
+  "scope": "Chat misc — list/delete sessions + history compression",
+  "primary_files": ["backend/src/api/v1/chat.py", "backend/src/services/chat.py"],
+  "total_scripts": 18,
+  "feature_test_scripts": [
+    {"feature_id":"FEAT-025","feature_name":"List Chat Sessions","script_count":6,"scripts_summary":"Auth required (401); user isolation (B's sessions excluded for A); ordered by updated_at DESC; LIMIT 100; empty list valid; data shape {data:[...], total}"},
+    {"feature_id":"FEAT-027","feature_name":"Delete Chat Session","script_count":6,"scripts_summary":"Auth required; cross-user 404; non-existent UUID 404; happy path 204 No Content; cascade delete via ON DELETE CASCADE removes messages; idempotent (404 on re-delete, never 500)"},
+    {"feature_id":"FEAT-031","feature_name":"Conversation History Token Compression","script_count":6,"scripts_summary":"_history_token_budget reads CHAT_HISTORY_TOKEN_BUDGET env (min 500, default 8000); _approx_tokens does len/4 estimate; under budget → returns input unchanged; over budget → drops up to second user message preserving first; assistant tool_use blocks stay glued to their assistant message (no half-turn drops); empty history short-circuits"}
+  ]
+}

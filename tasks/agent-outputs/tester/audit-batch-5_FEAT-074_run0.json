@@ -1,0 +1,16 @@
+{
+  "audit_run_id": "audit-2026-04-26",
+  "feature_id": "FEAT-074",
+  "tester_iteration": 0,
+  "verdict": "PASS",
+  "summary": "5 TCs reviewed; 0 real defects. Query filters OAuthAccount by user_id (line 58) — cross-user isolation enforced. Providers de-duped via set + sorted (line 61). Summary fields mirror User model. data.account_count = len(rows) (line 63).",
+  "defects": [
+    {"defect_id":"DEF-074-01","test_id":"TC-074-01","severity":"medium","description":"untestable_in_static_review — needs DB.","expected":"User profile returned","actual":"Logic verified at lines 56-71","file_hint":"backend/src/agents/infrastructure/auth_manager.py:56"}
+  ],
+  "total_defects_critical": 0,
+  "total_defects_high": 0,
+  "total_defects_medium": 1,
+  "total_defects_low": 0,
+  "real_defects_requiring_fix": 0,
+  "bug_fixer_required": false
+}

@@ -1,0 +1,22 @@
+{
+  "audit_run_id": "audit-2026-04-26",
+  "feature_id": "FEAT-116",
+  "feature_name": "Frontend Chat UI",
+  "primary_files": ["frontend/src/pages/Chat.tsx", "frontend/src/chat/ChatPanel.tsx", "frontend/src/chat/useChatStream.ts", "frontend/src/chat/ToolCallChip.tsx"],
+  "script_count": 12,
+  "test_cases": [
+    {"test_id":"TC-116-01","name":"Auto-create session","input":"Navigate to /chat (no sessionId)","expected":"useEffect POSTs /api/v1/chat/sessions; navigate('/chat/<id>', replace:true)"},
+    {"test_id":"TC-116-02","name":"Loading state","input":"sessionId not yet set","expected":"Renders 'Creating chat…'"},
+    {"test_id":"TC-116-03","name":"useChatStream sends bearer","input":"send('hello')","expected":"fetch with Authorization: Bearer <token>; Accept: text/event-stream"},
+    {"test_id":"TC-116-04","name":"Token absent","input":"getToken()=null","expected":"state.error='401 Unauthorized'; no fetch issued"},
+    {"test_id":"TC-116-05","name":"Multiple deltas concat","input":"3 delta events","expected":"assistantText is concatenation of all 3"},
+    {"test_id":"TC-116-06","name":"intent event","input":"server sends {intent:'calendar'}","expected":"state.intent='calendar'"},
+    {"test_id":"TC-116-07","name":"tool_use event","input":"server sends {tool_use:{id,name,input}}","expected":"toolCalls appended with status='running'"},
+    {"test_id":"TC-116-08","name":"tool_result mapping","input":"matches existing tool_use by id","expected":"That entry's status flips to 'completed' (or 'error' if is_error); output set"},
+    {"test_id":"TC-116-09","name":"[DONE] terminator","input":"server sends data: [DONE]","expected":"isStreaming=false; loop exits"},
+    {"test_id":"TC-116-10","name":"Malformed JSON line","input":"data: not-json","expected":"continue silently; no crash"},
+    {"test_id":"TC-116-11","name":"AbortController cancellation","input":"send() called twice in quick succession","expected":"First abort()'d; only second's stream applies"},
+    {"test_id":"TC-116-12","name":"Network error","input":"fetch throws non-AbortError","expected":"state.error set; isStreaming=false"}
+  ],
+  "rtm_coverage": "AC-116-01..06 (auto-session, SSE consumer, abort safety, 5 event types)"
+}

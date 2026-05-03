@@ -430,5 +430,10 @@ async def chat_turn(
             except Exception:
                 # Best-effort persistence on disconnect; don't mask the
                 # original GeneratorExit by raising a different exception.
-                pass
+                # Roll back so the AsyncSession's dirty state doesn't leak
+                # into the next request via connection-pool reuse.
+                try:
+                    await db.rollback()
+                except Exception:
+                    pass
         raise

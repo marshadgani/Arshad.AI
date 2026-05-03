@@ -1,0 +1,15 @@
+{
+  "audit_run_id": "audit-2026-04-26",
+  "feature_id": "FEAT-092",
+  "feature_name": "GitHub (personal integration)",
+  "primary_files": ["backend/src/integrations/personal/github.py", "backend/src/integrations/personal/_shared.py"],
+  "script_count": 5,
+  "test_cases": [
+    {"test_id":"TC-092-01","name":"Connect with existing GitHub account","input":"User has github oauth_account from login","expected":"Promotes; redirect_url=None"},
+    {"test_id":"TC-092-02","name":"Connect without GitHub account","input":"No github account","expected":"redirect_url='{FRONTEND}/login?reason=missing_github_scope'"},
+    {"test_id":"TC-092-03","name":"Connect, no user","input":"user=None","expected":"PermissionError"},
+    {"test_id":"TC-092-04","name":"Sync enqueues github_ingestor","input":"connect+sync","expected":"DagTriggerQueue row with dag_id='github_ingestor'"},
+    {"test_id":"TC-092-05","name":"Status from github oauth_account","input":"connected","expected":"status; extra.account_email; oauth_provider='github'"}
+  ],
+  "rtm_coverage": "AC-092-01..03"
+}

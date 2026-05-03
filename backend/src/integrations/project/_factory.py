@@ -111,9 +111,10 @@ def make_provider(spec: ProviderSpec) -> type[IntegrationProvider]:
             except Exception as exc:  # noqa: BLE001
                 await mark_error(integration=integration, db=db, err=exc)
                 raise IntegrationError("sync_failed", f"{type(exc).__name__}: {exc}")
-            integration.config = (
-                spec.parse_sync(body) if spec.parse_sync else {"ok": True}
-            )
+            integration.config = {
+                **(integration.config or {}),
+                **(spec.parse_sync(body) if spec.parse_sync else {"ok": True}),
+            }
             return await mark_synced(
                 integration=integration,
                 db=db,

@@ -1,0 +1,16 @@
+{
+  "audit_run_id": "audit-2026-04-26",
+  "feature_id": "FEAT-062",
+  "feature_name": "Tool Dispatcher Agent",
+  "primary_files": ["backend/src/agents/ai_core/tool_dispatcher.py", "backend/src/tools/registry.py"],
+  "script_count": 6,
+  "test_cases": [
+    {"test_id":"TC-062-01","name":"Happy path","input":"{tool_name:'calendar_list_events', payload:{...}}","expected":"Resolves tool from TOOL_REGISTRY; validates payload; runs tool; returns {data, summary} from tool output"},
+    {"test_id":"TC-062-02","name":"Unknown tool","input":"{tool_name:'nonexistent', payload:{}}","expected":"AgentError('unknown_tool')"},
+    {"test_id":"TC-062-03","name":"Invalid payload","input":"{tool_name:'calendar_list_events', payload:{}} (missing required fields)","expected":"AgentError('invalid_input') with first 3 validation errors"},
+    {"test_id":"TC-062-04","name":"tool_name min_length","input":"{tool_name:'', payload:{}}","expected":"Pydantic ValidationError"},
+    {"test_id":"TC-062-05","name":"Tool exception propagates","input":"Tool raises ProviderNotLinked","expected":"Exception propagates uncaught (router maps to 400)"},
+    {"test_id":"TC-062-06","name":"Output shape","input":"Successful tool call","expected":"data field unwrapped from tool output; summary unwrapped"}
+  ],
+  "rtm_coverage": "AC-062-01..03 (registry lookup, validation passthrough, output unwrapping)"
+}
