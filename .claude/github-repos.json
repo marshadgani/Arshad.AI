@@ -1491,6 +1491,45 @@
           "GCOMPACTION.md"
         ]
       }
+    },
+    "caveman": {
+      "url": "https://github.com/JuliusBrussee/caveman.git",
+      "name": "caveman",
+      "last_fetched": "2026-05-03 13:25 UTC",
+      "components": {
+        "skills": [
+          "caveman-commit",
+          "caveman",
+          "cavecrew",
+          "caveman-help",
+          "caveman-review",
+          "compress",
+          "caveman-stats",
+          "caveman",
+          "caveman",
+          "caveman-compress",
+          "caveman",
+          "caveman",
+          "cavecrew",
+          "compress",
+          "caveman-stats"
+        ],
+        "agents": [
+          "cavecrew-reviewer",
+          "cavecrew-investigator",
+          "cavecrew-builder",
+          "cavecrew-reviewer",
+          "cavecrew-investigator",
+          "cavecrew-builder"
+        ],
+        "commands": [],
+        "hooks": [
+          "uninstall.sh",
+          "install.sh",
+          "caveman-statusline.sh"
+        ],
+        "token_optimization": []
+      }
     }
   }
 }
