@@ -1005,11 +1005,15 @@ User escape hatches:
 
 ### Flow when triggered
 
-1. **Confirm interpretation**. Reflect back: requirement summary, the next `FEAT-NNN`, ask "Confirm or correct?"
-2. **On confirmation**, invoke the orchestrator: follow the recipe in `.claude/commands/dev-team.md`. Each agent stage is a `Task(subagent_type="<role>", ...)` call where `<role>` ∈ `business-analyst | enterprise-architect | solution-architect | developer | process-organiser | test-script-writer | tester | bug-fixer`.
-3. **Stream stage completions** to the user — one short line per agent (`▸ BA: 4 reqs, domain=Workspace ✅`).
-4. **On completion**, report: Feature ID, generated branch name, bug-fix iterations used, EA post-build decision, paths to each artifact.
-5. **On halt**, report the halt reason and the last successful stage.
+1. Spawn the dev-team-orchestrator subagent:
+   ```
+   Task(subagent_type="dev-team-orchestrator",
+        description="Run dev-team pipeline",
+        prompt=<requirement>)
+   ```
+2. The orchestrator runs all 11 steps autonomously — confirmation (via `AskUserQuestion`), counter increment, BA → EA-pre → SA → Dev → PO → TSW → Tester → BugFixer↔Tester loop → EA-post, denylist validation, branch creation, pipeline-runs row.
+3. Surface the orchestrator's return block to the user (Feature ID, branch, status, EA decision, artifact paths).
+4. The full recipe lives in `.claude/agents/dev-team/orchestrator.md`. The slash command is a thin wrapper.
 
 ### Pipeline guarantees
 
