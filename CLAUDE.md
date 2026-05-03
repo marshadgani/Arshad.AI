@@ -10,12 +10,19 @@ No need for the user to type the command — detect the URL and trigger the fetc
 
 ## Model Strategy (Read First)
 
-| Phase | Model | When |
-|---|---|---|
-| **Planning** | `claude-opus-4-7` | Any task with 3+ steps, architectural decisions, ambiguous requirements |
-| **Execution** | `claude-sonnet-4-6` | All regular prompts, all agent runs, all code writing |
+Three tiers. Pick by **cost-of-being-wrong**, not task length.
 
-**Rule:** Before writing a single line of code on any non-trivial task, invoke the `planner` agent (Opus) via `/plan <description>`. Opus thinks, Sonnet builds.
+| Tier | Model ID | When |
+|---|---|---|
+| **Cheap** | `claude-haiku-4-5-20251001` | Mechanical, near-deterministic, output verifiable in one read. Classification, intent routing, file lookups, single-line fixes, renames, config tweaks, lint cleanups, structured-extraction agents (BA, process-organiser), grep-style search. |
+| **Default** | `claude-sonnet-4-6` | Code writing, normal investigation, agent execution. The workhorse for every task that needs understanding but not deep reasoning. |
+| **Premium** | `claude-opus-4-7` | Planning, architecture, quality gates, hard debugging, security audit. Anything where wrong decisions cascade. |
+
+**Routing rule:** Haiku for verifiable mechanical work → Sonnet for default execution → Opus for high-leverage thinking. Most prompts land on Sonnet.
+
+**Planning rule (unchanged):** Before writing a line of code on any non-trivial task, invoke the `planner` agent (Opus) via `/plan <description>`. Opus thinks, Sonnet builds, Haiku tidies.
+
+**Escalation rule:** If a task fails on its assigned tier, **escalate one level** — never retry on the same tier. Haiku confused → Sonnet. Sonnet stuck after 1 attempt → Opus. The escalation path is the real quality guarantee.
 
 **Never skip planning for:**
 - New features touching multiple files or layers
@@ -23,11 +30,14 @@ No need for the user to type the command — detect the URL and trigger the fetc
 - Database schema changes
 - Any task where the approach is unclear
 
-**Skip planning for:**
+**Skip planning (route directly to Haiku) for:**
 - Single-line fixes
 - Config value changes
 - Renames
 - Adding a single test
+- Status / lookup questions
+
+**Per-call override:** When the orchestrator knows better than an agent's frontmatter default, pass `Task(model="haiku" | "sonnet" | "opus")`. Resolution order: per-call > frontmatter > project default > inherited.
 
 ---
 
@@ -542,6 +552,7 @@ A git commit is created automatically when any skill file changes.
 | `obsidian-skills` | https://github.com/kepano/obsidian-skills.git | defuddle, json-canvas, obsidian-bases, obsidian-cli, obsidian-markdown (5) |
 | `context7` | https://github.com/upstash/context7.git | context7-cli, context7-mcp, find-docs (3) |
 | `everything-claude-code` | https://github.com/affaan-m/everything-claude-code.git | agent-introspection-debugging, agent-sort, api-design, article-writing, backend-patterns, brand-voice, bun-runtime, claude-api, coding-standards, content-engine, crosspost, deep-research, dmux-workflows, documentation-lookup, e2e-testing, eval-harness, exa-search, fal-ai-media, frontend-design, frontend-patterns, frontend-slides, investor-materials, investor-outreach, market-research, mcp-server-patterns, nextjs-turbopack, product-capability, security-review, strategic-compact, tdd-workflow, verification-loop, video-editing, x-api (34) |
+| `gstack` | https://github.com/garrytan/gstack.git | gstack (root meta-skill), browse, qa, review, ship, careful, guard, freeze, unfreeze, learn, codex, retro, canary, scrape, autoplan, skillify, investigate, health, pair-agent, plan-tune, plan-design-review, plan-eng-review, plan-ceo-review, plan-devex-review, devex-review, design-review, design-shotgun, design-html, design-consultation, document-release, gstack-upgrade, land-and-deploy, landing-report, setup-deploy, setup-browser-cookies, setup-gbrain, open-gstack-browser, office-hours, context-save, context-restore, qa-only, cso, make-pdf, benchmark, benchmark-models, hackernews-frontpage, gstack-openclaw-ceo-review, gstack-openclaw-investigate, gstack-openclaw-retro, gstack-openclaw-office-hours (50) |
 
 ### Active Sources — Agents
 
@@ -669,6 +680,7 @@ This registry is the source of truth for weekly auto-updates.
 | `web-asset-generator` | https://github.com/alonw0/web-asset-generator.git | skills | 1 skill (favicons + OG images) | 2026-04-26 |
 | `Deep-Research-skills` | https://github.com/Weizhena/Deep-Research-skills.git | skills+agents | 24 skills, 7 agents (slug `-eep--esearch-skills` due to fetcher bug) | 2026-04-26 |
 | `andrej-karpathy-skills` | https://github.com/forrestchang/andrej-karpathy-skills.git | skills | 1 skill (karpathy-guidelines: anti-overcomplication, surgical changes, surface assumptions) | 2026-04-28 |
+| `gstack` | https://github.com/garrytan/gstack.git | skills | 50 skills (browser dogfooding, design/eng/ceo/devex review tracks, plan-tune, ship, careful, guard, freeze/unfreeze, openclaw variants — see §15 for full list). gstack uses a **flat layout** (skills at repo root); fetch script handles this since 2026-05-02 + a 5MB-per-file cap and a `test/`/`tests/`/`node_modules/`/`dist/`/`build/` prune so test fixtures don't bloat the vendored copy. | 2026-05-01 |
 
 > This table should be updated alongside `scripts/fetch-github-repo.sh` runs. Keep in sync with `.claude/github-repos.json`.
 
@@ -993,11 +1005,15 @@ User escape hatches:
 
 ### Flow when triggered
 
-1. **Confirm interpretation**. Reflect back: requirement summary, the next `FEAT-NNN`, ask "Confirm or correct?"
-2. **On confirmation**, invoke the orchestrator: follow the recipe in `.claude/commands/dev-team.md`. Each agent stage is a `Task(subagent_type="<role>", ...)` call where `<role>` ∈ `business-analyst | enterprise-architect | solution-architect | developer | process-organiser | test-script-writer | tester | bug-fixer`.
-3. **Stream stage completions** to the user — one short line per agent (`▸ BA: 4 reqs, domain=Workspace ✅`).
-4. **On completion**, report: Feature ID, generated branch name, bug-fix iterations used, EA post-build decision, paths to each artifact.
-5. **On halt**, report the halt reason and the last successful stage.
+1. Spawn the dev-team-orchestrator subagent:
+   ```
+   Task(subagent_type="dev-team-orchestrator",
+        description="Run dev-team pipeline",
+        prompt=<requirement>)
+   ```
+2. The orchestrator runs all 11 steps autonomously — confirmation (via `AskUserQuestion`), counter increment, BA → EA-pre → SA → Dev → PO → TSW → Tester → BugFixer↔Tester loop → EA-post, denylist validation, branch creation, pipeline-runs row.
+3. Surface the orchestrator's return block to the user (Feature ID, branch, status, EA decision, artifact paths).
+4. The full recipe lives in `.claude/agents/dev-team/orchestrator.md`. The slash command is a thin wrapper.
 
 ### Pipeline guarantees
 
@@ -1011,4 +1027,45 @@ User escape hatches:
 ### Cancellation
 
 If the user says "stop" / "cancel" between stages, halt the pipeline at the last completed stage. Partial artifacts persist; the run logs as `halted`.
+
+---
+
+## 22. Orchestrator Agent (PERMANENT)
+
+`/dev-team` runs a fixed 9-stage feature pipeline. Everything else multi-agent goes through the **Orchestrator** at `.claude/agents/orchestrator.md` (Opus-tier planner + executor).
+
+### When to use
+
+| Use | Why |
+|---|---|
+| `/dev-team <feature>` | New feature — deterministic 9-stage pipeline |
+| `/orchestrate <objective>` | Audit / refactor / multi-agent investigation / hybrid plan |
+| `Task(subagent_type="orchestrator", ...)` | Direct invocation from another agent / slash command |
+
+### Lifecycle
+
+Plan → Dispatch → (Reflect / Replan) → Quality Gate → Report. Each run gets a fresh `tasks/orchestrator-runs/ORCH-NNN/` directory containing `plan.json`, `progress.md`, `artifacts/`, `gate-report.md`, `final.md`.
+
+### Universe
+
+The orchestrator dispatches ONLY the 15 project + dev-team agents (Option B):
+`planner, code-reviewer, debugger, doc-writer, refactorer, security-auditor, test-writer, business-analyst, enterprise-architect, solution-architect, developer, process-organiser, test-script-writer, tester, bug-fixer`.
+
+It does NOT dispatch vendored agents, backend Python agents, or harness built-ins. If the objective needs those, that's an orchestrator-out-of-scope signal — surface to the user.
+
+### Caps
+
+- 25 `Task()` calls per run
+- 3 replans per run
+- 30 min wall clock (soft)
+- Always runs the 6-agent gate at the end (Option 3A)
+- Always interactive on ambiguous prompts (Option 2A — uses `AskUserQuestion`)
+
+### Persistence
+
+`tasks/orchestrator-runs/` is committed to git. Every run is auditable from disk alone. Counter at `tasks/.orchestrator-counter`.
+
+### Gate-report contract
+
+Each run writes BOTH `tasks/orchestrator-runs/<RUN-ID>/gate-report.md` (run-local) AND `tasks/last-gate-report.md` (the auto-pr workflow's merge signal per §20). A non-BLOCKED gate verdict from an orchestrator run can satisfy "Merge to Main" without re-running `/gate`.
 

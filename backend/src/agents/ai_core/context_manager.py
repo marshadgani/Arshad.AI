@@ -9,7 +9,6 @@ was this session about?" without scanning all messages.
 from __future__ import annotations
 
 import json
-import os
 import uuid
 from typing import Any
 
@@ -66,6 +65,8 @@ class ContextManagerAgent(Agent):
     input_schema = ContextManagerInput
     output_schema = ContextManagerOutput
     tool_dependencies: list[str] = []
+    # Compression / summarisation is mechanical; Haiku is sufficient.
+    model = "claude-haiku-4-5-20251001"
 
     async def run(
         self, *, user: User, db: AsyncSession, payload: BaseModel
@@ -108,6 +109,7 @@ class ContextManagerAgent(Agent):
                 system=_SUMMARY_PROMPT,
                 messages=[{"role": "user", "content": transcript}],
                 max_tokens=300,
+                model=self.model,
             )
             summary_text = "".join(
                 block.get("text", "")
@@ -117,11 +119,7 @@ class ContextManagerAgent(Agent):
 
         return ContextManagerOutput(
             data={
-                "model_used": (
-                    os.getenv("ANTHROPIC_MODEL_DEFAULT", "claude-haiku-4-5-20251001")
-                    if summary_text is not None
-                    else None
-                ),
+                "model_used": self.model if summary_text is not None else None,
                 "messages_inspected": len(rows),
             },
             summary=ContextSummary(

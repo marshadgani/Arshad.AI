@@ -3,7 +3,7 @@ name: business-analyst
 description: First stage of the dev-team pipeline. Takes a raw feature requirement and produces a Requirements Traceability Matrix (RTM) + Business Process Design Document (BPDD), inferring the domain and sub-section. Invoked by the dev-team orchestrator command, NOT for ad-hoc requirements analysis (use planner for that). Returns structured JSON only — no prose.
 tools:
   - read
-model: claude-sonnet-4-6
+model: claude-haiku-4-5-20251001
 memory: project
 ---
 

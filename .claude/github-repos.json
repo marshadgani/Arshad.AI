@@ -1423,6 +1423,113 @@
         "hooks": [],
         "token_optimization": []
       }
+    },
+    "gstack": {
+      "url": "https://github.com/garrytan/gstack.git",
+      "name": "gstack",
+      "last_fetched": "2026-05-02 10:30 UTC",
+      "components": {
+        "skills": [
+          "setup-deploy",
+          "document-release",
+          "gstack-upgrade",
+          "plan-devex-review",
+          "hackernews-frontpage",
+          "land-and-deploy",
+          "codex",
+          "retro",
+          "context-save",
+          "office-hours",
+          "plan-design-review",
+          "gstack",
+          "setup-browser-cookies",
+          "review",
+          "pair-agent",
+          "plan-tune",
+          "benchmark-models",
+          "devex-review",
+          "design-shotgun",
+          "benchmark",
+          "browse",
+          "qa",
+          "plan-eng-review",
+          "make-pdf",
+          "freeze",
+          "context-restore",
+          "qa-only",
+          "ship",
+          "canary",
+          "design-html",
+          "health",
+          "careful",
+          "scrape",
+          "skillify",
+          "investigate",
+          "design-review",
+          "plan-ceo-review",
+          "autoplan",
+          "cso",
+          "setup-gbrain",
+          "unfreeze",
+          "learn",
+          "design-consultation",
+          "guard",
+          "gstack-openclaw-ceo-review",
+          "gstack-openclaw-investigate",
+          "gstack-openclaw-retro",
+          "gstack-openclaw-office-hours",
+          "open-gstack-browser",
+          "landing-report"
+        ],
+        "agents": [],
+        "commands": [],
+        "hooks": [],
+        "token_optimization": [
+          "CLAUDE.md",
+          "CHANGELOG.md",
+          "DESIGN_SHOTGUN.md",
+          "GCOMPACTION.md"
+        ]
+      }
+    },
+    "caveman": {
+      "url": "https://github.com/JuliusBrussee/caveman.git",
+      "name": "caveman",
+      "last_fetched": "2026-05-03 13:25 UTC",
+      "components": {
+        "skills": [
+          "caveman-commit",
+          "caveman",
+          "cavecrew",
+          "caveman-help",
+          "caveman-review",
+          "compress",
+          "caveman-stats",
+          "caveman",
+          "caveman",
+          "caveman-compress",
+          "caveman",
+          "caveman",
+          "cavecrew",
+          "compress",
+          "caveman-stats"
+        ],
+        "agents": [
+          "cavecrew-reviewer",
+          "cavecrew-investigator",
+          "cavecrew-builder",
+          "cavecrew-reviewer",
+          "cavecrew-investigator",
+          "cavecrew-builder"
+        ],
+        "commands": [],
+        "hooks": [
+          "uninstall.sh",
+          "install.sh",
+          "caveman-statusline.sh"
+        ],
+        "token_optimization": []
+      }
     }
   }
 }

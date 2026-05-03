@@ -38,6 +38,12 @@ from . import ai, intent_classifier
 
 _MAX_AGENTIC_HOPS = 6  # safety cap on tool_use → tool_result → call rounds
 
+# 3-tier model strategy (CLAUDE.md §Model Strategy). The chat agentic loop
+# is the runtime "chat-orchestrator" — it picks tools and reasons over their
+# results. Sonnet, not Haiku: tool selection quality compounds across hops.
+# Override via env var for ad-hoc cost tuning without code changes.
+_CHAT_MODEL = os.getenv("ANTHROPIC_MODEL_CHAT", "claude-sonnet-4-6")
+
 _SYSTEM_PROMPT_BASE = """\
 You are Arshad's personal AI assistant. The user has linked Google (Calendar + Gmail)
 and GitHub. You can call tools to take real actions on their behalf. Be concise,
@@ -304,6 +310,7 @@ async def chat_turn(
             system=_SYSTEM_PROMPT_BASE,
             messages=history,
             tools=tool_schemas,
+            model=_CHAT_MODEL,
         ):
             if event_type == "delta":
                 assistant_text += payload
@@ -398,9 +405,7 @@ async def chat_turn(
                     session_id=session.id,
                     role="assistant",
                     content={"text": assistant_text},
-                    model=os.getenv(
-                        "ANTHROPIC_MODEL_DEFAULT", "claude-haiku-4-5-20251001"
-                    ),
+                    model=_CHAT_MODEL,
                     usage_input_tokens=final_usage.get("input_tokens"),
                     usage_output_tokens=final_usage.get("output_tokens"),
                 )
@@ -419,9 +424,7 @@ async def chat_turn(
                         session_id=session.id,
                         role="assistant",
                         content={"text": assistant_text, "_partial": True},
-                        model=os.getenv(
-                            "ANTHROPIC_MODEL_DEFAULT", "claude-haiku-4-5-20251001"
-                        ),
+                        model=_CHAT_MODEL,
                         usage_input_tokens=final_usage.get("input_tokens"),
                         usage_output_tokens=final_usage.get("output_tokens"),
                     )
