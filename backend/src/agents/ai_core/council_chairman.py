@@ -254,6 +254,10 @@ class CouncilChairmanAgent(Agent):
     )
     input_schema = CouncilInput
     output_schema = CouncilOutput
+    # Chairman synthesis is the highest-leverage call in the system: it picks
+    # one final answer from N panelists. Default = Opus, but the per-call
+    # `chairman_model` payload field still wins.
+    model = _DEFAULT_CHAIRMAN
     tool_dependencies: list[str] = []
 
     async def run(

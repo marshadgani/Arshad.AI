@@ -51,12 +51,14 @@ class EmailSummarizerAgent(Agent):
     domain = "email"
     name = "email_summarizer"
     description = (
-        "Summarizes a Gmail thread with a Haiku call focused on action items. "
+        "Summarizes a Gmail thread with a Sonnet call focused on action items. "
         "Phase B: real Claude summarisation. is_heuristic flag now false."
     )
     input_schema = EmailSummarizerInput
     output_schema = EmailSummarizerOutput
     tool_dependencies = ["gmail_get_thread"]
+    # Summarisation quality scales with reasoning — Sonnet, not Haiku.
+    model = "claude-sonnet-4-6"
 
     async def run(
         self, *, user: User, db: AsyncSession, payload: BaseModel
@@ -85,6 +87,7 @@ class EmailSummarizerAgent(Agent):
                 system=_SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": transcript}],
                 max_tokens=200,
+                model=self.model,
             )
             summary_text = "".join(
                 block.get("text", "")

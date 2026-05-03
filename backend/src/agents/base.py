@@ -60,6 +60,10 @@ class Agent(ABC):
     input_schema: ClassVar[type[BaseModel]]
     output_schema: ClassVar[type[BaseModel]]
     tool_dependencies: ClassVar[list[str]] = []
+    # 3-tier model strategy (CLAUDE.md §Model Strategy). None => fall through
+    # to ANTHROPIC_MODEL_DEFAULT in services.ai. Concrete LLM-bound agents
+    # SHOULD set this explicitly so cost/quality is declarative per-agent.
+    model: ClassVar[str | None] = None
 
     @property
     def slug(self) -> str:

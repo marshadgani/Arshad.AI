@@ -56,6 +56,8 @@ class CodeSummarizerAgent(Agent):
     input_schema = CodeSummarizerInput
     output_schema = CodeSummarizerOutput
     tool_dependencies = ["github_get_commit"]
+    # Plain-English diff-to-summary needs reasoning; Sonnet, not Haiku.
+    model = "claude-sonnet-4-6"
 
     async def run(
         self, *, user: User, db: AsyncSession, payload: BaseModel
@@ -91,6 +93,7 @@ class CodeSummarizerAgent(Agent):
             system=_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": prompt_body}],
             max_tokens=80,
+            model=self.model,
         )
         summary_text = "".join(
             block.get("text", "")

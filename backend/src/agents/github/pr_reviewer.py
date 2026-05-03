@@ -62,6 +62,8 @@ class PrReviewerAgent(Agent):
     input_schema = PrReviewerInput
     output_schema = PrReviewerOutput
     tool_dependencies = ["github_get_pr"]
+    # Code review is high-leverage: Opus catches subtle bugs Sonnet/Haiku miss.
+    model = "claude-opus-4-7"
 
     async def run(
         self, *, user: User, db: AsyncSession, payload: BaseModel
@@ -91,6 +93,7 @@ class PrReviewerAgent(Agent):
                 system=_SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": prompt_body}],
                 max_tokens=400,
+                model=self.model,
             )
             review_text = "".join(
                 block.get("text", "")

@@ -90,6 +90,9 @@ async def classify(message: str, history: list[dict] | None = None) -> Intent:
         system=_SYSTEM_PROMPT,
         messages=convo,
         max_tokens=8,
+        # Intent classification is the canonical Haiku job per the 3-tier
+        # strategy: 1-token output, verifiable in one read.
+        model="claude-haiku-4-5-20251001",
     )
     raw = ""
     for block in msg.get("content", []):
