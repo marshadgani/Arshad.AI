@@ -1024,3 +1024,44 @@ User escape hatches:
 
 If the user says "stop" / "cancel" between stages, halt the pipeline at the last completed stage. Partial artifacts persist; the run logs as `halted`.
 
+---
+
+## 22. Orchestrator Agent (PERMANENT)
+
+`/dev-team` runs a fixed 9-stage feature pipeline. Everything else multi-agent goes through the **Orchestrator** at `.claude/agents/orchestrator.md` (Opus-tier planner + executor).
+
+### When to use
+
+| Use | Why |
+|---|---|
+| `/dev-team <feature>` | New feature — deterministic 9-stage pipeline |
+| `/orchestrate <objective>` | Audit / refactor / multi-agent investigation / hybrid plan |
+| `Task(subagent_type="orchestrator", ...)` | Direct invocation from another agent / slash command |
+
+### Lifecycle
+
+Plan → Dispatch → (Reflect / Replan) → Quality Gate → Report. Each run gets a fresh `tasks/orchestrator-runs/ORCH-NNN/` directory containing `plan.json`, `progress.md`, `artifacts/`, `gate-report.md`, `final.md`.
+
+### Universe
+
+The orchestrator dispatches ONLY the 15 project + dev-team agents (Option B):
+`planner, code-reviewer, debugger, doc-writer, refactorer, security-auditor, test-writer, business-analyst, enterprise-architect, solution-architect, developer, process-organiser, test-script-writer, tester, bug-fixer`.
+
+It does NOT dispatch vendored agents, backend Python agents, or harness built-ins. If the objective needs those, that's an orchestrator-out-of-scope signal — surface to the user.
+
+### Caps
+
+- 25 `Task()` calls per run
+- 3 replans per run
+- 30 min wall clock (soft)
+- Always runs the 6-agent gate at the end (Option 3A)
+- Always interactive on ambiguous prompts (Option 2A — uses `AskUserQuestion`)
+
+### Persistence
+
+`tasks/orchestrator-runs/` is committed to git. Every run is auditable from disk alone. Counter at `tasks/.orchestrator-counter`.
+
+### Gate-report contract
+
+Each run writes BOTH `tasks/orchestrator-runs/<RUN-ID>/gate-report.md` (run-local) AND `tasks/last-gate-report.md` (the auto-pr workflow's merge signal per §20). A non-BLOCKED gate verdict from an orchestrator run can satisfy "Merge to Main" without re-running `/gate`.
+
