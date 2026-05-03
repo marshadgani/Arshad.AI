@@ -11,16 +11,28 @@ if not DATABASE_URL:
         "DATABASE_URL is not set. Copy backend/.env.example to backend/.env and fill it in."
     )
 
-# Supabase / pgbouncer compatibility: when DATABASE_URL points at a pooler
-# (any pgbouncer in transaction or session mode), asyncpg's automatic prepared
-# statements break because each query may land on a different upstream
-# connection. Disable the statement cache when we detect a pooler host.
-_engine_kwargs: dict = {"echo": False, "pool_pre_ping": True}
-if "pooler.supabase.com" in DATABASE_URL or "pgbouncer" in DATABASE_URL:
-    _engine_kwargs["connect_args"] = {
+# Always disable asyncpg's server-side prepared-statement cache.
+#
+# When DATABASE_URL points at any pgbouncer-style pooler in transaction or
+# statement mode (Supabase pooler, RDS Proxy, custom pgbouncer, Neon's pooler
+# endpoint), asyncpg's auto-prepared statements collide: the named statement
+# `__asyncpg_stmt_N__` is registered on one upstream connection but a
+# subsequent query in the same logical session lands on a different upstream
+# connection that already has its own statement N — DuplicatePreparedStatement,
+# 5xx, app down. The earlier substring check (pooler.supabase.com|pgbouncer)
+# missed prod URLs that pool without those tokens (e.g. RDS Proxy hosts).
+#
+# Disabling the cache costs one parse per query (dominated by network RTT) and
+# eliminates the failure mode regardless of how the URL is shaped. Direct
+# (non-pooled) connections work fine without prepared-statement caching.
+_engine_kwargs: dict = {
+    "echo": False,
+    "pool_pre_ping": True,
+    "connect_args": {
         "statement_cache_size": 0,
         "prepared_statement_cache_size": 0,
-    }
+    },
+}
 
 engine = create_async_engine(DATABASE_URL, **_engine_kwargs)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
