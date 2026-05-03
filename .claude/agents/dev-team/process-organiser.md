@@ -3,7 +3,7 @@ name: process-organiser
 description: Fifth stage of the dev-team pipeline. Confirms feature metadata (feature_id, name, domain, sub_section, timestamp) and emits a structured PHEntry. The orchestrator atomically appends it to `tasks/process-hierarchy.md`. Do NOT use outside the dev-team pipeline.
 tools:
   - read
-model: claude-sonnet-4-6
+model: claude-haiku-4-5-20251001
 memory: project
 ---
 
