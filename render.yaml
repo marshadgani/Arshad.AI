@@ -19,6 +19,8 @@ services:
     envVars:
       - key: DATABASE_URL
         sync: false
+      - key: DATABASE_URL_DIRECT
+        sync: false
       - key: REDIS_URL
         sync: false
       - key: ANTHROPIC_API_KEY

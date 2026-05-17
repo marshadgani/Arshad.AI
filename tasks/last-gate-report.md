@@ -1,136 +1,102 @@
-# Arshad.AI Quality Gate Report — Production Hotfix Merge
+# Arshad.AI Quality Gate Report
 
-**Source branch:** `claude/ai-personal-assistant-develop-AION`
-**Target branch:** `claude/ai-personal-assistant-main`
-**Date:** 2026-05-03
-**Triggered by:** user — "Merge to Main"
-**Urgency:** P0 — production is down (asyncpg DuplicatePreparedStatementError)
+**PR:** fix/supabase-migration-direct-url → claude/ai-personal-assistant-main
+**Branch:** `fix/supabase-migration-direct-url` → `claude/ai-personal-assistant-main`
+**Triggered by:** "Fix it and merge to main using pr gate standard protocol"
+**Date:** 2026-05-17
 
 ---
 
 ## Gate Summary
 
-| # | Gate | Agent verdict | Manual cross-check |
-|---|---|---|---|
-| 1 | Code Review | FIX | HALLUCINATED → manual: PASS |
-| 2 | Security Audit | PASS | CONFIRMED |
-| 3 | Bug Analysis | PASS | Hallucinated diff-state; manual review PASS |
-| 4 | Test Coverage | WARN | CONFIRMED — non-blocking for hotfix |
-| 5 | Code Quality | WARN | HALLUCINATED → manual: PASS |
-| 6 | Documentation | WARN | HALLUCINATED → manual: PASS |
+| # | Gate | Agent | Result | Critical | Warnings |
+|---|---|---|---|---|---|
+| 1 | Code Review | code-reviewer | ⚠️ WARN | 0 | 2 |
+| 2 | Security Audit | security-auditor | ✅ PASS | 0 | 1 |
+| 3 | Bug Analysis | debugger | ✅ PASS | 0 | 1 |
+| 4 | Test Coverage | test-writer | ⚠️ WARN | 0 | 1 |
+| 5 | Code Quality | refactorer | ✅ PASS | 0 | 1 |
+| 6 | Documentation | doc-writer | ⚠️ WARN | 0 | 3 |
 
 ## Overall Verdict
 
-### GATE PASSED — Ready for merge
+### ⚠️ GATE PASSED WITH WARNINGS — Ready for merge
 
-Production is down with `asyncpg.exceptions.DuplicatePreparedStatementError`. The hotfix at `backend/src/models/database.py` removes a fragile substring-based pooler detection and unconditionally disables asyncpg's server-side prepared-statement cache. This eliminates the failure mode for any pgbouncer-style pooled deployment regardless of URL shape (Supabase, RDS Proxy, Neon, custom pgbouncer behind CNAME).
-
-Subagent panel produced the hallucination pattern documented in `.claude/rules/subagent-verification.md`. Five of six findings cross-checked false. The one confirmed finding (test-writer's "engine config has no unit test") is a pre-existing repo-wide gap and explicitly non-blocking for an emergency hotfix.
+Zero FAIL gates. Zero Critical issues. Warnings are documentation quality and the pre-existing 0% test coverage baseline — none block this change.
 
 ---
 
-## What's in this merge
+## What This Fix Does
 
-### Production hotfix (urgent)
+**Root cause:** `alembic/env.py` always used `DATABASE_URL` for migrations. On Render, `DATABASE_URL` points to Supabase's transaction pooler (Supavisor, port 6543). Supavisor rejects DDL statements (CREATE TABLE, ALTER TABLE) with:
 
-- **`backend/src/models/database.py`** — always set `connect_args={"statement_cache_size": 0, "prepared_statement_cache_size": 0}` on the asyncpg engine. Old conditional path missed prod URLs that pool without `pooler.supabase.com` or `pgbouncer` tokens. Cost: one extra Postgres parse per query (negligible vs network RTT).
+```
+asyncpg.exceptions.InternalServerError: (ENOTFOUND) tenant/user postgres.PROJECT_REF not found
+```
 
-### 3-tier model strategy (Option B — per-agent model field)
+This blocked every Render deploy at the `preDeployCommand: "alembic upgrade head"` step.
 
-- **`backend/src/agents/base.py`** — adds `model: ClassVar[str | None] = None` to the `Agent` ABC. Falls through to `services.ai._default_model()` when None.
-- **`backend/src/agents/github/pr_reviewer.py`** — Opus
-- **`backend/src/agents/ai_core/council_chairman.py`** — Opus
-- **`backend/src/agents/email/email_summarizer.py`** — Sonnet
-- **`backend/src/agents/github/code_summarizer.py`** — Sonnet
-- **`backend/src/agents/ai_core/context_manager.py`** — Haiku
-- **`backend/src/services/chat.py`** — runtime chat orchestrator pinned to Sonnet via `_CHAT_MODEL` constant (env-var: `ANTHROPIC_MODEL_CHAT`)
-- **`backend/src/services/intent_classifier.py`** — explicit Haiku pin
+**Fix:** Alembic now reads `DATABASE_URL_DIRECT` first (expected: direct Supabase URL on port 5432, bypassing Supavisor entirely), falling back to `DATABASE_URL` if unset. Local docker-compose needs no changes — the fallback fires automatically.
 
-### General-purpose Orchestrator + dev-team-orchestrator
-
-- `.claude/agents/orchestrator.md` — Opus-tier planner+executor, dispatches across 15 project agents, runs 6-agent gate at end
-- `.claude/agents/dev-team/orchestrator.md` — full 11-step dev-team recipe as Task() agent
-- `.claude/commands/orchestrate.md` + thin-wrapper rewrite of `.claude/commands/dev-team.md`
-- CLAUDE.md §22 documents both
-- `tasks/orchestrator-runs/.gitkeep` + `tasks/.orchestrator-counter`
-
-### CLAUDE.md §Model Strategy
-
-Updated from 2-tier (Sonnet + Opus) to 3-tier (Haiku + Sonnet + Opus) with cost-of-being-wrong routing rule, escalation rule, and per-call override resolution order.
-
-### Vendored skill integration
-
-- gstack (50 skills, 4.7MB after prune) — `scripts/fetch-github-repo.sh` patched for flat-layout repos + 5MB-per-file cap + test-fixture prune
-- caveman (3 agents, 3 hooks)
-
----
-
-## Subagent verification context
-
-| Agent | Hallucinated claim | Reality |
-|---|---|---|
-| code-reviewer | `chat.py` sets `msg.model_used = ...` without migration | Code uses `model=_CHAT_MODEL` kwarg. Column `model: Mapped[str \| None]` at `conversation.py:75` — already in main. |
-| debugger | "diff not yet applied" | Diff IS applied (`c179313` in HEAD). Agent failed to fetch diff and fabricated "branches at same commit". |
-| refactorer | "SSL silently disables cert verification at lines 27-29" | database.py has ZERO SSL handling — 66 lines total, no `ssl_context`, no `CERT_NONE`. Agent fabricated ~25 lines of nonexistent code. |
-| refactorer | `import ssl as ssl_module` | No `import ssl` exists anywhere in database.py. |
-| doc-writer | `_CHAT_MODEL` defaults to Haiku at line 13 | Actual line: `chat.py:45 _CHAT_MODEL = os.getenv("ANTHROPIC_MODEL_CHAT", "claude-sonnet-4-6")`. Wrong line, wrong env var, wrong default. |
-| doc-writer | `statement_cache_size=0` has no comment | database.py has a 14-line WHY block comment at lines 14-27. |
-
-**Net real findings: 0 actionable.** All negative claims false. One confirmed legitimate observation (test-writer): pre-existing repo-wide test-coverage gap; non-blocking for emergency hotfix.
+**Files changed (3):**
+1. `backend/alembic/env.py` — reads `DATABASE_URL_DIRECT || DATABASE_URL`; improved error message names both vars
+2. `render.yaml` — declares `DATABASE_URL_DIRECT` env var (`sync: false`, set manually in Render dashboard)
+3. `backend/.env.example` — documents `DATABASE_URL_DIRECT` with example URL format and usage instructions
 
 ---
 
 ## Detailed Findings
 
-### 1. Code Review — PASS (after cross-check)
+### 1. Code Review (code-reviewer)
+**Status:** ⚠️ WARN
+- Error message now correctly names both vars (fixed in this run)
+- `.env.example` could note that `asyncpg` scheme prefix is handled automatically by `env.py` — non-blocking, informational only
 
-`model_used` migration concern moot — column `model` already exists. Hotfix logic correct.
+### 2. Security Audit (security-auditor)
+**Status:** ✅ PASS
+- No hardcoded secrets; `DATABASE_URL_DIRECT` follows same pattern as `DATABASE_URL`
+- `sync: false` is correct — credentials must be entered manually in Render, never synced from repo
+- `or` fallback is safe; empty string `""` correctly falls through to `DATABASE_URL`
+- WARN: `DATABASE_URL_DIRECT` likely carries DDL-capable credentials (higher blast radius than the pooled URL) — ensure it is never logged or echoed in CI output
 
-### 2. Security Audit — PASS (confirmed)
+### 3. Bug Analysis (debugger)
+**Status:** ✅ PASS — all 5 runtime paths traced correctly:
+- No `DATABASE_URL_DIRECT`, pooler `DATABASE_URL` → same behaviour as before (pooler error, intentional fallback)
+- `DATABASE_URL_DIRECT` = direct port-5432 URL → bypasses pooler, migrations run cleanly ✓
+- `DATABASE_URL_DIRECT` = `""` (empty) → falsy, falls back to `DATABASE_URL` ✓
+- Both unset → `RuntimeError` with clear message ✓
+- `DATABASE_URL_DIRECT` is wrong URL → asyncpg connection error, deploy blocked ✓
 
-Zero findings. `statement_cache_size=0` is a `connect_args` dict key (not query interpolation). All `model=` strings are hardcoded literals.
+### 4. Test Coverage (test-writer)
+**Status:** ⚠️ WARN
+- 0% coverage baseline project-wide (pre-existing)
+- This change introduces a two-branch env-var path; neither branch is tested
+- Logic is fully testable with `monkeypatch.setenv` without a live DB
+- Not blocking — consistent with existing baseline
 
-### 3. Bug Analysis — PASS (after cross-check)
+### 5. Code Quality (refactorer)
+**Status:** ✅ PASS
+- `os.getenv("A") or os.getenv("B")` is idiomatic Python for env var fallback
+- Comment explains the WHY (DDL, port numbers, platform names, fallback behaviour)
+- No duplication introduced
 
-Manual review: `connect_args` correctly disables both asyncpg and SQLAlchemy-side caching. `_CHAT_MODEL` env change is contained. `Agent.model = None` falls through to `_default_model()` correctly.
-
-### 4. Test Coverage — WARN (confirmed, non-blocking)
-
-Pre-existing gap: no engine-config or chat-flow unit tests. Hotfix's `connect_args` dict is one new testable contract — regression dropping these keys would silently reintroduce outage. Logged as follow-up.
-
-### 5. Code Quality — PASS (after cross-check)
-
-Refactorer's SSL findings entirely fabricated. "Literal model strings" observation misframes the intended declarative-per-tier design. Manual review of complexity, duplication, dead code: all clean.
-
-### 6. Documentation — PASS (after cross-check)
-
-"Missing comment" finding wrong — comprehensive WHY block at lines 14-27. CLAUDE.md §22 cross-references both orchestrator files correctly.
+### 6. Documentation (doc-writer)
+**Status:** ⚠️ WARN
+- `.env.example` could mention session pooler (port 5454) for Render as an alternative to direct
+- `env.py` comment could explain WHY Render sometimes needs session pooler vs direct
+- `render.yaml` `sync: false` has no explanatory comment — minor
+- All non-blocking; core documentation is clear and accurate
 
 ---
 
 ## Action Items
 
-All gate-blocking items resolved. Cosmetic/follow-up only:
-
-- [ ] Add unit test for engine `connect_args` dict (non-blocking; deferred)
-- [ ] Consider `model: ClassVar[str]` direct literal instead of `_DEFAULT_CHAIRMAN` indirection in council_chairman.py (cosmetic)
+- [ ] Set `DATABASE_URL_DIRECT` in Render dashboard → use the **direct** Supabase URL:
+  `postgresql+asyncpg://postgres:PASSWORD@db.PROJECT_REF.supabase.co:5432/postgres`
+  (find this in Supabase Dashboard → Project Settings → Database → Connection string → URI, select "Direct connection")
+- [ ] If Supabase project is paused (free tier pauses after 1 week idle) → unpause it at supabase.com first
+- [ ] Ensure `DATABASE_URL_DIRECT` is never printed in Render build logs (it contains a high-privilege credential)
+- [ ] When test infrastructure is established, add a `monkeypatch` test for the two-branch env fallback in `alembic/env.py`
 
 ---
-
-## Auto-merge signal
-
-Verdict is **GATE PASSED** (not BLOCKED). The `auto-pr.yml` workflow should squash-merge on this push, triggering Render redeploy with the asyncpg hotfix.
-
-**Production recovery ETA:** ~3-5 min after merge (workflow squash + Render auto-deploy).
-
-### Re-run notes
-
-**Run 1 (workflow #126 against `eef1cc1`)** — failed. The workflow fired the merge curl synchronously after opening/updating the PR. GitHub computes `mergeable_state` asynchronously; the merge endpoint returned 405 because the computation hadn't finished. Fixed in `8d87592` by adding a 12 × 5 s retry loop that polls `mergeable_state` before each merge attempt.
-
-**Run 2 (workflow #127 against `8d87592`)** — would have failed for a different reason: between `eef1cc1` and `8d87592`, main absorbed PR #32 as `a6b2a74` (squash-merge of `dev-team/audit-batch-2-chat-fixes`). This created the squash-divergence cycle described in CLAUDE.md §20: develop-AION's history no longer cleanly applies on top of the new main. The retry loop would correctly detect this as `mergeable_state=dirty` and bail.
-
-**Round-2 squash-divergence repair** applied as commit `6f77709` (`git merge origin/main --strategy=ours`). With main now in develop-AION's ancestry, the next squash-merge has a clean diff to apply.
-
-**This commit (run 3)** carries: the round-2 repair commit + a fresh gate-report touch. Verdict is unchanged — code review and gate panel results from `eef1cc1` still stand. Auto-pr workflow should: poll `mergeable_state` (now clean), PUT `/merge` 200, squash-merge develop-AION → main, Render redeploys with asyncpg hotfix.
-
-*Generated by Arshad.AI Quality Gate · 6-agent panel · subagent-verification rule applied*
+*Generated by Arshad.AI Quality Gate · All 6 agents · 2026-05-17*

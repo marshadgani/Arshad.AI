@@ -21,11 +21,16 @@ from src.models.database import Base  # noqa: E402
 
 config = context.config
 
-# Override sqlalchemy.url at runtime from DATABASE_URL — single source of truth.
-database_url = os.getenv("DATABASE_URL")
+# Migrations must never run through Supabase's transaction pooler (port 6543)
+# because DDL statements require a real session-level connection.  Set
+# DATABASE_URL_DIRECT to the direct URL (port 5432, host db.REF.supabase.co)
+# or session pooler (port 5454) on Render.  Falls back to DATABASE_URL so
+# local docker-compose requires no extra config.
+database_url = os.getenv("DATABASE_URL_DIRECT") or os.getenv("DATABASE_URL")
 if not database_url:
     raise RuntimeError(
-        "DATABASE_URL is not set. Copy backend/.env.example to backend/.env and fill it in."
+        "Neither DATABASE_URL_DIRECT nor DATABASE_URL is set. "
+        "Copy backend/.env.example to backend/.env and fill in at least DATABASE_URL."
     )
 config.set_main_option("sqlalchemy.url", database_url)
 
