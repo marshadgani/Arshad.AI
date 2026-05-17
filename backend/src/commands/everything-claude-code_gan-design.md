@@ -1,39 +1,45 @@
 ---
-description: Run a generator/evaluator design loop for frontend or visual work with bounded iterations and scoring.
+description: 运行一个生成器/评估器设计循环，用于前端或视觉工作，具有有限迭代和评分。
 ---
 
-Parse the following from $ARGUMENTS:
-1. `brief` — the user's description of the design to create
-2. `--max-iterations N` — (optional, default 10) maximum design-evaluate cycles
-3. `--pass-threshold N` — (optional, default 7.5) weighted score to pass (higher default for design)
+从 $ARGUMENTS 中解析以下内容：
 
-## GAN-Style Design Harness
+1. `brief` — 用户对要创建设计的描述
+2. `--max-iterations N` — （可选，默认10）最大设计-评估循环次数
+3. `--pass-threshold N` — （可选，默认7.5）通过所需的加权分数（设计模式默认值更高）
 
-A two-agent loop (Generator + Evaluator) focused on frontend design quality. No planner — the brief IS the spec.
+## GAN 风格设计框架
 
-This is the same mode Anthropic used for their frontend design experiments, where they saw creative breakthroughs like the 3D Dutch art museum with CSS perspective and doorway navigation.
+一个专注于前端设计质量的双代理循环（生成器 + 评估器）。无规划器——需求说明即规范。
 
-### Setup
-1. Create `gan-harness/` directory
-2. Write the brief directly as `gan-harness/spec.md`
-3. Write a design-focused `gan-harness/eval-rubric.md` with extra weight on Design Quality and Originality
+这与 Anthropic 用于前端设计实验的模式相同，他们在实验中取得了创意突破，例如使用 CSS 透视和门廊导航的 3D 荷兰艺术博物馆。
 
-### Design-Specific Eval Rubric
+### 设置
+
+1. 创建 `gan-harness/` 目录
+2. 直接将需求说明写入 `gan-harness/spec.md`
+3. 编写一个专注于设计的 `gan-harness/eval-rubric.md`，并额外加重设计质量和原创性的权重
+
+### 设计专用评估标准
+
 ```markdown
-### Design Quality (weight: 0.35)
-### Originality (weight: 0.30)
-### Craft (weight: 0.25)
-### Functionality (weight: 0.10)
+### 设计质量（权重：0.35）
+### 原创性（权重：0.30）
+### 工艺水平（权重：0.25）
+### 功能性（权重：0.10）
 ```
 
-Note: Originality weight is higher (0.30 vs 0.20) to push for creative breakthroughs. Functionality weight is lower since design mode focuses on visual quality.
+注意：原创性权重更高（0.30 vs 0.20）以推动创意突破。功能性权重较低，因为设计模式侧重于视觉质量。
 
-### Loop
-Same as `/project:gan-build` Phase 2, but:
-- Skip the planner
-- Use the design-focused rubric
-- Generator prompt emphasizes visual quality over feature completeness
-- Evaluator prompt emphasizes "would this win a design award?" over "do all features work?"
+### 循环
 
-### Key Difference from gan-build
-The Generator is told: "Your PRIMARY goal is visual excellence. A stunning half-finished app beats a functional ugly one. Push for creative leaps — unusual layouts, custom animations, distinctive color work."
+与 `/project:gan-build` 阶段 2 相同，但：
+
+* 跳过规划器
+* 使用设计专用评估标准
+* 生成器提示强调视觉质量而非功能完整性
+* 评估器提示强调"这个设计能赢得设计奖吗？"而非"所有功能都正常吗？"
+
+### 与 gan-build 的关键区别
+
+生成器被告知："你的首要目标是视觉卓越。一个惊艳的半成品应用胜过功能齐全但丑陋的应用。推动创意飞跃——不寻常的布局、自定义动画、独特的色彩搭配。"

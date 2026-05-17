@@ -1,49 +1,49 @@
 ---
-description: Guided feature development with codebase understanding and architecture focus
+description: 基于代码库理解和架构重点的引导式功能开发
 ---
 
-A structured feature-development workflow that emphasizes understanding existing code before writing new code.
+一种结构化的功能开发工作流程，强调在编写新代码之前先理解现有代码。
 
-## Phases
+## 阶段
 
-### 1. Discovery
+### 1. 发现
 
-- read the feature request carefully
-- identify requirements, constraints, and acceptance criteria
-- ask clarifying questions if the request is ambiguous
+* 仔细阅读功能需求
+* 识别需求、约束和验收标准
+* 如果需求不明确，提出澄清性问题
 
-### 2. Codebase Exploration
+### 2. 代码库探索
 
-- use `code-explorer` to analyze the relevant existing code
-- trace execution paths and architecture layers
-- understand integration points and conventions
+* 使用 `code-explorer` 分析相关的现有代码
+* 追踪执行路径和架构层次
+* 理解集成点和约定
 
-### 3. Clarifying Questions
+### 3. 澄清性问题
 
-- present findings from exploration
-- ask targeted design and edge-case questions
-- wait for user response before proceeding
+* 展示探索过程中的发现
+* 提出有针对性的设计和边界情况问题
+* 等待用户回复后再继续
 
-### 4. Architecture Design
+### 4. 架构设计
 
-- use `code-architect` to design the feature
-- provide the implementation blueprint
-- wait for approval before implementing
+* 使用 `code-architect` 设计功能
+* 提供实现蓝图
+* 等待批准后再实施
 
-### 5. Implementation
+### 5. 实现
 
-- implement the feature following the approved design
-- prefer TDD where appropriate
-- keep commits small and focused
+* 按照批准的设计实现功能
+* 在适当的情况下优先采用 TDD
+* 保持提交小而专注
 
-### 6. Quality Review
+### 6. 质量审查
 
-- use `code-reviewer` to review the implementation
-- address critical and important issues
-- verify test coverage
+* 使用 `code-reviewer` 审查实现
+* 处理关键和重要问题
+* 验证测试覆盖率
 
-### 7. Summary
+### 7. 总结
 
-- summarize what was built
-- list follow-up items or limitations
-- provide testing instructions
+* 总结已构建的内容
+* 列出后续事项或限制
+* 提供测试说明
