@@ -1,0 +1,79 @@
+.section {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-faint);
+  border-radius: var(--radius-lg);
+  padding: var(--s-6);
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--s-4);
+}
+
+.sectionTitle {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.sectionTitle::before {
+  content: '';
+  width: 3px;
+  height: 14px;
+  background: var(--accent);
+  display: inline-block;
+}
+
+.sectionMeta {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: var(--s-4);
+  padding-bottom: var(--s-4);
+  border-bottom: 1px dashed var(--border-faint);
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  color: var(--text-muted);
+}
+
+.legendDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.canvasWrap {
+  overflow-x: auto;
+  border-radius: var(--radius-md);
+  background: #0f1117;
+  border: 1px solid #1e2433;
+}
+
+/* Diagram is 1820px — intentionally wider than a laptop viewport.
+   overflow-x:auto on the wrapper provides horizontal scroll. */
+.canvasWrap svg {
+  display: block;
+  min-width: 1820px;
+}
