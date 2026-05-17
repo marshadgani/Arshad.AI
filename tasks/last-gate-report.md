@@ -2,7 +2,7 @@
 
 **PR:** fix/supabase-migration-direct-url → claude/ai-personal-assistant-main
 **Branch:** `fix/supabase-migration-direct-url` → `claude/ai-personal-assistant-main`
-**Triggered by:** "Merge to main" — after Fund Flow feature commit
+**Triggered by:** "Fix this error" — Render deploy "Exited with status 1" fix
 **Date:** 2026-05-17
 
 ---
@@ -23,25 +23,26 @@
 ### ⚠️ GATE PASSED WITH WARNINGS — Ready for merge
 
 Zero FAIL gates. Zero Critical issues. All warnings are non-blocking:
-- Code-reviewer "FIX" downgraded to WARN after manual cross-check: the SVG already has `viewBox="0 0 1820 1580"` (reviewer's premise of "no viewBox" was incorrect). Horizontal scroll via `overflow-x:auto` is intentional for a 1820px diagram. CSS min-width fix applied to make intent explicit.
-- Other WARNs are forward-looking (CSP, test infra, SVG-as-file refactor) — pre-existing or out-of-scope.
+- Code-reviewer "FIX" downgraded to WARN after manual cross-check: reviewer claimed "DATABASE_URL_DIRECT not wired into CMD" — **incorrect**. `alembic/env.py` already reads `os.getenv("DATABASE_URL_DIRECT") or os.getenv("DATABASE_URL")`, so alembic in CMD uses the direct URL when set. Reviewer's premise was false.
+- Security auditor Medium (exception handler schema leakage via `str(exc)`) — pre-existing in `main.py` before this diff; not introduced here.
+- Other WARNs are forward-looking (silent schema drift risk, 0% coverage baseline, CMD line length) — pre-existing or out-of-scope.
 
 ---
 
 ## What This Merge Includes
 
-### Feature: Fund Flow section in Personal Finance
-Adds a "Fund Flow" section below the standard domain sections on the Personal Finance page. Renders the full v13 cash flow map SVG (12 layers, 1820×1580px) in a horizontally scrollable canvas with colour-coded legend.
+### Fix: Render deploy "Exited with status 1"
 
-**Files changed (6):**
+**Root cause:** `backend/Dockerfile` CMD ran `alembic upgrade head` as a hard-fail prerequisite before starting uvicorn. When `DATABASE_URL` points to Supabase's transaction pooler (port 6543), alembic gets `(ENOTFOUND) tenant/user not found` because the pooler rejects DDL statements. This caused the container to exit with status 1 before uvicorn ever started.
+
+**Fix:** Made `alembic upgrade head` non-fatal in CMD. Render's `preDeployCommand` in `render.yaml` already handles migrations before the new container goes live. `docker-compose` overrides CMD entirely via its own `command:` (the `db-init` service handles migrations in local dev). The CMD alembic is now a belt-and-suspenders fallback only.
+
+**Also:** Removed stale `render-deploy probe — touched 2026-04-25` archaeology comment from ENV line.
+
+**Files changed (1):**
 | File | What changed |
 |---|---|
-| `frontend/index.html` | Loads Space Mono + Syne fonts (used by SVG text elements) |
-| `frontend/src/components/DomainPage.tsx` | Adds `children?: ReactNode` prop, rendered after activity feed |
-| `frontend/src/components/FundFlowMap/FundFlowMap.tsx` | New component — section header, 12-item legend, SVG map via `dangerouslySetInnerHTML` |
-| `frontend/src/components/FundFlowMap/FundFlowMap.module.css` | Section/legend/canvas styles; adds `min-width: 1820px` on SVG |
-| `frontend/src/components/FundFlowMap/index.ts` | Re-export |
-| `frontend/src/pages/PersonalFinance.tsx` | Passes `<FundFlowMap>` as a child to `<DomainPage slug="finance">` |
+| `backend/Dockerfile` | Made `alembic upgrade head` non-fatal in CMD (`|| echo WARN...`); removed stale probe comment; updated comment to explain preDeployCommand + docker-compose migration ownership |
 
 ---
 
@@ -49,50 +50,49 @@ Adds a "Fund Flow" section below the standard domain sections on the Personal Fi
 
 ### 1. Code Review
 **Status:** ✅ PASS (after cross-check)
-- Reviewer initially flagged "SVG has no viewBox" — **incorrect**. SVG has `viewBox="0 0 1820 1580"`.
-- Reviewer concern about fixed `width="1820"` causing overflow — **addressed**: added `min-width: 1820px` via CSS; `overflow-x: auto` on the canvas-wrap provides horizontal scroll as intended. This matches the original HTML design.
-- WARN: Google Fonts `<link rel="stylesheet">` is render-blocking. Non-blocking for a personal productivity tool; deferred.
+- Reviewer initially flagged "DATABASE_URL_DIRECT not wired into CMD" — **incorrect**. `alembic/env.py` reads `DATABASE_URL_DIRECT` via `os.getenv()`, so all alembic invocations (including CMD) use the direct URL when the env var is set.
+- WARN: Schema-before-traffic gap if both `preDeployCommand` and CMD alembic fail simultaneously. Acceptable risk — Render blocks the deploy when `preDeployCommand` fails, so this path requires both to fail independently.
+- `exec uvicorn` correct — PID 1 promotion, proper signal handling confirmed.
 
 ### 2. Security Audit
 **Status:** ⚠️ WARN
-- `MAP_SVG` confirmed free of `<script>`, `javascript:`, `on*` attributes — no XSS risk.
-- `dangerouslySetInnerHTML` on a module-level const (not user input) is safe as written.
-- WARN: No Content-Security-Policy covering the new external font dependency. Non-blocking for single-user MVP; deferred to infra phase.
+- No new injection vectors. `${PORT:-8000}` is platform-controlled, not user-controlled.
+- Non-root user (`app`) confirmed; no secrets in image layers; slim base image; no `.env` files in COPY paths.
+- WARN: Exception handler in `main.py` returns `str(exc)` for unhandled exceptions, which can expose schema info on SQLAlchemy errors. **Pre-existing issue** — not introduced by this diff. Deferred.
+- WARN: No `.dockerignore`. Current COPY paths are explicit and don't pick up `.env` files, but a future `COPY . .` refactor would. Deferred.
 
 ### 3. Bug Analysis
 **Status:** ⚠️ WARN
-- SVG marker/filter IDs (`url(#a-xxx)`, `url(#glow)`) are defined in `<defs>` in the same SVG string — correct, no broken references.
-- `key={label}` on legend items — unique static strings, no duplicate key errors.
-- `{children}` when undefined renders nothing — correct React behaviour.
-- WARN: If a CSP is ever added blocking `unsafe-inline`, `dangerouslySetInnerHTML` would silently blank out. Forward-looking; no action needed now.
+- Shell command sequence is mechanically correct: `(alembic || echo)` always exits 0, uvicorn always starts.
+- `exec uvicorn` correctly replaces sh process — SIGTERM from Render goes directly to uvicorn.
+- WARN: If `preDeployCommand` fails (Render blocks deploy) AND the CMD fallback also fails silently, uvicorn starts against un-migrated schema. Render's health check is the backstop. Acceptable for single-user personal tool.
 
 ### 4. Test Coverage
 **Status:** ⚠️ WARN (pre-existing baseline)
 - 0% coverage is a project-wide pre-existing gap. This change does not worsen it.
-- Priority tests when infrastructure is added:
-  1. `DomainPage` renders children after activity feed
-  2. `FundFlowMap` renders 12 legend items
-  3. `PersonalFinance` includes "Fund Flow" heading
+- Docker CMD startup sequencing is infrastructure-level and not meaningfully unit-testable without a real Docker build + Postgres environment.
+- A future smoke test (`docker compose up` → assert `/health` 200) would close the gap.
 
 ### 5. Code Quality
 **Status:** ⚠️ WARN
-- 400-line SVG string in a `.tsx` file obscures component logic. Refactorer suggests extracting to `.svg` + SVGR.
-- Approach is defensible: converting 200+ SVG elements to JSX camelCase is error-prone; `dangerouslySetInnerHTML` with a build-time const is safe and simpler.
-- WARN noted but non-blocking; deferred to a follow-up if the diagram is frequently edited.
+- CMD line is 266 characters — long but scannable; candidate for `scripts/entrypoint.sh` extraction in a future refactor.
+- Comment is accurate and explains the three non-obvious constraints (preDeployCommand timing, docker-compose override, Supabase pooler DDL rejection).
+- Non-fatal alembic is internally consistent with already-non-fatal seed script.
 
 ### 6. Documentation
 **Status:** ✅ PASS
-- `dangerouslySetInnerHTML` WHY comment is adequate and necessary (non-obvious security context).
-- `children?: ReactNode` is self-documenting.
-- CSS min-width comment added explaining the intentional wide-diagram + scroll pattern.
+- New comment passes WHY-vs-WHAT test: explains preDeployCommand timing, docker-compose CMD override, and Supabase pooler constraint — all non-obvious without reading Render docs + Supabase docs.
+- Stale `render-deploy probe` archaeology comment correctly removed.
+- Inline `echo` warning message tells operator exactly what to set.
 
 ---
 
 ## Action Items (deferred, non-blocking)
 
-- [ ] Add Content-Security-Policy header covering `fonts.googleapis.com` + `fonts.gstatic.com`
-- [ ] Consider extracting `MAP_SVG` to `src/assets/fund-flow-map.svg` + SVGR import when diagram is next revised
-- [ ] Make Google Fonts load non-blocking (`media="print" onload` pattern) if LCP becomes a concern
+- [ ] Fix `main.py` exception handler to catch `sqlalchemy.exc.SQLAlchemyError` separately and return generic `{"detail": "Database error"}` rather than `str(exc)` (prevents schema info leakage)
+- [ ] Add `.dockerignore` to `backend/` to exclude `.env*`, `__pycache__`, `*.pyc`, `.git`
+- [ ] Set `DATABASE_URL_DIRECT=postgresql+asyncpg://postgres:PASSWORD@db.dslnjhuciypccowyiwaa.supabase.co:5432/postgres` in Render dashboard (required for `preDeployCommand` + CMD alembic to succeed against Supabase)
+- [ ] Consider extracting Dockerfile CMD to `scripts/entrypoint.sh` if startup logic grows further
 
 ---
 
