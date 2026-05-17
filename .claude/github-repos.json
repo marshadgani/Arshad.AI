@@ -1495,24 +1495,24 @@
     "caveman": {
       "url": "https://github.com/JuliusBrussee/caveman.git",
       "name": "caveman",
-      "last_fetched": "2026-05-03 13:25 UTC",
+      "last_fetched": "2026-05-17 20:49 UTC",
       "components": {
         "skills": [
           "caveman-commit",
           "caveman",
           "cavecrew",
+          "caveman-compress",
           "caveman-help",
           "caveman-review",
-          "compress",
           "caveman-stats",
-          "caveman",
-          "caveman",
-          "caveman-compress",
-          "caveman",
+          "cavecrew",
+          "cavecrew",
+          "cavecrew",
           "caveman",
           "cavecrew",
-          "compress",
-          "caveman-stats"
+          "caveman-compress",
+          "caveman-stats",
+          "cavecrew"
         ],
         "agents": [
           "cavecrew-reviewer",
@@ -1522,7 +1522,13 @@
           "cavecrew-investigator",
           "cavecrew-builder"
         ],
-        "commands": [],
+        "commands": [
+          "caveman",
+          "caveman-stats",
+          "caveman-help",
+          "caveman-commit",
+          "caveman-review"
+        ],
         "hooks": [
           "uninstall.sh",
           "install.sh",
