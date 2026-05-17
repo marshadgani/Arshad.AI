@@ -259,7 +259,7 @@
     "awesome-claude-code": {
       "url": "https://github.com/hesreallyhim/awesome-claude-code.git",
       "name": "awesome-claude-code",
-      "last_fetched": "2026-05-01 12:31 UTC",
+      "last_fetched": "2026-05-17 20:48 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -273,7 +273,7 @@
     "context7": {
       "url": "https://github.com/upstash/context7.git",
       "name": "context7",
-      "last_fetched": "2026-05-01 12:32 UTC",
+      "last_fetched": "2026-05-17 20:48 UTC",
       "components": {
         "skills": [
           "context7-mcp",
