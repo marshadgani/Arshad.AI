@@ -88,7 +88,7 @@
     "obsidian-skills": {
       "url": "https://github.com/kepano/obsidian-skills.git",
       "name": "obsidian-skills",
-      "last_fetched": "2026-05-01 12:31 UTC",
+      "last_fetched": "2026-05-17 20:48 UTC",
       "components": {
         "skills": [
           "obsidian-cli",
@@ -106,7 +106,7 @@
     "n8n-mcp": {
       "url": "https://github.com/czlonkowski/n8n-mcp.git",
       "name": "n8n-mcp",
-      "last_fetched": "2026-05-01 12:31 UTC",
+      "last_fetched": "2026-05-17 20:48 UTC",
       "components": {
         "skills": [],
         "agents": [
@@ -131,7 +131,7 @@
     "get-shit-done": {
       "url": "https://github.com/gsd-build/get-shit-done.git",
       "name": "get-shit-done",
-      "last_fetched": "2026-05-01 12:31 UTC",
+      "last_fetched": "2026-05-17 20:48 UTC",
       "components": {
         "skills": [],
         "agents": [
@@ -167,7 +167,11 @@
           "gsd-verifier",
           "gsd-advisor-researcher",
           "gsd-roadmapper",
-          "gsd-pattern-mapper"
+          "gsd-pattern-mapper",
+          "issue-tracker",
+          "triage-labels",
+          "cjs-sdk-seam",
+          "domain"
         ],
         "commands": [
           "validate-phase",
@@ -184,6 +188,7 @@
           "plan-review-convergence",
           "discuss-phase",
           "audit-milestone",
+          "mvp-phase",
           "audit-fix",
           "spike",
           "review",
@@ -210,6 +215,7 @@
           "capture",
           "audit-uat",
           "ns-ideate",
+          "surface",
           "thread",
           "config",
           "pause-work",
@@ -237,9 +243,11 @@
           "verify-work"
         ],
         "hooks": [
+          "gsd-graphify-update.sh",
           "gsd-validate-commit.sh",
           "gsd-phase-boundary.sh",
-          "gsd-session-state.sh"
+          "gsd-session-state.sh",
+          "gsd-graphify-rebuild.sh"
         ],
         "token_optimization": [
           "scout-codebase.md",

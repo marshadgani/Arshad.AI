@@ -1,18 +1,8 @@
----
-name: gsd:thread
-description: Manage persistent context threads for cross-session work
-argument-hint: "[list [--open | --resolved] | close <slug> | status <slug> | name | description]"
-allowed-tools:
-  - Read
-  - Write
-  - Bash
----
+# Thread Workflow
 
-<objective>
-Create, list, close, or resume persistent context threads. Threads are lightweight
-cross-session knowledge stores for work that spans multiple sessions but
-doesn't belong to any specific phase.
-</objective>
+Invoked by `/gsd:thread` (`commands/gsd/thread.md`).
+
+Create, list, close, or resume persistent context threads for cross-session work.
 
 <process>
 
@@ -62,7 +52,7 @@ frontend-build-tools      resolved      2026-04-01   Vite vs webpack
 
 If no threads exist (or none match the filter):
 ```
-No threads found. Create one with: /gsd-thread <description>
+No threads found. Create one with: /gsd:thread <description>
 ```
 
 STOP after displaying. Do NOT proceed to further steps.
@@ -117,8 +107,8 @@ When SUBCMD=status and SLUG is set (already sanitized):
    Next Steps:
    {content of ## Next Steps section}
    ─────────────────────────────────────
-   Resume with: /gsd-thread {SLUG}
-   Close with:  /gsd-thread close {SLUG}
+   Resume with: /gsd:thread {SLUG}
+   Close with:  /gsd:thread close {SLUG}
    ```
 
 No agent spawn. STOP after printing.
@@ -127,7 +117,11 @@ No agent spawn. STOP after printing.
 <mode_resume>
 **RESUME mode:**
 
-If $ARGUMENTS matches an existing thread name (file `.planning/threads/{ARGUMENTS}.md` exists):
+If $ARGUMENTS matches an existing thread name:
+
+**Sanitize first:** apply the same slug sanitization used by CLOSE and STATUS — strip any characters not matching `[a-z0-9-]`, reject slugs longer than 60 chars or containing `..` or `/`. If invalid, output "Invalid thread slug." and stop. Use the sanitized value as SLUG for all subsequent file path construction.
+
+Check `.planning/threads/{SLUG}.md` exists. If not, fall through to CREATE mode.
 
 Resume the thread — load its context into the current session. Read the file content and display it as plain text. Ask what the user wants to work on next.
 
@@ -201,8 +195,8 @@ updated: {today ISO date}
    Thread: {slug}
    File: .planning/threads/{slug}.md
 
-   Resume anytime with: /gsd-thread {slug}
-   Close when done with: /gsd-thread close {slug}
+   Resume anytime with: /gsd:thread {slug}
+   Close when done with: /gsd:thread close {slug}
    ```
 </mode_create>
 
@@ -210,7 +204,7 @@ updated: {today ISO date}
 
 <notes>
 - Threads are NOT phase-scoped — they exist independently of the roadmap
-- Lighter weight than /gsd-pause-work — no phase state, no plan context
+- Lighter weight than /gsd:pause-work — no phase state, no plan context
 - The value is in Context and Next Steps — a cold-start session can pick up immediately
 - Threads can be promoted to phases or backlog items when they mature:
   /gsd-add-phase or /gsd-add-backlog with context from the thread
