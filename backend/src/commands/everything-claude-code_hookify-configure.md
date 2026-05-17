@@ -1,14 +1,14 @@
 ---
-description: Enable or disable hookify rules interactively
+description: 交互式启用或禁用 hookify 规则
 ---
 
-Interactively enable or disable existing hookify rules.
+交互式启用或禁用现有的 hookify 规则。
 
-## Steps
+## 步骤
 
-1. Find all `.claude/hookify.*.local.md` files
-2. Read the current state of each rule
-3. Present the list with current enabled / disabled status
-4. Ask which rules to toggle
-5. Update the `enabled:` field in the selected rule files
-6. Confirm the changes
+1. 查找所有 `.claude/hookify.*.local.md` 文件
+2. 读取每条规则的当前状态
+3. 展示列表，包含每条规则的当前启用/禁用状态
+4. 询问需要切换哪些规则
+5. 更新所选规则文件中的 `enabled:` 字段
+6. 确认更改

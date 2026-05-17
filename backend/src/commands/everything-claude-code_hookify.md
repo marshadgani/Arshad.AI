@@ -1,38 +1,38 @@
 ---
-description: Create hooks to prevent unwanted behaviors from conversation analysis or explicit instructions
+description: 创建钩子以防止对话分析或明确指令产生的不当行为
 ---
 
-Create hook rules to prevent unwanted Claude Code behaviors by analyzing conversation patterns or explicit user instructions.
+创建钩子规则，通过分析对话模式或明确的用户指令，防止 Claude Code 出现不期望的行为。
 
-## Usage
+## 用法
 
 `/hookify [description of behavior to prevent]`
 
-If no arguments are provided, analyze the current conversation to find behaviors worth preventing.
+如果不提供参数，则分析当前对话以找出值得阻止的行为。
 
-## Workflow
+## 工作流程
 
-### Step 1: Gather Behavior Info
+### 第一步：收集行为信息
 
-- With arguments: parse the user's description of the unwanted behavior
-- Without arguments: use the `conversation-analyzer` agent to find:
-  - explicit corrections
-  - frustrated reactions to repeated mistakes
-  - reverted changes
-  - repeated similar issues
+* 带参数：解析用户对不期望行为的描述
+* 不带参数：使用 `conversation-analyzer` 智能体查找：
+  * 明确的纠正
+  * 对重复错误的沮丧反应
+  * 被撤销的更改
+  * 反复出现的类似问题
 
-### Step 2: Present Findings
+### 第二步：展示发现
 
-Show the user:
+向用户展示：
 
-- behavior description
-- proposed event type
-- proposed pattern or matcher
-- proposed action
+* 行为描述
+* 建议的事件类型
+* 建议的模式或匹配器
+* 建议的操作
 
-### Step 3: Generate Rule Files
+### 第三步：生成规则文件
 
-For each approved rule, create a file at `.claude/hookify.{name}.local.md`:
+为每个批准的规则，在 `.claude/hookify.{name}.local.md` 创建文件：
 
 ```yaml
 ---
@@ -45,6 +45,6 @@ pattern: "regex pattern"
 Message shown when rule triggers.
 ```
 
-### Step 4: Confirm
+### 第四步：确认
 
-Report created rules and how to manage them with `/hookify-list` and `/hookify-configure`.
+报告已创建的规则，以及如何使用 `/hookify-list` 和 `/hookify-configure` 管理这些规则。

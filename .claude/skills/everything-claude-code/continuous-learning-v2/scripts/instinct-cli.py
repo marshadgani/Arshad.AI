@@ -28,6 +28,13 @@ from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from typing import Optional
 
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 try:
     import fcntl
     _HAS_FCNTL = True
@@ -38,7 +45,69 @@ except ImportError:
 # Configuration
 # ─────────────────────────────────────────────
 
-HOMUNCULUS_DIR = Path.home() / ".claude" / "homunculus"
+def _resolve_homunculus_dir() -> Path:
+    override = os.environ.get("CLV2_HOMUNCULUS_DIR")
+    if override:
+        if Path(override).is_absolute():
+            return Path(override)
+        print(f"[ecc] CLV2_HOMUNCULUS_DIR={override!r} is not absolute; ignoring", file=sys.stderr)
+
+    xdg = os.environ.get("XDG_DATA_HOME")
+    if xdg:
+        if Path(xdg).is_absolute():
+            return Path(xdg) / "ecc-homunculus"
+        print(f"[ecc] XDG_DATA_HOME={xdg!r} is not absolute; ignoring", file=sys.stderr)
+
+    return Path.home() / ".local" / "share" / "ecc-homunculus"
+
+
+def _strip_remote_credentials(remote_url: str) -> str:
+    return re.sub(r"://[^@]+@", "://", remote_url or "")
+
+
+def _normalize_remote_url(remote_url: str) -> str:
+    if not remote_url:
+        return ""
+
+    is_network = (
+        not remote_url.startswith("file://")
+        and ("://" in remote_url or re.match(r"^[^@/:]+@[^:/]+:", remote_url) is not None)
+    )
+    normalized = _strip_remote_credentials(remote_url)
+    normalized = re.sub(r"^[A-Za-z][A-Za-z0-9+.-]*://", "", normalized)
+    normalized = re.sub(r"^[^@/:]+@([^:/]+):", r"\1/", normalized)
+    normalized = re.sub(r"\.git/?$", "", normalized)
+    normalized = re.sub(r"/+$", "", normalized)
+
+    return normalized.lower() if is_network else normalized
+
+
+def _stream_can_encode(text: str, stream=None) -> bool:
+    stream = stream or sys.stdout
+    encoding = getattr(stream, "encoding", None) or sys.getdefaultencoding()
+    try:
+        text.encode(encoding)
+    except (LookupError, UnicodeEncodeError):
+        return False
+    return True
+
+
+def _confidence_bar(confidence, stream=None) -> str:
+    try:
+        filled = int(float(confidence) * 10)
+    except (TypeError, ValueError):
+        filled = 5
+    filled = max(0, min(10, filled))
+
+    full, empty = ("\u2588", "\u2591") if _stream_can_encode("\u2588\u2591", stream) else ("#", ".")
+    return full * filled + empty * (10 - filled)
+
+
+def _project_hash(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:12]
+
+
+HOMUNCULUS_DIR = _resolve_homunculus_dir()
 PROJECTS_DIR = HOMUNCULUS_DIR / "projects"
 REGISTRY_FILE = HOMUNCULUS_DIR / "projects.json"
 
@@ -177,10 +246,34 @@ def detect_project() -> dict:
     except (subprocess.TimeoutExpired, FileNotFoundError):
         pass
 
-    hash_source = remote_url if remote_url else project_root
-    project_id = hashlib.sha256(hash_source.encode()).hexdigest()[:12]
+    raw_remote_url = remote_url
+    if remote_url:
+        remote_url = _strip_remote_credentials(remote_url)
+
+    legacy_hash_source = remote_url if remote_url else project_root
+    normalized_remote = _normalize_remote_url(remote_url) if remote_url else ""
+    hash_source = normalized_remote if normalized_remote else legacy_hash_source
+    project_id = _project_hash(hash_source)
 
     project_dir = PROJECTS_DIR / project_id
+
+    if not project_dir.exists():
+        legacy_sources = []
+        if legacy_hash_source and legacy_hash_source != hash_source:
+            legacy_sources.append(legacy_hash_source)
+        if raw_remote_url and raw_remote_url not in {hash_source, legacy_hash_source}:
+            legacy_sources.append(raw_remote_url)
+
+        for legacy_source in legacy_sources:
+            legacy_id = _project_hash(legacy_source)
+            legacy_dir = PROJECTS_DIR / legacy_id
+            if legacy_id != project_id and legacy_dir.exists():
+                try:
+                    legacy_dir.rename(project_dir)
+                except OSError:
+                    project_id = legacy_id
+                    project_dir = legacy_dir
+                break
 
     # Ensure project directory structure
     for d in [
@@ -478,7 +571,7 @@ def _print_instincts_by_domain(instincts: list[dict]) -> None:
 
         for inst in sorted(domain_instincts, key=lambda x: -x.get('confidence', 0.5)):
             conf = inst.get('confidence', 0.5)
-            conf_bar = '\u2588' * int(conf * 10) + '\u2591' * (10 - int(conf * 10))
+            conf_bar = _confidence_bar(conf)
             trigger = inst.get('trigger', 'unknown trigger')
             scope_tag = f"[{inst.get('scope', '?')}]"
 

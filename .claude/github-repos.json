@@ -6,7 +6,7 @@
     "superpowers": {
       "url": "https://github.com/obra/superpowers.git",
       "name": "superpowers",
-      "last_fetched": "2026-05-01 12:31 UTC",
+      "last_fetched": "2026-05-17 20:48 UTC",
       "components": {
         "skills": [
           "using-superpowers",
@@ -24,14 +24,8 @@
           "test-driven-development",
           "systematic-debugging"
         ],
-        "agents": [
-          "code-reviewer"
-        ],
-        "commands": [
-          "execute-plan",
-          "write-plan",
-          "brainstorm"
-        ],
+        "agents": [],
+        "commands": [],
         "hooks": [],
         "token_optimization": [
           "testing.md"
@@ -61,16 +55,20 @@
     "claude-mem": {
       "url": "https://github.com/thedotmack/claude-mem.git",
       "name": "claude-mem",
-      "last_fetched": "2026-05-01 12:31 UTC",
+      "last_fetched": "2026-05-17 20:48 UTC",
       "components": {
         "skills": [
           "pathfinder",
+          "learn-codebase",
           "smart-explore",
           "mem-search",
           "timeline-report",
+          "wowerpoint",
           "make-plan",
           "version-bump",
+          "how-it-works",
           "do",
+          "babysit",
           "knowledge-agent",
           "make-plan",
           "do",
@@ -82,23 +80,15 @@
         ],
         "hooks": [],
         "token_optimization": [
-          "09-execution-runbook.md",
-          "05-clean-flowcharts.md",
-          "08-reconciliation.md",
-          "05-context-injection-engine.md",
-          "10-knowledge-corpus-builder.md",
-          "06-implementation-plan.md",
-          "04-read-path.md",
-          "98-execution-order.md",
-          "99-verification.md",
-          "_rewrite-plan.md"
+          "npx-distribution.md",
+          "CHANGELOG.md"
         ]
       }
     },
     "obsidian-skills": {
       "url": "https://github.com/kepano/obsidian-skills.git",
       "name": "obsidian-skills",
-      "last_fetched": "2026-05-01 12:31 UTC",
+      "last_fetched": "2026-05-17 20:48 UTC",
       "components": {
         "skills": [
           "obsidian-cli",
@@ -116,7 +106,7 @@
     "n8n-mcp": {
       "url": "https://github.com/czlonkowski/n8n-mcp.git",
       "name": "n8n-mcp",
-      "last_fetched": "2026-05-01 12:31 UTC",
+      "last_fetched": "2026-05-17 20:48 UTC",
       "components": {
         "skills": [],
         "agents": [
@@ -141,7 +131,7 @@
     "get-shit-done": {
       "url": "https://github.com/gsd-build/get-shit-done.git",
       "name": "get-shit-done",
-      "last_fetched": "2026-05-01 12:31 UTC",
+      "last_fetched": "2026-05-17 20:48 UTC",
       "components": {
         "skills": [],
         "agents": [
@@ -177,7 +167,11 @@
           "gsd-verifier",
           "gsd-advisor-researcher",
           "gsd-roadmapper",
-          "gsd-pattern-mapper"
+          "gsd-pattern-mapper",
+          "issue-tracker",
+          "triage-labels",
+          "cjs-sdk-seam",
+          "domain"
         ],
         "commands": [
           "validate-phase",
@@ -194,6 +188,7 @@
           "plan-review-convergence",
           "discuss-phase",
           "audit-milestone",
+          "mvp-phase",
           "audit-fix",
           "spike",
           "review",
@@ -220,6 +215,7 @@
           "capture",
           "audit-uat",
           "ns-ideate",
+          "surface",
           "thread",
           "config",
           "pause-work",
@@ -247,9 +243,11 @@
           "verify-work"
         ],
         "hooks": [
+          "gsd-graphify-update.sh",
           "gsd-validate-commit.sh",
           "gsd-phase-boundary.sh",
-          "gsd-session-state.sh"
+          "gsd-session-state.sh",
+          "gsd-graphify-rebuild.sh"
         ],
         "token_optimization": [
           "scout-codebase.md",
@@ -261,7 +259,7 @@
     "awesome-claude-code": {
       "url": "https://github.com/hesreallyhim/awesome-claude-code.git",
       "name": "awesome-claude-code",
-      "last_fetched": "2026-05-01 12:31 UTC",
+      "last_fetched": "2026-05-17 20:48 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -275,7 +273,7 @@
     "context7": {
       "url": "https://github.com/upstash/context7.git",
       "name": "context7",
-      "last_fetched": "2026-05-01 12:32 UTC",
+      "last_fetched": "2026-05-17 20:48 UTC",
       "components": {
         "skills": [
           "context7-mcp",
@@ -1249,7 +1247,7 @@
     "ui-ux-pro-max-skill": {
       "url": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git",
       "name": "ui-ux-pro-max-skill",
-      "last_fetched": "2026-05-01 12:32 UTC",
+      "last_fetched": "2026-05-17 20:49 UTC",
       "components": {
         "skills": [
           "banner-design",
@@ -1273,7 +1271,7 @@
     "browser-use": {
       "url": "https://github.com/browser-use/browser-use.git",
       "name": "browser-use",
-      "last_fetched": "2026-05-01 12:32 UTC",
+      "last_fetched": "2026-05-17 20:49 UTC",
       "components": {
         "skills": [
           "open-source",
@@ -1301,49 +1299,49 @@
     "marketingskills": {
       "url": "https://github.com/coreyhaines31/marketingskills.git",
       "name": "marketingskills",
-      "last_fetched": "2026-05-01 12:32 UTC",
+      "last_fetched": "2026-05-17 20:49 UTC",
       "components": {
         "skills": [
-          "free-tool-strategy",
-          "email-sequence",
+          "free-tools",
+          "schema",
+          "referrals",
           "copy-editing",
           "revops",
-          "social-content",
-          "launch-strategy",
+          "emails",
+          "social",
           "site-architecture",
-          "form-cro",
           "programmatic-seo",
+          "competitors",
           "marketing-ideas",
-          "pricing-strategy",
+          "co-marketing",
           "ai-seo",
           "seo-audit",
+          "popups",
           "ad-creative",
           "copywriting",
           "image",
-          "analytics-tracking",
-          "aso-audit",
+          "ab-testing",
+          "product-marketing",
           "churn-prevention",
-          "schema-markup",
           "community-marketing",
-          "onboarding-cro",
-          "signup-flow-cro",
-          "ab-test-setup",
+          "cro",
           "marketing-psychology",
-          "popup-cro",
+          "signup",
           "directory-submissions",
           "competitor-profiling",
-          "page-cro",
           "sales-enablement",
-          "paywall-upgrade-cro",
-          "paid-ads",
+          "aso",
+          "onboarding",
           "cold-email",
           "video",
           "lead-magnets",
-          "referral-program",
+          "pricing",
           "customer-research",
           "content-strategy",
-          "competitor-alternatives",
-          "product-marketing-context"
+          "launch",
+          "analytics",
+          "paywalls",
+          "ads"
         ],
         "agents": [],
         "commands": [],
@@ -1354,7 +1352,7 @@
     "web-asset-generator": {
       "url": "https://github.com/alonw0/web-asset-generator.git",
       "name": "web-asset-generator",
-      "last_fetched": "2026-05-01 12:32 UTC",
+      "last_fetched": "2026-05-17 20:49 UTC",
       "components": {
         "skills": [
           "web-asset-generator"
@@ -1368,7 +1366,7 @@
     "-eep--esearch-skills": {
       "url": "https://github.com/Weizhena/Deep-Research-skills.git",
       "name": "Deep-Research-skills",
-      "last_fetched": "2026-05-01 12:32 UTC",
+      "last_fetched": "2026-05-17 20:49 UTC",
       "components": {
         "skills": [
           "research",
@@ -1413,7 +1411,7 @@
     "andrej-karpathy-skills": {
       "url": "https://github.com/forrestchang/andrej-karpathy-skills.git",
       "name": "andrej-karpathy-skills",
-      "last_fetched": "2026-05-01 12:32 UTC",
+      "last_fetched": "2026-05-17 20:49 UTC",
       "components": {
         "skills": [
           "karpathy-guidelines"
@@ -1427,13 +1425,14 @@
     "gstack": {
       "url": "https://github.com/garrytan/gstack.git",
       "name": "gstack",
-      "last_fetched": "2026-05-02 10:30 UTC",
+      "last_fetched": "2026-05-17 20:49 UTC",
       "components": {
         "skills": [
           "setup-deploy",
           "document-release",
           "gstack-upgrade",
           "plan-devex-review",
+          "sync-gbrain",
           "hackernews-frontpage",
           "land-and-deploy",
           "codex",
@@ -1459,6 +1458,7 @@
           "qa-only",
           "ship",
           "canary",
+          "document-generate",
           "design-html",
           "health",
           "careful",
@@ -1495,24 +1495,24 @@
     "caveman": {
       "url": "https://github.com/JuliusBrussee/caveman.git",
       "name": "caveman",
-      "last_fetched": "2026-05-03 13:25 UTC",
+      "last_fetched": "2026-05-17 20:49 UTC",
       "components": {
         "skills": [
           "caveman-commit",
           "caveman",
           "cavecrew",
+          "caveman-compress",
           "caveman-help",
           "caveman-review",
-          "compress",
           "caveman-stats",
-          "caveman",
-          "caveman",
-          "caveman-compress",
-          "caveman",
+          "cavecrew",
+          "cavecrew",
+          "cavecrew",
           "caveman",
           "cavecrew",
-          "compress",
-          "caveman-stats"
+          "caveman-compress",
+          "caveman-stats",
+          "cavecrew"
         ],
         "agents": [
           "cavecrew-reviewer",
@@ -1522,7 +1522,13 @@
           "cavecrew-investigator",
           "cavecrew-builder"
         ],
-        "commands": [],
+        "commands": [
+          "caveman",
+          "caveman-stats",
+          "caveman-help",
+          "caveman-commit",
+          "caveman-review"
+        ],
         "hooks": [
           "uninstall.sh",
           "install.sh",

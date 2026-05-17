@@ -22,6 +22,7 @@ import type { TabSession, RefEntry } from './tab-session';
 import * as Diff from 'diff';
 import { TEMP_DIR, isPathWithin } from './platform';
 import { escapeEnvelopeSentinels } from './content-security';
+import { stripLoneSurrogates } from './sanitize';
 
 // Roles considered "interactive" for the -i flag
 const INTERACTIVE_ROLES = new Set([
@@ -576,7 +577,7 @@ export async function handleSnapshot(
     }
 
     session.setLastSnapshot(snapshotText);
-    return diffOutput.join('\n');
+    return stripLoneSurrogates(diffOutput.join('\n'));
   }
 
   // Store for future diffs
@@ -623,8 +624,8 @@ export async function handleSnapshot(
     parts.push('═══ BEGIN UNTRUSTED WEB CONTENT ═══');
     parts.push(...safeUntrusted);
     parts.push('═══ END UNTRUSTED WEB CONTENT ═══');
-    return parts.join('\n');
+    return stripLoneSurrogates(parts.join('\n'));
   }
 
-  return output.join('\n');
+  return stripLoneSurrogates(output.join('\n'));
 }

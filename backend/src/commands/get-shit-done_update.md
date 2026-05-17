@@ -14,13 +14,14 @@ Detect whether GSD is installed locally or globally by checking both locations a
 First, derive `PREFERRED_CONFIG_DIR` and `PREFERRED_RUNTIME` from the invoking prompt's `execution_context` path:
 - If the path contains `/get-shit-done/workflows/update.md`, strip that suffix and store the remainder as `PREFERRED_CONFIG_DIR`
 - Path contains `/.codex/` -> `codex`
+- Path contains `/.gemini/antigravity/` -> `antigravity`
 - Path contains `/.gemini/` -> `gemini`
 - Path contains `/.config/kilo/` or `/.kilo/`, or `PREFERRED_CONFIG_DIR` contains `kilo.json` / `kilo.jsonc` -> `kilo`
 - Path contains `/.config/opencode/` or `/.opencode/`, or `PREFERRED_CONFIG_DIR` contains `opencode.json` / `opencode.jsonc` -> `opencode`
 - Otherwise -> `claude`
 
 Use `PREFERRED_CONFIG_DIR` when available so custom `--config-dir` installs are checked before default locations.
-Use `PREFERRED_RUNTIME` as the first runtime checked so `/gsd-update` targets the runtime that invoked it.
+Use `PREFERRED_RUNTIME` as the first runtime checked so `/gsd:update` targets the runtime that invoked it.
 
 Kilo config precedence must match the installer: `KILO_CONFIG_DIR` -> `dirname(KILO_CONFIG)` -> `XDG_CONFIG_HOME/kilo` -> `~/.config/kilo`.
 
@@ -36,7 +37,7 @@ expand_home() {
 # Using an array instead of a space-separated string ensures correct
 # iteration in both bash and zsh (zsh does not word-split unquoted
 # variables by default). Fixes #1173.
-RUNTIME_DIRS=( "claude:.claude" "opencode:.config/opencode" "opencode:.opencode" "gemini:.gemini" "kilo:.config/kilo" "kilo:.kilo" "codex:.codex" )
+RUNTIME_DIRS=( "claude:.claude" "opencode:.config/opencode" "opencode:.opencode" "antigravity:.gemini/antigravity" "gemini:.gemini" "kilo:.config/kilo" "kilo:.kilo" "codex:.codex" )
 ENV_RUNTIME_DIRS=()
 
 # PREFERRED_CONFIG_DIR / PREFERRED_RUNTIME should be set from execution_context
@@ -58,6 +59,8 @@ fi
 if [ -z "$PREFERRED_RUNTIME" ]; then
   if [ -n "$CODEX_HOME" ]; then
     PREFERRED_RUNTIME="codex"
+  elif [ -n "$ANTIGRAVITY_CONFIG_DIR" ]; then
+    PREFERRED_RUNTIME="antigravity"
   elif [ -n "$GEMINI_CONFIG_DIR" ]; then
     PREFERRED_RUNTIME="gemini"
   elif [ -n "$KILO_CONFIG_DIR" ]; then
@@ -95,7 +98,7 @@ if [ -n "$PREFERRED_CONFIG_DIR" ] && { [ -f "$PREFERRED_CONFIG_DIR/get-shit-done
     printf '%s' "$p"
   }
   normalized_preferred="$(normalize_path "$PREFERRED_CONFIG_DIR")"
-  for dir in .claude .config/opencode .opencode .gemini .config/kilo .kilo .codex; do
+  for dir in .claude .config/opencode .opencode .gemini/antigravity .gemini .config/kilo .kilo .codex; do
     resolved_local="$(cd "./$dir" 2>/dev/null && pwd)"
     normalized_local="$(normalize_path "$resolved_local")"
     if [ -n "$normalized_local" ] && [ "$normalized_local" = "$normalized_preferred" ]; then
@@ -113,12 +116,21 @@ if [ -n "$PREFERRED_CONFIG_DIR" ] && { [ -f "$PREFERRED_CONFIG_DIR/get-shit-done
   echo "$INSTALLED_VERSION"
   echo "$INSTALL_SCOPE"
   echo "${PREFERRED_RUNTIME:-claude}"
+  # 4-line output contract (#2993 CR): early-return path must also emit
+  # GSD_DIR or downstream check_latest_version misreads the install as
+  # UNKNOWN. PREFERRED_CONFIG_DIR is the resolved config dir we just
+  # validated above (line 95-96); it is the right GSD_DIR value for
+  # this fast path.
+  echo "$PREFERRED_CONFIG_DIR"
   exit 0
 fi
 
 # Absolute global candidates from env overrides (covers custom config dirs).
 if [ -n "$CLAUDE_CONFIG_DIR" ]; then
   ENV_RUNTIME_DIRS+=( "claude:$(expand_home "$CLAUDE_CONFIG_DIR")" )
+fi
+if [ -n "$ANTIGRAVITY_CONFIG_DIR" ]; then
+  ENV_RUNTIME_DIRS+=( "antigravity:$(expand_home "$ANTIGRAVITY_CONFIG_DIR")" )
 fi
 if [ -n "$GEMINI_CONFIG_DIR" ]; then
   ENV_RUNTIME_DIRS+=( "gemini:$(expand_home "$GEMINI_CONFIG_DIR")" )
@@ -222,34 +234,41 @@ if [ "$IS_LOCAL" = true ]; then
   INSTALLED_VERSION="$(cat "$LOCAL_VERSION_FILE")"
   INSTALL_SCOPE="LOCAL"
   TARGET_RUNTIME="$LOCAL_RUNTIME"
+  RESOLVED_GSD_DIR="$LOCAL_DIR"
 elif [ -n "$GLOBAL_VERSION_FILE" ] && [ -f "$GLOBAL_VERSION_FILE" ] && [ -f "$GLOBAL_MARKER_FILE" ] && grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+' "$GLOBAL_VERSION_FILE"; then
   INSTALLED_VERSION="$(cat "$GLOBAL_VERSION_FILE")"
   INSTALL_SCOPE="GLOBAL"
   TARGET_RUNTIME="$GLOBAL_RUNTIME"
+  RESOLVED_GSD_DIR="$GLOBAL_DIR"
 elif [ -n "$LOCAL_RUNTIME" ] && [ -f "$LOCAL_MARKER_FILE" ]; then
   # Runtime detected but VERSION missing/corrupt: treat as unknown version, keep runtime target
   INSTALLED_VERSION="0.0.0"
   INSTALL_SCOPE="LOCAL"
   TARGET_RUNTIME="$LOCAL_RUNTIME"
+  RESOLVED_GSD_DIR="$LOCAL_DIR"
 elif [ -n "$GLOBAL_RUNTIME" ] && [ -f "$GLOBAL_MARKER_FILE" ]; then
   INSTALLED_VERSION="0.0.0"
   INSTALL_SCOPE="GLOBAL"
   TARGET_RUNTIME="$GLOBAL_RUNTIME"
+  RESOLVED_GSD_DIR="$GLOBAL_DIR"
 else
   INSTALLED_VERSION="0.0.0"
   INSTALL_SCOPE="UNKNOWN"
   TARGET_RUNTIME="claude"
+  RESOLVED_GSD_DIR=""
 fi
 
 echo "$INSTALLED_VERSION"
 echo "$INSTALL_SCOPE"
 echo "$TARGET_RUNTIME"
+echo "$RESOLVED_GSD_DIR"
 ```
 
 Parse output:
 - Line 1 = installed version (`0.0.0` means unknown version)
 - Line 2 = install scope (`LOCAL`, `GLOBAL`, or `UNKNOWN`)
 - Line 3 = target runtime (`claude`, `opencode`, `gemini`, `kilo`, or `codex`)
+- Line 4 = resolved GSD config dir (e.g. `/Users/me/.claude`, `/Users/me/.gemini`); empty if scope is `UNKNOWN`. Capture this as `GSD_DIR` and pass it to subsequent steps so they don't have to re-derive the runtime path.
 - If scope is `UNKNOWN`, proceed to install step using `--claude --global` fallback.
 
 If multiple runtime installs are detected and the invoking runtime cannot be determined from execution_context, ask the user which runtime to update before running install.
@@ -269,17 +288,45 @@ Proceed to install step (treat as version 0.0.0 for comparison).
 </step>
 
 <step name="check_latest_version">
-Check npm for latest version:
+Check npm for latest version via the deterministic script. **Do NOT run `npm view` or `npm search` directly** — the package name must come from the script, not from a free choice at execution time. (#2992: LLM-driven prescriptions of npm package names produced wrong-package queries; moving the package name into a script constant closes that gap.)
+
+The `GSD_DIR` value emitted by `get_installed_version` (line 4) resolves to the runtime-specific config dir (`~/.claude/`, `~/.gemini/`, `~/.codex/`, etc.), so the script invocation works for every runtime — not just Claude. If `GSD_DIR` is empty (scope `UNKNOWN`), skip this step and go directly to install.
+
+`LATEST_RESULT` is a JSON document with the documented shape `{ ok: bool, version: string, reason: string, detail?: string }`. Parse via `jq` ONLY when the script actually ran. When `GSD_DIR` is empty (scope `UNKNOWN`), skip the check entirely and seed the parsed fields with their no-op values so downstream logic does not mistake an unset `LATEST_RESULT` for a failed network check (#2993 CR feedback):
 
 ```bash
-npm view get-shit-done-cc version 2>/dev/null
+if [ -z "$GSD_DIR" ]; then
+  # No install detected — fall through to install step; version-check is skipped.
+  LATEST_RESULT=""
+  LATEST_STATUS=0
+  LATEST_OK=false
+  LATEST_VERSION=""
+  LATEST_REASON="no_install_detected"
+else
+  LATEST_RESULT="$(node "$GSD_DIR/get-shit-done/bin/check-latest-version.cjs" --json 2>/dev/null)"
+  LATEST_STATUS=$?
+  # #2993 CR: when node is missing or the script doesn't exist, LATEST_RESULT
+  # is empty and piping it to `jq` produces a parse error on stderr while
+  # leaving LATEST_OK / LATEST_REASON as empty strings. Fail the check with a
+  # meaningful reason instead of a blank diagnostic.
+  if [ -n "$LATEST_RESULT" ]; then
+    LATEST_OK="$(printf '%s' "$LATEST_RESULT" | jq -r '.ok // false')"
+    LATEST_VERSION="$(printf '%s' "$LATEST_RESULT" | jq -r '.version // empty')"
+    LATEST_REASON="$(printf '%s' "$LATEST_RESULT" | jq -r '.reason // empty')"
+  else
+    LATEST_OK=false
+    LATEST_VERSION=""
+    LATEST_REASON="script_not_found_or_node_unavailable"
+  fi
+fi
 ```
 
-**If npm check fails:**
-```
-Couldn't check for updates (offline or npm unavailable).
+**If `LATEST_OK` is not `true`** (or `LATEST_STATUS` is non-zero):
 
-To update manually: `npx get-shit-done-cc --global`
+```text
+Couldn't check for updates (reason: {LATEST_REASON}, exit: {LATEST_STATUS}).
+
+To update manually: `npx -y --package=get-shit-done-cc@latest -- get-shit-done-cc --global`
 ```
 
 Exit.
@@ -315,7 +362,7 @@ by re-running the local installer from your dev branch:
 
     node bin/install.js --global --claude
 
-Running /gsd-update would install the npm release (A.B.C) and downgrade
+Running /gsd:update would install the npm release (A.B.C) and downgrade
 your dev version — do NOT use it to resolve this warning.
 ```
 
@@ -365,7 +412,7 @@ Your custom files in other locations are preserved:
 - Custom hooks ✓
 - Your CLAUDE.md files ✓
 
-If you've modified any GSD files directly, they'll be automatically backed up to `gsd-local-patches/` and can be reapplied with `/gsd-reapply-patches` after the update.
+If you've modified any GSD files directly, they'll be automatically backed up to `gsd-local-patches/` and can be reapplied with `/gsd:update --reapply` after the update.
 ```
 
 
@@ -445,10 +492,15 @@ const path = require('path');
 for (const relPath of custom_files) {
   const src = path.join(runtimeDir, relPath);
   const dst = path.join(backupDir, relPath);
-  if (fs.existsSync(src)) {
+  if (!fs.existsSync(src)) continue;
+
+  try {
     fs.mkdirSync(path.dirname(dst), { recursive: true });
     fs.copyFileSync(src, dst);
     console.log('  Backed up: ' + relPath);
+  } catch (err) {
+    const code = err && err.code ? String(err.code) : 'ERROR';
+    console.log('  Skipped (non-fatal): ' + relPath + ' [' + code + ']');
   }
 }
 JSEOF
@@ -475,17 +527,17 @@ RUNTIME_FLAG="--$TARGET_RUNTIME"
 
 **If LOCAL install:**
 ```bash
-npx -y get-shit-done-cc@latest "$RUNTIME_FLAG" --local
+npx -y --package=get-shit-done-cc@latest -- get-shit-done-cc "$RUNTIME_FLAG" --local
 ```
 
 **If GLOBAL install:**
 ```bash
-npx -y get-shit-done-cc@latest "$RUNTIME_FLAG" --global
+npx -y --package=get-shit-done-cc@latest -- get-shit-done-cc "$RUNTIME_FLAG" --global
 ```
 
 **If UNKNOWN install:**
 ```bash
-npx -y get-shit-done-cc@latest --claude --global
+npx -y --package=get-shit-done-cc@latest -- get-shit-done-cc --claude --global
 ```
 
 Capture output. If install fails, show error and exit.
@@ -535,14 +587,14 @@ for dir in "${CACHE_DIRS[@]}"; do
   fi
 done
 
-for dir in .claude .config/opencode .opencode .gemini .config/kilo .kilo .codex; do
+for dir in .claude .config/opencode .opencode .gemini/antigravity .gemini .config/kilo .kilo .codex; do
   rm -f "./$dir/cache/gsd-update-check.json"
   rm -f "$HOME/$dir/cache/gsd-update-check.json"
 done
 
 # Clear the shared tool-agnostic cache written by gsd-check-update.js hook (#2784).
 # The hook uses ~/.cache/gsd/gsd-update-check.json regardless of runtime; clear it
-# so the statusline stops showing the stale "⬆ /gsd-update" indicator after update.
+# so the statusline stops showing the stale "⬆ /gsd:update" indicator after update.
 rm -f "$HOME/.cache/gsd/gsd-update-check.json"
 ```
 
@@ -573,7 +625,7 @@ Check for gsd-local-patches/backup-meta.json in the config directory.
 
 ```
 Local patches were backed up before the update.
-Run /gsd-update --reapply to merge your modifications into the new version.
+Run `/gsd:update --reapply` to merge your modifications into the new version.
 ```
 
 **If no patches:** Continue normally.
