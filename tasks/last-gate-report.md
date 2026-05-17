@@ -115,3 +115,4 @@ After setting the env var, trigger a manual redeploy on Render.
 
 ---
 *Re-pushed 2026-05-17: skill-update commits landed after gate report; this touch re-arms the auto-merge signal.*
+*Re-pushed again after squash-divergence repair (PR #36 was already in main).*
