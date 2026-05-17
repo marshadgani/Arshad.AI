@@ -71,6 +71,9 @@
   border: 1px solid #1e2433;
 }
 
+/* Diagram is 1820px — intentionally wider than a laptop viewport.
+   overflow-x:auto on the wrapper provides horizontal scroll. */
 .canvasWrap svg {
   display: block;
+  min-width: 1820px;
 }

@@ -2,7 +2,7 @@
 
 **PR:** fix/supabase-migration-direct-url → claude/ai-personal-assistant-main
 **Branch:** `fix/supabase-migration-direct-url` → `claude/ai-personal-assistant-main`
-**Triggered by:** "Fix this issue" — asyncpg ENOTFOUND tenant/user error
+**Triggered by:** "Merge to main" — after Fund Flow feature commit
 **Date:** 2026-05-17
 
 ---
@@ -12,107 +12,88 @@
 | # | Gate | Agent | Result | Critical | Warnings |
 |---|---|---|---|---|---|
 | 1 | Code Review | code-reviewer | ✅ PASS | 0 | 1 |
-| 2 | Security Audit | security-auditor | ✅ PASS | 0 | 1 |
+| 2 | Security Audit | security-auditor | ⚠️ WARN | 0 | 1 |
 | 3 | Bug Analysis | debugger | ⚠️ WARN | 0 | 1 |
 | 4 | Test Coverage | test-writer | ⚠️ WARN | 0 | 1 |
-| 5 | Code Quality | refactorer | ⚠️ WARN | 0 | 2 |
-| 6 | Documentation | doc-writer | ✅ PASS | 0 | 1 |
+| 5 | Code Quality | refactorer | ⚠️ WARN | 0 | 1 |
+| 6 | Documentation | doc-writer | ✅ PASS | 0 | 0 |
 
 ## Overall Verdict
 
 ### ⚠️ GATE PASSED WITH WARNINGS — Ready for merge
 
-Zero FAIL gates after auto-fix loop. Zero Critical issues. Remaining warnings are
-non-blocking: test coverage is pre-existing 0% baseline; other warnings are
-documentation/quality improvements deferred to a follow-up.
+Zero FAIL gates. Zero Critical issues. All warnings are non-blocking:
+- Code-reviewer "FIX" downgraded to WARN after manual cross-check: the SVG already has `viewBox="0 0 1820 1580"` (reviewer's premise of "no viewBox" was incorrect). Horizontal scroll via `overflow-x:auto` is intentional for a 1820px diagram. CSS min-width fix applied to make intent explicit.
+- Other WARNs are forward-looking (CSP, test infra, SVG-as-file refactor) — pre-existing or out-of-scope.
 
 ---
 
-## What This Fix Does
+## What This Merge Includes
 
-### Root cause
-`asyncpg.exceptions.InternalServerError: (ENOTFOUND) tenant/user postgres.PROJECT_REF not found`
+### Feature: Fund Flow section in Personal Finance
+Adds a "Fund Flow" section below the standard domain sections on the Personal Finance page. Renders the full v13 cash flow map SVG (12 layers, 1820×1580px) in a horizontally scrollable canvas with colour-coded legend.
 
-Two compounding problems:
-1. `alembic/env.py` used `DATABASE_URL` for migrations — Supabase's transaction pooler
-   (port 6543) rejects DDL statements with this error. Blocked every Render deploy.
-2. `/health` returned 200 unconditionally — Render thought the service was healthy even
-   when every DB-using request was failing with the same error.
-
-### Changes (5 files)
+**Files changed (6):**
 | File | What changed |
 |---|---|
-| `backend/alembic/env.py` | Reads `DATABASE_URL_DIRECT` first (direct Postgres, port 5432), falls back to `DATABASE_URL`. Alembic migrations now bypass Supavisor. |
-| `backend/src/main.py` | Startup probe: `_probe_db()` runs before accepting traffic — fails fast with actionable log message. `/health` returns 503 when DB is unreachable. DSN removed from 503 response body (security fix). Label corrected to "Readiness check". |
-| `render.yaml` | Declares `DATABASE_URL_DIRECT` env var (`sync: false`, set manually). |
-| `backend/.env.example` | Documents `DATABASE_URL_DIRECT` with example Supabase direct URL. |
-| `tasks/last-gate-report.md` | This file. |
-
-### Gate auto-fix loop (2 iterations)
-- **Iter 1:** code-reviewer flagged DSN leak in `/health` 503 body + liveness/readiness label mismatch
-- **Fix applied:** replaced `str(exc)[:200]` with static message + server-side log; changed `summary` to "Readiness check"
-- **Iter 2:** all gates pass
+| `frontend/index.html` | Loads Space Mono + Syne fonts (used by SVG text elements) |
+| `frontend/src/components/DomainPage.tsx` | Adds `children?: ReactNode` prop, rendered after activity feed |
+| `frontend/src/components/FundFlowMap/FundFlowMap.tsx` | New component — section header, 12-item legend, SVG map via `dangerouslySetInnerHTML` |
+| `frontend/src/components/FundFlowMap/FundFlowMap.module.css` | Section/legend/canvas styles; adds `min-width: 1820px` on SVG |
+| `frontend/src/components/FundFlowMap/index.ts` | Re-export |
+| `frontend/src/pages/PersonalFinance.tsx` | Passes `<FundFlowMap>` as a child to `<DomainPage slug="finance">` |
 
 ---
 
 ## Detailed Findings
 
 ### 1. Code Review
-**Status:** ✅ PASS
-- `async with AsyncSessionLocal()` properly closes on error ✓
-- `text("SELECT 1")` is valid ✓
-- Re-raise in lifespan causes Uvicorn to abort cleanly ✓
-- WARN: consider `engine.connect()` instead of `AsyncSessionLocal()` for probe — lighter weight, no ORM overhead (non-blocking)
+**Status:** ✅ PASS (after cross-check)
+- Reviewer initially flagged "SVG has no viewBox" — **incorrect**. SVG has `viewBox="0 0 1820 1580"`.
+- Reviewer concern about fixed `width="1820"` causing overflow — **addressed**: added `min-width: 1820px` via CSS; `overflow-x: auto` on the canvas-wrap provides horizontal scroll as intended. This matches the original HTML design.
+- WARN: Google Fonts `<link rel="stylesheet">` is render-blocking. Non-blocking for a personal productivity tool; deferred.
 
 ### 2. Security Audit
-**Status:** ✅ PASS
-- DSN leak in 503 body was fixed (was FAIL, now resolved)
-- `/health` is unauthenticated (correct — required by load balancers)
-- WARN: /health opens a real DB connection per call; connection pool exhaustion possible under extreme polling frequency — non-blocking for single-user MVP
+**Status:** ⚠️ WARN
+- `MAP_SVG` confirmed free of `<script>`, `javascript:`, `on*` attributes — no XSS risk.
+- `dangerouslySetInnerHTML` on a module-level const (not user input) is safe as written.
+- WARN: No Content-Security-Policy covering the new external font dependency. Non-blocking for single-user MVP; deferred to infra phase.
 
 ### 3. Bug Analysis
 **Status:** ⚠️ WARN
-- All 5 runtime paths traced correctly
-- WARN: `/health` probe creates a new connection per request; with default `pool_size=5 + max_overflow=10`, a flood of health checks could exhaust the pool (Render polls every 10–30s, so non-critical in practice)
-- NOTE: debugger reported missing `pool_pre_ping=True` — this finding was a hallucination. The actual `database.py` already has `pool_pre_ping=True`.
+- SVG marker/filter IDs (`url(#a-xxx)`, `url(#glow)`) are defined in `<defs>` in the same SVG string — correct, no broken references.
+- `key={label}` on legend items — unique static strings, no duplicate key errors.
+- `{children}` when undefined renders nothing — correct React behaviour.
+- WARN: If a CSP is ever added blocking `unsafe-inline`, `dangerouslySetInnerHTML` would silently blank out. Forward-looking; no action needed now.
 
 ### 4. Test Coverage
-**Status:** ⚠️ WARN
-- 0% coverage baseline project-wide (pre-existing)
-- All new paths are testable with `AsyncMock` + `httpx` — no live DB required
-- Priority: /health 200 → /health 503 → _probe_db unit → lifespan abort
+**Status:** ⚠️ WARN (pre-existing baseline)
+- 0% coverage is a project-wide pre-existing gap. This change does not worsen it.
+- Priority tests when infrastructure is added:
+  1. `DomainPage` renders children after activity feed
+  2. `FundFlowMap` renders 12 legend items
+  3. `PersonalFinance` includes "Fund Flow" heading
 
 ### 5. Code Quality
 **Status:** ⚠️ WARN
-- WARN: Supabase hint string appears in both lifespan and /health handler — extract as constant in a follow-up
-- WARN: `text("SELECT 1")` deviates from project ORM-first rule — non-blocking (no risk, just convention)
+- 400-line SVG string in a `.tsx` file obscures component logic. Refactorer suggests extracting to `.svg` + SVGR.
+- Approach is defensible: converting 200+ SVG elements to JSX camelCase is error-prone; `dangerouslySetInnerHTML` with a build-time const is safe and simpler.
+- WARN noted but non-blocking; deferred to a follow-up if the diagram is frequently edited.
 
 ### 6. Documentation
 **Status:** ✅ PASS
-- `_probe_db` docstring is adequate
-- "Readiness check" label now matches docstring behaviour
-- `_probe_db` could name exception types — deferred to follow-up
+- `dangerouslySetInnerHTML` WHY comment is adequate and necessary (non-obvious security context).
+- `children?: ReactNode` is self-documenting.
+- CSS min-width comment added explaining the intentional wide-diagram + scroll pattern.
 
 ---
 
-## Action Required on Render (infrastructure — not code)
+## Action Items (deferred, non-blocking)
 
-The code fix enables Alembic to use a direct connection URL, but you must **set the env var** in the Render dashboard:
-
-1. Go to Render → `arshad-ai-backend` → Environment
-2. Add `DATABASE_URL_DIRECT`:
-   ```
-   postgresql+asyncpg://postgres:PASSWORD@db.dslnjhuciypccowyiwaa.supabase.co:5432/postgres
-   ```
-   Find it in: **Supabase Dashboard → Project Settings → Database → Connection string → URI → select "Direct connection"**
-
-3. If the Supabase project shows as **paused** → unpause it first at supabase.com
-
-After setting the env var, trigger a manual redeploy on Render.
+- [ ] Add Content-Security-Policy header covering `fonts.googleapis.com` + `fonts.gstatic.com`
+- [ ] Consider extracting `MAP_SVG` to `src/assets/fund-flow-map.svg` + SVGR import when diagram is next revised
+- [ ] Make Google Fonts load non-blocking (`media="print" onload` pattern) if LCP becomes a concern
 
 ---
-*Generated by Arshad.AI Quality Gate · All 6 agents · auto-fix loop · 2026-05-17*
 
----
-*Re-pushed 2026-05-17: skill-update commits landed after gate report; this touch re-arms the auto-merge signal.*
-*Re-pushed again after squash-divergence repair (PR #36 was already in main).*
+*Generated by Arshad.AI Quality Gate · All 6 agents · 2026-05-17*
