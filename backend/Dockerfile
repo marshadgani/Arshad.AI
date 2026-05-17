@@ -1,6 +1,5 @@
 FROM python:3.12-slim
 
-# render-deploy probe — touched 2026-04-25 to confirm auto-deploy fires.
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
 
 WORKDIR /app
@@ -18,9 +17,9 @@ COPY --chown=app:app scripts/ ./scripts/
 USER app
 EXPOSE 8000
 
-# --reload is enabled in docker-compose for local dev; production runs without it.
-# Migrations run on every container start so Render free tier (no Pre-Deploy
-# Command available) still gets a migrated DB. alembic upgrade is idempotent —
-# already-applied revisions are skipped. Seed is idempotent (UPSERT) but
-# non-fatal — if it fails (e.g., transient DB hiccup) we still serve traffic.
-CMD ["sh", "-c", "alembic upgrade head && (python -m scripts.seed_from_mock || echo '[startup] seed skipped/failed — non-fatal') && exec uvicorn src.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Render runs migrations via preDeployCommand before the container goes live.
+# docker-compose overrides this CMD with its own `command:` (db-init handles migrations).
+# alembic here is a fallback only — non-fatal so uvicorn starts even if it fails
+# (e.g. DATABASE_URL points to the Supabase transaction pooler which rejects DDL).
+# Set DATABASE_URL_DIRECT on Render to the direct db.*.supabase.co:5432 URL.
+CMD ["sh", "-c", "(alembic upgrade head || echo '[startup] WARN: alembic failed — set DATABASE_URL_DIRECT on Render; preDeployCommand should have run migrations') && (python -m scripts.seed_from_mock || echo '[startup] seed skipped/failed — non-fatal') && exec uvicorn src.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
