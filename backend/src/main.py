@@ -137,7 +137,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     )
 
 
-@app.get("/health", summary="Liveness probe")
+@app.get("/health", summary="Readiness check")
 async def health():
     """Readiness probe — verifies the database is reachable.
 
@@ -148,13 +148,16 @@ async def health():
     try:
         await _probe_db()
     except Exception as exc:
+        # Log full exception server-side (visible in Render logs) but never
+        # expose DSN details — asyncpg exceptions embed connection strings.
+        _log.warning("Health probe: database unreachable — %s", exc)
         return JSONResponse(
             status_code=503,
             content={
                 "status": "unhealthy",
                 "detail": (
-                    "Database unreachable. If using Supabase, check the project "
-                    f"is not paused at supabase.com. Error: {str(exc)[:200]}"
+                    "Database unreachable. "
+                    "If using Supabase, check supabase.com — project may be paused."
                 ),
             },
         )
