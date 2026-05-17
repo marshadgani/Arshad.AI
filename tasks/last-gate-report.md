@@ -2,7 +2,7 @@
 
 **PR:** fix/supabase-migration-direct-url → claude/ai-personal-assistant-main
 **Branch:** `fix/supabase-migration-direct-url` → `claude/ai-personal-assistant-main`
-**Triggered by:** "Fix it and merge to main using pr gate standard protocol"
+**Triggered by:** "Fix this issue" — asyncpg ENOTFOUND tenant/user error
 **Date:** 2026-05-17
 
 ---
@@ -11,92 +11,104 @@
 
 | # | Gate | Agent | Result | Critical | Warnings |
 |---|---|---|---|---|---|
-| 1 | Code Review | code-reviewer | ⚠️ WARN | 0 | 2 |
+| 1 | Code Review | code-reviewer | ✅ PASS | 0 | 1 |
 | 2 | Security Audit | security-auditor | ✅ PASS | 0 | 1 |
-| 3 | Bug Analysis | debugger | ✅ PASS | 0 | 1 |
+| 3 | Bug Analysis | debugger | ⚠️ WARN | 0 | 1 |
 | 4 | Test Coverage | test-writer | ⚠️ WARN | 0 | 1 |
-| 5 | Code Quality | refactorer | ✅ PASS | 0 | 1 |
-| 6 | Documentation | doc-writer | ⚠️ WARN | 0 | 3 |
+| 5 | Code Quality | refactorer | ⚠️ WARN | 0 | 2 |
+| 6 | Documentation | doc-writer | ✅ PASS | 0 | 1 |
 
 ## Overall Verdict
 
 ### ⚠️ GATE PASSED WITH WARNINGS — Ready for merge
 
-Zero FAIL gates. Zero Critical issues. Warnings are documentation quality and the pre-existing 0% test coverage baseline — none block this change.
+Zero FAIL gates after auto-fix loop. Zero Critical issues. Remaining warnings are
+non-blocking: test coverage is pre-existing 0% baseline; other warnings are
+documentation/quality improvements deferred to a follow-up.
 
 ---
 
 ## What This Fix Does
 
-**Root cause:** `alembic/env.py` always used `DATABASE_URL` for migrations. On Render, `DATABASE_URL` points to Supabase's transaction pooler (Supavisor, port 6543). Supavisor rejects DDL statements (CREATE TABLE, ALTER TABLE) with:
+### Root cause
+`asyncpg.exceptions.InternalServerError: (ENOTFOUND) tenant/user postgres.PROJECT_REF not found`
 
-```
-asyncpg.exceptions.InternalServerError: (ENOTFOUND) tenant/user postgres.PROJECT_REF not found
-```
+Two compounding problems:
+1. `alembic/env.py` used `DATABASE_URL` for migrations — Supabase's transaction pooler
+   (port 6543) rejects DDL statements with this error. Blocked every Render deploy.
+2. `/health` returned 200 unconditionally — Render thought the service was healthy even
+   when every DB-using request was failing with the same error.
 
-This blocked every Render deploy at the `preDeployCommand: "alembic upgrade head"` step.
+### Changes (5 files)
+| File | What changed |
+|---|---|
+| `backend/alembic/env.py` | Reads `DATABASE_URL_DIRECT` first (direct Postgres, port 5432), falls back to `DATABASE_URL`. Alembic migrations now bypass Supavisor. |
+| `backend/src/main.py` | Startup probe: `_probe_db()` runs before accepting traffic — fails fast with actionable log message. `/health` returns 503 when DB is unreachable. DSN removed from 503 response body (security fix). Label corrected to "Readiness check". |
+| `render.yaml` | Declares `DATABASE_URL_DIRECT` env var (`sync: false`, set manually). |
+| `backend/.env.example` | Documents `DATABASE_URL_DIRECT` with example Supabase direct URL. |
+| `tasks/last-gate-report.md` | This file. |
 
-**Fix:** Alembic now reads `DATABASE_URL_DIRECT` first (expected: direct Supabase URL on port 5432, bypassing Supavisor entirely), falling back to `DATABASE_URL` if unset. Local docker-compose needs no changes — the fallback fires automatically.
-
-**Files changed (3):**
-1. `backend/alembic/env.py` — reads `DATABASE_URL_DIRECT || DATABASE_URL`; improved error message names both vars
-2. `render.yaml` — declares `DATABASE_URL_DIRECT` env var (`sync: false`, set manually in Render dashboard)
-3. `backend/.env.example` — documents `DATABASE_URL_DIRECT` with example URL format and usage instructions
+### Gate auto-fix loop (2 iterations)
+- **Iter 1:** code-reviewer flagged DSN leak in `/health` 503 body + liveness/readiness label mismatch
+- **Fix applied:** replaced `str(exc)[:200]` with static message + server-side log; changed `summary` to "Readiness check"
+- **Iter 2:** all gates pass
 
 ---
 
 ## Detailed Findings
 
-### 1. Code Review (code-reviewer)
-**Status:** ⚠️ WARN
-- Error message now correctly names both vars (fixed in this run)
-- `.env.example` could note that `asyncpg` scheme prefix is handled automatically by `env.py` — non-blocking, informational only
-
-### 2. Security Audit (security-auditor)
+### 1. Code Review
 **Status:** ✅ PASS
-- No hardcoded secrets; `DATABASE_URL_DIRECT` follows same pattern as `DATABASE_URL`
-- `sync: false` is correct — credentials must be entered manually in Render, never synced from repo
-- `or` fallback is safe; empty string `""` correctly falls through to `DATABASE_URL`
-- WARN: `DATABASE_URL_DIRECT` likely carries DDL-capable credentials (higher blast radius than the pooled URL) — ensure it is never logged or echoed in CI output
+- `async with AsyncSessionLocal()` properly closes on error ✓
+- `text("SELECT 1")` is valid ✓
+- Re-raise in lifespan causes Uvicorn to abort cleanly ✓
+- WARN: consider `engine.connect()` instead of `AsyncSessionLocal()` for probe — lighter weight, no ORM overhead (non-blocking)
 
-### 3. Bug Analysis (debugger)
-**Status:** ✅ PASS — all 5 runtime paths traced correctly:
-- No `DATABASE_URL_DIRECT`, pooler `DATABASE_URL` → same behaviour as before (pooler error, intentional fallback)
-- `DATABASE_URL_DIRECT` = direct port-5432 URL → bypasses pooler, migrations run cleanly ✓
-- `DATABASE_URL_DIRECT` = `""` (empty) → falsy, falls back to `DATABASE_URL` ✓
-- Both unset → `RuntimeError` with clear message ✓
-- `DATABASE_URL_DIRECT` is wrong URL → asyncpg connection error, deploy blocked ✓
+### 2. Security Audit
+**Status:** ✅ PASS
+- DSN leak in 503 body was fixed (was FAIL, now resolved)
+- `/health` is unauthenticated (correct — required by load balancers)
+- WARN: /health opens a real DB connection per call; connection pool exhaustion possible under extreme polling frequency — non-blocking for single-user MVP
 
-### 4. Test Coverage (test-writer)
+### 3. Bug Analysis
+**Status:** ⚠️ WARN
+- All 5 runtime paths traced correctly
+- WARN: `/health` probe creates a new connection per request; with default `pool_size=5 + max_overflow=10`, a flood of health checks could exhaust the pool (Render polls every 10–30s, so non-critical in practice)
+- NOTE: debugger reported missing `pool_pre_ping=True` — this finding was a hallucination. The actual `database.py` already has `pool_pre_ping=True`.
+
+### 4. Test Coverage
 **Status:** ⚠️ WARN
 - 0% coverage baseline project-wide (pre-existing)
-- This change introduces a two-branch env-var path; neither branch is tested
-- Logic is fully testable with `monkeypatch.setenv` without a live DB
-- Not blocking — consistent with existing baseline
+- All new paths are testable with `AsyncMock` + `httpx` — no live DB required
+- Priority: /health 200 → /health 503 → _probe_db unit → lifespan abort
 
-### 5. Code Quality (refactorer)
-**Status:** ✅ PASS
-- `os.getenv("A") or os.getenv("B")` is idiomatic Python for env var fallback
-- Comment explains the WHY (DDL, port numbers, platform names, fallback behaviour)
-- No duplication introduced
-
-### 6. Documentation (doc-writer)
+### 5. Code Quality
 **Status:** ⚠️ WARN
-- `.env.example` could mention session pooler (port 5454) for Render as an alternative to direct
-- `env.py` comment could explain WHY Render sometimes needs session pooler vs direct
-- `render.yaml` `sync: false` has no explanatory comment — minor
-- All non-blocking; core documentation is clear and accurate
+- WARN: Supabase hint string appears in both lifespan and /health handler — extract as constant in a follow-up
+- WARN: `text("SELECT 1")` deviates from project ORM-first rule — non-blocking (no risk, just convention)
+
+### 6. Documentation
+**Status:** ✅ PASS
+- `_probe_db` docstring is adequate
+- "Readiness check" label now matches docstring behaviour
+- `_probe_db` could name exception types — deferred to follow-up
 
 ---
 
-## Action Items
+## Action Required on Render (infrastructure — not code)
 
-- [ ] Set `DATABASE_URL_DIRECT` in Render dashboard → use the **direct** Supabase URL:
-  `postgresql+asyncpg://postgres:PASSWORD@db.PROJECT_REF.supabase.co:5432/postgres`
-  (find this in Supabase Dashboard → Project Settings → Database → Connection string → URI, select "Direct connection")
-- [ ] If Supabase project is paused (free tier pauses after 1 week idle) → unpause it at supabase.com first
-- [ ] Ensure `DATABASE_URL_DIRECT` is never printed in Render build logs (it contains a high-privilege credential)
-- [ ] When test infrastructure is established, add a `monkeypatch` test for the two-branch env fallback in `alembic/env.py`
+The code fix enables Alembic to use a direct connection URL, but you must **set the env var** in the Render dashboard:
+
+1. Go to Render → `arshad-ai-backend` → Environment
+2. Add `DATABASE_URL_DIRECT`:
+   ```
+   postgresql+asyncpg://postgres:PASSWORD@db.dslnjhuciypccowyiwaa.supabase.co:5432/postgres
+   ```
+   Find it in: **Supabase Dashboard → Project Settings → Database → Connection string → URI → select "Direct connection"**
+
+3. If the Supabase project shows as **paused** → unpause it first at supabase.com
+
+After setting the env var, trigger a manual redeploy on Render.
 
 ---
-*Generated by Arshad.AI Quality Gate · All 6 agents · 2026-05-17*
+*Generated by Arshad.AI Quality Gate · All 6 agents · auto-fix loop · 2026-05-17*
