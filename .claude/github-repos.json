@@ -1352,7 +1352,7 @@
     "web-asset-generator": {
       "url": "https://github.com/alonw0/web-asset-generator.git",
       "name": "web-asset-generator",
-      "last_fetched": "2026-05-01 12:32 UTC",
+      "last_fetched": "2026-05-17 20:49 UTC",
       "components": {
         "skills": [
           "web-asset-generator"
@@ -1366,7 +1366,7 @@
     "-eep--esearch-skills": {
       "url": "https://github.com/Weizhena/Deep-Research-skills.git",
       "name": "Deep-Research-skills",
-      "last_fetched": "2026-05-01 12:32 UTC",
+      "last_fetched": "2026-05-17 20:49 UTC",
       "components": {
         "skills": [
           "research",
@@ -1411,7 +1411,7 @@
     "andrej-karpathy-skills": {
       "url": "https://github.com/forrestchang/andrej-karpathy-skills.git",
       "name": "andrej-karpathy-skills",
-      "last_fetched": "2026-05-01 12:32 UTC",
+      "last_fetched": "2026-05-17 20:49 UTC",
       "components": {
         "skills": [
           "karpathy-guidelines"
@@ -1425,13 +1425,14 @@
     "gstack": {
       "url": "https://github.com/garrytan/gstack.git",
       "name": "gstack",
-      "last_fetched": "2026-05-02 10:30 UTC",
+      "last_fetched": "2026-05-17 20:49 UTC",
       "components": {
         "skills": [
           "setup-deploy",
           "document-release",
           "gstack-upgrade",
           "plan-devex-review",
+          "sync-gbrain",
           "hackernews-frontpage",
           "land-and-deploy",
           "codex",
@@ -1457,6 +1458,7 @@
           "qa-only",
           "ship",
           "canary",
+          "document-generate",
           "design-html",
           "health",
           "careful",
