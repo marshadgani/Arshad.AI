@@ -7,12 +7,14 @@ import src.integrations  # noqa: F401 — package __init__ triggers @register si
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
 from src.agents.routers import router as agents_router
 from src.api.v1.chat import router as chat_router
 from src.api.v1.dashboard import router as dashboard_router
 from src.api.v1.domains import router as domains_router
 from src.auth.routers import router as auth_router
 from src.middleware.cache import close_redis
+from src.models.database import AsyncSessionLocal
 from src.services import queue_worker
 from src.tools.routers import router as tools_router
 
@@ -24,8 +26,8 @@ _log = logging.getLogger(__name__)
 SECRET_KEY = os.getenv("SECRET_KEY")
 if not SECRET_KEY or SECRET_KEY == "change-me":
     raise RuntimeError(
-        "SECRET_KEY must be set to a non-default value. "
-        "Generate one with: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
+        "SECRET_KEY must be set to a non-default value. Generate one with: "
+        "python -c 'import secrets; print(secrets.token_urlsafe(32))'"
     )
 
 CORS_ORIGINS = [
@@ -35,8 +37,30 @@ CORS_ORIGINS = [
 ]
 
 
+async def _probe_db() -> None:
+    """Verify the database is reachable. Raises on any connection failure."""
+    async with AsyncSessionLocal() as session:
+        await session.execute(text("SELECT 1"))
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Fail fast if the database is unreachable so Render marks the service
+    # unhealthy immediately rather than letting every request explode.
+    # Common cause: Supabase free-tier project paused (supabase.com → resume),
+    # or DATABASE_URL pointing at a pooler that rejects the connection.
+    try:
+        await _probe_db()
+        _log.info("Database connectivity: OK")
+    except Exception as exc:
+        _log.critical(
+            "Database unreachable at startup — service will not handle requests. "
+            "If using Supabase, check the project is not paused at supabase.com. "
+            "Error: %s",
+            exc,
+        )
+        raise
+
     # Phase F: optional in-process queue worker. Gated on
     # ENABLE_INPROCESS_WORKER=true so docker-compose-Airflow setups don't
     # double-process; SELECT...FOR UPDATE SKIP LOCKED makes simultaneous
@@ -115,6 +139,25 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 
 @app.get("/health", summary="Liveness probe")
 async def health():
+    """Readiness probe — verifies the database is reachable.
+
+    Render routes traffic based on this endpoint. Returning 200 while the DB
+    is down causes every subsequent request to 500; verifying here surfaces
+    the outage immediately in Render's dashboard and stops routing.
+    """
+    try:
+        await _probe_db()
+    except Exception as exc:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "unhealthy",
+                "detail": (
+                    "Database unreachable. If using Supabase, check the project "
+                    f"is not paused at supabase.com. Error: {str(exc)[:200]}"
+                ),
+            },
+        )
     return {"status": "ok"}
 
 
