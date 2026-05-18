@@ -1,4 +1,5 @@
 import os
+import uuid
 from datetime import datetime
 
 from sqlalchemy import func
@@ -8,29 +9,28 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise RuntimeError(
-        "DATABASE_URL is not set. Copy backend/.env.example to backend/.env and fill it in."
+        "DATABASE_URL is not set. "
+        "Copy backend/.env.example to backend/.env and fill it in."
     )
 
-# Always disable asyncpg's server-side prepared-statement cache.
+# Supabase's transaction pooler (Supavisor, port 6543) keeps stale named
+# prepared statements on backend connections between logical sessions.
+# asyncpg's default counter-based names (__asyncpg_stmt_N__) start at 0 on
+# every new connection object, so a new connection hitting the same backend
+# tries to PREPARE __asyncpg_stmt_5__ that already exists
+# → DuplicatePreparedStatementError.
 #
-# When DATABASE_URL points at any pgbouncer-style pooler in transaction or
-# statement mode (Supabase pooler, RDS Proxy, custom pgbouncer, Neon's pooler
-# endpoint), asyncpg's auto-prepared statements collide: the named statement
-# `__asyncpg_stmt_N__` is registered on one upstream connection but a
-# subsequent query in the same logical session lands on a different upstream
-# connection that already has its own statement N — DuplicatePreparedStatement,
-# 5xx, app down. The earlier substring check (pooler.supabase.com|pgbouncer)
-# missed prod URLs that pool without those tokens (e.g. RDS Proxy hosts).
-#
-# Disabling the cache costs one parse per query (dominated by network RTT) and
-# eliminates the failure mode regardless of how the URL is shaped. Direct
-# (non-pooled) connections work fine without prepared-statement caching.
+# Fix: generate UUID-based names so no two prepared statements across any
+# number of connections can ever share a name.  statement_cache_size=0 still
+# disables caching (each statement is deallocated after use); the UUID prefix
+# makes the one-per-query names globally unique so stale leftovers on the
+# backend never collide with fresh ones.
 _engine_kwargs: dict = {
     "echo": False,
     "pool_pre_ping": True,
     "connect_args": {
         "statement_cache_size": 0,
-        "prepared_statement_cache_size": 0,
+        "prepared_statement_name_func": lambda _: f"__asyncpg_{uuid.uuid4().hex}__",
     },
 }
 

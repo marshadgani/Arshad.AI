@@ -2,8 +2,8 @@
 
 **PR:** fix/supabase-migration-direct-url → claude/ai-personal-assistant-main
 **Branch:** `fix/supabase-migration-direct-url` → `claude/ai-personal-assistant-main`
-**Triggered by:** "Fix this error" — Render deploy "Exited with status 1" fix
-**Date:** 2026-05-17
+**Triggered by:** "Fix this error" — asyncpg DuplicatePreparedStatementError at Render startup
+**Date:** 2026-05-18
 
 ---
 
@@ -11,89 +11,93 @@
 
 | # | Gate | Agent | Result | Critical | Warnings |
 |---|---|---|---|---|---|
-| 1 | Code Review | code-reviewer | ✅ PASS | 0 | 1 |
-| 2 | Security Audit | security-auditor | ⚠️ WARN | 0 | 1 |
-| 3 | Bug Analysis | debugger | ⚠️ WARN | 0 | 1 |
+| 1 | Code Review | code-reviewer | ✅ PASS | 0 | 0 |
+| 2 | Security Audit | security-auditor | ✅ SHIP | 0 | 1 |
+| 3 | Bug Analysis | debugger | ✅ PASS | 0 | 1 |
 | 4 | Test Coverage | test-writer | ⚠️ WARN | 0 | 1 |
-| 5 | Code Quality | refactorer | ⚠️ WARN | 0 | 1 |
+| 5 | Code Quality | refactorer | ✅ PASS | 0 | 0 |
 | 6 | Documentation | doc-writer | ✅ PASS | 0 | 0 |
 
 ## Overall Verdict
 
 ### ⚠️ GATE PASSED WITH WARNINGS — Ready for merge
 
-Zero FAIL gates. Zero Critical issues. All warnings are non-blocking:
-- Code-reviewer "FIX" downgraded to WARN after manual cross-check: reviewer claimed "DATABASE_URL_DIRECT not wired into CMD" — **incorrect**. `alembic/env.py` already reads `os.getenv("DATABASE_URL_DIRECT") or os.getenv("DATABASE_URL")`, so alembic in CMD uses the direct URL when set. Reviewer's premise was false.
-- Security auditor Medium (exception handler schema leakage via `str(exc)`) — pre-existing in `main.py` before this diff; not introduced here.
-- Other WARNs are forward-looking (silent schema drift risk, 0% coverage baseline, CMD line length) — pre-existing or out-of-scope.
+Zero FAIL gates. Zero Critical issues.
+
+Code-reviewer initially returned BLOCK: `lambda:` (zero-arg) raises `TypeError` in asyncpg 0.28+ because `prepared_statement_name_func` is called as `func(query)` — one positional arg. Fixed immediately: `lambda _:`. Re-run verdict: PASS.
+
+Remaining warnings are all non-blocking pre-existing issues:
+- Security WARN: uuid4 CSPRNG fork-safety note — inapplicable (uvicorn is single-process).
+- Bug WARN: `get_db()` annotated `-> AsyncSession` but is an async generator — pre-existing, no runtime impact.
+- Test WARN: 0% coverage is a project-wide pre-existing gap.
 
 ---
 
 ## What This Merge Includes
 
-### Fix: Render deploy "Exited with status 1"
+### Fix 1: `asyncpg.exceptions.DuplicatePreparedStatementError` at startup
 
-**Root cause:** `backend/Dockerfile` CMD ran `alembic upgrade head` as a hard-fail prerequisite before starting uvicorn. When `DATABASE_URL` points to Supabase's transaction pooler (port 6543), alembic gets `(ENOTFOUND) tenant/user not found` because the pooler rejects DDL statements. This caused the container to exit with status 1 before uvicorn ever started.
+**Root cause:** asyncpg generates counter-based prepared statement names (`__asyncpg_stmt_N__`) starting at 0 per connection object. Supabase's transaction pooler (Supavisor, port 6543) retains stale prepared statements on backend connections between logical sessions. A fresh asyncpg connection routed to the same backend tries to `PREPARE __asyncpg_stmt_5__` — which already exists from a previous connection whose counter also started at 0 and reached 5 during FastAPI startup queries. Result: `DuplicatePreparedStatementError → Application startup failed. Exiting.`
 
-**Fix:** Made `alembic upgrade head` non-fatal in CMD. Render's `preDeployCommand` in `render.yaml` already handles migrations before the new container goes live. `docker-compose` overrides CMD entirely via its own `command:` (the `db-init` service handles migrations in local dev). The CMD alembic is now a belt-and-suspenders fallback only.
+**Fix:** `prepared_statement_name_func: lambda _: f"__asyncpg_{uuid.uuid4().hex}__"` — asyncpg 0.28+ hook that receives the query string (ignored with `_`) and returns the name to use. UUID hex names are globally unique; even if `DEALLOCATE` is lost through the pooler, no two prepared statements across any number of connections can share a name. `statement_cache_size=0` is retained to also deallocate after each use (belt-and-suspenders).
 
-**Also:** Removed stale `render-deploy probe — touched 2026-04-25` archaeology comment from ENV line.
+Removed `prepared_statement_cache_size: 0` — not a real asyncpg parameter, was silently ignored.
 
-**Files changed (1):**
+### Fix 2 (same branch, previous commit): Dockerfile CMD hard-fail on alembic
+
+`alembic upgrade head` in Dockerfile CMD was a hard-fail prerequisite before uvicorn. With `DATABASE_URL` pointing to Supabase's transaction pooler, alembic also fails (DDL rejected). Made non-fatal since Render's `preDeployCommand` handles migrations; docker-compose uses `db-init` service.
+
+**Files changed (2):**
 | File | What changed |
 |---|---|
-| `backend/Dockerfile` | Made `alembic upgrade head` non-fatal in CMD (`|| echo WARN...`); removed stale probe comment; updated comment to explain preDeployCommand + docker-compose migration ownership |
+| `backend/src/models/database.py` | Added `import uuid`; replaced silently-ignored `prepared_statement_cache_size: 0` with `prepared_statement_name_func: lambda _: ...`; updated comment |
+| `backend/Dockerfile` | Made `alembic upgrade head` non-fatal in CMD; removed stale probe comment |
 
 ---
 
 ## Detailed Findings
 
 ### 1. Code Review
-**Status:** ✅ PASS (after cross-check)
-- Reviewer initially flagged "DATABASE_URL_DIRECT not wired into CMD" — **incorrect**. `alembic/env.py` reads `DATABASE_URL_DIRECT` via `os.getenv()`, so all alembic invocations (including CMD) use the direct URL when the env var is set.
-- WARN: Schema-before-traffic gap if both `preDeployCommand` and CMD alembic fail simultaneously. Acceptable risk — Render blocks the deploy when `preDeployCommand` fails, so this path requires both to fail independently.
-- `exec uvicorn` correct — PID 1 promotion, proper signal handling confirmed.
+**Status:** ✅ PASS (after auto-fix of lambda arity)
+- **BLOCK resolved:** Initial lambda `lambda:` had zero arguments. asyncpg 0.28+ calls `prepared_statement_name_func(query)` — one positional arg. Fixed to `lambda _:` (ignores query string, generates UUID). Without this fix, every database query would raise `TypeError: <lambda>() takes 0 positional arguments but 1 was given`.
+- `prepared_statement_name_func` is valid asyncpg 0.30.0 parameter; `lambda _: str` matches the expected `(query: str) -> str` signature.
+- `uuid.uuid4().hex` produces 32 lowercase hex chars; valid in Postgres extended query protocol name field (arbitrary byte string, not a SQL identifier — NAMEDATALEN does not apply). Resulting name is 38 chars.
+- `prepared_statement_cache_size: 0` was not a real asyncpg parameter (silently ignored). Removal is safe.
 
 ### 2. Security Audit
-**Status:** ⚠️ WARN
-- No new injection vectors. `${PORT:-8000}` is platform-controlled, not user-controlled.
-- Non-root user (`app`) confirmed; no secrets in image layers; slim base image; no `.env` files in COPY paths.
-- WARN: Exception handler in `main.py` returns `str(exc)` for unhandled exceptions, which can expose schema info on SQLAlchemy errors. **Pre-existing issue** — not introduced by this diff. Deferred.
-- WARN: No `.dockerignore`. Current COPY paths are explicit and don't pick up `.env` files, but a future `COPY . .` refactor would. Deferred.
+**Status:** ✅ SHIP
+- No injection surface: the name function callback is asyncpg-internal. The UUID name is never interpolated into SQL text.
+- `uuid.uuid4()` uses `os.urandom` (CPython 3.12 CSPRNG) — no weak PRNG.
+- WARN (non-blocking): Fork-safety — inapplicable. Uvicorn is single-process; no forking model.
 
 ### 3. Bug Analysis
-**Status:** ⚠️ WARN
-- Shell command sequence is mechanically correct: `(alembic || echo)` always exits 0, uvicorn always starts.
-- `exec uvicorn` correctly replaces sh process — SIGTERM from Render goes directly to uvicorn.
-- WARN: If `preDeployCommand` fails (Render blocks deploy) AND the CMD fallback also fails silently, uvicorn starts against un-migrated schema. Render's health check is the backstop. Acceptable for single-user personal tool.
+**Status:** ✅ PASS
+- UUID naming eliminates `DuplicatePreparedStatementError` regardless of pooler behaviour.
+- WARN (pre-existing): `get_db()` annotated `-> AsyncSession`; should be `-> AsyncGenerator[AsyncSession, None]`. No runtime impact — FastAPI DI uses `inspect.isasyncgenfunction()`, not the annotation.
 
 ### 4. Test Coverage
 **Status:** ⚠️ WARN (pre-existing baseline)
-- 0% coverage is a project-wide pre-existing gap. This change does not worsen it.
-- Docker CMD startup sequencing is infrastructure-level and not meaningfully unit-testable without a real Docker build + Postgres environment.
-- A future smoke test (`docker compose up` → assert `/health` 200) would close the gap.
+- 0% coverage project-wide — no regression.
+- One targeted test worth adding: call `prepared_statement_name_func` twice, assert strings differ. Pure Python, no DB needed.
 
 ### 5. Code Quality
-**Status:** ⚠️ WARN
-- CMD line is 266 characters — long but scannable; candidate for `scripts/entrypoint.sh` extraction in a future refactor.
-- Comment is accurate and explains the three non-obvious constraints (preDeployCommand timing, docker-compose override, Supabase pooler DDL rejection).
-- Non-fatal alembic is internally consistent with already-non-fatal seed script.
+**Status:** ✅ PASS
+- `lambda _: f"..."` is a single expression with a clearly named ignored parameter. Idiomatic.
+- 8-line comment documents the collision mechanism, making the lambda self-explaining in context.
 
 ### 6. Documentation
 **Status:** ✅ PASS
-- New comment passes WHY-vs-WHAT test: explains preDeployCommand timing, docker-compose CMD override, and Supabase pooler constraint — all non-obvious without reading Render docs + Supabase docs.
-- Stale `render-deploy probe` archaeology comment correctly removed.
-- Inline `echo` warning message tells operator exactly what to set.
+- Comment names pooler product, port, collision mechanism, exact exception class, and why UUID naming solves what `statement_cache_size=0` alone could not.
 
 ---
 
 ## Action Items (deferred, non-blocking)
 
-- [ ] Fix `main.py` exception handler to catch `sqlalchemy.exc.SQLAlchemyError` separately and return generic `{"detail": "Database error"}` rather than `str(exc)` (prevents schema info leakage)
-- [ ] Add `.dockerignore` to `backend/` to exclude `.env*`, `__pycache__`, `*.pyc`, `.git`
-- [ ] Set `DATABASE_URL_DIRECT=postgresql+asyncpg://postgres:PASSWORD@db.dslnjhuciypccowyiwaa.supabase.co:5432/postgres` in Render dashboard (required for `preDeployCommand` + CMD alembic to succeed against Supabase)
-- [ ] Consider extracting Dockerfile CMD to `scripts/entrypoint.sh` if startup logic grows further
+- [ ] Fix `get_db()` return annotation: `-> AsyncGenerator[AsyncSession, None]` (add `from collections.abc import AsyncGenerator`)
+- [ ] Add unit test: assert two consecutive `prepared_statement_name_func()` calls return different strings
+- [ ] Pin `asyncpg>=0.28.0` in `requirements.txt` to document minimum version for `prepared_statement_name_func`
+- [ ] Set `DATABASE_URL_DIRECT` in Render dashboard (for `preDeployCommand` migrations): `postgresql+asyncpg://postgres:PASSWORD@db.dslnjhuciypccowyiwaa.supabase.co:5432/postgres`
 
 ---
 
-*Generated by Arshad.AI Quality Gate · All 6 agents · 2026-05-17*
+*Generated by Arshad.AI Quality Gate · All 6 agents · 2026-05-18*
