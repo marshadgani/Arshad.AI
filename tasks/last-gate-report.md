@@ -2,7 +2,7 @@
 
 **PR:** fix/supabase-migration-direct-url → claude/ai-personal-assistant-main
 **Branch:** `fix/supabase-migration-direct-url` → `claude/ai-personal-assistant-main`
-**Triggered by:** "Fix this error" — asyncpg DuplicatePreparedStatementError at Render startup
+**Triggered by:** "Fix this error" — asyncpg DuplicatePreparedStatementError (persistent, second occurrence)
 **Date:** 2026-05-18
 
 ---
@@ -12,8 +12,8 @@
 | # | Gate | Agent | Result | Critical | Warnings |
 |---|---|---|---|---|---|
 | 1 | Code Review | code-reviewer | ✅ PASS | 0 | 0 |
-| 2 | Security Audit | security-auditor | ✅ SHIP | 0 | 1 |
-| 3 | Bug Analysis | debugger | ✅ PASS | 0 | 1 |
+| 2 | Security Audit | security-auditor | ✅ PASS | 0 | 1 |
+| 3 | Bug Analysis | debugger | ⚠️ WARN | 0 | 1 |
 | 4 | Test Coverage | test-writer | ⚠️ WARN | 0 | 1 |
 | 5 | Code Quality | refactorer | ✅ PASS | 0 | 0 |
 | 6 | Documentation | doc-writer | ✅ PASS | 0 | 0 |
@@ -24,79 +24,87 @@
 
 Zero FAIL gates. Zero Critical issues.
 
-Code-reviewer initially returned BLOCK: `lambda:` (zero-arg) raises `TypeError` in asyncpg 0.28+ because `prepared_statement_name_func` is called as `func(query)` — one positional arg. Fixed immediately: `lambda _:`. Re-run verdict: PASS.
+Code-reviewer initial FIX (missing `get_db` return annotation) resolved: added `from collections.abc import AsyncGenerator` and changed signature to `-> AsyncGenerator[AsyncSession, None]`.
 
-Remaining warnings are all non-blocking pre-existing issues:
-- Security WARN: uuid4 CSPRNG fork-safety note — inapplicable (uvicorn is single-process).
-- Bug WARN: `get_db()` annotated `-> AsyncSession` but is an async generator — pre-existing, no runtime impact.
+Remaining warnings are non-blocking:
+- Security WARN: no validation that `DATABASE_URL_DIRECT` doesn't accidentally point to the pooler. User-education issue, not a code defect.
+- Bug WARN: same as security — no port-validation guard. Acceptable for a personal tool; a wrong URL produces an obvious startup error.
 - Test WARN: 0% coverage is a project-wide pre-existing gap.
 
 ---
 
 ## What This Merge Includes
 
-### Fix 1: `asyncpg.exceptions.DuplicatePreparedStatementError` at startup
+### Fix: `asyncpg.exceptions.DuplicatePreparedStatementError` (definitive)
 
-**Root cause:** asyncpg generates counter-based prepared statement names (`__asyncpg_stmt_N__`) starting at 0 per connection object. Supabase's transaction pooler (Supavisor, port 6543) retains stale prepared statements on backend connections between logical sessions. A fresh asyncpg connection routed to the same backend tries to `PREPARE __asyncpg_stmt_5__` — which already exists from a previous connection whose counter also started at 0 and reached 5 during FastAPI startup queries. Result: `DuplicatePreparedStatementError → Application startup failed. Exiting.`
+**Why previous attempts failed:**
+- `statement_cache_size=0` — disables asyncpg's LRU cache but asyncpg still creates named prepared statements. With Supavisor in transaction mode, PREPARE and DEALLOCATE route to different backends, so stale statements accumulate on the backend and collide with counter-based names from the next connection object (counter resets to 0 per connection).
+- `prepared_statement_name_func` — only a parameter of `asyncpg.create_pool()`, **not** `asyncpg.connect()`. SQLAlchemy uses `asyncpg.connect()`, so the parameter was silently ignored. The error still showed `__asyncpg_stmt_5__` (counter-based, not UUID), confirming it was not applied.
 
-**Fix:** `prepared_statement_name_func: lambda _: f"__asyncpg_{uuid.uuid4().hex}__"` — asyncpg 0.28+ hook that receives the query string (ignored with `_`) and returns the name to use. UUID hex names are globally unique; even if `DEALLOCATE` is lost through the pooler, no two prepared statements across any number of connections can share a name. `statement_cache_size=0` is retained to also deallocate after each use (belt-and-suspenders).
+**Root fix:** use `DATABASE_URL_DIRECT` (direct Postgres, port 5432, no pooler) for the engine. Same `DATABASE_URL_DIRECT || DATABASE_URL` pattern already used in `alembic/env.py`. When the user sets `DATABASE_URL_DIRECT` on Render to `postgresql+asyncpg://postgres:PASSWORD@db.PROJECT_REF.supabase.co:5432/postgres`, all prepared statement conflicts disappear because SQLAlchemy's own connection pool connects directly to Postgres — no pooler intermediary.
 
-Removed `prepared_statement_cache_size: 0` — not a real asyncpg parameter, was silently ignored.
-
-### Fix 2 (same branch, previous commit): Dockerfile CMD hard-fail on alembic
-
-`alembic upgrade head` in Dockerfile CMD was a hard-fail prerequisite before uvicorn. With `DATABASE_URL` pointing to Supabase's transaction pooler, alembic also fails (DDL rejected). Made non-fatal since Render's `preDeployCommand` handles migrations; docker-compose uses `db-init` service.
+**Also fixed:** `get_db()` return annotation corrected from `-> AsyncSession` (wrong — it's an async generator) to `-> AsyncGenerator[AsyncSession, None]`.
 
 **Files changed (2):**
 | File | What changed |
 |---|---|
-| `backend/src/models/database.py` | Added `import uuid`; replaced silently-ignored `prepared_statement_cache_size: 0` with `prepared_statement_name_func: lambda _: ...`; updated comment |
-| `backend/Dockerfile` | Made `alembic upgrade head` non-fatal in CMD; removed stale probe comment |
+| `backend/src/models/database.py` | Engine now uses `DATABASE_URL_DIRECT \|\| DATABASE_URL`; removed `prepared_statement_name_func` (wrong API); fixed `get_db` return annotation; updated comment explaining pooler incompatibility |
+| `backend/.env.example` | `DATABASE_URL_DIRECT` comment updated to clarify it's needed for both the application engine AND Alembic migrations |
 
 ---
 
 ## Detailed Findings
 
 ### 1. Code Review
-**Status:** ✅ PASS (after auto-fix of lambda arity)
-- **BLOCK resolved:** Initial lambda `lambda:` had zero arguments. asyncpg 0.28+ calls `prepared_statement_name_func(query)` — one positional arg. Fixed to `lambda _:` (ignores query string, generates UUID). Without this fix, every database query would raise `TypeError: <lambda>() takes 0 positional arguments but 1 was given`.
-- `prepared_statement_name_func` is valid asyncpg 0.30.0 parameter; `lambda _: str` matches the expected `(query: str) -> str` signature.
-- `uuid.uuid4().hex` produces 32 lowercase hex chars; valid in Postgres extended query protocol name field (arbitrary byte string, not a SQL identifier — NAMEDATALEN does not apply). Resulting name is 38 chars.
-- `prepared_statement_cache_size: 0` was not a real asyncpg parameter (silently ignored). Removal is safe.
+**Status:** ✅ PASS (after fix applied)
+- Initial FIX: `get_db()` return annotation `-> AsyncSession` is wrong (it's an async generator). Fixed to `-> AsyncGenerator[AsyncSession, None]` with `from collections.abc import AsyncGenerator` import.
+- `os.getenv("DATABASE_URL_DIRECT") or os.getenv("DATABASE_URL")` fallback is correct: `None` and `""` are both falsy, so empty-string `DATABASE_URL_DIRECT` correctly falls back.
+- `RuntimeError` guard fires before `create_async_engine` so the failure is explicit and actionable.
+- `statement_cache_size=0` retained as secondary safeguard — correct even on direct connections.
 
 ### 2. Security Audit
-**Status:** ✅ SHIP
-- No injection surface: the name function callback is asyncpg-internal. The UUID name is never interpolated into SQL text.
-- `uuid.uuid4()` uses `os.urandom` (CPython 3.12 CSPRNG) — no weak PRNG.
-- WARN (non-blocking): Fork-safety — inapplicable. Uvicorn is single-process; no forking model.
+**Status:** ✅ PASS
+- No new attack surface. `DATABASE_URL_DIRECT` follows the same secret-in-env-var pattern as `DATABASE_URL`.
+- Error message in `RuntimeError` does not expose the URL value (just the variable name).
+- WARN: no code-level validation that the resolved URL targets port 5432 vs the pooler. Acceptable — a wrong URL produces a clear asyncpg connection error at startup.
 
 ### 3. Bug Analysis
-**Status:** ✅ PASS
-- UUID naming eliminates `DuplicatePreparedStatementError` regardless of pooler behaviour.
-- WARN (pre-existing): `get_db()` annotated `-> AsyncSession`; should be `-> AsyncGenerator[AsyncSession, None]`. No runtime impact — FastAPI DI uses `inspect.isasyncgenfunction()`, not the annotation.
+**Status:** ⚠️ WARN
+- URL-priority logic is correct and handles all env var states.
+- WARN: if a user sets `DATABASE_URL_DIRECT` to the pooler URL (port 6543) by mistake, the error is identical to the original. No guard distinguishes. Acceptable for a personal tool — the `.env.example` comment is the mitigation.
 
 ### 4. Test Coverage
 **Status:** ⚠️ WARN (pre-existing baseline)
 - 0% coverage project-wide — no regression.
-- One targeted test worth adding: call `prepared_statement_name_func` twice, assert strings differ. Pure Python, no DB needed.
+- Two unit tests worth adding: (a) both vars set → engine uses `DATABASE_URL_DIRECT`; (b) only `DATABASE_URL` set → fallback used. Cheap with `pytest` + `monkeypatch`.
 
 ### 5. Code Quality
 **Status:** ✅ PASS
-- `lambda _: f"..."` is a single expression with a clearly named ignored parameter. Idiomatic.
-- 8-line comment documents the collision mechanism, making the lambda self-explaining in context.
+- `_db_url = os.getenv(...) or os.getenv(...)` is idiomatic and readable.
+- No duplication with `alembic/env.py` — same pattern, different module.
+- `uuid` import removed (was from the failed `prepared_statement_name_func` approach).
 
 ### 6. Documentation
 **Status:** ✅ PASS
-- Comment names pooler product, port, collision mechanism, exact exception class, and why UUID naming solves what `statement_cache_size=0` alone could not.
+- Comment explains the pooler incompatibility mechanism (PREPARE/DEALLOCATE routing to different backends), why `statement_cache_size=0` alone is insufficient, and what `DATABASE_URL_DIRECT` must point to.
+- `.env.example` updated to clarify the env var is needed for both the app engine and Alembic.
+
+---
+
+## Action Required (user — not code)
+
+**Set `DATABASE_URL_DIRECT` on Render** (`arshad-ai-backend` → Environment):
+```
+DATABASE_URL_DIRECT = postgresql+asyncpg://postgres:YOUR_PASSWORD@db.dslnjhuciypccowyiwaa.supabase.co:5432/postgres
+```
+This is the Supabase **direct** URL — host `db.PROJECT_REF.supabase.co`, port **5432** (not 6543). Without this, `DATABASE_URL` (the pooler URL) is still used and the error persists.
 
 ---
 
 ## Action Items (deferred, non-blocking)
 
-- [ ] Fix `get_db()` return annotation: `-> AsyncGenerator[AsyncSession, None]` (add `from collections.abc import AsyncGenerator`)
-- [ ] Add unit test: assert two consecutive `prepared_statement_name_func()` calls return different strings
-- [ ] Pin `asyncpg>=0.28.0` in `requirements.txt` to document minimum version for `prepared_statement_name_func`
-- [ ] Set `DATABASE_URL_DIRECT` in Render dashboard (for `preDeployCommand` migrations): `postgresql+asyncpg://postgres:PASSWORD@db.dslnjhuciypccowyiwaa.supabase.co:5432/postgres`
+- [ ] Add two unit tests for the URL-priority fallback logic
+- [ ] Pin `asyncpg>=0.28.0` in `requirements.txt` (documents minimum version for `statement_cache_size` support)
 
 ---
 
