@@ -89,12 +89,21 @@ def ask_claude_for_fix(logs: str, source_context: str) -> list[dict]:
     """
     Call Claude API with the error logs and source files.
     Returns a list of file fixes: [{"path": "...", "content": "..."}]
+    Returns None if ANTHROPIC_API_KEY is not configured.
     """
-    client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    if not api_key:
+        log("  ⚠️ ANTHROPIC_API_KEY not set — skipping AI fix, logging only.")
+        return None  # type: ignore[return-value]
 
-    prompt = f"""You are a senior backend engineer debugging a production deployment failure.
+    client = anthropic.Anthropic(api_key=api_key)
 
-The Render service health check is failing. Here are the recent logs:
+    system_prompt = (
+        "You are a senior backend engineer debugging a production deployment failure. "
+        "You give minimal, precise fixes — never refactor beyond what is needed to restore the service."
+    )
+
+    user_prompt = f"""The Render service health check is failing. Here are the recent logs:
 
 <logs>
 {logs}
@@ -120,7 +129,7 @@ Example format:
   }}
 ]
 
-If no code change can fix this (e.g. it's a missing env var or external service issue),
+If no code change can fix this (e.g. it is a missing env var or external service issue),
 return an empty array [] and I will alert the developer.
 
 Return ONLY the JSON array — no explanation, no markdown wrapping."""
@@ -129,12 +138,24 @@ Return ONLY the JSON array — no explanation, no markdown wrapping."""
     message = client.messages.create(
         model="claude-opus-4-7",
         max_tokens=8096,
-        messages=[{"role": "user", "content": prompt}],
+        system=[
+            {
+                "type": "text",
+                "text": system_prompt,
+                # Cache the system prompt — source files are large and reused across attempts
+                "cache_control": {"type": "ephemeral"},
+            }
+        ],
+        messages=[{"role": "user", "content": user_prompt}],
+    )
+
+    log(
+        f"  Tokens used — input: {message.usage.input_tokens}, output: {message.usage.output_tokens}"
     )
 
     raw = message.content[0].text.strip()
 
-    # Strip markdown code fences if Claude wrapped in them
+    # Strip markdown code fences if Claude wrapped the response
     if raw.startswith("```"):
         raw = raw.split("```")[1]
         if raw.startswith("json"):
