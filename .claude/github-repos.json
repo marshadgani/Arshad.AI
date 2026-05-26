@@ -6,28 +6,30 @@
     "superpowers": {
       "url": "https://github.com/obra/superpowers.git",
       "name": "superpowers",
-      "type": "skills",
-      "last_fetched": "2026-04-25",
+      "last_fetched": "2026-05-26 05:59 UTC",
       "components": {
         "skills": [
+          "using-superpowers",
+          "subagent-driven-development",
           "brainstorming",
-          "dispatching-parallel-agents",
+          "writing-plans",
           "executing-plans",
-          "finishing-a-development-branch",
           "receiving-code-review",
           "requesting-code-review",
-          "subagent-driven-development",
-          "systematic-debugging",
-          "test-driven-development",
-          "using-git-worktrees",
-          "using-superpowers",
+          "writing-skills",
+          "dispatching-parallel-agents",
           "verification-before-completion",
-          "writing-plans",
-          "writing-skills"
+          "using-git-worktrees",
+          "finishing-a-development-branch",
+          "test-driven-development",
+          "systematic-debugging"
         ],
         "agents": [],
         "commands": [],
-        "hooks": []
+        "hooks": [],
+        "token_optimization": [
+          "testing.md"
+        ]
       }
     },
     "ui-ux-pro-max": {
@@ -239,7 +241,7 @@
     "ui-ux-pro-max-skill": {
       "url": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git",
       "name": "ui-ux-pro-max-skill",
-      "last_fetched": "2026-04-25 09:33 UTC",
+      "last_fetched": "2026-05-26 05:59 UTC",
       "components": {
         "skills": [
           "banner-design",
