@@ -16,7 +16,7 @@ import os
 import secrets
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -156,8 +156,7 @@ async def me(user: User = Depends(get_current_user)) -> dict:
 @router.post(
     "/logout",
     status_code=status.HTTP_204_NO_CONTENT,
-    response_class=Response,
     summary="Logout (no-op server-side)",
 )
-async def logout() -> Response:
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+async def logout() -> None:
+    return None

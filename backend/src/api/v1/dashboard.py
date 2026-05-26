@@ -81,46 +81,7 @@ async def list_tasks(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/events", summary="Events across calendars")
-async def list_events(
-    db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
-):
-    """Calendar events.
-
-    Reads from Phase F's ``ingested_calendar_events`` (real Google Calendar
-    rows, populated by the calendar_ingestor DAG). Falls back to Phase A's
-    seeded ``events`` table only when the user has no ingested rows yet —
-    so the UI never shows blank for a fresh sign-in.
-    """
-    from src.models.ingested import IngestedCalendarEvent
-
-    rows = (
-        (
-            await db.execute(
-                select(IngestedCalendarEvent)
-                .where(IngestedCalendarEvent.user_id == user.id)
-                .order_by(IngestedCalendarEvent.occurred_at.desc())
-                .limit(50)
-            )
-        )
-        .scalars()
-        .all()
-    )
-    if rows:
-        items = [
-            {
-                "id": str(r.id),
-                "title": (r.raw or {}).get("summary") or "(no title)",
-                "start": r.occurred_at.isoformat() if r.occurred_at else None,
-                "end": (r.raw or {}).get("end", {}).get("dateTime"),
-                "calendar": (r.raw or {}).get("organizer", {}).get("email", ""),
-                "location": (r.raw or {}).get("location"),
-                "source": "ingested",
-            }
-            for r in rows
-        ]
-        return {"data": items, "total": len(items)}
-    # No ingested rows yet — fall back to seed data so the dashboard isn't blank.
+async def list_events(db: AsyncSession = Depends(get_db)):
     items = (await db.execute(select(m.Event).order_by(m.Event.id))).scalars().all()
     return _collection(items, s.EventResponse)
 

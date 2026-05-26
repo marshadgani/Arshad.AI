@@ -9,9 +9,8 @@ asyncpg==0.30.0
 redis==5.2.1
 anthropic==0.42.0
 python-dotenv==1.0.1
-pydantic[email]==2.10.4
+pydantic==2.10.4
 pydantic-settings==2.7.1
-email-validator==2.2.0
 alembic==1.14.0
 httpx==0.28.1
 

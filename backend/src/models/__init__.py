@@ -2,15 +2,5 @@
 with ``Base.metadata`` so Alembic autogenerate sees them.
 """
 
-from . import (  # noqa: F401
-    conversation,
-    dag_trigger,
-    dashboard,
-    domain,
-    ingested,
-    integration,
-    oauth_account,
-    oauth_token,
-    user,
-)
+from . import dashboard, domain, oauth_account, oauth_token, user  # noqa: F401
 from .database import AsyncSessionLocal, Base, engine, get_db  # noqa: F401

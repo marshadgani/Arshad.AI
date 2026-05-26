@@ -1,19 +1,10 @@
 """Google OAuth2 provider.
 
-Scopes (Phase H-widened):
+Scopes (Phase C-locked):
     openid email profile
     https://www.googleapis.com/auth/calendar.events
     https://www.googleapis.com/auth/gmail.modify
     https://www.googleapis.com/auth/gmail.send
-    https://www.googleapis.com/auth/drive.metadata.readonly       (Phase H)
-    https://www.googleapis.com/auth/tasks                         (Phase H)
-    https://www.googleapis.com/auth/youtube.readonly              (Phase H)
-
-Existing logged-in users have a pre-Phase-H scope set on their stored token,
-so Drive/Tasks/YouTube tools will 403 on first call. The integrations
-status reporter detects this and surfaces "Re-auth required" — the user
-logs out + back in to grant the widened scope set. Refresh tokens persist
-across the re-consent because of access_type=offline + prompt=consent.
 
 Refresh tokens require access_type=offline + prompt=consent on the auth URL.
 Without prompt=consent, Google only returns a refresh token on the FIRST
@@ -40,9 +31,6 @@ _SCOPES = [
     "https://www.googleapis.com/auth/calendar.events",
     "https://www.googleapis.com/auth/gmail.modify",
     "https://www.googleapis.com/auth/gmail.send",
-    "https://www.googleapis.com/auth/drive.metadata.readonly",
-    "https://www.googleapis.com/auth/tasks",
-    "https://www.googleapis.com/auth/youtube.readonly",
 ]
 
 

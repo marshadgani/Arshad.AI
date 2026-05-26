@@ -21,16 +21,15 @@ from src.models.database import Base  # noqa: E402
 
 config = context.config
 
-# Migrations must never run through Supabase's transaction pooler (port 6543)
-# because DDL statements require a real session-level connection.  Set
-# DATABASE_URL_DIRECT to the direct URL (port 5432, host db.REF.supabase.co)
-# or session pooler (port 5454) on Render.  Falls back to DATABASE_URL so
-# local docker-compose requires no extra config.
+# Prefer DATABASE_URL_DIRECT (bypasses Supabase/PgBouncer transaction pooler) for
+# migrations. Supabase's transaction pooler rejects the SET commands and advisory
+# locks Alembic uses during DDL — DuplicatePreparedStatement / lock errors result.
+# Falls back to DATABASE_URL for local dev and non-pooled environments.
 database_url = os.getenv("DATABASE_URL_DIRECT") or os.getenv("DATABASE_URL")
 if not database_url:
     raise RuntimeError(
         "Neither DATABASE_URL_DIRECT nor DATABASE_URL is set. "
-        "Copy backend/.env.example to backend/.env and fill in at least DATABASE_URL."
+        "Copy backend/.env.example to backend/.env and fill in DATABASE_URL."
     )
 config.set_main_option("sqlalchemy.url", database_url)
 
@@ -52,20 +51,10 @@ def do_run_migrations(connection: Connection) -> None:
 
 
 async def run_async_migrations() -> None:
-    section = config.get_section(config.config_ini_section, {})
-    # Supabase/pgbouncer compat — match the runtime engine config in
-    # backend/src/models/database.py.
-    connect_args: dict = {}
-    if "pooler.supabase.com" in database_url or "pgbouncer" in database_url:
-        connect_args = {
-            "statement_cache_size": 0,
-            "prepared_statement_cache_size": 0,
-        }
     connectable = async_engine_from_config(
-        section,
+        config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
-        connect_args=connect_args,
     )
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)
