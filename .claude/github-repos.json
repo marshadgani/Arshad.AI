@@ -270,15 +270,15 @@
     "awesome-claude-code": {
       "url": "https://github.com/hesreallyhim/awesome-claude-code.git",
       "name": "awesome-claude-code",
-      "type": "commands",
-      "last_fetched": "2026-04-25",
+      "last_fetched": "2026-05-26 05:59 UTC",
       "components": {
         "skills": [],
         "agents": [],
         "commands": [
           "evaluate-repository"
         ],
-        "hooks": []
+        "hooks": [],
+        "token_optimization": []
       }
     },
     "context7": {
