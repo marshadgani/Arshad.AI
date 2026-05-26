@@ -1,17 +1,32 @@
 import os
+from collections.abc import AsyncGenerator
 from datetime import datetime
 
 from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-DATABASE_URL = os.getenv("DATABASE_URL")
+# Prefer DATABASE_URL_DIRECT (bypasses Supabase/PgBouncer transaction pooler).
+# asyncpg's prepared-statement LRU cache collides across pooler connections —
+# the pooler routes PREPARE and EXECUTE to different Postgres backends, so the
+# named statement is unknown on the backend that receives EXECUTE.
+# Disabling statement_cache_size eliminates those DuplicatePreparedStatementError
+# crashes. Falls back to DATABASE_URL for local dev and non-pooled environments.
+DATABASE_URL = os.getenv("DATABASE_URL_DIRECT") or os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise RuntimeError(
-        "DATABASE_URL is not set. Copy backend/.env.example to backend/.env and fill it in."
+        "Neither DATABASE_URL_DIRECT nor DATABASE_URL is set. "
+        "Copy backend/.env.example to backend/.env and fill in DATABASE_URL."
     )
 
-engine = create_async_engine(DATABASE_URL, echo=False, pool_pre_ping=True)
+engine = create_async_engine(
+    DATABASE_URL,
+    echo=False,
+    pool_pre_ping=True,
+    connect_args={
+        "statement_cache_size": 0
+    },  # required when routed through Supabase/PgBouncer
+)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 
@@ -34,7 +49,7 @@ class TimestampedMixin:
     )
 
 
-async def get_db() -> AsyncSession:
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as session:
         try:
             yield session
