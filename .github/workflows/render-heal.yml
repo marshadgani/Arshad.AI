@@ -1,0 +1,71 @@
+name: Render Self-Healing Deploy Monitor
+
+# Triggers after every push to the production branch (the one Render deploys from).
+# Waits for Render to finish deploying, checks the health endpoint,
+# and if the service is down it fetches logs, asks Claude to fix the code,
+# commits the fix, and re-deploys. Loops up to 3 times.
+
+on:
+  push:
+    branches:
+      - claude/ai-personal-assistant-main
+
+permissions:
+  contents: write
+
+jobs:
+  heal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+      RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+      RENDER_HEALTH_URL: ${{ secrets.RENDER_HEALTH_URL }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      MAX_HEAL_ATTEMPTS: 3
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install anthropic httpx
+
+      - name: Wait for Render deploy to complete
+        id: wait_deploy
+        run: |
+          echo "⏳ Waiting for Render deploy to complete..."
+          python3 scripts/render_wait_deploy.py
+        env:
+          RENDER_API_KEY: ${{ env.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ env.RENDER_SERVICE_ID }}
+
+      - name: Self-healing loop
+        id: heal_loop
+        run: |
+          python3 scripts/render_heal.py
+        env:
+          RENDER_API_KEY: ${{ env.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ env.RENDER_SERVICE_ID }}
+          RENDER_HEALTH_URL: ${{ env.RENDER_HEALTH_URL }}
+          ANTHROPIC_API_KEY: ${{ env.ANTHROPIC_API_KEY }}
+          MAX_HEAL_ATTEMPTS: ${{ env.MAX_HEAL_ATTEMPTS }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+
+      - name: Report final status
+        if: always()
+        run: |
+          echo "## Render Self-Heal Summary" >> $GITHUB_STEP_SUMMARY
+          if [ -f /tmp/heal_summary.md ]; then
+            cat /tmp/heal_summary.md >> $GITHUB_STEP_SUMMARY
+          fi

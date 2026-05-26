@@ -117,3 +117,29 @@ Interactive Swagger UI at http://localhost:8000/docs when backend is running.
 
 ## Airflow UI
 Dashboard at http://localhost:8080 — login: `admin` / `admin`.
+
+## Self-Healing Render Deploy Pipeline
+
+The `.github/workflows/render-heal.yml` workflow runs automatically after every push to `claude/ai-personal-assistant-main`. It:
+
+1. Waits for Render to finish deploying (`scripts/render_wait_deploy.py`)
+2. Checks the service health endpoint
+3. If unhealthy: fetches Render logs, calls Claude to diagnose and patch the code, commits the fix, and triggers a new deploy
+4. Loops up to 3 times before giving up and failing the workflow
+
+### Required GitHub Secrets
+
+Add these in **Settings → Secrets and variables → Actions → Repository secrets**:
+
+| Secret | Description |
+|---|---|
+| `RENDER_API_KEY` | Render API key — [dashboard.render.com/u/settings](https://dashboard.render.com/u/settings) |
+| `RENDER_SERVICE_ID` | Render service ID (e.g. `srv-d7m9kub7uimc73cq9afg`) — found in the service URL |
+| `RENDER_HEALTH_URL` | Full URL of your backend health endpoint (e.g. `https://your-service.onrender.com/health`) |
+| `ANTHROPIC_API_KEY` | Claude API key — optional; without it the pipeline logs but skips AI-assisted fixes |
+
+### Security Notes
+
+- Claude may only modify files in the `CONTEXT_FILES` allowlist in `scripts/render_heal.py`
+- Log content is XML-escaped before being sent to Claude to prevent prompt injection
+- The GitHub token is never written to `.git/config`
