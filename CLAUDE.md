@@ -9,27 +9,45 @@
 > Every new feature, every non-trivial change, goes through the dev-team pipeline.
 > No exceptions. No shortcuts. No writing code directly.
 
-### The Rule
+### Auto-Trigger — No command needed
 
-**Whenever Arshad asks to build, add, create, implement, or develop any feature:**
+**Arshad will NEVER type `/dev-team`. He gives prompts directly.**
 
-1. **Use the dev-team orchestrator** — not the planner, not direct code writing
-2. **Trigger:** `/dev-team <requirement>` or `Task(subagent_type="dev-team-orchestrator", prompt=<requirement>)`
-3. **The orchestrator controls everything** — 17 specialist agents run in sequence automatically
-4. **You (Claude) do not write feature code directly** — the agents do
+**You must analyse every prompt and decide: is this a development request?**
+If yes → immediately invoke the dev-team orchestrator with his prompt. Do NOT ask for confirmation. Do NOT write code yourself. Just dispatch.
 
-### When to use the dev-team pipeline
+```
+Task(subagent_type="dev-team-orchestrator", prompt=<arshad's exact prompt>)
+```
 
-| Use dev-team pipeline | Write code directly |
+### Trigger Detection — Read the intent, not the words
+
+Route to dev-team orchestrator when the prompt contains ANY of these intents:
+
+| Intent | Example prompts |
 |---|---|
-| New feature (any size) | Single-line bug fix |
-| New API endpoint | Config value change |
-| New UI component or page | Rename / move file |
-| Database schema change | Typo correction |
-| New integration / service | Adding a single import |
-| Refactor spanning 2+ files | Hotfix with < 5 lines changed |
+| Build something new | "Add a dark mode", "Create a settings page", "I want users to be able to…" |
+| Implement a feature | "Implement real-time notifications", "Build the chat interface" |
+| Add functionality | "Add search to the sidebar", "Let me filter by date" |
+| Create an endpoint | "I need an API for…", "Expose a route that…" |
+| New UI / component | "Design a dashboard widget", "Build a modal for…" |
+| Schema / data change | "Store user preferences", "Track conversation history" |
+| Integration | "Connect to Google Calendar", "Add GitHub webhook support" |
+| Refactor (multi-file) | "Clean up the auth flow", "Restructure the agent system" |
 
-**When in doubt → use the pipeline.**
+### Do NOT route to dev-team — handle directly
+
+| Situation | Handle as |
+|---|---|
+| Single-line bug fix | Direct edit |
+| Config / env var change | Direct edit |
+| Rename / move file | Direct edit |
+| Typo / comment fix | Direct edit |
+| Explanation / question | Answer directly |
+| Fixing a broken test | Direct debugger agent |
+| Deployment issue | Direct fix |
+
+**When in doubt → route to dev-team.**
 
 ### The 17-Agent Pipeline (19 Steps)
 
