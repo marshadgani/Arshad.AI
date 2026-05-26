@@ -3,6 +3,84 @@
 > This file is the single source of truth for Claude working on this project.
 > Read it fully at the start of every session before touching any code.
 
+## 🚨 DEVELOPMENT STRATEGY — READ THIS FIRST, EVERY SESSION
+
+> **This is the non-negotiable rule for ALL feature development on this project.**
+> Every new feature, every non-trivial change, goes through the dev-team pipeline.
+> No exceptions. No shortcuts. No writing code directly.
+
+### The Rule
+
+**Whenever Arshad asks to build, add, create, implement, or develop any feature:**
+
+1. **Use the dev-team orchestrator** — not the planner, not direct code writing
+2. **Trigger:** `/dev-team <requirement>` or `Task(subagent_type="dev-team-orchestrator", prompt=<requirement>)`
+3. **The orchestrator controls everything** — 17 specialist agents run in sequence automatically
+4. **You (Claude) do not write feature code directly** — the agents do
+
+### When to use the dev-team pipeline
+
+| Use dev-team pipeline | Write code directly |
+|---|---|
+| New feature (any size) | Single-line bug fix |
+| New API endpoint | Config value change |
+| New UI component or page | Rename / move file |
+| Database schema change | Typo correction |
+| New integration / service | Adding a single import |
+| Refactor spanning 2+ files | Hotfix with < 5 lines changed |
+
+**When in doubt → use the pipeline.**
+
+### The 17-Agent Pipeline (19 Steps)
+
+The orchestrator runs these agents in strict sequence. Every agent output feeds the next.
+
+| Stage | Agent | Model | What It Does |
+|---|---|---|---|
+| 1 | `business-analyst` | Haiku | Extracts requirements → RTM + BPDD |
+| 2 | `enterprise-architect` *(pre)* | Sonnet | Enterprise architecture review — rejects bad ideas before any code |
+| 2.5 | `ai-engineer` | **Opus** | Tech lead — challenges decisions, flags scaling risks, sets architecture direction SA must follow |
+| 3 | `solution-architect` | Sonnet | Produces Solution Design Document (SDD) constrained by Tech Lead |
+| 3.3 | `system-engineer` | **Opus** | Designs system architecture, component structure, data flow, DB schema, caching strategy |
+| 3.5 | `engineer` | Sonnet | Builds production-ready MVP from SDD + system design |
+| 4 | `developer` | Sonnet | Generates complete feature code |
+| 4.3 | `frontend-engineer` | Sonnet | Production-grade UI — all 4 states (loading/empty/error/content), accessible, responsive, reusable |
+| 4.5 | `senior-engineer` | **Opus** | Code quality audit — finds N+1, bad patterns, scalability risks. No functionality changes. |
+| 4.6 | `software-architect` | **Opus** | Architecture restructuring — separates concerns, reduces coupling, increases modularity |
+| 5 | `process-organiser` | Haiku | Logs feature in process hierarchy |
+| 6 | `test-script-writer` | Sonnet | Writes test scripts for every requirement |
+| 7 | `tester` | Sonnet | Executes tests, reports defects |
+| 8 | `bug-fixer` ↔ `tester` | Sonnet | Fix + re-test loop (max 5 iterations) |
+| 8.5 | `debugger` | **Opus** | Root cause analysis — production outage mode, 3 levels deep |
+| 8.6 | `performance-optimisation-engineer` | Sonnet | Eliminates bottlenecks — N+1, missing indexes, async gaps, memory leaks |
+| 8.7 | `security-auditor` | **Opus** | OWASP Top 10 — attack scenarios, secure implementation fixes |
+| 8.8 | `devops-engineer` | Sonnet | Deployment architecture, monitoring, scaling, production checklist |
+| 9 | `enterprise-architect` *(post)* | Sonnet | Final architectural verdict — always runs |
+
+**Orchestrator model: `claude-opus-4-7`** — it controls all 17 agents.
+
+### Model Tiers
+
+| Tier | Agents | Purpose |
+|---|---|---|
+| **Opus** (6 agents) | ai-engineer, system-engineer, senior-engineer, software-architect, debugger, security-auditor | Deep reasoning — architectural decisions, audits, root cause, security |
+| **Sonnet** (10 agents) | engineer, developer, frontend-engineer, perf-opt, devops, solution-architect, enterprise-architect, test-writer, tester, bug-fixer | Execution — code generation, testing, optimization |
+| **Haiku** (2 agents) | business-analyst, process-organiser | Simple extraction and formatting |
+
+### Three Invariants (never break these)
+
+1. **Code accumulates forward** — one `code` object from Step 3.5 onward; each agent improves it in-place
+2. **Steps 8.5 → 9 always run** — even if the bug-fix loop exhausted 5 iterations; code is always hardened, secured, and signed off
+3. **Path denylist is checked after every code-generating step** — forbidden file path = immediate pipeline halt
+
+### Agent files location
+
+All agent definitions live in `.claude/agents/dev-team/`:
+- `orchestrator.md` — the controlling agent
+- One `.md` file per specialist agent listed above
+
+---
+
 ## Auto-Trigger Rule — GitHub URLs
 
 **Whenever a GitHub URL (github.com/...) appears in a user prompt, automatically run `/fetch-github-repo <url>` on it.**
