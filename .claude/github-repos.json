@@ -55,21 +55,37 @@
     "claude-mem": {
       "url": "https://github.com/thedotmack/claude-mem.git",
       "name": "claude-mem",
-      "type": "skills",
-      "last_fetched": "2026-04-25",
+      "last_fetched": "2026-05-26 05:59 UTC",
       "components": {
         "skills": [
+          "weekly-digests",
+          "pathfinder",
+          "oh-my-issues",
+          "learn-codebase",
+          "smart-explore",
+          "mem-search",
+          "timeline-report",
+          "design-is",
+          "wowerpoint",
+          "make-plan",
+          "version-bump",
+          "how-it-works",
           "do",
+          "babysit",
           "knowledge-agent",
           "make-plan",
-          "mem-search",
-          "smart-explore",
-          "timeline-report",
-          "version-bump"
+          "do",
+          "openclaw"
         ],
         "agents": [],
-        "commands": [],
-        "hooks": []
+        "commands": [
+          "anti-pattern-czar"
+        ],
+        "hooks": [],
+        "token_optimization": [
+          "npx-distribution.md",
+          "CHANGELOG.md"
+        ]
       }
     },
     "obsidian-skills": {
