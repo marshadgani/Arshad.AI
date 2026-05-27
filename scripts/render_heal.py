@@ -32,12 +32,41 @@ SUMMARY_FILE = Path("/tmp/heal_summary.md")
 # Source files Claude will read when diagnosing.
 # IMPORTANT: apply_fixes() uses this as an allowlist — Claude may only modify
 # files in this list. Never allow paths outside this set.
+# Migration files (alembic/versions/*) are intentionally excluded — existing
+# migrations must never be edited; new ones must be generated via alembic CLI.
 CONTEXT_FILES = [
+    # Entry point & config
     "backend/src/main.py",
-    "backend/src/models/database.py",
-    "backend/alembic/env.py",
     "backend/requirements.txt",
     "backend/Dockerfile",
+    "backend/alembic.ini",
+    # Database
+    "backend/src/models/database.py",
+    "backend/src/models/__init__.py",
+    "backend/src/models/dashboard.py",
+    "backend/src/models/domain.py",
+    "backend/src/models/user.py",
+    "backend/src/models/oauth_account.py",
+    "backend/src/models/oauth_token.py",
+    # Alembic
+    "backend/alembic/env.py",
+    # API endpoints
+    "backend/src/api/v1/dashboard.py",
+    "backend/src/api/v1/domains.py",
+    # Schemas
+    "backend/src/schemas/dashboard.py",
+    "backend/src/schemas/domain.py",
+    # Middleware
+    "backend/src/middleware/cache.py",
+    # Auth
+    "backend/src/auth/dependencies.py",
+    "backend/src/auth/jwt.py",
+    "backend/src/auth/crypto.py",
+    "backend/src/auth/routers.py",
+    "backend/src/auth/service.py",
+    "backend/src/auth/providers/base.py",
+    "backend/src/auth/providers/github.py",
+    "backend/src/auth/providers/google.py",
 ]
 _ALLOWED_PATHS: frozenset[str] = frozenset(CONTEXT_FILES)
 
