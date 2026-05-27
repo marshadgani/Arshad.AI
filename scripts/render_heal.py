@@ -258,18 +258,61 @@ def apply_fixes(fixes: list[dict]) -> list[str]:
     return changed
 
 
-def get_current_deploy_id() -> str:
-    """Return the ID of the most recent Render deploy, or '' on any error."""
+def get_last_deploy_info() -> dict:
+    """Return the most recent deploy's full info dict, or {} on any error."""
     url = f"https://api.render.com/v1/services/{SERVICE_ID}/deploys?limit=1"
     try:
         r = httpx.get(url, headers=HEADERS, timeout=30)
         r.raise_for_status()
         deploys = r.json()
         if deploys:
-            return deploys[0]["deploy"].get("id", "")
+            return deploys[0]["deploy"]
+    except Exception:
+        pass
+    return {}
+
+
+def get_current_deploy_id() -> str:
+    """Return the ID of the most recent Render deploy, or '' on any error."""
+    return get_last_deploy_info().get("id", "")
+
+
+def fetch_deploy_logs(deploy_id: str) -> str:
+    """Try fetching build-phase logs for a specific deploy. Returns '' if unavailable.
+
+    Render's logs endpoint accepts a deployId query param that filters to build
+    output for that deploy — useful when a build failure leaves the old version
+    running (so service runtime logs show nothing wrong).
+    """
+    if not deploy_id:
+        return ""
+    url = f"https://api.render.com/v1/services/{SERVICE_ID}/logs?deployId={deploy_id}&limit=200"
+    try:
+        r = httpx.get(url, headers=HEADERS, timeout=30)
+        if r.status_code == 200:
+            entries = r.json()
+            if isinstance(entries, list) and entries:
+                return "\n".join(e.get("message", "") for e in entries)
     except Exception:
         pass
     return ""
+
+
+def get_recent_git_diff() -> str:
+    """Return the diff of the most recent backend commit, truncated to 3 KB.
+
+    Included in build-failure context so Claude can see what changed even when
+    build logs are unavailable via the Render API.
+    """
+    try:
+        diff = subprocess.check_output(
+            ["git", "diff", "HEAD~1", "HEAD", "--", "backend/"],
+            cwd=REPO_ROOT,
+            stderr=subprocess.DEVNULL,
+        ).decode("utf-8", errors="replace")
+        return diff[:3000] if diff else "(no backend diff in last commit)"
+    except Exception as e:
+        return f"(could not fetch git diff: {e})"
 
 
 def git_commit_and_push(changed_files: list[str], attempt: int) -> bool:
@@ -375,15 +418,33 @@ def main() -> None:
     """Orchestrate the self-healing loop: check health, diagnose, fix, redeploy."""
     append_summary("## 🔧 Render Self-Heal Log\n")
 
+    # Check deploy status first — a build/update failure leaves the OLD version
+    # running, so is_healthy() would return True even when new code is broken.
+    last_deploy = get_last_deploy_info()
+    deploy_status = last_deploy.get("status", "unknown")
+    deploy_failed = deploy_status in ("build_failed", "update_failed")
+
     # Initial health check
     log(f"\n🏥 Checking health: {HEALTH_URL}")
-    if is_healthy():
-        log("✅ Service is healthy. Nothing to do.")
+    healthy = is_healthy()
+
+    if healthy and not deploy_failed:
+        log("✅ Service is healthy and last deploy succeeded. Nothing to do.")
         append_summary("✅ **Service was healthy on first check — no action needed.**")
         sys.exit(0)
 
-    log("❌ Service is unhealthy. Starting self-heal loop...")
-    append_summary("❌ **Service unhealthy — starting self-heal loop.**\n")
+    if not healthy:
+        log("❌ Service is unhealthy. Starting self-heal loop...")
+        append_summary("❌ **Service unhealthy — starting self-heal loop.**\n")
+    else:
+        log(
+            f"🔨 Last deploy FAILED ({deploy_status}) — old version still running. "
+            "Starting fix loop to repair build..."
+        )
+        append_summary(
+            f"🔨 **Last deploy failed** (`{deploy_status}`) — service is still running the old "
+            "version but the new deploy is broken. Starting fix loop.\n"
+        )
 
     for attempt in range(1, MAX_ATTEMPTS + 1):
         log(f"\n{'=' * 60}")
@@ -391,9 +452,25 @@ def main() -> None:
         log(f"{'=' * 60}")
         append_summary(f"\n### Attempt {attempt}\n")
 
-        # 1. Fetch logs
+        # 1. Fetch logs.
+        # For build failures, service runtime logs are from the OLD version and won't
+        # contain the build error. Supplement with deploy-specific logs and the recent
+        # git diff so Claude can see what changed.
         log("  📋 Fetching Render logs...")
         logs = fetch_render_logs()
+        if deploy_failed:
+            deploy_id = last_deploy.get("id", "")
+            deploy_logs = fetch_deploy_logs(deploy_id)
+            diff_context = get_recent_git_diff()
+            logs = (
+                f"[DEPLOY STATUS: {deploy_status}]\n"
+                "[NOTE: The latest deploy failed at the build/update stage. The service is still "
+                "running the PREVIOUS version — runtime logs below may look healthy. "
+                "Focus on the deploy logs and recent git diff to diagnose the build failure.]\n\n"
+                f"=== Deploy/Build Logs ===\n{deploy_logs or '(unavailable)'}\n\n"
+                f"=== Recent Backend Diff ===\n{diff_context}\n\n"
+                f"=== Runtime Logs (from OLD version) ===\n{logs}"
+            )
         log(f"  Got {len(logs.splitlines())} log lines")
         append_summary(f"**Logs fetched:** {len(logs.splitlines())} lines\n")
 
@@ -437,15 +514,24 @@ def main() -> None:
         # 7. Wait for Render to redeploy
         wait_for_deploy(pre_push_deploy_id=pre_push_id)
 
-        # 8. Check health again
-        log(f"\n🏥 Re-checking health after attempt {attempt}...")
-        if is_healthy():
-            log(f"✅ Service is healthy after attempt {attempt}!")
+        # 8. Check health AND new deploy status.
+        # For build failures, health stays 200 (old version still running); we need to
+        # confirm the NEW deploy actually went live before declaring success.
+        log(f"\n🏥 Re-checking health and deploy status after attempt {attempt}...")
+        last_deploy = get_last_deploy_info()
+        deploy_status = last_deploy.get("status", "unknown")
+        deploy_failed = deploy_status in ("build_failed", "update_failed")
+
+        if is_healthy() and not deploy_failed:
+            log(f"✅ Service is healthy and deploy succeeded after attempt {attempt}!")
             append_summary(f"\n✅ **Service recovered after attempt {attempt}!**")
             sys.exit(0)
 
-        log(f"  Still unhealthy after attempt {attempt}.")
-        append_summary(f"❌ Still unhealthy after attempt {attempt}.\n")
+        if deploy_failed:
+            log(f"  Deploy still failing ({deploy_status}) after attempt {attempt}.")
+        else:
+            log(f"  Still unhealthy after attempt {attempt}.")
+        append_summary(f"❌ Still failing after attempt {attempt}.\n")
 
     # All attempts exhausted
     log(
