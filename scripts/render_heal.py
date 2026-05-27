@@ -35,6 +35,7 @@ SUMMARY_FILE = Path("/tmp/heal_summary.md")
 # Changes to these files must go through the normal git/human-review path.
 CONTEXT_READ_ONLY_FILES = [
     "backend/alembic.ini",
+    # Auth primitives — JWT signing, Fernet encryption, token issuance
     "backend/src/auth/crypto.py",
     "backend/src/auth/jwt.py",
     "backend/src/auth/service.py",
@@ -43,6 +44,11 @@ CONTEXT_READ_ONLY_FILES = [
     "backend/src/auth/providers/base.py",
     "backend/src/auth/providers/github.py",
     "backend/src/auth/providers/google.py",
+    # Security-principal models — store user credentials and encrypted OAuth tokens;
+    # schema changes here can silently break auth even if auth code is untouched
+    "backend/src/models/user.py",
+    "backend/src/models/oauth_account.py",
+    "backend/src/models/oauth_token.py",
 ]
 
 # Files Claude may both read AND overwrite via apply_fixes().
@@ -53,14 +59,11 @@ CONTEXT_FILES = [
     "backend/src/main.py",
     "backend/requirements.txt",
     "backend/Dockerfile",
-    # Database models
+    # Database models (non-security-critical only)
     "backend/src/models/database.py",
     "backend/src/models/__init__.py",
     "backend/src/models/dashboard.py",
     "backend/src/models/domain.py",
-    "backend/src/models/user.py",
-    "backend/src/models/oauth_account.py",
-    "backend/src/models/oauth_token.py",
     # Alembic runtime config
     "backend/alembic/env.py",
     # API endpoints
