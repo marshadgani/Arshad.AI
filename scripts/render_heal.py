@@ -29,15 +29,51 @@ HEADERS = {"Authorization": f"Bearer {RENDER_API_KEY}", "Accept": "application/j
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SUMMARY_FILE = Path("/tmp/heal_summary.md")
 
-# Source files Claude will read when diagnosing.
-# IMPORTANT: apply_fixes() uses this as an allowlist — Claude may only modify
-# files in this list. Never allow paths outside this set.
+# Files Claude reads for diagnostic context but may NEVER overwrite.
+# These are auth primitives and alembic config — root-of-trust files where
+# an autonomous bad write would silently disable auth or corrupt DB routing.
+# Changes to these files must go through the normal git/human-review path.
+CONTEXT_READ_ONLY_FILES = [
+    "backend/alembic.ini",
+    # Auth primitives — JWT signing, Fernet encryption, token issuance
+    "backend/src/auth/crypto.py",
+    "backend/src/auth/jwt.py",
+    "backend/src/auth/service.py",
+    "backend/src/auth/dependencies.py",
+    "backend/src/auth/routers.py",
+    "backend/src/auth/providers/base.py",
+    "backend/src/auth/providers/github.py",
+    "backend/src/auth/providers/google.py",
+    # Security-principal models — store user credentials and encrypted OAuth tokens;
+    # schema changes here can silently break auth even if auth code is untouched
+    "backend/src/models/user.py",
+    "backend/src/models/oauth_account.py",
+    "backend/src/models/oauth_token.py",
+]
+
+# Files Claude may both read AND overwrite via apply_fixes().
+# Migration files (alembic/versions/*) are intentionally excluded — existing
+# migrations must never be edited; new ones must be generated via alembic CLI.
 CONTEXT_FILES = [
+    # Entry point & config
     "backend/src/main.py",
-    "backend/src/models/database.py",
-    "backend/alembic/env.py",
     "backend/requirements.txt",
     "backend/Dockerfile",
+    # Database models (non-security-critical only)
+    "backend/src/models/database.py",
+    "backend/src/models/__init__.py",
+    "backend/src/models/dashboard.py",
+    "backend/src/models/domain.py",
+    # Alembic runtime config
+    "backend/alembic/env.py",
+    # API endpoints
+    "backend/src/api/v1/dashboard.py",
+    "backend/src/api/v1/domains.py",
+    # Schemas
+    "backend/src/schemas/dashboard.py",
+    "backend/src/schemas/domain.py",
+    # Middleware
+    "backend/src/middleware/cache.py",
 ]
 _ALLOWED_PATHS: frozenset[str] = frozenset(CONTEXT_FILES)
 
@@ -83,9 +119,9 @@ def fetch_render_logs(lines: int = 200) -> str:
 
 
 def read_source_files() -> str:
-    """Read relevant source files to give Claude context."""
+    """Read all context files for Claude — writable + read-only combined."""
     parts = []
-    for rel_path in CONTEXT_FILES:
+    for rel_path in CONTEXT_FILES + CONTEXT_READ_ONLY_FILES:
         full = REPO_ROOT / rel_path
         if full.exists():
             content = full.read_text(errors="replace")
@@ -135,7 +171,7 @@ Respond with ONLY a JSON array of file changes. Each item must have:
 - "path": relative path from repo root (e.g. "backend/src/main.py")
 - "content": the complete new file content (not a diff — full file)
 
-IMPORTANT: you may only suggest changes to these specific files:
+IMPORTANT: you may only suggest changes to these specific files (auth primitives and alembic config are read-only — diagnose issues in them but do not include them in your fix):
 {json.dumps(CONTEXT_FILES, indent=2)}
 
 Example format:
