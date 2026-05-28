@@ -1,14 +1,18 @@
 name: Render Self-Healing Deploy Monitor
 
-# Triggers after every push to the production branch (the one Render deploys from).
-# Waits for Render to finish deploying, checks the health endpoint,
-# and if the service is down it fetches logs, asks Claude to fix the code,
-# commits the fix, and re-deploys. Loops up to 3 times.
+# Triggers two ways:
+#   1. push — runs immediately when a human/PAT pushes to the production branch.
+#   2. schedule — runs every 15 minutes to catch failures from auto-merges made
+#      by GITHUB_TOKEN. GitHub blocks push-triggered workflows when the push
+#      originates from GITHUB_TOKEN (to prevent infinite loops), so without the
+#      schedule, auto-pr.yml merges that break the deploy are never healed.
 
 on:
   push:
     branches:
       - claude/ai-personal-assistant-main
+  schedule:
+    - cron: '*/15 * * * *'
 
 permissions:
   contents: write
@@ -17,6 +21,11 @@ jobs:
   heal:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Queue concurrent runs rather than cancel them — a push-triggered run may
+    # be mid-heal and should complete before the next schedule fires.
+    concurrency:
+      group: render-heal
+      cancel-in-progress: false
 
     env:
       RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
@@ -29,6 +38,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          # Explicit ref ensures schedule-triggered runs always check out the
+          # deployed branch, not whatever GitHub's default branch is.
+          ref: claude/ai-personal-assistant-main
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -42,6 +54,9 @@ jobs:
 
       - name: Wait for Render deploy to complete
         id: wait_deploy
+        # Skip on schedule runs — no new deploy was just triggered, so there's
+        # nothing to wait for. The heal script checks the current state directly.
+        if: github.event_name == 'push'
         run: |
           echo "⏳ Waiting for Render deploy to complete..."
           python3 scripts/render_wait_deploy.py
