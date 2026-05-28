@@ -26,8 +26,10 @@ FROM nginx:1.27-alpine AS prod
 RUN addgroup -S app && adduser -S app -G app \
     && mkdir -p /tmp/nginx-body /tmp/nginx-proxy /tmp/nginx-fastcgi /tmp/nginx-uwsgi /tmp/nginx-scgi \
     && chown -R app:app /var/cache/nginx /var/log/nginx /tmp/nginx-* /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/nginx.conf
+# Store the config as a template; BACKEND_URL is substituted at startup.
+COPY nginx.conf /etc/nginx/nginx.conf.template
 COPY --from=build --chown=app:app /app/dist /usr/share/nginx/html
 USER app
 EXPOSE 8080
-CMD ["nginx", "-g", "daemon off;"]
+# Only substitute ${BACKEND_URL} — leave nginx variables ($uri, $http_host, …) untouched.
+CMD ["/bin/sh", "-c", "envsubst '${BACKEND_URL}' < /etc/nginx/nginx.conf.template > /tmp/nginx-runtime.conf && nginx -c /tmp/nginx-runtime.conf -g 'daemon off;'"]

@@ -8,6 +8,21 @@
 
 services:
   - type: web
+    name: arshad-ai-frontend
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    dockerBuildTarget: prod
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: BACKEND_URL
+        # Set to the full Render URL of arshad-ai-backend, e.g.:
+        # https://arshad-ai-backend.onrender.com
+        sync: false
+
+  - type: web
     name: arshad-ai-backend
     runtime: docker
     plan: starter
@@ -26,6 +41,22 @@ services:
       - key: SECRET_KEY
         sync: false
       - key: CORS_ORIGINS
+        sync: false
+      - key: BACKEND_URL
+        # e.g. https://arshad-ai-backend.onrender.com
+        sync: false
+      - key: FRONTEND_URL
+        # e.g. https://arshad-ai-frontend.onrender.com
+        sync: false
+      - key: GOOGLE_OAUTH_CLIENT_ID
+        sync: false
+      - key: GOOGLE_OAUTH_CLIENT_SECRET
+        sync: false
+      - key: GITHUB_OAUTH_CLIENT_ID
+        sync: false
+      - key: GITHUB_OAUTH_CLIENT_SECRET
+        sync: false
+      - key: OAUTH_ENCRYPTION_KEY
         sync: false
       - key: PYTHONUNBUFFERED
         value: "1"
