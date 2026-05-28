@@ -17,9 +17,12 @@ services:
     healthCheckPath: /
     autoDeploy: true
     envVars:
+      - key: VITE_API_BASE_URL
+        # Full URL of the backend service, e.g. https://arshad-ai-backend.onrender.com
+        # Baked into the JS bundle at build time — rebuild required after changing.
+        sync: false
       - key: BACKEND_URL
-        # Set to the full Render URL of arshad-ai-backend, e.g.:
-        # https://arshad-ai-backend.onrender.com
+        # Same value as VITE_API_BASE_URL — used by nginx to proxy /api/* in the container.
         sync: false
 
   - type: web
