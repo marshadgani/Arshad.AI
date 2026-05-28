@@ -2,7 +2,7 @@ name: Render Self-Healing Deploy Monitor
 
 # Triggers two ways:
 #   1. push — runs immediately when a human/PAT pushes to the production branch.
-#   2. schedule — runs every 10 minutes to catch failures from auto-merges made
+#   2. schedule — runs every 15 minutes to catch failures from auto-merges made
 #      by GITHUB_TOKEN. GitHub blocks push-triggered workflows when the push
 #      originates from GITHUB_TOKEN (to prevent infinite loops), so without the
 #      schedule, auto-pr.yml merges that break the deploy are never healed.
@@ -12,7 +12,7 @@ on:
     branches:
       - claude/ai-personal-assistant-main
   schedule:
-    - cron: '*/10 * * * *'
+    - cron: '*/15 * * * *'
 
 permissions:
   contents: write
@@ -21,6 +21,11 @@ jobs:
   heal:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Queue concurrent runs rather than cancel them — a push-triggered run may
+    # be mid-heal and should complete before the next schedule fires.
+    concurrency:
+      group: render-heal
+      cancel-in-progress: false
 
     env:
       RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
@@ -33,6 +38,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          # Explicit ref ensures schedule-triggered runs always check out the
+          # deployed branch, not whatever GitHub's default branch is.
+          ref: claude/ai-personal-assistant-main
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
