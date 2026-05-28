@@ -158,5 +158,5 @@ async def me(user: User = Depends(get_current_user)) -> dict:
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Logout (no-op server-side)",
 )
-async def logout() -> None:
-    return None
+async def logout():
+    pass
