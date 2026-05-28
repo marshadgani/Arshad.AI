@@ -1,14 +1,18 @@
 name: Render Self-Healing Deploy Monitor
 
-# Triggers after every push to the production branch (the one Render deploys from).
-# Waits for Render to finish deploying, checks the health endpoint,
-# and if the service is down it fetches logs, asks Claude to fix the code,
-# commits the fix, and re-deploys. Loops up to 3 times.
+# Triggers two ways:
+#   1. push — runs immediately when a human/PAT pushes to the production branch.
+#   2. schedule — runs every 10 minutes to catch failures from auto-merges made
+#      by GITHUB_TOKEN. GitHub blocks push-triggered workflows when the push
+#      originates from GITHUB_TOKEN (to prevent infinite loops), so without the
+#      schedule, auto-pr.yml merges that break the deploy are never healed.
 
 on:
   push:
     branches:
       - claude/ai-personal-assistant-main
+  schedule:
+    - cron: '*/10 * * * *'
 
 permissions:
   contents: write
@@ -42,6 +46,9 @@ jobs:
 
       - name: Wait for Render deploy to complete
         id: wait_deploy
+        # Skip on schedule runs — no new deploy was just triggered, so there's
+        # nothing to wait for. The heal script checks the current state directly.
+        if: github.event_name == 'push'
         run: |
           echo "⏳ Waiting for Render deploy to complete..."
           python3 scripts/render_wait_deploy.py
