@@ -2,7 +2,7 @@
 
 **PR:** claude/ai-personal-assistant-CcA11 → claude/ai-personal-assistant-main
 **Branch:** `claude/ai-personal-assistant-CcA11`
-**Triggered by:** Merge to Main
+**Triggered by:** Merge to Main (production startup crash)
 **Date:** 2026-05-28
 
 ---
@@ -11,87 +11,102 @@
 
 | # | Gate | Agent | Result | Critical | Warnings |
 |---|---|---|---|---|---|
-| 1 | Code Review | code-reviewer | ⚠️ WARN | 0 | 1 |
-| 2 | Security Audit | security-auditor | ✅ PASS | 0 | 1 |
-| 3 | Bug Analysis | debugger | ⚠️ WARN | 0 | 1 |
+| 1 | Code Review | code-reviewer | ✅ PASS | 0 | 1 |
+| 2 | Security Audit | security-auditor | ⚠️ WARN | 0 | 3 |
+| 3 | Bug Analysis | debugger | ✅ PASS | 0 | 1 |
 | 4 | Test Coverage | test-writer | ✅ PASS | 0 | 0 |
-| 5 | Code Quality | refactorer | ⚠️ WARN | 0 | 1 |
+| 5 | Code Quality | refactorer | ⚠️ WARN | 0 | 2 |
 | 6 | Documentation | doc-writer | ✅ PASS | 0 | 0 |
 
-> *All gate findings (missing `ref:`, missing `concurrency:`, cron interval) were auto-fixed before this report was written. Results above reflect post-fix state.*
+> *Test coverage FAIL auto-fixed before this report: `backend/tests/test_auth.py` + `backend/conftest.py` added and committed. Security WARNs are pre-existing design decisions (stateless JWT, no-op logout, SECRET_KEY guard) — none introduced by this diff.*
 
 ## Overall Verdict
 
 ### ⚠️ GATE PASSED WITH WARNINGS — Ready for merge
 
-No Critical issues. All significant findings (checkout ref, concurrency, cron interval) resolved in the auto-fix commits. Remaining warning is the theoretical heal-loop re-trigger via schedule (non-blocking — the heal script correctly exits early when service is healthy).
+No Critical issues. No FAIL gates. The startup crash fix is correct and minimal. All security WARNs are pre-existing architectural decisions accepted in Phase C (not introduced by this diff).
 
 ---
 
 ## What This Diff Does
 
-**Root cause of "auto-heal never fires after auto-merges":**
+**Root cause of "Application startup failed":**
 
-GitHub explicitly blocks push-triggered workflows when the push is made by `GITHUB_TOKEN` (prevents infinite loops). `auto-pr.yml` merges use `GITHUB_TOKEN` → the merge push to `claude/ai-personal-assistant-main` is invisible to `render-heal.yml`'s `on: push` trigger → failed deploys are never healed.
+FastAPI 0.115.6 tightened response-model validation. A `-> None` return-type annotation on a `status_code=204` route causes FastAPI to set `response_model=None` (the Python literal) rather than `Default(None)` (its internal sentinel). The assertion `is_body_allowed_for_status_code(204)` then fires at module import time — before the app binds to any port — producing:
 
-**Fix:** Added `schedule: cron: '*/15 * * * *'` as a second trigger. Runs every 15 minutes. On healthy runs: exits in ~90s (health check + deploy status → "Nothing to do"). On failure: runs the full heal loop.
+```
+AssertionError: Status code 204 must not have a response body
+ERROR: Application startup failed. Exiting.
+```
+
+**Fix:** Remove the `-> None` annotation from `logout()` in `backend/src/auth/routers.py`. Without an annotation, FastAPI leaves `response_model` at `Default(None)` and the assertion is never reached.
+
+**Secondary fix:** Added `backend/tests/test_auth.py` (first test in the repo) verifying `POST /api/v1/auth/logout` returns 204 with no body. `backend/conftest.py` sets the three env vars required at import time so tests run without live services.
 
 ---
 
 ## Detailed Findings
 
 ### 1. Code Review (code-reviewer)
-**Status:** ⚠️ WARN (post-fix)
-
-Auto-fixed findings:
-- ✅ Missing `ref: claude/ai-personal-assistant-main` on checkout — without it, schedule runs checked out the GitHub default branch (likely `main`) instead of the deployed branch. Fixed.
-- ✅ `if: github.event_name == 'push'` syntax confirmed correct — the heal script's unconditional health + deploy-status check on entry makes skipping the wait step safe on schedule runs.
-
-Remaining warnings (non-blocking):
-- ⚠️ A heal-fix commit pushed by the heal script via `GITHUB_TOKEN` won't re-trigger `render-heal.yml` on push (same GITHUB_TOKEN limitation), but the next 15-min schedule run will pick it up. Acceptable — the Render deploy from a fix commit typically takes 3–8 minutes, so the next schedule run sees the post-deploy state.
-
-### 2. Security Audit (security-auditor)
 **Status:** ✅ PASS
 
-Schedule trigger inherits the same `permissions: contents: write` declared at workflow level. Schedule events cannot be triggered by external actors (unlike `workflow_dispatch` or `pull_request_target`). No new attack surface.
+- Fix correctly resolves the FastAPI 0.115.6 startup assertion for 204 routes.
+- `pass` is semantically identical to `return None` — both return `None` implicitly; FastAPI strips the body for 204 regardless.
+- No logic change, no security surface change.
 
 Remaining warnings (non-blocking):
-- ⚠️ Comment noting that schedule runs may see a post-heal-commit state before Render has re-deployed could be added to avoid future confusion — cosmetic only.
+- ⚠️ The logout body is intentionally empty pending future JWT invalidation (Redis denylist). A TODO comment would prevent future reviewers from re-adding the annotation. Acceptable for now given the module docstring already explains the stateless design.
+
+### 2. Security Audit (security-auditor)
+**Status:** ⚠️ WARN
+
+All three findings are **pre-existing design decisions** from Phase C (auth implementation session). None are introduced by this diff.
+
+- ⚠️ Stateless logout — no server-side JWT revocation. Documented as intentional in module docstring. Mitigation path: Redis `jti` denylist in a future phase. Accepted.
+- ⚠️ Logout endpoint has no `Depends(get_current_user)` — intentional (it's a no-op server-side; any body with side-effects must add auth at that point). Accepted.
+- ⚠️ `SECRET_KEY` weak-default guard — `main.py` already raises `RuntimeError` if `SECRET_KEY == "change-me"` (the guard the agent recommended is already in place). Non-issue.
 
 ### 3. Bug Analysis (debugger)
-**Status:** ⚠️ WARN (post-fix)
+**Status:** ✅ PASS
 
-Auto-fixed findings:
-- ✅ Concurrent run race condition — push-triggered and schedule-triggered runs could have fired simultaneously, both applying fixes and racing on `git push`. Fixed with `concurrency: group: render-heal, cancel-in-progress: false` (queues rather than cancels).
+- Root cause fully resolved: without `-> None`, `response_model` stays at `Default(None)` sentinel; assertion condition `response_model is not Default(None)` evaluates `False`; startup succeeds.
+- `pass` and `return None` are bytecode-equivalent in CPython.
+- No parameters, no I/O, no exception paths — zero new runtime error paths.
 
 Remaining warnings (non-blocking):
-- ⚠️ The `ref: claude/ai-personal-assistant-main` on checkout means the heal script always runs on the same branch. If a fix is pushed to a different branch by a developer while a schedule run is active, the schedule run still heals `claude/ai-personal-assistant-main` — correct behavior.
+- ⚠️ Removing `-> None` means a future `return SomeObject()` would pass the type-checker but FastAPI would still drop the body on a 204. Consider `response_class=Response` in the decorator as a self-documenting alternative. Non-blocking for this change.
 
 ### 4. Test Coverage (test-writer)
 **Status:** ✅ PASS
 
-GitHub Actions YAML files are infrastructure-as-code. No unit test framework applies. Validation was done via logic review. The underlying Python scripts (`render_heal.py`, `render_wait_deploy.py`) are unchanged — no new coverage gaps.
+Auto-fixed finding:
+- ✅ Added `backend/tests/test_auth.py` — covers `POST /api/v1/auth/logout → 204`. First test in the repository.
+- ✅ Added `backend/conftest.py` — sets `SECRET_KEY`, `DATABASE_URL`, `REDIS_URL` at import time so tests run without live services.
+- Test verified locally: 1 passed in 0.65s.
 
 ### 5. Code Quality (refactorer)
-**Status:** ⚠️ WARN (post-fix)
+**Status:** ⚠️ WARN
 
-Auto-fixed findings:
-- ✅ Cron interval reduced from `*/10` (4,320 runs/month) to `*/15` (2,880 runs/month) — better cost/latency tradeoff for a personal project. Still catches failures within 15 minutes, well within Render's typical deploy window.
+- `pass` vs `return None` is semantically correct and idiomatic for an empty body.
 
 Remaining warnings (non-blocking):
-- ⚠️ Even at `*/15`, ~2,880 monthly schedule runs on `ubuntu-latest` consume significant GitHub Actions minutes. If GitHub free-tier minutes are a concern, consider `*/30` (1,440 runs/month).
+- ⚠️ No inline comment explaining why `-> None` was removed — a reviewer could re-add it and re-introduce the crash. Acceptable given the commit message documents the reason.
+- ⚠️ `fastapi==0.115.6` is pinned in `requirements.txt`. If upgraded, the annotation behaviour may change again. Revisit the annotation on next FastAPI version bump.
 
 ### 6. Documentation (doc-writer)
 **Status:** ✅ PASS
 
-Header comment accurately describes the root cause (GITHUB_TOKEN loop-prevention mechanism) and the two-trigger design. Inline comment on the skipped wait step is correct and complete.
+- OpenAPI change: none. FastAPI renders 204 routes as body-less regardless of annotation.
+- `summary="Logout (no-op server-side)"` and the module docstring remain accurate.
+- No API documentation regression from removing `-> None`.
 
 ---
 
 ## Action Items
 
-- [ ] If GitHub Actions minutes usage becomes a concern, change cron from `*/15` to `*/30`
-- [ ] Add `tests/scripts/test_render_heal.py` — deferred from all prior gate runs
+- [ ] Add `response_class=Response` to the logout decorator on next FastAPI upgrade (makes the no-body intent explicit without annotation-inference)
+- [ ] Implement Redis `jti` denylist in auth-manager agent phase for proper JWT revocation
+- [ ] Add tests for remaining auth routes (`/google/login`, `/github/login`, `/me`) — deferred, low priority since those require OAuth mocking
 
 ---
 *Generated by Arshad.AI Quality Gate · All 6 agents · Auto-posted to PR*
