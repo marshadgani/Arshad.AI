@@ -1,9 +1,9 @@
 # Arshad.AI Quality Gate Report
 
-**PR:** claude/ai-personal-assistant-CcA11 → claude/ai-personal-assistant-main
+**PR:** `claude/ai-personal-assistant-CcA11` → `claude/ai-personal-assistant-main`
 **Branch:** `claude/ai-personal-assistant-CcA11`
-**Triggered by:** Merge to Main (production startup crash)
-**Date:** 2026-05-28
+**Triggered by:** "Merge to Main"
+**Date:** 2026-05-29
 
 ---
 
@@ -13,35 +13,35 @@
 |---|---|---|---|---|---|
 | 1 | Code Review | code-reviewer | ✅ PASS | 0 | 1 |
 | 2 | Security Audit | security-auditor | ⚠️ WARN | 0 | 3 |
-| 3 | Bug Analysis | debugger | ✅ PASS | 0 | 1 |
-| 4 | Test Coverage | test-writer | ✅ PASS | 0 | 0 |
-| 5 | Code Quality | refactorer | ⚠️ WARN | 0 | 2 |
-| 6 | Documentation | doc-writer | ✅ PASS | 0 | 0 |
-
-> *Test coverage FAIL auto-fixed before this report: `backend/tests/test_auth.py` + `backend/conftest.py` added and committed. Security WARNs are pre-existing design decisions (stateless JWT, no-op logout, SECRET_KEY guard) — none introduced by this diff.*
+| 3 | Bug Analysis | debugger | ⚠️ WARN | 0 | 4 |
+| 4 | Test Coverage | test-writer | ✅ PASS (auto-fixed) | 0 | 0 |
+| 5 | Code Quality | refactorer | ⚠️ WARN | 0 | 5 |
+| 6 | Documentation | doc-writer | ⚠️ WARN | 0 | 3 |
 
 ## Overall Verdict
 
 ### ⚠️ GATE PASSED WITH WARNINGS — Ready for merge
 
-No Critical issues. No FAIL gates. The startup crash fix is correct and minimal. All security WARNs are pre-existing architectural decisions accepted in Phase C (not introduced by this diff).
+Zero FAIL gates, zero Critical issues. Test-writer initial FAIL was resolved in the auto-fix loop (vitest infrastructure + 13 unit tests added in one iteration). Remaining items are WARN-level and do not block merge.
 
 ---
 
 ## What This Diff Does
 
-**Root cause of "Application startup failed":**
+**Root cause of Google OAuth 404 in cloud deployment:**
 
-FastAPI 0.115.6 tightened response-model validation. A `-> None` return-type annotation on a `status_code=204` route causes FastAPI to set `response_model=None` (the Python literal) rather than `Default(None)` (its internal sentinel). The assertion `is_body_allowed_for_status_code(204)` then fires at module import time — before the app binds to any port — producing:
+The frontend JS bundle used relative `/api/...` URLs that resolved to the Vercel domain
+(`arshad-ai-seven.vercel.app`) instead of the Render backend (`arshad-ai.onrender.com`).
+Every API call was hitting Vercel's CDN, which has no `/api` routes → 404.
 
-```
-AssertionError: Status code 204 must not have a response body
-ERROR: Application startup failed. Exiting.
-```
-
-**Fix:** Remove the `-> None` annotation from `logout()` in `backend/src/auth/routers.py`. Without an annotation, FastAPI leaves `response_model` at `Default(None)` and the assertion is never reached.
-
-**Secondary fix:** Added `backend/tests/test_auth.py` (first test in the repo) verifying `POST /api/v1/auth/logout` returns 204 with no body. `backend/conftest.py` sets the three env vars required at import time so tests run without live services.
+**Fix:**
+- `frontend/src/lib/api.ts`: single-source-of-truth `API_BASE` constant — empty in dev (Vite proxy handles local forwarding), baked to the full Render URL at Vercel build time via `VITE_API_BASE_URL`.
+- `frontend/src/hooks/useFetch.ts`: prepends `API_BASE` to all relative `/api/...` URLs (fixes all 14+ dashboard/domain/nav calls automatically).
+- `frontend/src/auth/AuthContext.tsx`: uses `API_BASE` for OAuth redirect, `/auth/me` check, and logout call.
+- `frontend/vite.config.ts`: removed incorrect `rewrite` that was stripping `/api` from proxied paths (backend routes include `/api` in prefix, so stripping it caused 404s in local dev too).
+- `frontend/nginx.conf`: added `/api` proxy block for the Docker prod image path.
+- `frontend/Dockerfile`: uses `envsubst '${BACKEND_URL}'` restricted substitution at container startup.
+- `render.yaml`: added `VITE_API_BASE_URL`, `BACKEND_URL`, `FRONTEND_URL`, and OAuth env var declarations to both services.
 
 ---
 
@@ -50,63 +50,67 @@ ERROR: Application startup failed. Exiting.
 ### 1. Code Review (code-reviewer)
 **Status:** ✅ PASS
 
-- Fix correctly resolves the FastAPI 0.115.6 startup assertion for 204 routes.
-- `pass` is semantically identical to `return None` — both return `None` implicitly; FastAPI strips the body for 204 regardless.
-- No logic change, no security surface change.
+- Split-service URL routing is correctly solved via build-time env var baking.
+- `useFetch` `startsWith('/')` guard correctly routes relative API paths through `API_BASE`.
+- `envsubst '${BACKEND_URL}'` restricted substitution correctly preserves nginx `$variables`.
 
 Remaining warnings (non-blocking):
-- ⚠️ The logout body is intentionally empty pending future JWT invalidation (Redis denylist). A TODO comment would prevent future reviewers from re-adding the annotation. Acceptable for now given the module docstring already explains the stateless design.
+- ⚠️ `$http_host` vs `$host` in nginx: `$http_host` is used in `proxy_set_header`. `$host` is the canonical nginx variable. Functionally equivalent in this setup.
 
 ### 2. Security Audit (security-auditor)
 **Status:** ⚠️ WARN
 
-All three findings are **pre-existing design decisions** from Phase C (auth implementation session). None are introduced by this diff.
-
-- ⚠️ Stateless logout — no server-side JWT revocation. Documented as intentional in module docstring. Mitigation path: Redis `jti` denylist in a future phase. Accepted.
-- ⚠️ Logout endpoint has no `Depends(get_current_user)` — intentional (it's a no-op server-side; any body with side-effects must add auth at that point). Accepted.
-- ⚠️ `SECRET_KEY` weak-default guard — `main.py` already raises `RuntimeError` if `SECRET_KEY == "change-me"` (the guard the agent recommended is already in place). Non-issue.
+- ⚠️ **CORS wildcard + credentials**: `allow_origins=["*"]` combined with `allow_credentials=True` in `backend/src/main.py`. Should be locked to `FRONTEND_URL`. Pre-existing; not introduced by this diff.
+- ⚠️ **No rate limiting**: OAuth login endpoints have no rate limiting — susceptible to enumeration/abuse. Add slowapi or nginx `limit_req`.
+- ⚠️ **nginx `BACKEND_URL` guard missing**: If `BACKEND_URL` is unset in Docker prod, `envsubst` produces `proxy_pass ;` (broken nginx config that starts silently). Add a fail-fast check in the Dockerfile CMD.
 
 ### 3. Bug Analysis (debugger)
-**Status:** ✅ PASS
+**Status:** ⚠️ WARN
 
-- Root cause fully resolved: without `-> None`, `response_model` stays at `Default(None)` sentinel; assertion condition `response_model is not Default(None)` evaluates `False`; startup succeeds.
-- `pass` and `return None` are bytecode-equivalent in CPython.
-- No parameters, no I/O, no exception paths — zero new runtime error paths.
-
-Remaining warnings (non-blocking):
-- ⚠️ Removing `-> None` means a future `return SomeObject()` would pass the type-checker but FastAPI would still drop the body on a 204. Consider `response_class=Response` in the decorator as a self-documenting alternative. Non-blocking for this change.
+- ⚠️ **WARN-1 — `API_BASE` whitespace**: A whitespace-only `VITE_API_BASE_URL` (e.g. `'   '`) passes through `??` and `replace(/\/$/, '')` unchanged, producing `'   /api/v1/...'` which `fetch()` rejects with a TypeError. Fix: add `.trim()`.
+- ⚠️ **WARN-2 — provider allowlist**: `loginWith` injects `provider` directly into `window.location.href` without a runtime allowlist. TypeScript type is stripped at runtime. Low risk currently (provider only comes from typed call sites), but an open redirect if provider ever comes from external input. Add `if (!['google','github'].includes(provider)) throw ...`.
+- ⚠️ **WARN-3 — Vite proxy retained**: Proxy correctly kept in `vite.config.ts` for local dev. No action required.
+- ⚠️ **WARN-4 — nginx `${...}` audit**: Verify the nginx template has no `${varname}` patterns used as nginx variables (nginx does not support curly-brace var syntax natively; envsubst would leave them as literal strings).
 
 ### 4. Test Coverage (test-writer)
-**Status:** ✅ PASS
+**Status:** ✅ PASS (auto-fixed in gate loop — iteration 1)
 
-Auto-fixed finding:
-- ✅ Added `backend/tests/test_auth.py` — covers `POST /api/v1/auth/logout → 204`. First test in the repository.
-- ✅ Added `backend/conftest.py` — sets `SECRET_KEY`, `DATABASE_URL`, `REDIS_URL` at import time so tests run without live services.
-- Test verified locally: 1 passed in 0.65s.
+Initial FAIL: 0% coverage on all 3 changed frontend files; no test runner configured.
+
+Fix applied:
+- Added vitest 1.6 + @testing-library/react + jsdom infrastructure
+- `frontend/src/lib/api.test.ts` (4 tests): trailing-slash stripping, nullish coalescing
+- `frontend/src/hooks/useFetch.test.ts` (5 tests): success path, error path, 401 token clear, URL resolution (relative + absolute)
+- `frontend/src/auth/AuthContext.test.tsx` (4 tests): no user when unauthenticated, successful `/me` fetch, 401 token clear, hook-outside-provider guard
+
+**All 13 tests pass.**
 
 ### 5. Code Quality (refactorer)
 **Status:** ⚠️ WARN
 
-- `pass` vs `return None` is semantically correct and idiomatic for an empty body.
-
-Remaining warnings (non-blocking):
-- ⚠️ No inline comment explaining why `-> None` was removed — a reviewer could re-add it and re-introduce the crash. Acceptable given the commit message documents the reason.
-- ⚠️ `fastapi==0.115.6` is pinned in `requirements.txt`. If upgraded, the annotation behaviour may change again. Revisit the annotation on next FastAPI version bump.
+- ⚠️ `url.startsWith('/')` heuristic is a convention, not enforced — could silently misroute. Consider documenting the contract in a JSDoc.
+- ⚠️ `lib/` folder name is generic; `config/` or `constants/` would be more descriptive for a module containing only env-derived constants.
+- No structural complexity or duplication issues found.
 
 ### 6. Documentation (doc-writer)
-**Status:** ✅ PASS
+**Status:** ⚠️ WARN
 
-- OpenAPI change: none. FastAPI renders 204 routes as body-less regardless of annotation.
-- `summary="Logout (no-op server-side)"` and the module docstring remain accurate.
-- No API documentation regression from removing `-> None`.
+- ⚠️ `frontend/.env.example` is missing — `VITE_API_BASE_URL` is a required production env var with no example file for frontend developers.
+- ⚠️ `README.md` does not mention the Vercel + Render split-service model or how to configure `VITE_API_BASE_URL`.
+- ⚠️ `AuthContext.tsx` `loginWith` lacks a comment explaining why `window.location.href` is used over `fetch` (browser must own the cross-origin OAuth redirect).
 
 ---
 
 ## Action Items
 
-- [ ] Add `response_class=Response` to the logout decorator on next FastAPI upgrade (makes the no-body intent explicit without annotation-inference)
-- [ ] Implement Redis `jti` denylist in auth-manager agent phase for proper JWT revocation
-- [ ] Add tests for remaining auth routes (`/google/login`, `/github/login`, `/me`) — deferred, low priority since those require OAuth mocking
+WARN-level items for post-merge follow-up (priority order):
+
+- [ ] Lock `allow_origins` to `FRONTEND_URL` in `backend/src/main.py` (security — CORS hardening)
+- [ ] Add `.trim()` to `API_BASE` expression in `frontend/src/lib/api.ts`
+- [ ] Add runtime `provider` allowlist in `AuthContext.tsx` `loginWith`
+- [ ] Add `frontend/.env.example` with `VITE_API_BASE_URL` documented
+- [ ] Add `BACKEND_URL` fail-fast guard in `frontend/Dockerfile` CMD
+- [ ] Add rate limiting to OAuth login endpoints (slowapi or nginx `limit_req`)
 
 ---
-*Generated by Arshad.AI Quality Gate · All 6 agents · Auto-posted to PR*
+*Generated by Arshad.AI Quality Gate · All 6 agents · Auto-fix loop: test-writer FAIL resolved (iteration 1 of 3)*
