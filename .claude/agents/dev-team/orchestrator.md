@@ -78,7 +78,16 @@ Pipeline execution is fully autonomous. Do not pause mid-pipeline to explain, su
 
 ## Step 0 — Issue feature ID
 
-**0.1 Atomic counter increment.** First action: read and increment the counter via Bash.
+**0.0 Working directory pre-flight.** Absolute first action — before ANY file read or write:
+
+```bash
+cd /home/user/Arshad.AI || { echo "HALT: cannot cd to /home/user/Arshad.AI"; exit 1; }
+pwd
+```
+
+If `pwd` does not print `/home/user/Arshad.AI`, halt immediately. Do not proceed.
+
+**0.1 Atomic counter increment.** Read and increment the counter via Bash.
 
 ```bash
 N=$(cat tasks/.feature-counter)
