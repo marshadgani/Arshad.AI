@@ -1,26 +1,29 @@
 """/api/v1/auth/* — login, callback, me, logout.
 
-State is stored in Redis (``oauth_state:<state> = "<provider>"``, 5-min TTL).
-The callback uses ``GETDEL`` to validate-and-consume atomically — a plain
-``GET`` then ``DELETE`` would leave a millisecond-wide replay window where
-two concurrent callbacks with the same code could both pass validation.
+State is carried in a signed HttpOnly cookie (HMAC-SHA256 over
+"state|provider|timestamp" with SECRET_KEY, 5-min TTL). This eliminates
+the Redis dependency for OAuth state — Redis is still used elsewhere, but
+a Redis outage or cold-start state loss no longer breaks the login flow.
 
-Logout is a stateless 204 — the frontend wipes its localStorage entry.
-A real revocation list would require Redis lookups on every authenticated
-request, which contradicts our stateless-JWT decision.
+The cookie path is restricted to /api/v1/auth so it is only sent to the
+backend, not leaked to the frontend proxy or other routes.
+
+Logout is a stateless 204 — the frontend wipes its localStorage JWT.
 """
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import os
 import secrets
+import time
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..middleware.cache import get_redis
 from ..models.database import get_db
 from ..models.user import User
 from .dependencies import get_current_user
@@ -32,10 +35,23 @@ from .service import upsert_user_from_oauth
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 _STATE_TTL_SECONDS = 300
+_COOKIE_NAME = "oauth_state"
+_COOKIE_PATH = "/api/v1/auth"
+
+
+def _secret_key() -> str:
+    key = os.getenv("SECRET_KEY", "")
+    if not key:
+        raise RuntimeError("SECRET_KEY env var is required for OAuth state signing")
+    return key
 
 
 def _frontend_url() -> str:
     return os.getenv("FRONTEND_URL", "http://localhost:3000").rstrip("/")
+
+
+def _is_https() -> bool:
+    return os.getenv("BACKEND_URL", "http://localhost:8000").startswith("https://")
 
 
 def _provider(name: str) -> OAuthProvider:
@@ -62,12 +78,45 @@ def _envelope(status_code: int, code: str, message: str) -> HTTPException:
     )
 
 
+def _make_state_cookie(state: str, provider: str) -> str:
+    ts = str(int(time.time()))
+    payload = f"{state}|{provider}|{ts}"
+    sig = hmac.new(_secret_key().encode(), payload.encode(), hashlib.sha256).hexdigest()
+    return f"{payload}|{sig}"
+
+
+def _verify_state_cookie(cookie: str, url_state: str, provider: str) -> bool:
+    try:
+        state, prov, ts_str, sig = cookie.split("|", 3)
+        ts = int(ts_str)
+    except ValueError:
+        return False
+    if state != url_state or prov != provider:
+        return False
+    if int(time.time()) - ts > _STATE_TTL_SECONDS:
+        return False
+    payload = f"{state}|{prov}|{ts_str}"
+    expected = hmac.new(
+        _secret_key().encode(), payload.encode(), hashlib.sha256
+    ).hexdigest()
+    return hmac.compare_digest(sig, expected)
+
+
 async def _start_login(provider_name: str) -> RedirectResponse:
     provider = _provider(provider_name)
     state = secrets.token_urlsafe(32)
-    redis = await get_redis()
-    await redis.set(f"oauth_state:{state}", provider_name, ex=_STATE_TTL_SECONDS)
-    return RedirectResponse(provider.authorization_url(state), status_code=302)
+    cookie_val = _make_state_cookie(state, provider_name)
+    response = RedirectResponse(provider.authorization_url(state), status_code=302)
+    response.set_cookie(
+        key=_COOKIE_NAME,
+        value=cookie_val,
+        httponly=True,
+        samesite="lax",
+        secure=_is_https(),
+        max_age=_STATE_TTL_SECONDS,
+        path=_COOKIE_PATH,
+    )
+    return response
 
 
 async def _handle_callback(
@@ -75,10 +124,10 @@ async def _handle_callback(
     code: str,
     state: str,
     db: AsyncSession,
+    request: Request,
 ) -> RedirectResponse:
-    redis = await get_redis()
-    stored = await redis.getdel(f"oauth_state:{state}")
-    if stored != provider_name:
+    cookie = request.cookies.get(_COOKIE_NAME, "")
+    if not _verify_state_cookie(cookie, state, provider_name):
         raise _envelope(
             status.HTTP_400_BAD_REQUEST,
             "invalid_state",
@@ -108,9 +157,11 @@ async def _handle_callback(
         db, provider=provider_name, info=info, bundle=bundle
     )
     token = encode_jwt(user.id)
-    return RedirectResponse(
+    response = RedirectResponse(
         f"{_frontend_url()}/auth/callback#token={token}", status_code=302
     )
+    response.delete_cookie(key=_COOKIE_NAME, path=_COOKIE_PATH)
+    return response
 
 
 @router.get("/google/login", summary="Start Google OAuth")
@@ -120,11 +171,12 @@ async def google_login() -> RedirectResponse:
 
 @router.get("/google/callback", summary="Google OAuth callback")
 async def google_callback(
+    request: Request,
     code: str = Query(...),
     state: str = Query(...),
     db: AsyncSession = Depends(get_db),
 ) -> RedirectResponse:
-    return await _handle_callback("google", code, state, db)
+    return await _handle_callback("google", code, state, db, request)
 
 
 @router.get("/github/login", summary="Start GitHub OAuth")
@@ -134,11 +186,12 @@ async def github_login() -> RedirectResponse:
 
 @router.get("/github/callback", summary="GitHub OAuth callback")
 async def github_callback(
+    request: Request,
     code: str = Query(...),
     state: str = Query(...),
     db: AsyncSession = Depends(get_db),
 ) -> RedirectResponse:
-    return await _handle_callback("github", code, state, db)
+    return await _handle_callback("github", code, state, db, request)
 
 
 @router.get("/me", summary="Current authenticated user")

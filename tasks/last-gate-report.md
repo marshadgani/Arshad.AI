@@ -11,79 +11,112 @@
 
 | # | Gate | Agent | Result | Critical | Warnings |
 |---|---|---|---|---|---|
-| 1 | Code Review | code-reviewer | ✅ PASS | 0 | 1 |
-| 2 | Security Audit | security-auditor | ✅ PASS | 0 | 0 |
-| 3 | Bug Analysis | debugger | ✅ PASS | 0 | 1 |
-| 4 | Test Coverage | test-writer | ✅ PASS | 0 | 1 |
-| 5 | Code Quality | refactorer | ✅ PASS | 0 | 1 |
-| 6 | Documentation | doc-writer | ✅ PASS | 0 | 0 |
+| 1 | Code Review | code-reviewer | ⚠️ WARN | 0 | 4 |
+| 2 | Security Audit | security-auditor | ⚠️ WARN | 0 | 4 |
+| 3 | Bug Analysis | debugger | ✅ PASS (auto-fixed) | 0 | 1 |
+| 4 | Test Coverage | test-writer | ⚠️ WARN | 0 | 3 |
+| 5 | Code Quality | refactorer | ⚠️ WARN | 0 | 4 |
+| 6 | Documentation | doc-writer | ⚠️ WARN | 0 | 3 |
 
 ## Overall Verdict
 
-### ✅ GATE PASSED — Ready for merge
+### ⚠️ GATE PASSED WITH WARNINGS — Ready for merge
 
-All 6 agents passed. Zero Critical issues. Zero FAIL gates. Warnings are minor and do not block merge.
+Zero FAIL gates after auto-fix loop (iteration 1 of 3). Zero Critical issues. Remaining WARNs are design-level concerns (replay window, rate limiting, URL fragment token) — none block the merge for a personal single-user app on HTTPS.
 
 ---
 
 ## What This Diff Does
 
-Three TypeScript build fixes to unblock Vercel production build (`tsc -b` was failing):
+**Root cause of `invalid_state` error on OAuth callback:**
 
-1. **`frontend/vite.config.ts`**: Changed `import { defineConfig } from 'vite'` to `import { defineConfig } from 'vitest/config'`. The `test:` vitest config block requires the vitest import — Vite's `defineConfig` doesn't include the `test` property in its types. `vitest/config` re-exports all Vite functionality with Vitest types merged in.
+The OAuth state was stored in Redis (`GETDEL` pattern). Redis is not available on Render free tier (no Redis service in `render.yaml`), so `GETDEL` returns `None` on every callback, causing the `invalid_state` error on every login attempt.
 
-2. **`frontend/src/auth/AuthContext.test.tsx`**: Removed unused `act` import (TypeScript TS6133 error under strict mode).
+**Fix:** Replace Redis state storage with HMAC-SHA256 signed HttpOnly cookies:
+- `_make_state_cookie(state, provider)` — signs `"state|provider|timestamp"` with `SECRET_KEY` (HMAC-SHA256), 5-min TTL
+- `_verify_state_cookie(cookie, url_state, provider)` — splits, checks state/provider match, verifies TTL, verifies HMAC with `compare_digest`
+- Cookie: `HttpOnly`, `SameSite=Lax`, `secure=True` in production, `path=/api/v1/auth`
+- No external service dependency; works across Render instance restarts and cold starts
 
-3. **`frontend/src/lib/api.test.ts`**: Replaced `(undefined ?? '').replace(...)` (TS2871 always-nullish literal) with `('').replace(...)`. Same runtime result; fixes the TypeScript error.
+**Auto-fix loop fixes (2 Criticals resolved):**
+1. `int(ts_str)` moved inside the `try/except ValueError` — tampered non-numeric timestamp now returns `False` instead of raising a 500
+2. `_secret_key()` now raises `RuntimeError` on empty key — prevents HMAC forgery with an empty secret
 
 ---
 
 ## Detailed Findings
 
 ### 1. Code Review (code-reviewer)
-**Status:** ✅ PASS
+**Status:** ⚠️ WARN
 
-- `vite.config.ts`: Correct fix. `vitest/config` re-exports all Vite config functionality — no runtime behaviour change.
-- `AuthContext.test.tsx`: Correct. `act` was imported but never referenced. TS6133 is a hard error under strict mode.
-- ⚠️ `api.test.ts`: The replacement of `undefined ?? ''` with `''` means the test no longer exercises the nullish-coalescing fallback for an absent env var. The test now verifies that `''.replace(...)` returns `''`, which is a JS built-in, not project behaviour. The original intent is partially lost. Not blocking — other tests in the same file exercise the module constant.
+- `secrets.token_urlsafe(32)` produces `[A-Za-z0-9_-]` — no pipe. Safe separator choice. ✓
+- `hmac.compare_digest` is constant-time and used correctly (both sides are hex strings). ✓
+- `SameSite=Lax` is correct for OAuth — top-level cross-site GET navigations carry Lax cookies. ✓
+- `cookie.split("|", 3)` with maxsplit=3 is safe — sig field absorbs any extra pipes (hexdigest has none). ✓
+- ⚠️ Replay window: cookie is replayable within the 300s TTL. Google's authorization code is itself single-use, so exploiting this requires both the cookie AND the unspent code — extremely difficult in practice.
+- ⚠️ `secure=False` in local dev: documents correctly via `_is_https()` but should be noted.
+- ⚠️ `hmac.compare_digest` type safety: both sides are hex strings — no type mismatch risk.
+- ⚠️ No HTTP-layer integration test for cookie attributes on the login route.
 
 ### 2. Security Audit (security-auditor)
-**Status:** ✅ PASS
+**Status:** ⚠️ WARN
 
-No security concerns. All three changes are in test files or build config. No application logic, no auth/CORS/proxy changes, no secrets introduced.
+- ✅ Empty `SECRET_KEY` fallback: **fixed in auto-fix loop** — `_secret_key()` now raises `RuntimeError` on empty key.
+- ⚠️ Replay window: cookie has no server-side single-use enforcement (was `GETDEL`). Mitigated: Google's auth code is single-use; replaying the cookie alone (without the code) achieves nothing.
+- ⚠️ JWT in URL fragment: `#token=<jwt>` stored in browser history and readable by JS on the callback page. Accepted for now — single-user app, no third-party analytics on the callback page.
+- ⚠️ No rate limiting on `/api/v1/auth/*` endpoints. Pre-existing; not introduced by this diff.
+- ✅ `SameSite=Lax` correct for OAuth callbacks. ✓
+- ✅ Separator injection not possible (`token_urlsafe`, provider names, hexdigest — all pipe-free). ✓
+- ✅ Cookie attributes well-configured (HttpOnly, path-scoped, max_age=TTL, secure derived from BACKEND_URL). ✓
 
 ### 3. Bug Analysis (debugger)
-**Status:** ✅ PASS
+**Status:** ✅ PASS (auto-fixed, iteration 1)
 
-- `act` removal: safe — confirmed by tsc passing after the change.
-- `('').replace(...)` is identical in behaviour to `(undefined ?? '').replace(...)`. No regression.
-- `vitest/config` import: correct canonical fix. No production code path affected.
-- ⚠️ Minor: `vitest` must be present during the Vercel build step. It is in `devDependencies` and Vercel retains devDependencies during build — low-probability issue, already working in practice.
+Initial FAIL — 2 Criticals fixed:
+
+**CRITICAL-1 (fixed):** `int(ts_str)` was outside the `try/except ValueError`. A tampered cookie with a non-numeric timestamp raised an uncaught ValueError → HTTP 500. Fixed by moving `ts = int(ts_str)` inside the except block. New test `test_verify_state_cookie_rejects_non_numeric_timestamp` verifies the fix.
+
+**CRITICAL-2 (fixed):** `_secret_key()` fell back to `""` if `SECRET_KEY` env var was unset. HMAC with an empty key is valid Python but forgeable by anyone who knows the payload format. Fixed: `_secret_key()` now raises `RuntimeError("SECRET_KEY env var is required...")` on empty key.
+
+**Remaining WARN:** Replay within 300s TTL — design limitation, not a runtime bug. Google's code is single-use, and exploiting this requires intercepting both cookie and code simultaneously.
 
 ### 4. Test Coverage (test-writer)
-**Status:** ✅ PASS
+**Status:** ⚠️ WARN
 
-All 13 tests pass. No test was deleted — only an import and a test body were refined.
-- ⚠️ `api.test.ts` test is now tautological for the `??` operator: it tests `''.replace(...)` not the `undefined ?? ''` fallback. The behavioural coverage is maintained by the other 3 tests in the file which exercise `API_BASE` directly.
+8 tests pass, covering all branches of `_verify_state_cookie`:
+- roundtrip (happy path), wrong state, wrong provider, tampered sig, expired TTL, malformed, empty string, non-numeric timestamp ✓
+
+Remaining gaps (non-blocking):
+- ⚠️ No HTTP-level integration test for `GET /auth/google/login` — `Set-Cookie` attributes (HttpOnly, SameSite, Secure, Path, Max-Age) not asserted
+- ⚠️ No end-to-end test for `GET /auth/google/callback` with a valid cookie
+- ⚠️ Replay test missing (same cookie used twice)
 
 ### 5. Code Quality (refactorer)
-**Status:** ✅ PASS
+**Status:** ⚠️ WARN
 
-Changes are correct and minimal. No duplication, no complexity introduced.
-- ⚠️ `api.test.ts`: The test description "nullish-coalescing fallback for empty string" no longer matches the original intent. The body and description are consistent with each other but weaker than the original. No structural issue.
+- ✅ `_secret_key()` now raises on empty — correctly eliminates the silent-failure footgun
+- ⚠️ `_make_state_cookie`/`_verify_state_cookie` could live in a separate `state.py` module. Acceptable in a 200-line router file for now.
+- ⚠️ `_secret_key()` and `_is_https()` re-read env vars per call (cheap; enables test isolation without module reload). Acceptable.
+- ⚠️ Mixed naming: accessor helpers (`_secret_key`, `_frontend_url`, `_is_https`) vs verb helpers (`_make_state_cookie`, `_verify_state_cookie`). Minor inconsistency.
 
 ### 6. Documentation (doc-writer)
-**Status:** ✅ PASS
+**Status:** ⚠️ WARN
 
-No new public API surface, no new env vars, no new functions. No documentation updates required. The test rename is more precise than the original.
+- Module docstring explains WHY (Redis unavailable), WHAT (HMAC-SHA256 over defined payload), and the cookie path restriction. ✓
+- ⚠️ `_make_state_cookie` and `_verify_state_cookie` have no docstrings. Security-critical signing functions should document the payload format and failure modes.
+- ⚠️ No mention of clock-skew behavior in the TTL check (`time.time()` is wall clock).
 
 ---
 
 ## Action Items
 
-Minor follow-up (non-blocking):
+Post-merge follow-up (WARN items, priority order):
 
-- [ ] Strengthen the `api.test.ts` nullish-coalescing test — cast `undefined as string | undefined` to keep the original intent without the TS2871 error, or delete it and rely on the module-level constant tests
+- [ ] Add docstrings to `_make_state_cookie` and `_verify_state_cookie` documenting payload format and failure modes
+- [ ] Add HTTP-layer integration test for `GET /auth/google/login` asserting cookie security attributes
+- [ ] Add rate limiting to `/api/v1/auth/*` endpoints (slowapi)
+- [ ] Add `history.replaceState` in the frontend callback page to strip `#token=` from browser history
+- [ ] Consider server-side nonce store for replay prevention if security posture requires it
 
 ---
-*Generated by Arshad.AI Quality Gate · All 6 agents · No auto-fix loop needed*
+*Generated by Arshad.AI Quality Gate · All 6 agents · Auto-fix loop: debugger FAIL resolved (iteration 1 of 3)*
