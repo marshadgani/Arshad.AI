@@ -1,12 +1,15 @@
 """/api/v1/auth/* — login, callback, me, logout.
 
-State is carried in a signed HttpOnly cookie (HMAC-SHA256 over
-"state|provider|timestamp" with SECRET_KEY, 5-min TTL). This eliminates
-the Redis dependency for OAuth state — Redis is still used elsewhere, but
-a Redis outage or cold-start state loss no longer breaks the login flow.
+OAuth CSRF protection uses a self-verifying signed state parameter:
+  "{nonce}.{timestamp}.{hmac_sha256}"
+The nonce is random (token_urlsafe), the timestamp enforces a 5-min TTL,
+and the HMAC (keyed with SECRET_KEY) proves the state was issued by this
+backend. Google echoes the state back unchanged, and the callback verifies
+the signature — no cookies, no Redis, no cross-domain issues.
 
-The cookie path is restricted to /api/v1/auth so it is only sent to the
-backend, not leaked to the frontend proxy or other routes.
+This works correctly regardless of whether the frontend and backend are on
+different domains (Vercel + Render), because no browser-stored state is
+involved. The signed state in the URL is the entire CSRF token.
 
 Logout is a stateless 204 — the frontend wipes its localStorage JWT.
 """
@@ -20,7 +23,7 @@ import secrets
 import time
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -35,8 +38,6 @@ from .service import upsert_user_from_oauth
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 _STATE_TTL_SECONDS = 300
-_COOKIE_NAME = "oauth_state"
-_COOKIE_PATH = "/api/v1/auth"
 
 
 def _secret_key() -> str:
@@ -48,10 +49,6 @@ def _secret_key() -> str:
 
 def _frontend_url() -> str:
     return os.getenv("FRONTEND_URL", "http://localhost:3000").rstrip("/")
-
-
-def _is_https() -> bool:
-    return os.getenv("BACKEND_URL", "http://localhost:8000").startswith("https://")
 
 
 def _provider(name: str) -> OAuthProvider:
@@ -78,24 +75,30 @@ def _envelope(status_code: int, code: str, message: str) -> HTTPException:
     )
 
 
-def _make_state_cookie(state: str, provider: str) -> str:
+def _make_signed_state(nonce: str) -> str:
+    """Return nonce.timestamp.hmac — a self-verifying OAuth state parameter.
+
+    nonce: token_urlsafe chars [A-Za-z0-9_-], no dots.
+    timestamp: decimal integer, no dots.
+    hmac: hex digest, no dots.
+    Splitting on '.' with maxsplit=2 is therefore unambiguous.
+    """
     ts = str(int(time.time()))
-    payload = f"{state}|{provider}|{ts}"
+    payload = f"{nonce}.{ts}"
     sig = hmac.new(_secret_key().encode(), payload.encode(), hashlib.sha256).hexdigest()
-    return f"{payload}|{sig}"
+    return f"{nonce}.{ts}.{sig}"
 
 
-def _verify_state_cookie(cookie: str, url_state: str, provider: str) -> bool:
+def _verify_signed_state(signed_state: str) -> bool:
+    """Return True only if the signed state is structurally valid, unexpired, and HMAC-correct."""
     try:
-        state, prov, ts_str, sig = cookie.split("|", 3)
+        nonce, ts_str, sig = signed_state.split(".", 2)
         ts = int(ts_str)
     except ValueError:
         return False
-    if state != url_state or prov != provider:
-        return False
     if int(time.time()) - ts > _STATE_TTL_SECONDS:
         return False
-    payload = f"{state}|{prov}|{ts_str}"
+    payload = f"{nonce}.{ts_str}"
     expected = hmac.new(
         _secret_key().encode(), payload.encode(), hashlib.sha256
     ).hexdigest()
@@ -104,34 +107,22 @@ def _verify_state_cookie(cookie: str, url_state: str, provider: str) -> bool:
 
 async def _start_login(provider_name: str) -> RedirectResponse:
     provider = _provider(provider_name)
-    state = secrets.token_urlsafe(32)
-    cookie_val = _make_state_cookie(state, provider_name)
-    response = RedirectResponse(provider.authorization_url(state), status_code=302)
-    response.set_cookie(
-        key=_COOKIE_NAME,
-        value=cookie_val,
-        httponly=True,
-        samesite="lax",
-        secure=_is_https(),
-        max_age=_STATE_TTL_SECONDS,
-        path=_COOKIE_PATH,
-    )
-    return response
+    nonce = secrets.token_urlsafe(32)
+    signed_state = _make_signed_state(nonce)
+    return RedirectResponse(provider.authorization_url(signed_state), status_code=302)
 
 
 async def _handle_callback(
     provider_name: str,
     code: str,
-    state: str,
+    signed_state: str,
     db: AsyncSession,
-    request: Request,
 ) -> RedirectResponse:
-    cookie = request.cookies.get(_COOKIE_NAME, "")
-    if not _verify_state_cookie(cookie, state, provider_name):
+    if not _verify_signed_state(signed_state):
         raise _envelope(
             status.HTTP_400_BAD_REQUEST,
             "invalid_state",
-            "OAuth state is missing, expired, already used, or does not match.",
+            "OAuth state is missing, expired, or does not match.",
         )
 
     provider = _provider(provider_name)
@@ -157,11 +148,9 @@ async def _handle_callback(
         db, provider=provider_name, info=info, bundle=bundle
     )
     token = encode_jwt(user.id)
-    response = RedirectResponse(
+    return RedirectResponse(
         f"{_frontend_url()}/auth/callback#token={token}", status_code=302
     )
-    response.delete_cookie(key=_COOKIE_NAME, path=_COOKIE_PATH)
-    return response
 
 
 @router.get("/google/login", summary="Start Google OAuth")
@@ -171,12 +160,11 @@ async def google_login() -> RedirectResponse:
 
 @router.get("/google/callback", summary="Google OAuth callback")
 async def google_callback(
-    request: Request,
     code: str = Query(...),
     state: str = Query(...),
     db: AsyncSession = Depends(get_db),
 ) -> RedirectResponse:
-    return await _handle_callback("google", code, state, db, request)
+    return await _handle_callback("google", code, state, db)
 
 
 @router.get("/github/login", summary="Start GitHub OAuth")
@@ -186,12 +174,11 @@ async def github_login() -> RedirectResponse:
 
 @router.get("/github/callback", summary="GitHub OAuth callback")
 async def github_callback(
-    request: Request,
     code: str = Query(...),
     state: str = Query(...),
     db: AsyncSession = Depends(get_db),
 ) -> RedirectResponse:
-    return await _handle_callback("github", code, state, db, request)
+    return await _handle_callback("github", code, state, db)
 
 
 @router.get("/me", summary="Current authenticated user")
