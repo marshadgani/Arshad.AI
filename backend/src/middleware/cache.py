@@ -3,14 +3,17 @@ import os
 
 from redis.asyncio import Redis
 
-REDIS_URL = os.getenv("REDIS_URL")
-if not REDIS_URL:
-    raise RuntimeError(
-        "REDIS_URL is not set. Copy backend/.env.example to backend/.env and fill it in."
-    )
-
 _redis: Redis | None = None
 _init_lock = asyncio.Lock()
+
+
+def _redis_url() -> str:
+    url = os.getenv("REDIS_URL")
+    if not url:
+        raise RuntimeError(
+            "REDIS_URL is not set. Copy backend/.env.example to backend/.env and fill it in."
+        )
+    return url
 
 
 async def get_redis() -> Redis:
@@ -20,7 +23,7 @@ async def get_redis() -> Redis:
     async with _init_lock:
         if _redis is None:
             _redis = Redis.from_url(
-                REDIS_URL,
+                _redis_url(),
                 encoding="utf-8",
                 decode_responses=True,
             )
