@@ -40,7 +40,10 @@ _COOKIE_PATH = "/api/v1/auth"
 
 
 def _secret_key() -> str:
-    return os.getenv("SECRET_KEY", "")
+    key = os.getenv("SECRET_KEY", "")
+    if not key:
+        raise RuntimeError("SECRET_KEY env var is required for OAuth state signing")
+    return key
 
 
 def _frontend_url() -> str:
@@ -85,11 +88,12 @@ def _make_state_cookie(state: str, provider: str) -> str:
 def _verify_state_cookie(cookie: str, url_state: str, provider: str) -> bool:
     try:
         state, prov, ts_str, sig = cookie.split("|", 3)
+        ts = int(ts_str)
     except ValueError:
         return False
     if state != url_state or prov != provider:
         return False
-    if int(time.time()) - int(ts_str) > _STATE_TTL_SECONDS:
+    if int(time.time()) - ts > _STATE_TTL_SECONDS:
         return False
     payload = f"{state}|{prov}|{ts_str}"
     expected = hmac.new(

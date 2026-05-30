@@ -51,3 +51,12 @@ def test_verify_state_cookie_rejects_expired(monkeypatch):
 def test_verify_state_cookie_rejects_malformed():
     assert not _verify_state_cookie("notavalidcookie", "abc123", "google")
     assert not _verify_state_cookie("", "abc123", "google")
+
+
+def test_verify_state_cookie_rejects_non_numeric_timestamp():
+    # Tamper the timestamp field with a non-integer — must return False not raise
+    cookie = _make_state_cookie("abc123", "google")
+    parts = cookie.split("|")
+    parts[2] = "not-a-number"
+    tampered = "|".join(parts)
+    assert not _verify_state_cookie(tampered, "abc123", "google")
