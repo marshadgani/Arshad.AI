@@ -1,0 +1,16 @@
+{
+  "audit_run_id": "audit-2026-04-26",
+  "feature_id": "FEAT-096",
+  "tester_iteration": 0,
+  "verdict": "PASS",
+  "summary": "8 TCs reviewed; 0 real defects. Overrides connect to use api_key (not client_id) in auth URL with redirect_params=state=<state> (lines 49-62) — Kite's non-standard OAuth. exchange_code computes SHA256(api_key+request_token+api_secret) checksum exactly per Kite spec (lines 70-72). Token-shape mapping correctly returns access_token + refresh_token=None + expires_in=None (lines 99-105) since Kite tokens expire daily at 6 AM IST without refresh. Error paths: 4xx → 'token_exchange_failed' (line 86-90); body.status!='success' → 'kite_error' (lines 92-96). fetch_profile uses 'token api_key:access_token' auth scheme (line 113). sync GETs /portfolio/holdings with same auth scheme; truncates to 10 holdings.",
+  "defects": [
+    {"defect_id":"DEF-096-01","test_id":"TC-096-03","severity":"medium","description":"untestable_in_static_review — needs Kite test environment.","expected":"Checksum matches Kite's expected","actual":"SHA256 calculation verified at lines 70-72","file_hint":"backend/src/integrations/personal/zerodha_kite.py:70"}
+  ],
+  "total_defects_critical": 0,
+  "total_defects_high": 0,
+  "total_defects_medium": 1,
+  "total_defects_low": 0,
+  "real_defects_requiring_fix": 0,
+  "bug_fixer_required": false
+}

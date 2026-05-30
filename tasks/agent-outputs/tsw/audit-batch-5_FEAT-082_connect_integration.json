@@ -1,0 +1,16 @@
+{
+  "audit_run_id": "audit-2026-04-26",
+  "feature_id": "FEAT-082",
+  "feature_name": "Connect Integration",
+  "primary_files": ["backend/src/integrations/routers.py:111-134", "backend/src/integrations/base.py", "backend/src/integrations/personal/_oauth_base.py"],
+  "script_count": 6,
+  "test_cases": [
+    {"test_id":"TC-082-01","name":"Auth required","input":"POST /connect no JWT","expected":"401"},
+    {"test_id":"TC-082-02","name":"Unknown slug","input":"POST /api/v1/integrations/nope/connect","expected":"404 envelope {code:'unknown_integration'}"},
+    {"test_id":"TC-082-03","name":"OAuth happy path","input":"POST with valid OAuth provider","expected":"{integration_id, redirect_url} returned; redirect_url is provider authorize URL"},
+    {"test_id":"TC-082-04","name":"API key happy path","input":"POST {api_key:'xxx'} with API-key provider","expected":"{integration_id, redirect_url:None} returned"},
+    {"test_id":"TC-082-05","name":"IntegrationError","input":"provider.connect raises","expected":"400 envelope with provider's exc.code/message"},
+    {"test_id":"TC-082-06","name":"Missing payload defaults","input":"POST with no body","expected":"payload defaults to {} (no crash)"}
+  ],
+  "rtm_coverage": "AC-082-01..04 (auth, dispatch, error envelope, payload tolerance)"
+}

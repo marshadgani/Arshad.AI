@@ -1,0 +1,21 @@
+{
+  "audit_run_id": "audit-2026-04-26",
+  "feature_id": "FEAT-100",
+  "tester_iteration": 0,
+  "verdict": "FAIL",
+  "summary": "5 TCs reviewed; 1 real LOW-severity defect: hardcoded start_date='2026-04-20' in sync_url will return ever-growing windows as time passes. Should be a relative window (e.g., last 7 days). Defensive [{}] fallback for empty data verified.",
+  "defects": [
+    {"defect_id":"DEF-100-01","test_id":"TC-100-03","severity":"low","description":"sync_url has HARDCODED start_date='2026-04-20'. As of audit date (2026-04-28) this returns ~8 days of readiness, but the window grows unbounded over time. Will eventually return months/years of data, slowing sync and bloating integration.config.","expected":"Rolling window — e.g., start_date computed as (today - 7 days).isoformat()","actual":"sync_url=f'.../daily_readiness?start_date=2026-04-20' is a literal string","file_hint":"backend/src/integrations/personal/oauth_providers.py:152"},
+    {"defect_id":"DEF-100-02","test_id":"TC-100-04","severity":"low","description":"Defensive but unusual: `(body or {}).get('data', []) or [{}]` — works but inscrutable.","expected":"Empty data → latest_readiness_score=None","actual":"Empty list correctly falls back to [{}], and {}.get('score')=None — no crash. Verified.","file_hint":"backend/src/integrations/personal/oauth_providers.py:155-156"}
+  ],
+  "total_defects_critical": 0,
+  "total_defects_high": 0,
+  "total_defects_medium": 0,
+  "total_defects_low": 2,
+  "real_defects_requiring_fix": 1,
+  "bug_fixer_required": false,
+  "notes": [
+    "DEF-100-01 is a real defect but LOW severity. Will be aggregated and fixed in a single audit-fixup commit at the end of the campaign rather than per-batch.",
+    "DEF-100-02 is style, not a defect — included as observation."
+  ]
+}

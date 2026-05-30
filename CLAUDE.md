@@ -3,102 +3,6 @@
 > This file is the single source of truth for Claude working on this project.
 > Read it fully at the start of every session before touching any code.
 
-## 🚨 DEVELOPMENT STRATEGY — READ THIS FIRST, EVERY SESSION
-
-> **This is the non-negotiable rule for ALL feature development on this project.**
-> Every new feature, every non-trivial change, goes through the dev-team pipeline.
-> No exceptions. No shortcuts. No writing code directly.
-
-### Auto-Trigger — No command needed
-
-**Arshad will NEVER type `/dev-team`. He gives prompts directly.**
-
-**You must analyse every prompt and decide: is this a development request?**
-If yes → immediately invoke the dev-team orchestrator with his prompt. Do NOT ask for confirmation. Do NOT write code yourself. Just dispatch.
-
-```
-Task(subagent_type="dev-team-orchestrator", prompt=<arshad's exact prompt>)
-```
-
-### Trigger Detection — Read the intent, not the words
-
-Route to dev-team orchestrator when the prompt contains ANY of these intents:
-
-| Intent | Example prompts |
-|---|---|
-| Build something new | "Add a dark mode", "Create a settings page", "I want users to be able to…" |
-| Implement a feature | "Implement real-time notifications", "Build the chat interface" |
-| Add functionality | "Add search to the sidebar", "Let me filter by date" |
-| Create an endpoint | "I need an API for…", "Expose a route that…" |
-| New UI / component | "Design a dashboard widget", "Build a modal for…" |
-| Schema / data change | "Store user preferences", "Track conversation history" |
-| Integration | "Connect to Google Calendar", "Add GitHub webhook support" |
-| Refactor (multi-file) | "Clean up the auth flow", "Restructure the agent system" |
-
-### Do NOT route to dev-team — handle directly
-
-| Situation | Handle as |
-|---|---|
-| Single-line bug fix | Direct edit |
-| Config / env var change | Direct edit |
-| Rename / move file | Direct edit |
-| Typo / comment fix | Direct edit |
-| Explanation / question | Answer directly |
-| Fixing a broken test | Direct debugger agent |
-| Deployment issue | Direct fix |
-
-**When in doubt → route to dev-team.**
-
-### The 17-Agent Pipeline (19 Steps)
-
-The orchestrator runs these agents in strict sequence. Every agent output feeds the next.
-
-| Stage | Agent | Model | What It Does |
-|---|---|---|---|
-| 1 | `business-analyst` | Haiku | Extracts requirements → RTM + BPDD |
-| 2 | `enterprise-architect` *(pre)* | Sonnet | Enterprise architecture review — rejects bad ideas before any code |
-| 2.5 | `ai-engineer` | **Opus** | Tech lead — challenges decisions, flags scaling risks, sets architecture direction SA must follow |
-| 3 | `solution-architect` | Sonnet | Produces Solution Design Document (SDD) constrained by Tech Lead |
-| 3.3 | `system-engineer` | **Opus** | Designs system architecture, component structure, data flow, DB schema, caching strategy |
-| 3.5 | `engineer` | Sonnet | Builds production-ready MVP from SDD + system design |
-| 4 | `developer` | Sonnet | Generates complete feature code |
-| 4.3 | `frontend-engineer` | Sonnet | Production-grade UI — all 4 states (loading/empty/error/content), accessible, responsive, reusable |
-| 4.5 | `senior-engineer` | **Opus** | Code quality audit — finds N+1, bad patterns, scalability risks. No functionality changes. |
-| 4.6 | `software-architect` | **Opus** | Architecture restructuring — separates concerns, reduces coupling, increases modularity |
-| 5 | `process-organiser` | Haiku | Logs feature in process hierarchy |
-| 6 | `test-script-writer` | Sonnet | Writes test scripts for every requirement |
-| 7 | `tester` | Sonnet | Executes tests, reports defects |
-| 8 | `bug-fixer` ↔ `tester` | Sonnet | Fix + re-test loop (max 5 iterations) |
-| 8.5 | `debugger` | **Opus** | Root cause analysis — production outage mode, 3 levels deep |
-| 8.6 | `performance-optimisation-engineer` | Sonnet | Eliminates bottlenecks — N+1, missing indexes, async gaps, memory leaks |
-| 8.7 | `security-auditor` | **Opus** | OWASP Top 10 — attack scenarios, secure implementation fixes |
-| 8.8 | `devops-engineer` | Sonnet | Deployment architecture, monitoring, scaling, production checklist |
-| 9 | `enterprise-architect` *(post)* | Sonnet | Final architectural verdict — always runs |
-
-**Orchestrator model: `claude-opus-4-7`** — it controls all 17 agents.
-
-### Model Tiers
-
-| Tier | Agents | Purpose |
-|---|---|---|
-| **Opus** (6 agents) | ai-engineer, system-engineer, senior-engineer, software-architect, debugger, security-auditor | Deep reasoning — architectural decisions, audits, root cause, security |
-| **Sonnet** (10 agents) | engineer, developer, frontend-engineer, perf-opt, devops, solution-architect, enterprise-architect, test-writer, tester, bug-fixer | Execution — code generation, testing, optimization |
-| **Haiku** (2 agents) | business-analyst, process-organiser | Simple extraction and formatting |
-
-### Three Invariants (never break these)
-
-1. **Code accumulates forward** — one `code` object from Step 3.5 onward; each agent improves it in-place
-2. **Steps 8.5 → 9 always run** — even if the bug-fix loop exhausted 5 iterations; code is always hardened, secured, and signed off
-3. **Path denylist is checked after every code-generating step** — forbidden file path = immediate pipeline halt
-
-### Agent files location
-
-All agent definitions live in `.claude/agents/dev-team/`:
-- `orchestrator.md` — the controlling agent
-- One `.md` file per specialist agent listed above
-
----
-
 ## Auto-Trigger Rule — GitHub URLs
 
 **Whenever a GitHub URL (github.com/...) appears in a user prompt, automatically run `/fetch-github-repo <url>` on it.**
@@ -106,12 +10,19 @@ No need for the user to type the command — detect the URL and trigger the fetc
 
 ## Model Strategy (Read First)
 
-| Phase | Model | When |
-|---|---|---|
-| **Planning** | `claude-opus-4-7` | Any task with 3+ steps, architectural decisions, ambiguous requirements |
-| **Execution** | `claude-sonnet-4-6` | All regular prompts, all agent runs, all code writing |
+Three tiers. Pick by **cost-of-being-wrong**, not task length.
 
-**Rule:** Before writing a single line of code on any non-trivial task, invoke the `planner` agent (Opus) via `/plan <description>`. Opus thinks, Sonnet builds.
+| Tier | Model ID | When |
+|---|---|---|
+| **Cheap** | `claude-haiku-4-5-20251001` | Mechanical, near-deterministic, output verifiable in one read. Classification, intent routing, file lookups, single-line fixes, renames, config tweaks, lint cleanups, structured-extraction agents (BA, process-organiser), grep-style search. |
+| **Default** | `claude-sonnet-4-6` | Code writing, normal investigation, agent execution. The workhorse for every task that needs understanding but not deep reasoning. |
+| **Premium** | `claude-opus-4-7` | Planning, architecture, quality gates, hard debugging, security audit. Anything where wrong decisions cascade. |
+
+**Routing rule:** Haiku for verifiable mechanical work → Sonnet for default execution → Opus for high-leverage thinking. Most prompts land on Sonnet.
+
+**Planning rule (unchanged):** Before writing a line of code on any non-trivial task, invoke the `planner` agent (Opus) via `/plan <description>`. Opus thinks, Sonnet builds, Haiku tidies.
+
+**Escalation rule:** If a task fails on its assigned tier, **escalate one level** — never retry on the same tier. Haiku confused → Sonnet. Sonnet stuck after 1 attempt → Opus. The escalation path is the real quality guarantee.
 
 **Never skip planning for:**
 - New features touching multiple files or layers
@@ -119,11 +30,14 @@ No need for the user to type the command — detect the URL and trigger the fetc
 - Database schema changes
 - Any task where the approach is unclear
 
-**Skip planning for:**
+**Skip planning (route directly to Haiku) for:**
 - Single-line fixes
 - Config value changes
 - Renames
 - Adding a single test
+- Status / lookup questions
+
+**Per-call override:** When the orchestrator knows better than an agent's frontmatter default, pass `Task(model="haiku" | "sonnet" | "opus")`. Resolution order: per-call > frontmatter > project default > inherited.
 
 ---
 
@@ -280,6 +194,12 @@ Arshad.AI/
 | `OAUTH_ENCRYPTION_KEY` | Phase C+ | 32-byte URL-safe base64. Encrypts provider tokens at rest. Rotation locks all users out. |
 | `JWT_EXPIRY_HOURS` | Phase C+ | JWT lifetime; default 24 |
 | `BACKEND_URL` / `FRONTEND_URL` | Phase C+ | Public URLs — used to build provider redirect URIs and post-login frontend redirect |
+| `ENABLE_INPROCESS_WORKER` | Phase F+ | `true` to start the queue worker on FastAPI lifespan (Render). Leave `false` in docker-compose where Airflow handles it. |
+| `QUEUE_POLL_INTERVAL_SECONDS` | Phase F+ | Worker poll interval; default `5`. |
+| `MAX_INGEST_BATCH_SIZE` | Phase F+ | Per-DAG row limit per run; default `100`. |
+| `ANTHROPIC_MODEL_DEFAULT` | Phase B+ | Default model name; defaults to `claude-haiku-4-5-20251001`. |
+| `CHAT_MAX_TOKENS` | Phase B+ | Max output tokens per chat turn; default `2048`. |
+| `CHAT_HISTORY_TOKEN_BUDGET` | Phase B+ | Drop oldest user/assistant pairs once history exceeds this; default `8000`. |
 
 Never hard-code secrets. Always add new vars to `backend/.env.example`.
 
@@ -306,15 +226,110 @@ cd backend && uvicorn src.main:app --reload --port 8000
 
 ## 8. Key Code Patterns
 
-### Adding a new Claude tool *(planned — module not yet created)*
-1. Define the tool schema in `backend/src/tools/definitions.py`
-2. Implement the handler in `backend/src/tools/handlers.py`
-3. Register it in the `TOOL_HANDLERS` map
-4. All Claude calls go through `backend/src/services/ai.py` — never inline
+### Adding a new Claude tool *(Phase D — implemented)*
 
-> The `backend/src/tools/` and `backend/src/services/` packages do not yet exist;
-> create them when the first tool is implemented. The pattern above is the target
-> design, not the current state of the codebase.
+Tool layout (per Phase D spec at `docs/superpowers/specs/2026-04-26-backend-phase-d-design.md`):
+
+```
+backend/src/tools/
+├── base.py            ← Tool ABC + ToolError / ProviderNotLinked / ProviderReauthRequired
+├── registry.py        ← TOOL_REGISTRY + @register decorator
+├── token_service.py   ← get_access_token + refresh_google_token
+├── clients/           ← google_calendar, gmail, github HTTP wrappers
+├── calendar/ gmail/ github/   ← one module per tool
+└── routers.py         ← POST /api/v1/tools/{name}
+```
+
+To add a tool:
+1. Pick the provider directory (`tools/<provider>/`).
+2. Create a module with `Input` / `Output` Pydantic schemas (output MUST have `data` + `summary`) and a class subclassing `Tool` with `@register` decorator.
+3. Import the module in the provider's `__init__.py` so `@register` runs at app startup.
+4. The REST endpoint `POST /api/v1/tools/{name}` and the `TOOL_REGISTRY` map both pick it up automatically.
+
+Phase B chat will eventually call tools directly via `TOOL_REGISTRY[name](user=..., db=..., payload=...)` — no HTTP round-trip needed.
+
+### Adding a new domain agent *(Phase E — implemented)*
+
+Agent layout (per Phase E spec at `docs/superpowers/specs/2026-04-26-backend-phase-e-design.md`):
+
+```
+backend/src/agents/
+├── base.py            ← Agent ABC + AgentError + AgentNotImplemented
+├── registry.py        ← AGENT_REGISTRY + @register decorator
+├── routers.py         ← POST /api/v1/agents/{domain}/{agent}/run + GET /api/v1/agents
+├── calendar/ email/ github/ ai_core/ data_pipeline/ infrastructure/   ← one module per agent
+
+backend/src/services/
+└── gateway.py         ← dispatch(domain, agent, user, db, payload) — single in-process entry point
+```
+
+To add an agent:
+1. Pick the domain directory (`agents/<domain>/`).
+2. Create a module with `Input`/`Output` Pydantic schemas (output MUST have `data` + `summary`) and a class subclassing `Agent` with `@register` decorator. Set `domain`, `name`, `description`, `tool_dependencies` (Phase D tool slugs).
+3. Import the module in the domain's `__init__.py` so `@register` runs at app startup.
+4. The REST endpoint and `AGENT_REGISTRY` map both pick it up automatically. The gateway routes by `(domain, name)` slug.
+
+Inter-agent calls (rule §19.4): never call another agent's `run()` directly — call `gateway.dispatch(...)` so cross-cutting concerns (auth, error mapping) stay in one place.
+
+LLM-bound agents (chat orchestration, summarisation, code review) raise `AgentNotImplemented(slug, owning_phase="Phase B")` from `run()` until Phase B replaces with real Claude calls.
+
+### Adding a new ingestion DAG *(Phase F — implemented)*
+
+Layout (per Phase F spec at `docs/superpowers/specs/2026-04-26-backend-phase-f-design.md`):
+
+```
+backend/src/services/ingestion/
+├── runner.py            ← run(dag_id, user_id, payload, db) — single dispatch point
+├── calendar.py          ← per-DAG ingestion logic (called by runner)
+├── email.py
+├── github.py
+└── analytics.py
+
+backend/src/services/queue_worker.py  ← in-process FastAPI worker (Render)
+backend/src/models/dag_trigger.py     ← DagTriggerQueue ORM model
+backend/src/models/ingested.py        ← 4 ingested_* tables
+
+data-pipelines/ingestion/
+├── _ingestion_helpers.py   ← shared claim_one / run_ingest_for_row / mark_done
+├── calendar_dag.py         ← thin Airflow wrapper (sensor → ingest → mark_done)
+├── email_dag.py
+├── github_dag.py
+└── analytics_dag.py
+```
+
+To add a new ingestion DAG:
+1. Write a new module in `backend/src/services/ingestion/<name>.py` exposing `async def ingest(*, user, db, payload) -> dict`.
+2. Wire it into `runner.py`'s dispatch.
+3. Replace the corresponding `data_pipeline/<name>_ingestor.py` agent's `AgentNotImplemented` with a real INSERT-queue body.
+4. Copy one of the existing `*_dag.py` files in `data-pipelines/ingestion/` and change the `DAG_ID` string.
+
+Both Airflow (docker-compose dev) and the in-process queue worker (Render prod via `ENABLE_INPROCESS_WORKER=true`) consume the same `dag_trigger_queue` table with `SELECT ... FOR UPDATE SKIP LOCKED LIMIT 1`. Same logic, two execution environments.
+
+### Adding chat features *(Phase B — implemented; final phase)*
+
+Layout (per Phase B spec at `docs/superpowers/specs/2026-04-26-backend-phase-b-design.md`):
+
+```
+backend/src/
+├── services/
+│   ├── ai.py                  ← Anthropic SDK wrapper (call + stream)
+│   ├── intent_classifier.py   ← stage-1 Haiku call: domain picker
+│   └── chat.py                ← agentic loop + SSE event yielding
+├── api/v1/chat.py             ← /api/v1/chat sessions + SSE messages
+└── models/conversation.py     ← ConversationSession + ConversationMessage
+```
+
+Key invariants:
+- **All SDK calls go through `services/ai.py`** — never `anthropic.AsyncAnthropic` inline.
+- **SSE event protocol** is defined in the `response_streamer` agent — `delta` / `tool_use` / `tool_result` / `intent` / `error` + `[DONE]` terminator.
+- **Two-stage routing**: stage-1 keyword fast-path or Haiku classifier picks domain; stage-2 Haiku call gets only that domain's tools (calendar / email / github / general). Tool subset is computed in `services.chat._tool_subset(intent)`.
+- **History is reconstructed** from `conversation_messages` rows on every turn so the SDK call sees the canonical Anthropic-API-shaped messages array. Token-budget compression drops oldest user/assistant turns until under `CHAT_HISTORY_TOKEN_BUDGET`.
+- **Inter-agent calls inside the agentic loop** still go through the gateway — `services.chat._dispatch_tool` validates input + runs via `Tool()(...)` or `Agent.run(...)`.
+- **Claude tool use exposes agents** via `agent_<slug>` prefix; `_dispatch_tool` strips the prefix and dispatches.
+
+To add a new chat-relevant tool or agent:
+1. Build it under Phase D (tool) or Phase E (agent) per their existing patterns.
+2. Add it to `services.chat._tool_subset` for the appropriate intent so Claude can pick it.
 
 ### Adding a new API endpoint
 Follow `.claude/rules/api.md`:
@@ -506,6 +521,19 @@ When a skill or agent is genuinely useful but invisible, **promote it** by copyi
 5. **Document Results** — Add a review section to `tasks/todo.md` when done
 6. **Capture Lessons** — Update `tasks/lessons.md` after every correction
 
+### Session lifecycle — `/session-end` + `tasks/handoff.md` + `tasks/dev-log.md`
+
+The repo runs a session-end cycle that keeps Claude productive across sessions:
+
+| File | Behaviour | Read when |
+|---|---|---|
+| `tasks/handoff.md` | **Overwritten** every session by `/session-end`. Single tight "where we are / what's next / watch out for" snapshot, kept under 60 lines. | Auto-surfaced by `.claude/hooks/session-start.sh` so every new session starts with it in context. |
+| `tasks/dev-log.md` | **Append-only** chronological history. New entries go at the top. Past entries are immutable — corrections become new entries. | On demand when historical context is needed (decisions, pivots, skipped work). |
+| `tasks/lessons.md` | **Append-only** corrections + rules-going-forward. | Reviewed at session start; durable across sessions. |
+| `tasks/last-gate-report.md` | Most-recent gate verdict. Drives the auto-pr workflow's squash-merge. | Read before any "Merge to Main" trigger. |
+
+**At session end, run `/session-end`** (slash command at `.claude/commands/session-end.md`). It writes the handoff, appends the dev log entry, commits both files, and asks before pushing (private by default per the original pattern). **At session start**, the SessionStart hook prints `tasks/handoff.md` so whichever Claude is loaded sees it without being told.
+
 ---
 
 ## 15. External Skill Sources (Auto-Updated Weekly)
@@ -524,6 +552,7 @@ A git commit is created automatically when any skill file changes.
 | `obsidian-skills` | https://github.com/kepano/obsidian-skills.git | defuddle, json-canvas, obsidian-bases, obsidian-cli, obsidian-markdown (5) |
 | `context7` | https://github.com/upstash/context7.git | context7-cli, context7-mcp, find-docs (3) |
 | `everything-claude-code` | https://github.com/affaan-m/everything-claude-code.git | agent-introspection-debugging, agent-sort, api-design, article-writing, backend-patterns, brand-voice, bun-runtime, claude-api, coding-standards, content-engine, crosspost, deep-research, dmux-workflows, documentation-lookup, e2e-testing, eval-harness, exa-search, fal-ai-media, frontend-design, frontend-patterns, frontend-slides, investor-materials, investor-outreach, market-research, mcp-server-patterns, nextjs-turbopack, product-capability, security-review, strategic-compact, tdd-workflow, verification-loop, video-editing, x-api (34) |
+| `gstack` | https://github.com/garrytan/gstack.git | gstack (root meta-skill), browse, qa, review, ship, careful, guard, freeze, unfreeze, learn, codex, retro, canary, scrape, autoplan, skillify, investigate, health, pair-agent, plan-tune, plan-design-review, plan-eng-review, plan-ceo-review, plan-devex-review, devex-review, design-review, design-shotgun, design-html, design-consultation, document-release, gstack-upgrade, land-and-deploy, landing-report, setup-deploy, setup-browser-cookies, setup-gbrain, open-gstack-browser, office-hours, context-save, context-restore, qa-only, cso, make-pdf, benchmark, benchmark-models, hackernews-frontpage, gstack-openclaw-ceo-review, gstack-openclaw-investigate, gstack-openclaw-retro, gstack-openclaw-office-hours (50) |
 
 ### Active Sources — Agents
 
@@ -646,8 +675,14 @@ This registry is the source of truth for weekly auto-updates.
 | `awesome-claude-code` | https://github.com/hesreallyhim/awesome-claude-code.git | commands | 1 command | 2026-04-25 |
 | `context7` | https://github.com/upstash/context7.git | skills+agents+commands | 3 skills, 1 agent, 1 command | 2026-04-25 |
 | `everything-claude-code` | https://github.com/affaan-m/everything-claude-code.git | skills | 34 skills | 2026-04-25 |
+| `browser-use` | https://github.com/browser-use/browser-use.git | skills | 4 skills | 2026-04-26 |
+| `marketingskills` | https://github.com/coreyhaines31/marketingskills.git | skills | 40 skills | 2026-04-26 |
+| `web-asset-generator` | https://github.com/alonw0/web-asset-generator.git | skills | 1 skill (favicons + OG images) | 2026-04-26 |
+| `Deep-Research-skills` | https://github.com/Weizhena/Deep-Research-skills.git | skills+agents | 24 skills, 7 agents (slug `-eep--esearch-skills` due to fetcher bug) | 2026-04-26 |
+| `andrej-karpathy-skills` | https://github.com/forrestchang/andrej-karpathy-skills.git | skills | 1 skill (karpathy-guidelines: anti-overcomplication, surgical changes, surface assumptions) | 2026-04-28 |
+| `gstack` | https://github.com/garrytan/gstack.git | skills | 50 skills (browser dogfooding, design/eng/ceo/devex review tracks, plan-tune, ship, careful, guard, freeze/unfreeze, openclaw variants — see §15 for full list). gstack uses a **flat layout** (skills at repo root); fetch script handles this since 2026-05-02 + a 5MB-per-file cap and a `test/`/`tests/`/`node_modules/`/`dist/`/`build/` prune so test fixtures don't bloat the vendored copy. | 2026-05-01 |
 
-> This table is updated automatically by `scripts/fetch-github-repo.sh` when a new repo is integrated.
+> This table should be updated alongside `scripts/fetch-github-repo.sh` runs. Keep in sync with `.claude/github-repos.json`.
 
 ---
 
@@ -736,6 +771,7 @@ agent/<domain>/<agent-name>
 | `tool-dispatcher` | `agent/ai-core/tool-dispatcher` | Resolves and invokes Claude tool calls |
 | `context-manager` | `agent/ai-core/context-manager` | Manages conversation history and context compression |
 | `response-streamer` | `agent/ai-core/response-streamer` | Handles SSE streaming of Claude responses to frontend |
+| `council-chairman` | (in-process, no branch) | Multi-model LLM panel: 3 Claude models answer in parallel, anonymously rank each other, chairman synthesises. Wired to `general` chat intent + REST `POST /api/v1/agents/ai_core/council_chairman/run`. |
 
 #### data-pipeline domain
 | Agent | Branch | Purpose |
@@ -935,4 +971,101 @@ Claude itself never invokes the merge directly. The auto-merge is a property of 
 The full report is **always posted to the GitHub PR as a comment**, regardless of outcome.
 Format: see `.claude/commands/gate.md § Step 2`.
 The report includes: agent-by-agent results table, detailed findings per agent, and a prioritised action-item checklist.
+
+
+---
+
+## 21. AI Dev Team Auto-Trigger (PERMANENT)
+
+**Whenever the user prompt is a feature requirement** — phrased as 'build / add / implement / create / develop X', or describes new functionality with multi-step nature — automatically invoke the `/dev-team` slash command.
+
+### Cost model
+
+The dev-team is a Claude-Code-native agent set. Each role lives at `.claude/agents/dev-team/<role>.md` and runs as a `Task()` subagent in this session. **No `ANTHROPIC_API_KEY` consumption.** Same billing model as `code-reviewer`, `debugger`, etc.
+
+### Trigger detection (heuristics — done in your own context)
+
+Treat the prompt as a feature requirement if:
+- Starts with build / add / implement / create / develop / design / make
+- Length ≥ 6 words
+- Not in the do-NOT-trigger list below
+
+User escape hatches:
+- Prefix `@build` → force trigger
+- Prefix `@chat` → force skip (always treat as conversation)
+
+### Do NOT trigger on
+
+- Diagnostic prompts ("why is X failing", "investigate Y", "the deploy is broken")
+- Questions ("how does X work", "what are my options")
+- Single-line edits / typos
+- Conversational chatter ("yes", "ok", "continue", "stop", "cancel")
+- Ambiguous one-word prompts
+- Explicit `@chat` prefix
+
+### Flow when triggered
+
+1. Spawn the dev-team-orchestrator subagent:
+   ```
+   Task(subagent_type="dev-team-orchestrator",
+        description="Run dev-team pipeline",
+        prompt=<requirement>)
+   ```
+2. The orchestrator runs all 11 steps autonomously — confirmation (via `AskUserQuestion`), counter increment, BA → EA-pre → SA → Dev → PO → TSW → Tester → BugFixer↔Tester loop → EA-post, denylist validation, branch creation, pipeline-runs row.
+3. Surface the orchestrator's return block to the user (Feature ID, branch, status, EA decision, artifact paths).
+4. The full recipe lives in `.claude/agents/dev-team/orchestrator.md`. The slash command is a thin wrapper.
+
+### Pipeline guarantees
+
+- 9 stages: BA → EA-pre → SA → Dev → PO → TSW → Tester → [BugFixer ↔ Tester loop, cap 5] → EA-post (always runs, even after cap)
+- Path denylist enforced before any Write (`backend/src/main.py`, `backend/src/auth/*`, `backend/alembic/env.py`, `.github/workflows/*`, `render.yaml`, `vercel.json`, `Dockerfile*`, `CLAUDE.md`, `tasks/process-hierarchy.md`, `tasks/last-gate-report.md`, `tasks/lessons.md`, `tasks/.feature-counter`, any `..` paths)
+- Live writes go to a fresh `dev-team/<feat-id>-<slug>` branch — never `develop-AION` or `main` directly
+- `tasks/process-hierarchy.md` updated via Edit (or atomic Write+mv) — never recreated
+- Every agent output written to `tasks/agent-outputs/<role>/<FEAT-NNN>_<ts>.json`
+- One row appended to `tasks/pipeline-runs.md` per invocation
+
+### Cancellation
+
+If the user says "stop" / "cancel" between stages, halt the pipeline at the last completed stage. Partial artifacts persist; the run logs as `halted`.
+
+---
+
+## 22. Orchestrator Agent (PERMANENT)
+
+`/dev-team` runs a fixed 9-stage feature pipeline. Everything else multi-agent goes through the **Orchestrator** at `.claude/agents/orchestrator.md` (Opus-tier planner + executor).
+
+### When to use
+
+| Use | Why |
+|---|---|
+| `/dev-team <feature>` | New feature — deterministic 9-stage pipeline |
+| `/orchestrate <objective>` | Audit / refactor / multi-agent investigation / hybrid plan |
+| `Task(subagent_type="orchestrator", ...)` | Direct invocation from another agent / slash command |
+
+### Lifecycle
+
+Plan → Dispatch → (Reflect / Replan) → Quality Gate → Report. Each run gets a fresh `tasks/orchestrator-runs/ORCH-NNN/` directory containing `plan.json`, `progress.md`, `artifacts/`, `gate-report.md`, `final.md`.
+
+### Universe
+
+The orchestrator dispatches ONLY the 15 project + dev-team agents (Option B):
+`planner, code-reviewer, debugger, doc-writer, refactorer, security-auditor, test-writer, business-analyst, enterprise-architect, solution-architect, developer, process-organiser, test-script-writer, tester, bug-fixer`.
+
+It does NOT dispatch vendored agents, backend Python agents, or harness built-ins. If the objective needs those, that's an orchestrator-out-of-scope signal — surface to the user.
+
+### Caps
+
+- 25 `Task()` calls per run
+- 3 replans per run
+- 30 min wall clock (soft)
+- Always runs the 6-agent gate at the end (Option 3A)
+- Always interactive on ambiguous prompts (Option 2A — uses `AskUserQuestion`)
+
+### Persistence
+
+`tasks/orchestrator-runs/` is committed to git. Every run is auditable from disk alone. Counter at `tasks/.orchestrator-counter`.
+
+### Gate-report contract
+
+Each run writes BOTH `tasks/orchestrator-runs/<RUN-ID>/gate-report.md` (run-local) AND `tasks/last-gate-report.md` (the auto-pr workflow's merge signal per §20). A non-BLOCKED gate verdict from an orchestrator run can satisfy "Merge to Main" without re-running `/gate`.
 

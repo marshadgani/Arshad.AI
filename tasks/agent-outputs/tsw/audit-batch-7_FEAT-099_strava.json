@@ -1,0 +1,16 @@
+{
+  "audit_run_id": "audit-2026-04-26",
+  "feature_id": "FEAT-099",
+  "feature_name": "Strava (personal integration)",
+  "primary_files": ["backend/src/integrations/personal/oauth_providers.py:73-117"],
+  "script_count": 6,
+  "test_cases": [
+    {"test_id":"TC-099-01","name":"Comma-separated scopes","input":"connect","expected":"scope_separator=',' so URL has scope=read,activity:read_all,profile:read_all"},
+    {"test_id":"TC-099-02","name":"approval_prompt=auto","input":"connect","expected":"additional_auth_params={'approval_prompt':'auto'} appended to URL"},
+    {"test_id":"TC-099-03","name":"fetch_profile","input":"access_token","expected":"GET /api/v3/athlete; returns {strava_id, username, firstname}"},
+    {"test_id":"TC-099-04","name":"Sync activities","input":"connected","expected":"GET /api/v3/athlete/activities?per_page=10; integration.config.recent_activities truncated to 5"},
+    {"test_id":"TC-099-05","name":"recent_activity_count","input":"sync","expected":"len of returned list (not truncated)"},
+    {"test_id":"TC-099-06","name":"distance_m field","input":"sync","expected":"each activity has {name, type, distance_m}"}
+  ],
+  "rtm_coverage": "AC-099-01..03 (comma-scope quirk)"
+}

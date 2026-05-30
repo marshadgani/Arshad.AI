@@ -1,0 +1,18 @@
+{
+  "audit_run_id": "audit-2026-04-26",
+  "feature_id": "FEAT-034",
+  "tester_iteration": 0,
+  "verdict": "PASS",
+  "summary": "8 TCs reviewed; 0 real defects. PATCH body built only from `is not None` fields (lines 59-68); empty patch yields {} body; event_id Field(min_length=1) enforced; PATCH method sent; all error paths share the verified google_calendar.request infrastructure (refresh-on-401, ProviderReauthRequired, ToolError mapping for 4xx/5xx).",
+  "defects": [
+    {"defect_id":"DEF-034-01","test_id":"TC-034-03","severity":"medium","description":"untestable_in_static_review — provider linkage check needs live AsyncSession.","expected":"ProviderNotLinked('google') when oauth_account row absent","actual":"Inherits from token_service.get_access_token; verified in FEAT-033","file_hint":"backend/src/tools/token_service.py:56"},
+    {"defect_id":"DEF-034-02","test_id":"TC-034-04","severity":"medium","description":"untestable_in_static_review — needs httpx mock for 401-then-refresh sequence.","expected":"first 401 → refresh → retry","actual":"Inherits google_calendar.request; verified in FEAT-033","file_hint":"backend/src/tools/clients/google_calendar.py:40"},
+    {"defect_id":"DEF-034-03","test_id":"TC-034-05","severity":"medium","description":"untestable_in_static_review — needs httpx mock for second 401.","expected":"second 401 → ProviderReauthRequired","actual":"Inherits google_calendar.request; verified in FEAT-033","file_hint":"backend/src/tools/clients/google_calendar.py:43"}
+  ],
+  "total_defects_critical": 0,
+  "total_defects_high": 0,
+  "total_defects_medium": 3,
+  "total_defects_low": 0,
+  "real_defects_requiring_fix": 0,
+  "bug_fixer_required": false
+}

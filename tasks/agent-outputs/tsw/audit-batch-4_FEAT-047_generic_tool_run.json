@@ -1,0 +1,18 @@
+{
+  "audit_run_id": "audit-2026-04-26",
+  "feature_id": "FEAT-047",
+  "feature_name": "Generic Tool Run Endpoint",
+  "primary_files": ["backend/src/tools/routers.py", "backend/src/tools/registry.py"],
+  "script_count": 8,
+  "test_cases": [
+    {"test_id":"TC-047-01","name":"GET /api/v1/tools list","input":"GET /api/v1/tools (auth required)","expected":"200; {data:[{name, description, input_schema}, ...], total:N}; reflects TOOL_REGISTRY"},
+    {"test_id":"TC-047-02","name":"Auth-gated","input":"POST /api/v1/tools/calendar_create_event without JWT","expected":"401 from get_current_user dependency at router level (line 29)"},
+    {"test_id":"TC-047-03","name":"Unknown tool 404","input":"POST /api/v1/tools/nonexistent_tool {} with valid JWT","expected":"404 envelope {error:{code:'unknown_tool', message, details:{}}}"},
+    {"test_id":"TC-047-04","name":"ValidationError 400","input":"POST /api/v1/tools/calendar_create_event with empty body {}","expected":"400 envelope {error:{code:'invalid_input', details:{errors:[...]}}}"},
+    {"test_id":"TC-047-05","name":"ProviderNotLinked 400","input":"valid input but oauth_account row absent","expected":"400 envelope {error:{code:'oauth_account_not_linked', message:'User has not linked google. ...'}}"},
+    {"test_id":"TC-047-06","name":"ProviderReauthRequired 401","input":"second-401 path triggered","expected":"401 envelope {error:{code:'google_reauth_required', message}}"},
+    {"test_id":"TC-047-07","name":"ToolError(provider_http_error) 502","input":"provider 5xx","expected":"502 envelope {error:{code:'provider_http_error', message}}"},
+    {"test_id":"TC-047-08","name":"ToolError other 400","input":"provider non-401 4xx","expected":"400 envelope {error:{code:'provider_request_failed', message}}"}
+  ],
+  "rtm_coverage": "AC-047-01..06 (router-level auth, dynamic tool lookup, validation error envelope, three exception classes mapped to correct HTTP codes)"
+}

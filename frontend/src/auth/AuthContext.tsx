@@ -8,7 +8,6 @@ import {
   type ReactNode,
 } from 'react';
 
-import { API_BASE } from '../lib/api';
 import { clearToken, getToken, setToken } from './tokenStorage';
 
 export type AuthUser = {
@@ -43,7 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const controller = new AbortController();
     let active = true;
     setIsLoading(true);
-    fetch(`${API_BASE}/api/v1/auth/me`, {
+    fetch('/api/v1/auth/me', {
       headers: { Authorization: `Bearer ${token}` },
       signal: controller.signal,
     })
@@ -77,12 +76,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginWith = useCallback((provider: 'google' | 'github') => {
     // Top-level navigation (NOT fetch) — fetch can't follow the cross-origin
     // redirect to the provider's consent page; the browser must own the URL bar.
-    window.location.href = `${API_BASE}/api/v1/auth/${provider}/login`;
+    window.location.href = `/api/v1/auth/${provider}/login`;
   }, []);
 
   const logout = useCallback(async () => {
     try {
-      await fetch(`${API_BASE}/api/v1/auth/logout`, { method: 'POST' });
+      await fetch('/api/v1/auth/logout', { method: 'POST' });
     } catch {
       // server-side noop — ignore network errors
     }

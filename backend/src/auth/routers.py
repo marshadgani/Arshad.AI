@@ -1,32 +1,26 @@
 """/api/v1/auth/* — login, callback, me, logout.
 
-OAuth CSRF protection uses a self-verifying signed state parameter:
-  "{nonce}.{timestamp}.{hmac_sha256}"
-The nonce is random (token_urlsafe), the timestamp enforces a 5-min TTL,
-and the HMAC (keyed with SECRET_KEY) proves the state was issued by this
-backend. Google echoes the state back unchanged, and the callback verifies
-the signature — no cookies, no Redis, no cross-domain issues.
+State is stored in Redis (``oauth_state:<state> = "<provider>"``, 5-min TTL).
+The callback uses ``GETDEL`` to validate-and-consume atomically — a plain
+``GET`` then ``DELETE`` would leave a millisecond-wide replay window where
+two concurrent callbacks with the same code could both pass validation.
 
-This works correctly regardless of whether the frontend and backend are on
-different domains (Vercel + Render), because no browser-stored state is
-involved. The signed state in the URL is the entire CSRF token.
-
-Logout is a stateless 204 — the frontend wipes its localStorage JWT.
+Logout is a stateless 204 — the frontend wipes its localStorage entry.
+A real revocation list would require Redis lookups on every authenticated
+request, which contradicts our stateless-JWT decision.
 """
 
 from __future__ import annotations
 
-import hashlib
-import hmac
 import os
 import secrets
-import time
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..middleware.cache import get_redis
 from ..models.database import get_db
 from ..models.user import User
 from .dependencies import get_current_user
@@ -38,13 +32,6 @@ from .service import upsert_user_from_oauth
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 _STATE_TTL_SECONDS = 300
-
-
-def _secret_key() -> str:
-    key = os.getenv("SECRET_KEY", "")
-    if not key:
-        raise RuntimeError("SECRET_KEY env var is required for OAuth state signing")
-    return key
 
 
 def _frontend_url() -> str:
@@ -75,57 +62,27 @@ def _envelope(status_code: int, code: str, message: str) -> HTTPException:
     )
 
 
-def _make_signed_state(nonce: str) -> str:
-    """Return nonce.timestamp.hmac — a self-verifying OAuth state parameter.
-
-    nonce: token_urlsafe chars [A-Za-z0-9_-], no dots.
-    timestamp: decimal integer, no dots.
-    hmac: hex digest, no dots.
-    Splitting on '.' with maxsplit=2 is therefore unambiguous.
-    """
-    ts = str(int(time.time()))
-    payload = f"{nonce}.{ts}"
-    sig = hmac.new(_secret_key().encode(), payload.encode(), hashlib.sha256).hexdigest()
-    return f"{nonce}.{ts}.{sig}"
-
-
-def _verify_signed_state(signed_state: str) -> bool:
-    """Return True only if the signed state is structurally valid, unexpired, and HMAC-correct."""
-    try:
-        nonce, ts_str, sig = signed_state.split(".", 2)
-        ts = int(ts_str)
-    except ValueError:
-        return False
-    age = int(time.time()) - ts
-    if (
-        age < 0 or age > _STATE_TTL_SECONDS
-    ):  # negative age = future-dated state (clock skew attack)
-        return False
-    payload = f"{nonce}.{ts_str}"
-    expected = hmac.new(
-        _secret_key().encode(), payload.encode(), hashlib.sha256
-    ).hexdigest()
-    return hmac.compare_digest(sig, expected)
-
-
 async def _start_login(provider_name: str) -> RedirectResponse:
     provider = _provider(provider_name)
-    nonce = secrets.token_urlsafe(32)
-    signed_state = _make_signed_state(nonce)
-    return RedirectResponse(provider.authorization_url(signed_state), status_code=302)
+    state = secrets.token_urlsafe(32)
+    redis = await get_redis()
+    await redis.set(f"oauth_state:{state}", provider_name, ex=_STATE_TTL_SECONDS)
+    return RedirectResponse(provider.authorization_url(state), status_code=302)
 
 
 async def _handle_callback(
     provider_name: str,
     code: str,
-    signed_state: str,
+    state: str,
     db: AsyncSession,
 ) -> RedirectResponse:
-    if not _verify_signed_state(signed_state):
+    redis = await get_redis()
+    stored = await redis.getdel(f"oauth_state:{state}")
+    if stored != provider_name:
         raise _envelope(
             status.HTTP_400_BAD_REQUEST,
             "invalid_state",
-            "OAuth state is missing, expired, or does not match.",
+            "OAuth state is missing, expired, already used, or does not match.",
         )
 
     provider = _provider(provider_name)
@@ -199,7 +156,8 @@ async def me(user: User = Depends(get_current_user)) -> dict:
 @router.post(
     "/logout",
     status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
     summary="Logout (no-op server-side)",
 )
-async def logout():
-    pass
+async def logout() -> Response:
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

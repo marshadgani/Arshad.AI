@@ -213,21 +213,78 @@ jobs:
 
           # Both `gh pr merge` and `gh api PUT /merge` were terminating
           # the shell mid-execution. Use raw curl to bypass gh CLI entirely.
-          echo "- BEFORE curl merge" >> "$DIAG"
-          http_code=$(curl -sS -X PUT \
-            -H "Authorization: Bearer ${GH_TOKEN}" \
-            -H "Accept: application/vnd.github+json" \
-            -H "Content-Type: application/json" \
-            -d '{"merge_method":"squash"}' \
-            -o /tmp/merge.out \
-            -w "%{http_code}" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/merge")
-          rc=$?
-          echo "- AFTER curl merge (rc=${rc} http=${http_code})" >> "$DIAG"
+          #
+          # Retry loop: GitHub computes mergeable_state asynchronously after
+          # a push. The merge endpoint returns 405 "Pull Request is not
+          # mergeable" until the computation finishes (typically 2-10 s).
+          # We poll the PR mergeable_state until it's clean/unstable, then
+          # PUT /merge. Cap at ~60 s of total wait so the workflow doesn't
+          # hang indefinitely on a genuinely-not-mergeable state.
+          echo "- BEFORE merge retry loop" >> "$DIAG"
+          merge_attempts=0
+          merge_max_attempts=12        # 12 × 5 s = 60 s ceiling
+          merge_sleep=5
+          http_code=""
+          mergeable_state=""
+
+          while [ "$merge_attempts" -lt "$merge_max_attempts" ]; do
+            merge_attempts=$((merge_attempts + 1))
+
+            # Step A: ask GitHub if the PR is currently mergeable.
+            pr_state=$(curl -sS \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}")
+            mergeable=$(printf '%s' "$pr_state" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("mergeable") if d.get("mergeable") is not None else "null")' 2>/dev/null || echo "null")
+            mergeable_state=$(printf '%s' "$pr_state" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("mergeable_state",""))' 2>/dev/null || echo "")
+            echo "- attempt ${merge_attempts}: mergeable=${mergeable} mergeable_state=${mergeable_state}" >> "$DIAG"
+
+            # `null` = GitHub still computing. Retry.
+            if [ "$mergeable" = "null" ]; then
+              sleep "$merge_sleep"
+              continue
+            fi
+
+            # `false` = genuinely not mergeable (conflicts, blocked, draft).
+            if [ "$mergeable" = "false" ] || [ "$mergeable_state" = "dirty" ]; then
+              http_code="409"
+              echo '{"message":"Pull request is not mergeable","mergeable_state":"'"${mergeable_state}"'"}' > /tmp/merge.out
+              break
+            fi
+
+            # `true` (or any truthy) — try the merge.
+            http_code=$(curl -sS -X PUT \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              -H "Content-Type: application/json" \
+              -d '{"merge_method":"squash"}' \
+              -o /tmp/merge.out \
+              -w "%{http_code}" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/merge")
+            echo "- attempt ${merge_attempts}: PUT /merge http=${http_code}" >> "$DIAG"
+
+            # 200 = merged. Exit retry loop.
+            if [ "$http_code" = "200" ]; then
+              break
+            fi
+
+            # 405 = "Pull Request is not mergeable" (transient: GitHub is
+            # still indexing). 409 = ref state changed under us (concurrent
+            # push). Both are worth retrying.
+            if [ "$http_code" = "405" ] || [ "$http_code" = "409" ]; then
+              sleep "$merge_sleep"
+              continue
+            fi
+
+            # Anything else (403, 422, 500) is fatal — don't burn retries.
+            break
+          done
+          echo "- AFTER merge retry loop (attempts=${merge_attempts} http=${http_code})" >> "$DIAG"
 
           {
-            echo "- curl exit code: \`${rc}\`"
+            echo "- attempts:       \`${merge_attempts} / ${merge_max_attempts}\`"
             echo "- HTTP status:    \`${http_code}\`"
+            echo "- mergeable_state on last poll: \`${mergeable_state}\`"
             echo "- response body:"
             echo
             echo '```json'

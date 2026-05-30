@@ -1,0 +1,31 @@
+{
+  "audit_run_id": "audit-2026-04-26",
+  "scope": "Sweep 4 — Domain agents (calendar/email/github + ai_core context_manager)",
+  "tester_iteration": 0,
+  "verdict": "PASS",
+  "summary": "13 features × ~5 TCs = 65 TCs reviewed; 0 real defects. All 12 domain agents follow the pass-through-or-composition pattern: input_schema mirrors tool's, run() instantiates Tool() and dispatches, output schema {data, summary}. tool_dependencies declared. No agent calls another agent's run() directly (rule §19.4). FEAT-051 + FEAT-060 verified as compositions: parallel-style fetch from two tools, results merged into summary. FEAT-063 ContextManagerAgent: cross-user filter via WHERE user_id (line 82), uuid.UUID parse with try/except → AgentError. summarize=true path uses ai.call (services.ai) — single source for all SDK calls per CLAUDE.md §8. Transcript capped at 32000 chars before passing to Claude.",
+  "feature_defects": [
+    {"feature_id":"FEAT-049","summary":"PASS — pass-through","defects":[]},
+    {"feature_id":"FEAT-050","summary":"PASS — pass-through","defects":[]},
+    {"feature_id":"FEAT-051","summary":"PASS — composition","defects":[]},
+    {"feature_id":"FEAT-052","summary":"PASS","defects":[]},
+    {"feature_id":"FEAT-053","summary":"PASS","defects":[]},
+    {"feature_id":"FEAT-054","summary":"PASS","defects":[]},
+    {"feature_id":"FEAT-055","summary":"PASS","defects":[]},
+    {"feature_id":"FEAT-056","summary":"PASS","defects":[]},
+    {"feature_id":"FEAT-057","summary":"PASS — multi-tool","defects":[]},
+    {"feature_id":"FEAT-058","summary":"PASS","defects":[]},
+    {"feature_id":"FEAT-059","summary":"PASS","defects":[]},
+    {"feature_id":"FEAT-060","summary":"PASS — composition","defects":[]},
+    {"feature_id":"FEAT-063","summary":"PASS — UUID guard, user filter, transcript cap verified","defects":[]}
+  ],
+  "total_defects_critical": 0,
+  "total_defects_high": 0,
+  "total_defects_medium": 0,
+  "total_defects_low": 0,
+  "real_defects_requiring_fix": 0,
+  "bug_fixer_required": false,
+  "notes": [
+    "Phase B docstrings explicitly mark agents as 'deterministic Phase E' with 'Phase B will add Claude reasoning'. Phase B has shipped — these agents may eventually evolve. Audit confirms current behaviour matches Phase E spec."
+  ]
+}
