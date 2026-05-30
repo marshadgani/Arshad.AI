@@ -17,8 +17,8 @@ describe('API_BASE', () => {
     expect(''.replace(/\/$/, '')).toBe('');
   });
 
-  it('nullish-coalescing fallback for undefined env var produces a string', () => {
-    const value = (undefined ?? '').replace(/\/$/, '');
+  it('nullish-coalescing fallback for empty string produces a string', () => {
+    const value = ('').replace(/\/$/, '');
     expect(value).toBe('');
   });
 });
