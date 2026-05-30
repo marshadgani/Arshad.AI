@@ -18,5 +18,7 @@ COPY --chown=app:app scripts/ ./scripts/
 USER app
 EXPOSE 8000
 
+# Render injects $PORT; bind to it so the health check on the platform's
+# assigned port succeeds. Falls back to 8000 for local docker runs.
 # --reload is enabled in docker-compose for local dev; production runs without it.
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "uvicorn src.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
