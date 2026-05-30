@@ -96,7 +96,10 @@ def _verify_signed_state(signed_state: str) -> bool:
         ts = int(ts_str)
     except ValueError:
         return False
-    if int(time.time()) - ts > _STATE_TTL_SECONDS:
+    age = int(time.time()) - ts
+    if (
+        age < 0 or age > _STATE_TTL_SECONDS
+    ):  # negative age = future-dated state (clock skew attack)
         return False
     payload = f"{nonce}.{ts_str}"
     expected = hmac.new(
