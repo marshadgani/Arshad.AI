@@ -49,24 +49,31 @@ Route to dev-team orchestrator when the prompt contains ANY of these intents:
 
 **When in doubt → route to dev-team.**
 
-### The 17-Agent Pipeline (19 Steps)
+### The 24-Agent Pipeline (26 Steps)
 
 The orchestrator runs these agents in strict sequence. Every agent output feeds the next.
 
 | Stage | Agent | Model | What It Does |
 |---|---|---|---|
+| 0.5 | `code-explorer` | Sonnet | Maps codebase patterns, module boundaries, naming idioms — context fed to all subsequent agents |
 | 1 | `business-analyst` | Haiku | Extracts requirements → RTM + BPDD |
 | 2 | `enterprise-architect` *(pre)* | Sonnet | Enterprise architecture review — rejects bad ideas before any code |
 | 2.5 | `ai-engineer` | **Opus** | Tech lead — challenges decisions, flags scaling risks, sets architecture direction SA must follow |
 | 3 | `solution-architect` | Sonnet | Produces Solution Design Document (SDD) constrained by Tech Lead |
+| 3.1 | `architecture-critic` | **Opus** | Adversarially reviews the SDD — flags over-engineering, coupling risks, convention deviations; blocking findings halt the pipeline |
 | 3.3 | `system-engineer` | **Opus** | Designs system architecture, component structure, data flow, DB schema, caching strategy |
 | 3.5 | `engineer` | Sonnet | Builds production-ready MVP from SDD + system design |
 | 4 | `developer` | Sonnet | Generates complete feature code |
-| 4.3 | `frontend-engineer` | Sonnet | Production-grade UI — all 4 states (loading/empty/error/content), accessible, responsive, reusable |
+| 4.2 | `code-reviewer` | **Opus** | Project-conventions review — checks all code against CLAUDE.md rules (api.md, database.md, frontend.md) |
+| 4.3 | `frontend-engineer` | Sonnet | Production-grade UI with bold aesthetic direction (frontend-design skill) — all 4 states, accessible, responsive, reusable |
+| 4.4 | `type-design-analyzer` | Sonnet | TypeScript type system audit — weak types, missing invariant encoding, illegal-state prevention |
 | 4.5 | `senior-engineer` | **Opus** | Code quality audit — finds N+1, bad patterns, scalability risks. No functionality changes. |
 | 4.6 | `software-architect` | **Opus** | Architecture restructuring — separates concerns, reduces coupling, increases modularity |
+| 4.7 | `silent-failure-hunter` | Sonnet | Error handling audit — swallowed exceptions, HTTP 200 masking errors, missing propagation |
+| 4.8 | `code-simplifier` | **Opus** | Code clarity refinement — eliminates unnecessary abstraction, over-engineering, verbose constructs |
 | 5 | `process-organiser` | Haiku | Logs feature in process hierarchy |
 | 6 | `test-script-writer` | Sonnet | Writes test scripts for every requirement |
+| 6.1 | `pr-test-analyzer` | Sonnet | Test quality review — coverage of happy/error/edge paths, negative tests, behaviour vs implementation |
 | 7 | `tester` | Sonnet | Executes tests, reports defects |
 | 8 | `bug-fixer` ↔ `tester` | Sonnet | Fix + re-test loop (max 5 iterations) |
 | 8.5 | `debugger` | **Opus** | Root cause analysis — production outage mode, 3 levels deep |
@@ -75,14 +82,14 @@ The orchestrator runs these agents in strict sequence. Every agent output feeds 
 | 8.8 | `devops-engineer` | Sonnet | Deployment architecture, monitoring, scaling, production checklist |
 | 9 | `enterprise-architect` *(post)* | Sonnet | Final architectural verdict — always runs |
 
-**Orchestrator model: `claude-opus-4-7`** — it controls all 17 agents.
+**Orchestrator model: `claude-opus-4-8`** — it controls all 24 agents.
 
 ### Model Tiers
 
 | Tier | Agents | Purpose |
 |---|---|---|
-| **Opus** (6 agents) | ai-engineer, system-engineer, senior-engineer, software-architect, debugger, security-auditor | Deep reasoning — architectural decisions, audits, root cause, security |
-| **Sonnet** (10 agents) | engineer, developer, frontend-engineer, perf-opt, devops, solution-architect, enterprise-architect, test-writer, tester, bug-fixer | Execution — code generation, testing, optimization |
+| **Opus** (10 agents) | ai-engineer, architecture-critic, system-engineer, code-reviewer, senior-engineer, software-architect, code-simplifier, debugger, security-auditor | Deep reasoning — architectural decisions, audits, root cause, security |
+| **Sonnet** (12 agents) | code-explorer, engineer, developer, frontend-engineer, type-design-analyzer, silent-failure-hunter, perf-opt, devops, solution-architect, enterprise-architect, test-writer, tester, bug-fixer, pr-test-analyzer | Execution — code generation, testing, optimization |
 | **Haiku** (2 agents) | business-analyst, process-organiser | Simple extraction and formatting |
 
 ### Three Invariants (never break these)
@@ -909,7 +916,7 @@ Claude itself never invokes the merge directly. The auto-merge is a property of 
 
 ---
 
-### Gate Agents (all 6 must pass)
+### Gate Agents (all 8 must pass)
 
 | Agent | File | What it checks |
 |---|---|---|
@@ -919,12 +926,14 @@ Claude itself never invokes the merge directly. The auto-merge is a property of 
 | `test-writer` | `.claude/agents/test-writer.md` | Coverage < 70% = FAIL |
 | `refactorer` | `.claude/agents/refactorer.md` | Complexity, duplication |
 | `doc-writer` | `.claude/agents/doc-writer.md` | Undocumented public APIs |
+| `silent-failure-hunter` | `.claude/agents/claude-plugins-official/silent-failure-hunter.md` | Swallowed exceptions, HTTP 200 masking errors |
+| `pr-test-analyzer` | `.claude/agents/claude-plugins-official/pr-test-analyzer.md` | Test quality, negative coverage, behaviour vs implementation |
 
 ### Gate Verdicts
 
 | Verdict | Condition | Merge allowed? |
 |---|---|---|
-| ✅ PASS | All 6 agents: no FAIL, no Critical | Yes — on "Merge to Main" |
+| ✅ PASS | All 8 agents: no FAIL, no Critical | Yes — on "Merge to Main" |
 | ⚠️ WARN | Some WARN, zero FAIL, zero Critical | Yes — on "Merge to Main" |
 | ❌ BLOCKED | Any FAIL gate OR any Critical issue | No — fix first |
 
