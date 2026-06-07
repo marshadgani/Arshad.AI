@@ -654,7 +654,7 @@ This registry is the source of truth for weekly auto-updates.
 | `awesome-claude-code` | https://github.com/hesreallyhim/awesome-claude-code.git | commands | 1 command | 2026-04-25 |
 | `context7` | https://github.com/upstash/context7.git | skills+agents+commands | 3 skills, 1 agent, 1 command | 2026-04-25 |
 | `everything-claude-code` | https://github.com/affaan-m/everything-claude-code.git | skills | 34 skills | 2026-04-25 |
-| `ruflo` | https://github.com/ruvnet/ruflo.git | skills | 134 skills | 2026-06-07 |
+| `ruflo` | https://github.com/ruvnet/ruflo.git | skills+agents | 134 skills, 107 agents | 2026-06-07 |
 
 > This table is updated automatically by `scripts/fetch-github-repo.sh` when a new repo is integrated.
 
