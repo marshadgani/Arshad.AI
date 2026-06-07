@@ -352,6 +352,42 @@
         "hooks": []
       }
     },
+    "claude-plugins-official": {
+      "url": "https://github.com/anthropics/claude-plugins-official",
+      "name": "claude-plugins-official",
+      "last_fetched": "2026-05-31",
+      "components": {
+        "skills": [
+          "frontend-design",
+          "claude-md-improver",
+          "writing-rules"
+        ],
+        "agents": [
+          "code-architect",
+          "code-explorer",
+          "code-reviewer",
+          "code-simplifier",
+          "comment-analyzer",
+          "pr-test-analyzer",
+          "silent-failure-hunter",
+          "type-design-analyzer",
+          "architecture-critic",
+          "legacy-analyst",
+          "security-auditor",
+          "test-engineer"
+        ],
+        "commands": [
+          "code-review",
+          "feature-dev",
+          "review-pr",
+          "commit",
+          "commit-push-pr",
+          "clean_gone",
+          "revise-claude-md"
+        ],
+        "hooks": []
+      }
+    },
     "ui-ux-pro-max-skill": {
       "url": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git",
       "name": "ui-ux-pro-max-skill",
