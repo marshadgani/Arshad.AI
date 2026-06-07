@@ -91,7 +91,7 @@
     "obsidian-skills": {
       "url": "https://github.com/kepano/obsidian-skills.git",
       "name": "obsidian-skills",
-      "last_fetched": "2026-05-26 05:59 UTC",
+      "last_fetched": "2026-06-07 19:52 UTC",
       "components": {
         "skills": [
           "obsidian-cli",
@@ -109,7 +109,7 @@
     "n8n-mcp": {
       "url": "https://github.com/czlonkowski/n8n-mcp.git",
       "name": "n8n-mcp",
-      "last_fetched": "2026-05-26 05:59 UTC",
+      "last_fetched": "2026-06-07 19:52 UTC",
       "components": {
         "skills": [
           "n8n-code-python",
@@ -142,7 +142,7 @@
     "get-shit-done": {
       "url": "https://github.com/gsd-build/get-shit-done.git",
       "name": "get-shit-done",
-      "last_fetched": "2026-05-26 05:59 UTC",
+      "last_fetched": "2026-06-07 19:52 UTC",
       "components": {
         "skills": [],
         "agents": [
@@ -270,7 +270,7 @@
     "awesome-claude-code": {
       "url": "https://github.com/hesreallyhim/awesome-claude-code.git",
       "name": "awesome-claude-code",
-      "last_fetched": "2026-05-26 05:59 UTC",
+      "last_fetched": "2026-06-07 19:52 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -284,7 +284,7 @@
     "context7": {
       "url": "https://github.com/upstash/context7.git",
       "name": "context7",
-      "last_fetched": "2026-05-26 05:59 UTC",
+      "last_fetched": "2026-06-07 19:52 UTC",
       "components": {
         "skills": [
           "context7-mcp",
