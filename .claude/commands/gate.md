@@ -25,8 +25,8 @@ This command runs **automatically** whenever the user:
 ### Step 0 — Resolve Context
 
 1. Run `git branch --show-current` to get the source branch.
-2. Run `git diff main...HEAD --stat` to get the change scope.
-3. Run `git log main..HEAD --oneline` to list commits in this branch.
+2. Run `git diff claude/ai-personal-assistant-main...HEAD --stat` to get the change scope.
+3. Run `git log claude/ai-personal-assistant-main..HEAD --oneline` to list commits in this branch.
 4. If a PR number was provided, use it. Otherwise search for an open PR for
    this branch via `mcp__github__search_pull_requests` with `head:<branch>`.
 5. If no PR exists yet, create one via `mcp__github__create_pull_request`:

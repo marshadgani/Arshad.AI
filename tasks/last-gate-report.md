@@ -1,9 +1,9 @@
 # Arshad.AI Quality Gate Report
 
-**PR:** fix/supabase-migration-direct-url → claude/ai-personal-assistant-main
-**Branch:** `fix/supabase-migration-direct-url` → `claude/ai-personal-assistant-main`
-**Triggered by:** "Fix this error" — asyncpg DuplicatePreparedStatementError (persistent, second occurrence)
-**Date:** 2026-05-18
+**PR:** #52 — feat: expand dev-team pipeline to 28 agents (30 stages)
+**Branch:** `claude/ai-personal-assistant-CcA11` → `claude/ai-personal-assistant-main`
+**Triggered by:** "Merge to Main"
+**Date:** 2026-06-08
 
 ---
 
@@ -11,101 +11,132 @@
 
 | # | Gate | Agent | Result | Critical | Warnings |
 |---|---|---|---|---|---|
-| 1 | Code Review | code-reviewer | ✅ PASS | 0 | 0 |
-| 2 | Security Audit | security-auditor | ✅ PASS | 0 | 1 |
-| 3 | Bug Analysis | debugger | ⚠️ WARN | 0 | 1 |
-| 4 | Test Coverage | test-writer | ⚠️ WARN | 0 | 1 |
-| 5 | Code Quality | refactorer | ✅ PASS | 0 | 0 |
-| 6 | Documentation | doc-writer | ✅ PASS | 0 | 0 |
+| 1 | Code Review | code-reviewer | ⚠️ WARN | 0 | 4 |
+| 2 | Security Audit | security-auditor | ❌ FAIL | 0 | 4 |
+| 3 | Bug Analysis | debugger | ⚠️ WARN | 0 | 7 |
+| 4 | Test Coverage | test-writer | ✅ PASS | 0 | 1 |
+| 5 | Code Quality | refactorer | ✅ PASS | 0 | 3 |
+| 6 | Documentation | doc-writer | ⚠️ WARN | 0 | 6 |
+| 7 | Silent Failures | silent-failure-hunter | ⚠️ WARN | 0 | 7 |
+| 8 | Test Quality | pr-test-analyzer | ❌ FAIL | 3 | 4 |
 
 ## Overall Verdict
 
-### ⚠️ GATE PASSED WITH WARNINGS — Ready for merge
+### ❌ GATE BLOCKED — Fix all FAIL gates before merging to main
 
-Zero FAIL gates. Zero Critical issues.
+**2 FAIL gates · 3 Critical issues · 32 Warnings**
 
-Code-reviewer initial FIX (missing `get_db` return annotation) resolved: added `from collections.abc import AsyncGenerator` and changed signature to `-> AsyncGenerator[AsyncSession, None]`.
-
-Remaining warnings are non-blocking:
-- Security WARN: no validation that `DATABASE_URL_DIRECT` doesn't accidentally point to the pooler. User-education issue, not a code defect.
-- Bug WARN: same as security — no port-validation guard. Acceptable for a personal tool; a wrong URL produces an obvious startup error.
-- Test WARN: 0% coverage is a project-wide pre-existing gap.
-
----
-
-## What This Merge Includes
-
-### Fix: `asyncpg.exceptions.DuplicatePreparedStatementError` (definitive)
-
-**Why previous attempts failed:**
-- `statement_cache_size=0` — disables asyncpg's LRU cache but asyncpg still creates named prepared statements. With Supavisor in transaction mode, PREPARE and DEALLOCATE route to different backends, so stale statements accumulate on the backend and collide with counter-based names from the next connection object (counter resets to 0 per connection).
-- `prepared_statement_name_func` — only a parameter of `asyncpg.create_pool()`, **not** `asyncpg.connect()`. SQLAlchemy uses `asyncpg.connect()`, so the parameter was silently ignored. The error still showed `__asyncpg_stmt_5__` (counter-based, not UUID), confirming it was not applied.
-
-**Root fix:** use `DATABASE_URL_DIRECT` (direct Postgres, port 5432, no pooler) for the engine. Same `DATABASE_URL_DIRECT || DATABASE_URL` pattern already used in `alembic/env.py`. When the user sets `DATABASE_URL_DIRECT` on Render to `postgresql+asyncpg://postgres:PASSWORD@db.PROJECT_REF.supabase.co:5432/postgres`, all prepared statement conflicts disappear because SQLAlchemy's own connection pool connects directly to Postgres — no pooler intermediary.
-
-**Also fixed:** `get_db()` return annotation corrected from `-> AsyncSession` (wrong — it's an async generator) to `-> AsyncGenerator[AsyncSession, None]`.
-
-**Files changed (2):**
-| File | What changed |
-|---|---|
-| `backend/src/models/database.py` | Engine now uses `DATABASE_URL_DIRECT \|\| DATABASE_URL`; removed `prepared_statement_name_func` (wrong API); fixed `get_db` return annotation; updated comment explaining pooler incompatibility |
-| `backend/.env.example` | `DATABASE_URL_DIRECT` comment updated to clarify it's needed for both the application engine AND Alembic migrations |
+Security gate: WARN upgraded to FAIL per security exception rule.
+Test quality gate: FAIL — 3 Critical findings (zero test coverage for production code in this PR).
 
 ---
 
 ## Detailed Findings
 
-### 1. Code Review
-**Status:** ✅ PASS (after fix applied)
-- Initial FIX: `get_db()` return annotation `-> AsyncSession` is wrong (it's an async generator). Fixed to `-> AsyncGenerator[AsyncSession, None]` with `from collections.abc import AsyncGenerator` import.
-- `os.getenv("DATABASE_URL_DIRECT") or os.getenv("DATABASE_URL")` fallback is correct: `None` and `""` are both falsy, so empty-string `DATABASE_URL_DIRECT` correctly falls back.
-- `RuntimeError` guard fires before `create_async_engine` so the failure is explicit and actionable.
-- `statement_cache_size=0` retained as secondary safeguard — correct even on direct connections.
-
-### 2. Security Audit
-**Status:** ✅ PASS
-- No new attack surface. `DATABASE_URL_DIRECT` follows the same secret-in-env-var pattern as `DATABASE_URL`.
-- Error message in `RuntimeError` does not expose the URL value (just the variable name).
-- WARN: no code-level validation that the resolved URL targets port 5432 vs the pooler. Acceptable — a wrong URL produces a clear asyncpg connection error at startup.
-
-### 3. Bug Analysis
+### 1. Code Review (code-reviewer)
 **Status:** ⚠️ WARN
-- URL-priority logic is correct and handles all env var states.
-- WARN: if a user sets `DATABASE_URL_DIRECT` to the pooler URL (port 6543) by mistake, the error is identical to the original. No guard distinguishes. Acceptable for a personal tool — the `.env.example` comment is the mitigation.
 
-### 4. Test Coverage
-**Status:** ⚠️ WARN (pre-existing baseline)
-- 0% coverage project-wide — no regression.
-- Two unit tests worth adding: (a) both vars set → engine uses `DATABASE_URL_DIRECT`; (b) only `DATABASE_URL` set → fallback used. Cheap with `pytest` + `monkeypatch`.
+- ⚠️ `auto-pr.yml`: Retry/poll loop for `mergeable_state` removed — single-shot merge will 405 transiently for 2-10s after push.
+- ⚠️ `requirements.txt`: `pydantic[email]` removed — any `EmailStr` field raises `PydanticUserError` at startup.
+- ⚠️ `dashboard.py`: Confirm `get_current_user` dependency applied to `/events` endpoint — no unauthenticated fallback to mock data.
+- ⚠️ `google.py`: Three OAuth scopes removed (`drive.metadata.readonly`, `tasks`, `youtube.readonly`) but `GoogleDriveIntegration`, `google_tasks.py`, `google_youtube.py` still depend on them — every call returns 403.
 
-### 5. Code Quality
+### 2. Security Audit (security-auditor)
+**Status:** ❌ FAIL (WARN upgraded per security exception rule)
+
+- ⚠️ Denylist: `backend/src/auth/*` non-recursive — nested paths like `backend/src/auth/providers/new.py` bypass it. Fix: `backend/src/auth/**`.
+- ⚠️ Denylist: `*.env*` matches only root-level env files. `backend/.env`, `frontend/.env.local` not protected. Fix: add `**/.env*`.
+- ⚠️ Supply-chain: 107 ruflo agents + 134 skills added with no content audit for prompt-injection or policy-override instructions.
+- ⚠️ `backend/src/main.py` carve-out ("router additions only") enforced by agent self-discipline, not the path matcher.
+
+### 3. Bug Analysis (debugger)
+**Status:** ⚠️ WARN
+
+- ⚠️ `tasks/.feature-counter` does not exist — first pipeline run fails Step 0 with no fallback.
+- ⚠️ `tasks/agent-outputs/` directory tree does not exist — all 30 Write calls will fail.
+- ⚠️ 9 subagent types have no `.md` file in `dev-team/` — Task tool falls back to generic model silently.
+- ⚠️ `security_halt = true` never checked before Step 10 — insecure code committed silently.
+- ⚠️ Step 6 (TSW) receives BPDD+SDD but not the code object — tests generated without real signatures.
+- ⚠️ EA post-build `decision: rejected` not a documented halt — rejected code still committed.
+- ⚠️ `gate.md` Step 2 had stale "all 6 agents" reference (fixed in d5d80dc).
+
+### 4. Test Coverage (test-writer)
 **Status:** ✅ PASS
-- `_db_url = os.getenv(...) or os.getenv(...)` is idiomatic and readable.
-- No duplication with `alembic/env.py` — same pattern, different module.
-- `uuid` import removed (was from the failed `prepared_statement_name_func` approach).
 
-### 6. Documentation
+No executable files in the config/markdown diff. Coverage threshold does not apply to `.md` files.
+*(Full coverage assessment by agent 8 below.)*
+
+### 5. Code Quality (refactorer)
 **Status:** ✅ PASS
-- Comment explains the pooler incompatibility mechanism (PREPARE/DEALLOCATE routing to different backends), why `statement_cache_size=0` alone is insufficient, and what `DATABASE_URL_DIRECT` must point to.
-- `.env.example` updated to clarify the env var is needed for both the app engine and Alembic.
+
+- ⚠️ CLAUDE.md: "Opus (10 agents)" names 9; "Sonnet (16 agents)" names 18 — counts wrong.
+- ⚠️ `code-reviewer.md` exists in both gate path and pipeline path — may diverge.
+- ⚠️ Step numbering (4.15 before 4.2) creates ordering confusion.
+
+### 6. Documentation (doc-writer)
+**Status:** ⚠️ WARN
+
+- ⚠️ `bug-fixer.md` missing from `.claude/agents/dev-team/` — referenced by Step 8 but file does not exist.
+- ⚠️ `pr-test-analyzer.md` in `claude-plugins-official/` but execution protocol says `dev-team/` — ambiguous.
+- ⚠️ CLAUDE.md §15 directory layout stale: shows `n8n-mcp/`, `get-shit-done/`, `context7/` (none exist); missing `dev-team/`, `claude-plugins-official/` (both exist).
+- ⚠️ CLAUDE.md §18: claims 107 ruflo agents but no `.claude/agents/ruflo/` directory exists.
+- ⚠️ Pipeline table row 4.3 contradicts itself: orchestrator says "agent readable", CLAUDE.md says "reusable".
+- ⚠️ Several agent files pin stale model versions (code-reviewer: opus-4-5, ai-engineer: opus-4-7) vs orchestrator on opus-4-8.
+
+### 7. Silent Failures (silent-failure-hunter)
+**Status:** ⚠️ WARN
+
+**Orchestrator (config-level):**
+- ⚠️ HIGH: `security_halt = true` not checked before Step 10 — code with unresolved security escalations committed silently.
+- ⚠️ HIGH: EA post-build `decision: rejected` not checked before Step 10 — architecturally rejected code committed silently.
+- ⚠️ HIGH: Feature counter (Step 0) has no error recovery — missing/corrupted file causes undefined FEAT_ID across all steps.
+- ⚠️ HIGH: 9+ missing agent files — Task tool falls back to generic model, silently bypassing denylist + audit schemas.
+- ⚠️ MEDIUM: `codebase_context` not explicitly listed as input in 15 of 22 steps after 0.5.
+
+**Production code (chat/gateway):**
+- ⚠️ `backend/src/api/v1/chat.py`: SSE `event_stream` generator has no try/except — any exception after streaming starts closes the stream silently with HTTP 200 and no error event emitted to frontend.
+- ⚠️ `backend/src/services/ai.py`: bare `except Exception: pass` silently drops malformed tool-input JSON with no log.
+- ⚠️ `backend/src/tools/github/get_pr.py`: bare `except Exception: pass` on diff fetch swallows all errors (including timeouts) with no logging — returns empty review indistinguishable from "no diff".
+- ⚠️ `backend/src/services/briefing.py`: `except Exception` catches programmer errors too broadly; no `exc_info=True` so tracebacks are lost.
+- ⚠️ `backend/src/services/chat.py` disconnect rollback: inner `except Exception: pass` has no logging — failed rollback leaves DB session dirty with no trace.
+
+### 8. Test Quality (pr-test-analyzer)
+**Status:** ❌ FAIL
+
+- 🔴 **CRITICAL**: Zero test coverage for 108 new Python source files. Measured coverage ~0%. Gate rule: FAIL if < 70% on changed files.
+- 🔴 **CRITICAL**: No tests for `_compress_history` (`backend/src/services/chat.py:173`) — 4 code paths, off-by-one risk in `user_indices[1]`. A regression silently corrupts every conversation over ~20 turns.
+- 🔴 **CRITICAL**: No tests for `refresh_google_token` (`backend/src/tools/token_service.py:65`) — handles `SELECT...FOR UPDATE` concurrency, `invalid_grant` detection, token rotation, `None expiry`. Silent failure modes reach production undetected.
+- ⚠️ `gate.md` Step 0: `git diff main...HEAD` should be `git diff claude/ai-personal-assistant-main...HEAD` — gate agents analyse wrong diff when branches diverge.
+- ⚠️ No tests for `services/gateway.py dispatch()` — single chokepoint for all inter-agent traffic.
+- ⚠️ `_fast_path` leading-space prefix: `"Agenda for tomorrow"` falls through to LLM — no negative test.
+- ⚠️ Orchestrator denylist is prose-only — no executable test for path-matching logic.
 
 ---
 
-## Action Required (user — not code)
+## Action Items
 
-**Set `DATABASE_URL_DIRECT` on Render** (`arshad-ai-backend` → Environment):
-```
-DATABASE_URL_DIRECT = postgresql+asyncpg://postgres:YOUR_PASSWORD@db.dslnjhuciypccowyiwaa.supabase.co:5432/postgres
-```
-This is the Supabase **direct** URL — host `db.PROJECT_REF.supabase.co`, port **5432** (not 6543). Without this, `DATABASE_URL` (the pooler URL) is still used and the error persists.
+**Critical — blocking merge:**
+- [ ] Write unit tests for `_compress_history` (4 paths: under budget, trim, single-user break, empty)
+- [ ] Write unit tests for `refresh_google_token` (success, 400/401, missing row, rotation, None expiry)
+- [ ] Achieve ≥70% coverage on `services/chat.py`, `services/gateway.py`, `services/intent_classifier.py`, `tools/token_service.py`
+
+**Security — blocking merge:**
+- [ ] Fix denylist: `backend/src/auth/*` → `backend/src/auth/**`
+- [ ] Fix denylist: add `**/.env*` alongside `*.env*`
+- [ ] Add `security_halt` check before Step 10 in orchestrator.md
+- [ ] Add EA post-build `decision: rejected` halt before Step 10
+
+**Warnings — recommended:**
+- [ ] Restore `pydantic[email]` in `requirements.txt`
+- [ ] Restore Google OAuth scopes or gate integrations as coming-soon
+- [ ] Reinstate `mergeable_state` retry loop in `auto-pr.yml`
+- [ ] Fix `gate.md` Step 0: `main` → `claude/ai-personal-assistant-main`
+- [ ] Fix SSE stream error handling in `chat.py` `event_stream`
+- [ ] Replace bare `except Exception: pass` in `ai.py` and `get_pr.py` with logged handlers
+- [ ] Create `tasks/.feature-counter` with value `1`
+- [ ] Create `tasks/agent-outputs/` directory tree
+- [ ] Add `bug-fixer.md` to `.claude/agents/dev-team/`
 
 ---
-
-## Action Items (deferred, non-blocking)
-
-- [ ] Add two unit tests for the URL-priority fallback logic
-- [ ] Pin `asyncpg>=0.28.0` in `requirements.txt` (documents minimum version for `statement_cache_size` support)
-
----
-
-*Generated by Arshad.AI Quality Gate · All 6 agents · 2026-05-18*
+*Generated by Arshad.AI Quality Gate · All 8 agents · Auto-fix iteration 1 of 3*
+*Gate verdict: BLOCKED — do not merge until Critical and Security findings are resolved*

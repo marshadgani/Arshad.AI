@@ -152,10 +152,10 @@ Run path denylist check. Halt if any match.
 
 **Path denylist — halt if any agent targets these paths:**
 - `backend/src/main.py` — EXCEPTION: `app.include_router()` additions only
-- `backend/src/auth/*` · `backend/src/middleware/*`
+- `backend/src/auth/**` · `backend/src/middleware/*`
 - `backend/src/services/ai.py` · `backend/src/services/gateway.py`
 - `backend/alembic/env.py` · existing `backend/alembic/versions/*`
-- `.github/workflows/*` · `render.yaml` · `vercel.json` · `Dockerfile*` · `*.env*`
+- `.github/workflows/*` · `render.yaml` · `vercel.json` · `Dockerfile*` · `*.env*` · `**/.env*`
 - `CLAUDE.md` · `tasks/process-hierarchy.md` · `tasks/last-gate-report.md`
 - `tasks/lessons.md` · `tasks/.feature-counter`
 - Any path containing `..`, starting with `/`, or containing `~`, `$VAR`, `${VAR}`
@@ -413,6 +413,10 @@ Spawn a Task subagent with:
 - prompt: include FEAT_ID, stage=post_build, BPDD, SDD, list of files built, halt_reason (if any), and security_halt flag
 
 Write result to `/home/user/Arshad.AI/tasks/agent-outputs/ea/{FEAT_ID}_post.json`. Capture `decision`.
+
+**Halt checks before Step 10:**
+- If `security_halt = true` → stop. Do NOT write files or commit. Report: "Pipeline halted: unresolved security escalations. Fix findings from Step 8.7 before proceeding."
+- If `decision: rejected` → stop. Do NOT write files or commit. Report: "Pipeline halted: EA post-build rejected the implementation. Reason: {halt_reason}."
 
 ---
 
