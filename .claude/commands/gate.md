@@ -80,7 +80,7 @@ FINDINGS: <bulleted list>
 
 ### Step 2 — Compile Master Gate Report
 
-Aggregate all 6 agent results into this exact report format:
+Aggregate all 8 agent results into this exact report format:
 
 ```markdown
 # Arshad.AI Quality Gate Report
