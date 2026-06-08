@@ -371,3 +371,85 @@ class TestRefreshGoogleTokenNoneExpiry:
             await refresh_google_token(db, ACCOUNT_ID)
 
         assert token_row.token_expires_at is None
+
+
+# ---------------------------------------------------------------------------
+# get_access_token
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+class TestGetAccessToken:
+    async def test_no_oauth_account_raises_provider_not_linked(self):
+        """db returns None for the OAuthAccount → ProviderNotLinked."""
+        db = AsyncMock()
+        db.scalar = AsyncMock(return_value=None)
+
+        from src.tools.base import ProviderNotLinked
+        from src.tools.token_service import get_access_token
+
+        user = MagicMock()
+        user.id = ACCOUNT_ID
+
+        with pytest.raises(ProviderNotLinked) as exc_info:
+            await get_access_token(db, user, "google")
+
+        assert exc_info.value.provider == "google"
+
+    async def test_no_token_row_raises_provider_not_linked(self):
+        """OAuthAccount exists but OAuthToken row is None → ProviderNotLinked."""
+        account = MagicMock()
+        account.id = ACCOUNT_ID
+
+        # First call returns the account, second returns None (no token row)
+        db = AsyncMock()
+        db.scalar = AsyncMock(side_effect=[account, None])
+
+        from src.tools.base import ProviderNotLinked
+        from src.tools.token_service import get_access_token
+
+        user = MagicMock()
+        user.id = ACCOUNT_ID
+
+        with pytest.raises(ProviderNotLinked) as exc_info:
+            await get_access_token(db, user, "google")
+
+        assert exc_info.value.provider == "google"
+
+    async def test_success_returns_plaintext_token_and_account(self):
+        """Both rows exist → decrypted access token and account returned."""
+        account = MagicMock()
+        account.id = ACCOUNT_ID
+
+        token_row = MagicMock()
+        token_row.encrypted_access_token = b"enc_access"
+
+        db = AsyncMock()
+        db.scalar = AsyncMock(side_effect=[account, token_row])
+
+        from src.tools.token_service import get_access_token
+
+        user = MagicMock()
+        user.id = ACCOUNT_ID
+
+        with patch("src.tools.token_service.decrypt", return_value="plaintext_tok"):
+            access_token, returned_account = await get_access_token(db, user, "google")
+
+        assert access_token == "plaintext_tok"
+        assert returned_account is account
+
+    async def test_github_provider_uses_correct_provider_name(self):
+        """ProviderNotLinked carries the provider name passed to get_access_token."""
+        db = AsyncMock()
+        db.scalar = AsyncMock(return_value=None)
+
+        from src.tools.base import ProviderNotLinked
+        from src.tools.token_service import get_access_token
+
+        user = MagicMock()
+        user.id = ACCOUNT_ID
+
+        with pytest.raises(ProviderNotLinked) as exc_info:
+            await get_access_token(db, user, "github")
+
+        assert exc_info.value.provider == "github"
