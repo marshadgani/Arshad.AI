@@ -49,7 +49,7 @@ Route to dev-team orchestrator when the prompt contains ANY of these intents:
 
 **When in doubt → route to dev-team.**
 
-### The 24-Agent Pipeline (26 Steps)
+### The 28-Agent Pipeline (30 Steps)
 
 The orchestrator runs these agents in strict sequence. Every agent output feeds the next.
 
@@ -64,6 +64,8 @@ The orchestrator runs these agents in strict sequence. Every agent output feeds 
 | 3.3 | `system-engineer` | **Opus** | Designs system architecture, component structure, data flow, DB schema, caching strategy |
 | 3.5 | `engineer` | Sonnet | Builds production-ready MVP from SDD + system design |
 | 4 | `developer` | Sonnet | Generates complete feature code |
+| 4.15 | `database-specialist` | Sonnet | Deep SQL/ORM/migration audit — N+1, missing indexes, unsafe queries, Alembic correctness |
+| 4.16 | `python-specialist` | Sonnet | Python/FastAPI audit — async correctness, Pydantic v2, dependency injection, type annotations |
 | 4.2 | `code-reviewer` | **Opus** | Project-conventions review — checks all code against CLAUDE.md rules (api.md, database.md, frontend.md) |
 | 4.3 | `frontend-engineer` | Sonnet | Production-grade UI with bold aesthetic direction (frontend-design skill) — all 4 states, accessible, responsive, reusable |
 | 4.4 | `type-design-analyzer` | Sonnet | TypeScript type system audit — weak types, missing invariant encoding, illegal-state prevention |
@@ -72,7 +74,8 @@ The orchestrator runs these agents in strict sequence. Every agent output feeds 
 | 4.7 | `silent-failure-hunter` | Sonnet | Error handling audit — swallowed exceptions, HTTP 200 masking errors, missing propagation |
 | 4.8 | `code-simplifier` | **Opus** | Code clarity refinement — eliminates unnecessary abstraction, over-engineering, verbose constructs |
 | 5 | `process-organiser` | Haiku | Logs feature in process hierarchy |
-| 6 | `test-script-writer` | Sonnet | Writes test scripts for every requirement |
+| 5.9 | `test-architect` | Sonnet | Designs test architecture — unit vs integration boundaries, mock strategy, coverage plan |
+| 6 | `test-script-writer` | Sonnet | Writes test scripts following Test Architect's plan |
 | 6.1 | `pr-test-analyzer` | Sonnet | Test quality review — coverage of happy/error/edge paths, negative tests, behaviour vs implementation |
 | 7 | `tester` | Sonnet | Executes tests, reports defects |
 | 8 | `bug-fixer` ↔ `tester` | Sonnet | Fix + re-test loop (max 5 iterations) |
@@ -80,16 +83,17 @@ The orchestrator runs these agents in strict sequence. Every agent output feeds 
 | 8.6 | `performance-optimisation-engineer` | Sonnet | Eliminates bottlenecks — N+1, missing indexes, async gaps, memory leaks |
 | 8.7 | `security-auditor` | **Opus** | OWASP Top 10 — attack scenarios, secure implementation fixes |
 | 8.8 | `devops-engineer` | Sonnet | Deployment architecture, monitoring, scaling, production checklist |
+| 8.9 | `production-validator` | Sonnet | Final production-readiness check — no stubs, no TODOs, all endpoints functional, no debug code |
 | 9 | `enterprise-architect` *(post)* | Sonnet | Final architectural verdict — always runs |
 
-**Orchestrator model: `claude-opus-4-8`** — it controls all 24 agents.
+**Orchestrator model: `claude-opus-4-8`** — it controls all 28 agents.
 
 ### Model Tiers
 
 | Tier | Agents | Purpose |
 |---|---|---|
 | **Opus** (10 agents) | ai-engineer, architecture-critic, system-engineer, code-reviewer, senior-engineer, software-architect, code-simplifier, debugger, security-auditor | Deep reasoning — architectural decisions, audits, root cause, security |
-| **Sonnet** (12 agents) | code-explorer, engineer, developer, frontend-engineer, type-design-analyzer, silent-failure-hunter, perf-opt, devops, solution-architect, enterprise-architect, test-writer, tester, bug-fixer, pr-test-analyzer | Execution — code generation, testing, optimization |
+| **Sonnet** (16 agents) | code-explorer, engineer, developer, database-specialist, python-specialist, frontend-engineer, type-design-analyzer, silent-failure-hunter, perf-opt, devops, production-validator, solution-architect, enterprise-architect, test-architect, test-writer, tester, bug-fixer, pr-test-analyzer | Execution — code generation, testing, optimization |
 | **Haiku** (2 agents) | business-analyst, process-organiser | Simple extraction and formatting |
 
 ### Three Invariants (never break these)
