@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 
-import { API_BASE } from '../lib/api';
 import { clearToken, getToken } from '../auth/tokenStorage';
 
 export interface UseFetchResult<T> {
@@ -30,8 +29,7 @@ export function useFetch<T>(url: string): UseFetchResult<T> {
     const headers: Record<string, string> = {};
     if (token) headers.Authorization = `Bearer ${token}`;
 
-    const resolvedUrl = url.startsWith('/') ? `${API_BASE}${url}` : url;
-    fetch(resolvedUrl, { signal: controller.signal, headers })
+    fetch(url, { signal: controller.signal, headers })
       .then(async (res) => {
         if (res.status === 401) {
           clearToken();

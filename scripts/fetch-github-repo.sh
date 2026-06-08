@@ -134,6 +134,64 @@ if [ "$DRY_RUN" != "--dry-run" ]; then
       CHANGED=1
       log "Installed .claude/skills/$REPO_SLUG/"
     fi
+  elif [ "${#FOUND_SKILLS[@]}" -gt 0 ]; then
+    # Flat-layout fallback: SKILL.md files scattered around the repo (e.g. gstack
+    # puts each skill at the repo root). Copy every directory containing a SKILL.md
+    # into .claude/skills/<repo-slug>/<dir-name>/, and any root-level SKILL.md as
+    # .claude/skills/<repo-slug>/SKILL.md. CHANGED is decided by git diff afterwards.
+    mkdir -p "$SKILL_DEST"
+    flat_copied=0
+    while IFS= read -r src_skill_md; do
+      src_dir="$(dirname "$src_skill_md")"
+      if [ "$src_dir" = "$CLONE_DIR" ]; then
+        cp "$src_skill_md" "$SKILL_DEST/SKILL.md"
+        flat_copied=$((flat_copied + 1))
+        continue
+      fi
+      name="$(basename "$src_dir")"
+      # Skip non-skill directories that happen to contain a SKILL.md by accident
+      case "$name" in
+        node_modules|dist|build|.git|tests|test) continue ;;
+      esac
+      dest_dir="$SKILL_DEST/$name"
+      rm -rf "$dest_dir"
+      cp -r "$src_dir" "$dest_dir"
+      flat_copied=$((flat_copied + 1))
+    done < <(find "$CLONE_DIR" -not -path '*/.git/*' -name "SKILL.md" 2>/dev/null || true)
+    if ! git -C "$REPO_ROOT" diff --quiet -- ".claude/skills/$REPO_SLUG" 2>/dev/null \
+        || [ -n "$(git -C "$REPO_ROOT" status --porcelain ".claude/skills/$REPO_SLUG" 2>/dev/null)" ]; then
+      CHANGED=1
+      log "Installed .claude/skills/$REPO_SLUG/ (flat layout — $flat_copied skills)"
+    fi
+  fi
+
+  # Prune bloat from any installed skill tree. Removes well-known non-skill
+  # subdirectories that pad the repo (test fixtures, build artefacts, vendor)
+  # and any single file >5MB. This applies to both structured and flat layouts.
+  # gstack's browse skill ships a 28MB Haiku-benchmark JSON under test/ — that
+  # was the catalyst for adding this prune step.
+  if [ -d "$SKILL_DEST" ]; then
+    pruned_dirs=0
+    while IFS= read -r d; do
+      rm -rf "$d"
+      pruned_dirs=$((pruned_dirs + 1))
+    done < <(find "$SKILL_DEST" \
+        \( -type d -name test -o -type d -name tests \
+           -o -type d -name node_modules -o -type d -name dist \
+           -o -type d -name build -o -type d -name .git \) \
+        -prune -print 2>/dev/null)
+    pruned_files=0
+    while IFS= read -r f; do
+      rm -f "$f"
+      pruned_files=$((pruned_files + 1))
+    done < <(find "$SKILL_DEST" -type f -size +5M 2>/dev/null)
+    if [ "$pruned_dirs" -gt 0 ] || [ "$pruned_files" -gt 0 ]; then
+      log "Pruned $pruned_dirs bloat dir(s) and $pruned_files oversize file(s) from .claude/skills/$REPO_SLUG/"
+      # Re-evaluate CHANGED so the prune diff gets committed
+      if [ -n "$(git -C "$REPO_ROOT" status --porcelain ".claude/skills/$REPO_SLUG" 2>/dev/null)" ]; then
+        CHANGED=1
+      fi
+    fi
   fi
 
   # Copy agent .md files → backend/src/agents/ (reference copies)

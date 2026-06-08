@@ -1,0 +1,16 @@
+{
+  "audit_run_id": "audit-2026-04-26",
+  "feature_id": "FEAT-087",
+  "tester_iteration": 0,
+  "verdict": "PASS",
+  "summary": "5 TCs reviewed; 0 real defects. connect calls upsert_personal_integration which checks for existing oauth_account first (lines 46-54 in _shared.py); if absent, returns redirect_url to login with reason=missing_google_scope. user=None raises PermissionError (line 38-39). sync uses make_sync_via_dag('calendar_ingestor') → enqueues DagTriggerQueue row (lines 114-142 in _shared.py). status enriches with account_email if oauth_account present.",
+  "defects": [
+    {"defect_id":"DEF-087-01","test_id":"TC-087-01","severity":"medium","description":"untestable_in_static_review — needs DB.","expected":"Promotes existing token","actual":"Logic verified at _shared.py:46-77","file_hint":"backend/src/integrations/personal/_shared.py:46"}
+  ],
+  "total_defects_critical": 0,
+  "total_defects_high": 0,
+  "total_defects_medium": 1,
+  "total_defects_low": 0,
+  "real_defects_requiring_fix": 0,
+  "bug_fixer_required": false
+}

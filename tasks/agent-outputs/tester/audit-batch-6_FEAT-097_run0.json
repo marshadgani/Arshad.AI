@@ -1,0 +1,14 @@
+{
+  "audit_run_id": "audit-2026-04-26",
+  "feature_id": "FEAT-097",
+  "tester_iteration": 0,
+  "verdict": "PASS",
+  "summary": "5 TCs reviewed; 0 real defects. Pure subclass of OAuthIntegrationProvider — inherits standard connect/exchange_code/_refresh from base class (no overrides). fetch_profile uses Bearer auth on /v2/user/profile (lines 37-54). sync delegated to make_oauth_sync_via_api factory with sync_url=/v2/portfolio/long-term-holdings (line 56-70); parse_sync extracts holding_count + first-10 holdings into integration.config. Empty scopes list correct (Upstox doesn't use scope param).",
+  "defects": [],
+  "total_defects_critical": 0,
+  "total_defects_high": 0,
+  "total_defects_medium": 0,
+  "total_defects_low": 0,
+  "real_defects_requiring_fix": 0,
+  "bug_fixer_required": false
+}

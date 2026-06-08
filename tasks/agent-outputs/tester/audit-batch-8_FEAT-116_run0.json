@@ -1,0 +1,21 @@
+{
+  "audit_run_id": "audit-2026-04-26",
+  "feature_id": "FEAT-116",
+  "tester_iteration": 0,
+  "verdict": "PASS",
+  "summary": "12 TCs reviewed; 0 real defects. Chat.tsx auto-creates session via POST /api/v1/chat/sessions and navigates with replace:true (lines 12-23). useChatStream uses fetch (not EventSource) so it can attach Authorization header (line 68-77). SSE parse: split on '\\n\\n', leftover stays in buffer (line 101-102) — handles partial chunks correctly. [DONE] terminator (line 107-110). Malformed JSON: try/catch in JSON.parse with `continue` (lines 112-116). AbortController stored in ref; abort() called before each new send (line 61); AbortError filtered in catch (lines 79, 121). All 5 event types (intent/delta/tool_use/tool_result/error) handled in applyEvent. tool_result correctly maps by id and updates the matching toolCall.",
+  "defects": [
+    {"defect_id":"DEF-116-01","test_id":"TC-116-01","severity":"medium","description":"untestable_in_static_review — needs network mock + React Testing Library.","expected":"POST + redirect","actual":"Logic verified at Chat.tsx:12-23","file_hint":"frontend/src/pages/Chat.tsx:12"},
+    {"defect_id":"DEF-116-02","test_id":"TC-116-11","severity":"low","description":"Subtle: setState in `finally` (line 125) runs even on successful [DONE] return path. Effect: redundant but idempotent setState. Not a defect, but minor wasted re-render.","expected":"isStreaming=false on success path","actual":"Line 108 already sets isStreaming=false, then line 125 sets it again. Idempotent.","file_hint":"frontend/src/chat/useChatStream.ts:124-126"}
+  ],
+  "total_defects_critical": 0,
+  "total_defects_high": 0,
+  "total_defects_medium": 1,
+  "total_defects_low": 1,
+  "real_defects_requiring_fix": 0,
+  "bug_fixer_required": false,
+  "notes": [
+    "Confirmed: SSE protocol matches backend exactly — 5 event types + [DONE] terminator. Cross-referenced services/chat.py SSE emission.",
+    "Token retrieved via getToken() from auth/tokenStorage — NOT prop-drilled. Good separation."
+  ]
+}

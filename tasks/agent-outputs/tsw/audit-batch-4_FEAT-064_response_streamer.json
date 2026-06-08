@@ -1,0 +1,15 @@
+{
+  "audit_run_id": "audit-2026-04-26",
+  "feature_id": "FEAT-064",
+  "feature_name": "Response Streamer Agent",
+  "primary_files": ["backend/src/agents/ai_core/response_streamer.py", "backend/src/services/chat.py", "backend/src/api/v1/chat.py"],
+  "script_count": 5,
+  "test_cases": [
+    {"test_id":"TC-064-01","name":"Returns event protocol","input":"empty input","expected":"summary contains sse_endpoint, media_type='text/event-stream', event_types sorted list, terminator 'data: [DONE]\\\\n\\\\n'"},
+    {"test_id":"TC-064-02","name":"All 5 event types listed","input":"empty input","expected":"event_types == sorted(['delta','error','intent','tool_result','tool_use'])"},
+    {"test_id":"TC-064-03","name":"data.event_shapes complete","input":"empty input","expected":"data.event_shapes has the 5 keys with example payload shapes"},
+    {"test_id":"TC-064-04","name":"Read-only — no DB writes","input":"any input","expected":"No db.add/commit invoked"},
+    {"test_id":"TC-064-05","name":"Empty input schema","input":"any input","expected":"ResponseStreamerInput accepts {}"}
+  ],
+  "rtm_coverage": "AC-064-01..02 (introspection endpoint, schema parity with services/chat.py)"
+}

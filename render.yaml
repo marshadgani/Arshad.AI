@@ -8,24 +8,6 @@
 
 services:
   - type: web
-    name: arshad-ai-frontend
-    runtime: docker
-    plan: starter
-    dockerfilePath: ./frontend/Dockerfile
-    dockerContext: ./frontend
-    dockerBuildTarget: prod
-    healthCheckPath: /
-    autoDeploy: true
-    envVars:
-      - key: VITE_API_BASE_URL
-        # Full URL of the backend service, e.g. https://arshad-ai-backend.onrender.com
-        # Baked into the JS bundle at build time — rebuild required after changing.
-        sync: false
-      - key: BACKEND_URL
-        # Same value as VITE_API_BASE_URL — used by nginx to proxy /api/* in the container.
-        sync: false
-
-  - type: web
     name: arshad-ai-backend
     runtime: docker
     plan: starter
@@ -37,6 +19,8 @@ services:
     envVars:
       - key: DATABASE_URL
         sync: false
+      - key: DATABASE_URL_DIRECT
+        sync: false
       - key: REDIS_URL
         sync: false
       - key: ANTHROPIC_API_KEY
@@ -44,22 +28,6 @@ services:
       - key: SECRET_KEY
         sync: false
       - key: CORS_ORIGINS
-        sync: false
-      - key: BACKEND_URL
-        # e.g. https://arshad-ai-backend.onrender.com
-        sync: false
-      - key: FRONTEND_URL
-        # e.g. https://arshad-ai-frontend.onrender.com
-        sync: false
-      - key: GOOGLE_OAUTH_CLIENT_ID
-        sync: false
-      - key: GOOGLE_OAUTH_CLIENT_SECRET
-        sync: false
-      - key: GITHUB_OAUTH_CLIENT_ID
-        sync: false
-      - key: GITHUB_OAUTH_CLIENT_SECRET
-        sync: false
-      - key: OAUTH_ENCRYPTION_KEY
         sync: false
       - key: PYTHONUNBUFFERED
         value: "1"
