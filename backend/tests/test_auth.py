@@ -2,7 +2,6 @@
 
 import hashlib as _hashlib
 import hmac as _hmac
-import os
 import time
 from unittest.mock import MagicMock
 
@@ -82,7 +81,7 @@ def test_verify_signed_state_rejects_future_timestamp():
     nonce = "testnonce"
     ts_str = str(int(time.time()) + 3600)
     payload = f"{nonce}.{ts_str}"
-    key = os.getenv("SECRET_KEY", "").encode()
+    key = b"test-secret-key-for-unit-tests"
     sig = _hmac.new(key, payload.encode(), _hashlib.sha256).hexdigest()
     assert not _verify_signed_state(f"{nonce}.{ts_str}.{sig}")
 

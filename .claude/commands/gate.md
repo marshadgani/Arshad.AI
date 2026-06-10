@@ -31,7 +31,7 @@ This command runs **automatically** whenever the user:
    this branch via `mcp__github__search_pull_requests` with `head:<branch>`.
 5. If no PR exists yet, create one via `mcp__github__create_pull_request`:
    - title: branch name in sentence case
-   - base: `main`
+   - base: `claude/ai-personal-assistant-main`
    - body: auto-generated from commit list
    Record the PR number for the report.
 
@@ -86,7 +86,7 @@ Aggregate all 8 agent results into this exact report format:
 # Arshad.AI Quality Gate Report
 
 **PR:** #<number> — <title>
-**Branch:** `<source>` → `main`
+**Branch:** `<source>` → `claude/ai-personal-assistant-main`
 **Triggered by:** <user message / /gate>
 **Date:** <today>
 

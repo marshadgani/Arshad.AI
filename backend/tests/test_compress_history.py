@@ -1,48 +1,22 @@
 """Unit tests for _compress_history in backend/src/services/chat.py.
 
-Tests all 4 code paths:
+Tests all 4 code paths against the REAL production function:
   1. Under budget — returns messages unchanged
   2. Over budget — trims oldest user/assistant pairs
   3. Over budget with only one user message — break condition (can't trim further)
   4. Empty messages list
+
+Budget is controlled via the CHAT_HISTORY_TOKEN_BUDGET env var (monkeypatched per
+test), since _compress_history sources its limit from _history_token_budget().
+
+Token math (mirrors production _approx_tokens):
+  tokens(text) = max(1, len(json.dumps(text)) // 4)
+  "A" * 2000   → json.dumps = 2002 chars → 500 tokens
+  "hello"      → json.dumps = 7 chars    → 1 token
+  budget floor = 500  (env vars below 500 are clamped to 500)
 """
 
-import importlib
-import sys
-from unittest.mock import patch
-
-
-def _load_compress():
-    """Import _compress_history without triggering heavy service-level imports."""
-    # Patch out the Anthropic client and other heavy deps at import time
-    with patch.dict(
-        sys.modules,
-        {
-            "anthropic": __import__(
-                "unittest.mock", fromlist=["MagicMock"]
-            ).MagicMock(),
-            "src.middleware.cache": __import__(
-                "unittest.mock", fromlist=["MagicMock"]
-            ).MagicMock(),
-            "src.models.database": __import__(
-                "unittest.mock", fromlist=["MagicMock"]
-            ).MagicMock(),
-            "src.auth.dependencies": __import__(
-                "unittest.mock", fromlist=["MagicMock"]
-            ).MagicMock(),
-        },
-    ):
-        spec = importlib.util.spec_from_file_location(
-            "chat_module",
-            "/home/user/Arshad.AI/backend/src/services/chat.py",
-        )
-        mod = importlib.util.module_from_spec(spec)
-        try:
-            spec.loader.exec_module(mod)
-        except Exception:
-            pass
-        return mod
-
+from __future__ import annotations
 
 import json
 
@@ -51,170 +25,173 @@ def _msg(role: str, content: str) -> dict:
     return {"role": role, "content": content}
 
 
-def _approx_tokens(s: str) -> int:
-    """Mirrors the production implementation: ceil(len(s) / 4)."""
-    import math
-
-    return math.ceil(len(s) / 4)
+def _count_tokens(messages: list[dict]) -> int:
+    """Mirrors production: max(1, len(json.dumps(content)) // 4) per message."""
+    return sum(max(1, len(json.dumps(m.get("content", ""))) // 4) for m in messages)
 
 
-def _total_tokens(messages: list[dict]) -> int:
-    return sum(_approx_tokens(json.dumps(m.get("content", ""))) for m in messages)
-
-
-# ---------------------------------------------------------------------------
-# Inline implementation for isolation (avoids heavy service imports)
-# ---------------------------------------------------------------------------
-import math
-
-
-def _compress_history_impl(messages: list[dict], budget: int) -> list[dict]:
-    """Extracted copy of the production logic for isolated testing."""
-    total = sum(math.ceil(len(json.dumps(m.get("content", ""))) / 4) for m in messages)
-    if total <= budget:
-        return messages
-
-    compressed = list(messages)
-    while compressed and total > budget:
-        user_indices = [i for i, m in enumerate(compressed) if m.get("role") == "user"]
-        if len(user_indices) < 2:
-            break
-        drop_until = user_indices[1]
-        dropped = compressed[:drop_until]
-        compressed = compressed[drop_until:]
-        total -= sum(
-            math.ceil(len(json.dumps(m.get("content", ""))) / 4) for m in dropped
-        )
-    return compressed
-
-
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
+# Large content: json.dumps = 2002 chars → 500 tokens (= budget floor)
+_LARGE = "A" * 2000
+# Medium content: json.dumps = 402 chars → 100 tokens
+_MEDIUM = "B" * 400
+# Small content: json.dumps = 7 chars → 1 token
+_SMALL = "hello"
 
 
 class TestCompressHistoryUnderBudget:
-    def test_empty_list_returns_empty(self):
-        result = _compress_history_impl([], budget=1000)
+    def test_empty_list_returns_empty(self, monkeypatch):
+        monkeypatch.setenv("CHAT_HISTORY_TOKEN_BUDGET", "10000")
+        from src.services.chat import _compress_history
+
+        result = _compress_history([])
         assert result == []
 
-    def test_single_message_under_budget_unchanged(self):
-        msgs = [_msg("user", "hello")]
-        result = _compress_history_impl(msgs, budget=10000)
+    def test_single_message_under_budget_unchanged(self, monkeypatch):
+        monkeypatch.setenv("CHAT_HISTORY_TOKEN_BUDGET", "10000")
+        from src.services.chat import _compress_history
+
+        msgs = [_msg("user", _SMALL)]
+        result = _compress_history(msgs)
         assert result == msgs
 
-    def test_multiple_messages_under_budget_unchanged(self):
+    def test_multiple_messages_under_budget_unchanged(self, monkeypatch):
+        monkeypatch.setenv("CHAT_HISTORY_TOKEN_BUDGET", "10000")
+        from src.services.chat import _compress_history
+
         msgs = [
-            _msg("user", "first"),
-            _msg("assistant", "reply"),
-            _msg("user", "second"),
+            _msg("user", _SMALL),
+            _msg("assistant", _SMALL),
+            _msg("user", _SMALL),
         ]
-        result = _compress_history_impl(msgs, budget=10000)
+        result = _compress_history(msgs)
         assert result == msgs
 
-    def test_exactly_at_budget_unchanged(self):
-        msgs = [_msg("user", "x")]
-        total = _total_tokens(msgs)
-        result = _compress_history_impl(msgs, budget=total)
+    def test_exactly_at_budget_unchanged(self, monkeypatch):
+        # One message with content "A" * 2000 → 500 tokens = budget floor
+        monkeypatch.setenv("CHAT_HISTORY_TOKEN_BUDGET", "500")
+        from src.services.chat import _compress_history
+
+        msgs = [_msg("user", _LARGE)]
+        assert _count_tokens(msgs) <= 500
+        result = _compress_history(msgs)
+        assert result == msgs
+
+    def test_all_assistant_messages_unchanged(self, monkeypatch):
+        """No user messages → user_indices empty → loop breaks immediately."""
+        monkeypatch.setenv("CHAT_HISTORY_TOKEN_BUDGET", "500")
+        from src.services.chat import _compress_history
+
+        msgs = [_msg("assistant", _LARGE), _msg("assistant", _LARGE)]
+        result = _compress_history(msgs)
+        # Can't trim without user messages, returned as-is even if over budget
         assert result == msgs
 
 
 class TestCompressHistoryOverBudgetTrims:
-    def test_drops_oldest_pair(self):
-        """With three turns over budget, the oldest pair is dropped."""
-        msgs = [
-            _msg("user", "turn one — oldest, should be dropped"),
-            _msg("assistant", "reply one"),
-            _msg("user", "turn two — keep"),
-            _msg("assistant", "reply two"),
-            _msg("user", "turn three — keep"),
-        ]
-        # Budget that forces dropping the first turn
-        total = _total_tokens(msgs)
-        budget = total - _total_tokens(msgs[:2]) - 1
-        result = _compress_history_impl(msgs, budget=budget)
-        assert result[0]["content"] == "turn two — keep"
+    def test_drops_oldest_pair_leaves_recent(self, monkeypatch):
+        """Three turns over budget → oldest user+assistant pair dropped."""
+        monkeypatch.setenv("CHAT_HISTORY_TOKEN_BUDGET", "500")
+        from src.services.chat import _compress_history
 
-    def test_preserves_most_recent_messages(self):
         msgs = [
-            _msg("user", "old A"),
-            _msg("assistant", "old B"),
-            _msg("user", "recent C"),
-            _msg("assistant", "recent D"),
+            _msg("user", _LARGE),  # 500 tokens — oldest, should be dropped
+            _msg("assistant", _SMALL),  # 1 token
+            _msg("user", _SMALL),  # 1 token — recent, must be kept
         ]
-        total = _total_tokens(msgs)
-        budget = _total_tokens(msgs[2:])  # only fits last pair
-        result = _compress_history_impl(msgs, budget=budget)
+        # total = 502 > 500 → triggers trimming
+        result = _compress_history(msgs)
+        assert result[0]["content"] == _SMALL  # oldest user message gone
+        assert result[-1]["content"] == _SMALL  # recent user message present
+
+    def test_preserves_most_recent_messages(self, monkeypatch):
+        """Oldest pair removed; most-recent pair preserved."""
+        monkeypatch.setenv("CHAT_HISTORY_TOKEN_BUDGET", "500")
+        from src.services.chat import _compress_history
+
+        msgs = [
+            _msg("user", _LARGE),  # 500 tokens — old
+            _msg("assistant", _SMALL),  # 1 token
+            _msg("user", "recent"),  # 1 token — recent
+            _msg("assistant", "reply"),  # 1 token
+        ]
+        result = _compress_history(msgs)
         contents = [m["content"] for m in result]
-        assert "recent C" in contents
-        assert "recent D" in contents
+        assert "recent" in contents
+        assert "reply" in contents
 
-    def test_result_within_budget(self):
-        msgs = [_msg("user", "A" * 100), _msg("assistant", "B" * 100)] * 5
-        budget = _total_tokens(msgs) // 2
-        result = _compress_history_impl(msgs, budget=budget)
-        assert _total_tokens(result) <= budget or len(result) < len(msgs)
+    def test_result_within_budget_after_trim(self, monkeypatch):
+        """After trimming, total tokens ≤ budget (or we hit the break condition)."""
+        monkeypatch.setenv("CHAT_HISTORY_TOKEN_BUDGET", "500")
+        from src.services.chat import _compress_history
 
-    def test_returns_list_not_original(self):
-        """Must return a new list, not mutate the input."""
         msgs = [
-            _msg("user", "u1"),
-            _msg("assistant", "a1"),
-            _msg("user", "u2"),
+            _msg("user", _LARGE),
+            _msg("assistant", _SMALL),
+            _msg("user", _SMALL),
         ]
-        budget = 1  # force compression
+        result = _compress_history(msgs)
+        assert _count_tokens(result) <= 500 or len(result) < len(msgs)
+
+    def test_does_not_mutate_input(self, monkeypatch):
+        """The input list must not be modified in-place."""
+        monkeypatch.setenv("CHAT_HISTORY_TOKEN_BUDGET", "500")
+        from src.services.chat import _compress_history
+
+        msgs = [
+            _msg("user", _LARGE),
+            _msg("assistant", _SMALL),
+            _msg("user", _SMALL),
+        ]
         original_len = len(msgs)
-        result = _compress_history_impl(msgs, budget=budget)
-        assert len(msgs) == original_len  # original not mutated
+        _compress_history(msgs)
+        assert len(msgs) == original_len
+
+    def test_multiple_trim_iterations(self, monkeypatch):
+        """When one trim pass is not enough, the loop continues."""
+        monkeypatch.setenv("CHAT_HISTORY_TOKEN_BUDGET", "500")
+        from src.services.chat import _compress_history
+
+        # 4 turns, each large enough — trim must iterate more than once
+        msgs = [
+            _msg("user", _LARGE),  # 500 tokens
+            _msg("assistant", _SMALL),  # 1 token
+            _msg("user", _LARGE),  # 500 tokens
+            _msg("assistant", _SMALL),  # 1 token
+            _msg("user", _SMALL),  # 1 token — must survive
+        ]
+        result = _compress_history(msgs)
+        # Last user message must be preserved
+        assert any(m["content"] == _SMALL and m["role"] == "user" for m in result)
 
 
 class TestCompressHistorySingleUserBreak:
-    def test_single_user_message_not_trimmed(self):
-        """When only one user message remains, loop breaks without reducing further."""
+    def test_one_user_message_over_budget_not_trimmed(self, monkeypatch):
+        """With only one user message, the break fires — no trimming even if over budget."""
+        monkeypatch.setenv("CHAT_HISTORY_TOKEN_BUDGET", "500")
+        from src.services.chat import _compress_history
+
         msgs = [
-            _msg("user", "only user message — must be preserved"),
-            _msg("assistant", "assistant reply"),
+            _msg("user", _LARGE),  # 500 tokens
+            _msg("assistant", _LARGE),  # 500 tokens
         ]
-        budget = 1  # impossibly small — but we can't drop below 1 user message
-        result = _compress_history_impl(msgs, budget=budget)
-        # Must keep the last user message even when over budget
+        # total = 1000 > 500, but only 1 user message → break immediately
+        result = _compress_history(msgs)
         assert any(m["role"] == "user" for m in result)
-        assert result[0]["content"] == "only user message — must be preserved"
+        assert result[0]["content"] == _LARGE
 
-    def test_break_does_not_infinite_loop(self):
-        """Regression: the while loop must exit cleanly on the break condition."""
-        msgs = [_msg("user", "u"), _msg("assistant", "a")]
-        budget = 0
-        result = _compress_history_impl(msgs, budget=budget)
+    def test_break_does_not_infinite_loop(self, monkeypatch):
+        """Loop must exit cleanly under all conditions — no infinite loop."""
+        monkeypatch.setenv("CHAT_HISTORY_TOKEN_BUDGET", "500")
+        from src.services.chat import _compress_history
+
+        msgs = [_msg("user", _LARGE), _msg("assistant", _LARGE)]
+        result = _compress_history(msgs)
         assert isinstance(result, list)
 
+    def test_empty_input_no_loop(self, monkeypatch):
+        """Empty list short-circuits before the while loop entirely."""
+        monkeypatch.setenv("CHAT_HISTORY_TOKEN_BUDGET", "500")
+        from src.services.chat import _compress_history
 
-class TestCompressHistoryEdgeCases:
-    def test_empty_budget_with_multiple_turns(self):
-        msgs = [
-            _msg("user", "a"),
-            _msg("assistant", "b"),
-            _msg("user", "c"),
-        ]
-        result = _compress_history_impl(msgs, budget=0)
-        # Should drop down to single-user-message break point
-        assert isinstance(result, list)
-        assert len(result) >= 1
-
-    def test_assistant_only_messages_no_user(self):
-        """Edge case: no user messages — user_indices is empty, loop breaks immediately."""
-        msgs = [_msg("assistant", "x"), _msg("assistant", "y")]
-        result = _compress_history_impl(msgs, budget=0)
-        assert result == msgs  # can't trim without user messages
-
-    def test_large_content_compresses(self):
-        long_content = "word " * 500
-        msgs = [
-            _msg("user", long_content),
-            _msg("assistant", long_content),
-            _msg("user", "short"),
-        ]
-        total = _total_tokens(msgs)
-        budget = _total_tokens([msgs[-1]])
-        result = _compress_history_impl(msgs, budget=budget)
-        assert any(m["content"] == "short" for m in result)
+        result = _compress_history([])
+        assert result == []
