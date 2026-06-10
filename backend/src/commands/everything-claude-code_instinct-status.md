@@ -1,59 +1,59 @@
 ---
 name: instinct-status
-description: 展示已学习的本能（项目+全局）并充满信心
+description: Mostrar los instintos aprendidos (proyecto + global) con confianza
 command: true
 ---
 
-# 本能状态命令
+# Comando Instinct Status
 
-显示当前项目学习到的本能以及全局本能，按领域分组。
+Muestra los instintos aprendidos para el proyecto actual más los instintos globales, agrupados por dominio.
 
-## 实现
+## Implementación
 
-使用插件根路径运行本能 CLI：
+Ejecutar la CLI de instintos usando la ruta raíz del plugin:
 
 ```bash
 python3 "${CLAUDE_PLUGIN_ROOT}/skills/continuous-learning-v2/scripts/instinct-cli.py" status
 ```
 
-或者，如果未设置 `CLAUDE_PLUGIN_ROOT`（手动安装），则使用：
+O si `CLAUDE_PLUGIN_ROOT` no está configurado (instalación manual):
 
 ```bash
 python3 ~/.claude/skills/continuous-learning-v2/scripts/instinct-cli.py status
 ```
 
-## 用法
+## Uso
 
 ```
 /instinct-status
 ```
 
-## 操作步骤
+## Qué Hacer
 
-1. 检测当前项目上下文（git remote/路径哈希）
-2. 从 `~/.claude/homunculus/projects/<project-id>/instincts/` 读取项目本能
-3. 从 `~/.claude/homunculus/instincts/` 读取全局本能
-4. 合并并应用优先级规则（当ID冲突时，项目本能覆盖全局本能）
-5. 按领域分组显示，包含置信度条和观察统计数据
+1. Detectar el contexto actual del proyecto (hash de remote/ruta de git)
+2. Leer instintos del proyecto desde `~/.claude/homunculus/projects/<project-id>/instincts/`
+3. Leer instintos globales desde `~/.claude/homunculus/instincts/`
+4. Fusionar con reglas de precedencia (el proyecto sobreescribe global cuando hay colisión de IDs)
+5. Mostrar agrupados por dominio con barras de confianza y estadísticas de observación
 
-## 输出格式
+## Formato de Salida
 
 ```
 ============================================================
-  INSTINCT 状态 - 总计 12
+  ESTADO DE INSTINTOS - 12 en total
 ============================================================
 
-  项目: my-app (a1b2c3d4e5f6)
-  项目 instincts: 8
-  全局 instincts:  4
+  Proyecto: my-app (a1b2c3d4e5f6)
+  Instintos del proyecto: 8
+  Instintos globales:     4
 
-## 项目范围内 (my-app)
-  ### 工作流 (3)
-    ███████░░░  70%  grep-before-edit [project]
-              触发条件: 当修改代码时
+## CON ALCANCE DE PROYECTO (my-app)
+  ### WORKFLOW (3)
+    ███████░░░  70%  grep-before-edit [proyecto]
+              disparador: when modifying code
 
-## 全局 (适用于所有项目)
-  ### 安全 (2)
+## GLOBAL (aplican a todos los proyectos)
+  ### SECURITY (2)
     █████████░  85%  validate-user-input [global]
-              触发条件: 当处理用户输入时
+              disparador: when handling user input
 ```

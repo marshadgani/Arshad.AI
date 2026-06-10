@@ -1,9 +1,17 @@
-"""Read-only dashboard endpoints — Phase A.
+"""Dashboard API endpoints — Phase A + live Google Calendar / Gmail / Claude data.
 
-Every collection returns ``{"data": [...], "total": N}``; every
-singleton returns ``{"data": {...}}`` per ``.claude/rules/api.md``.
+/events and /briefing serve live data when Google is connected, falling back to
+seeded mock rows on TokenUnavailableError. All other endpoints remain mock-only.
+
+Every collection returns ``{"data": [...], "total": N}``; every singleton returns
+``{"data": {...}}`` per ``.claude/rules/api.md``.
 """
 
+from __future__ import annotations
+
+import asyncio
+import logging
+from dataclasses import asdict
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -12,7 +20,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.auth.dependencies import get_current_user
 from src.models import dashboard as m
 from src.models.database import get_db
+from src.models.user import User
 from src.schemas import dashboard as s
+from src.services.briefing import compose_briefing
+from src.services.gmail_client import fetch_unread_count
+from src.services.google_calendar import fetch_todays_events
+from src.services.google_token import TokenUnavailableError, get_valid_google_token
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/api/v1/dashboard",
@@ -21,7 +36,6 @@ router = APIRouter(
 )
 
 
-# Helper: shape collection responses
 def _collection(items: list[Any], schema) -> dict[str, Any]:
     return {
         "data": [schema.model_validate(i).model_dump(by_alias=True) for i in items],
@@ -45,10 +59,39 @@ def _singleton(obj: Any | None, schema, name: str) -> dict[str, Any]:
 
 
 # ── Singletons ─────────────────────────────────────────────────────
+
+
 @router.get("/briefing", summary="Daily briefing")
-async def get_briefing(db: AsyncSession = Depends(get_db)):
-    obj = (await db.execute(select(m.DailyBriefing).limit(1))).scalar_one_or_none()
-    return _singleton(obj, s.DailyBriefingResponse, "briefing")
+async def get_briefing(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        token = await get_valid_google_token(current_user.id, db)
+    except TokenUnavailableError:
+        obj = (await db.execute(select(m.DailyBriefing).limit(1))).scalar_one_or_none()
+        return _singleton(obj, s.DailyBriefingResponse, "briefing")
+
+    events_res, unread_res = await asyncio.gather(
+        fetch_todays_events(token),
+        fetch_unread_count(token),
+        return_exceptions=True,
+    )
+
+    if isinstance(events_res, Exception):
+        logger.warning("Calendar fetch failed in briefing (%s)", events_res)
+        events = []
+    else:
+        events = events_res
+
+    if isinstance(unread_res, Exception):
+        logger.warning("Gmail fetch failed in briefing (%s)", unread_res)
+        unread = None
+    else:
+        unread = unread_res
+
+    data = await compose_briefing(events, unread)
+    return {"data": data}
 
 
 @router.get("/focus", summary="Current focus block")
@@ -70,6 +113,8 @@ async def get_commute(db: AsyncSession = Depends(get_db)):
 
 
 # ── Collections ────────────────────────────────────────────────────
+
+
 @router.get("/tasks", summary="Auto-prioritised tasks across sources")
 async def list_tasks(db: AsyncSession = Depends(get_db)):
     items = (
@@ -82,47 +127,29 @@ async def list_tasks(db: AsyncSession = Depends(get_db)):
 
 @router.get("/events", summary="Events across calendars")
 async def list_events(
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
 ):
-    """Calendar events.
+    try:
+        token = await get_valid_google_token(current_user.id, db)
+    except TokenUnavailableError:
+        items = (await db.execute(select(m.Event).order_by(m.Event.id))).scalars().all()
+        return _collection(items, s.EventResponse)
 
-    Reads from Phase F's ``ingested_calendar_events`` (real Google Calendar
-    rows, populated by the calendar_ingestor DAG). Falls back to Phase A's
-    seeded ``events`` table only when the user has no ingested rows yet —
-    so the UI never shows blank for a fresh sign-in.
-    """
-    from src.models.ingested import IngestedCalendarEvent
+    try:
+        events = await fetch_todays_events(token)
+    except Exception as exc:
+        logger.warning("Live calendar fetch failed (%s); falling back to mock", exc)
+        items = (await db.execute(select(m.Event).order_by(m.Event.id))).scalars().all()
+        return _collection(items, s.EventResponse)
 
-    rows = (
-        (
-            await db.execute(
-                select(IngestedCalendarEvent)
-                .where(IngestedCalendarEvent.user_id == user.id)
-                .order_by(IngestedCalendarEvent.occurred_at.desc())
-                .limit(50)
-            )
-        )
-        .scalars()
-        .all()
-    )
-    if rows:
-        items = [
-            {
-                "id": str(r.id),
-                "title": (r.raw or {}).get("summary") or "(no title)",
-                "start": r.occurred_at.isoformat() if r.occurred_at else None,
-                "end": (r.raw or {}).get("end", {}).get("dateTime"),
-                "calendar": (r.raw or {}).get("organizer", {}).get("email", ""),
-                "location": (r.raw or {}).get("location"),
-                "source": "ingested",
-            }
-            for r in rows
-        ]
-        return {"data": items, "total": len(items)}
-    # No ingested rows yet — fall back to seed data so the dashboard isn't blank.
-    items = (await db.execute(select(m.Event).order_by(m.Event.id))).scalars().all()
-    return _collection(items, s.EventResponse)
+    return {
+        "data": [
+            s.EventResponse.model_validate(asdict(e)).model_dump(by_alias=True)
+            for e in events
+        ],
+        "total": len(events),
+    }
 
 
 @router.get("/agents", summary="Cross-domain agent roster")
@@ -200,5 +227,4 @@ async def list_knowledge_suggestions(db: AsyncSession = Depends(get_db)):
         .scalars()
         .all()
     )
-    # Frontend consumes only the text — return a list of strings.
     return {"data": [i.text for i in items], "total": len(items)}

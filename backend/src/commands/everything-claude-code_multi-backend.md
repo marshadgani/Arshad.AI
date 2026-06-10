@@ -1,162 +1,97 @@
-# 后端 - 后端导向开发
+---
+description: Ejecutar un flujo de trabajo multi-modelo enfocado en backend para APIs, algoritmos, datos y lógica de negocio.
+---
 
-后端导向的工作流程（研究 → 构思 → 规划 → 执行 → 优化 → 评审），由 Codex 主导。
+# Backend - Desarrollo Enfocado en Backend
 
-## 使用方法
+Flujo de trabajo enfocado en backend (Investigación → Ideación → Plan → Ejecución → Optimización → Revisión), liderado por Codex.
+
+## Uso
 
 ```bash
-/backend <backend task description>
+/backend <descripción de tarea backend>
 ```
 
-## 上下文
+## Contexto
 
-* 后端任务：$ARGUMENTS
-* Codex 主导，Gemini 作为辅助参考
-* 适用场景：API 设计、算法实现、数据库优化、业务逻辑
+- Tarea backend: $ARGUMENTS
+- Liderado por Codex, Gemini para referencia auxiliar
+- Aplicable a: diseño de API, implementación de algoritmos, optimización de base de datos, lógica de negocio
 
-## 你的角色
+## Tu Rol
 
-你是 **后端协调者**，为服务器端任务协调多模型协作（研究 → 构思 → 规划 → 执行 → 优化 → 评审）。
+Eres el **Orquestador Backend**, coordinando la colaboración multi-modelo para tareas del lado del servidor (Investigación → Ideación → Plan → Ejecución → Optimización → Revisión).
 
-**协作模型**：
+**Modelos Colaboradores**:
+- **Codex** – Lógica backend, algoritmos (**Autoridad de backend, confiable**)
+- **Gemini** – Perspectiva frontend (**Opiniones de backend solo como referencia**)
+- **Claude (propio)** – Orquestación, planificación, ejecución, entrega
 
-* **Codex** – 后端逻辑、算法（**后端权威，可信赖**）
-* **Gemini** – 前端视角（**后端意见仅供参考**）
-* **Claude (自身)** – 协调、规划、执行、交付
+---
 
-***
+## Flujo de Trabajo Principal
 
-## 多模型调用规范
+### Fase 0: Mejora del Prompt (Opcional)
 
-**调用语法**：
+`[Modo: Preparar]` - Si el MCP ace-tool está disponible, llamar a `mcp__ace-tool__enhance_prompt`. Si no está disponible, usar `$ARGUMENTS` tal cual.
 
-```
-# 新会话调用
-Bash({
-  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend codex - \"$PWD\" <<'EOF'
-ROLE_FILE: <角色提示路径>
-<TASK>
-需求: <增强后的需求（若未增强则为 $ARGUMENTS）>
-上下文: <来自先前阶段的项目上下文与分析>
-</TASK>
-OUTPUT: 期望的输出格式
-EOF",
-  run_in_background: false,
-  timeout: 3600000,
-  description: "简要描述"
-})
+### Fase 1: Investigación
 
-# 恢复会话调用
-Bash({
-  command: "~/.claude/bin/codeagent-wrapper {{LITE_MODE_FLAG}}--backend codex resume <SESSION_ID> - \"$PWD\" <<'EOF'
-ROLE_FILE: <角色提示路径>
-<TASK>
-需求: <增强后的需求（若未增强则为 $ARGUMENTS）>
-上下文: <来自先前阶段的项目上下文与分析>
-</TASK>
-OUTPUT: 期望的输出格式
-EOF",
-  run_in_background: false,
-  timeout: 3600000,
-  description: "简要描述"
-})
-```
+`[Modo: Investigación]` - Entender los requisitos y recopilar contexto
 
-**角色提示词**：
+1. **Recuperación de Código** (si el MCP ace-tool está disponible): Llamar a `mcp__ace-tool__search_context`. Si no está disponible, usar herramientas integradas: `Glob` para descubrir archivos, `Grep` para buscar símbolos/APIs, `Read` para recopilar contexto.
+2. Puntuación de completitud de requisitos (0-10): >=7 continuar, <7 parar y complementar
 
-| 阶段 | Codex |
-|-------|-------|
-| 分析 | `~/.claude/.ccg/prompts/codex/analyzer.md` |
-| 规划 | `~/.claude/.ccg/prompts/codex/architect.md` |
-| 评审 | `~/.claude/.ccg/prompts/codex/reviewer.md` |
+### Fase 2: Ideación
 
-**会话复用**：每次调用返回 `SESSION_ID: xxx`，在后续阶段使用 `resume xxx`。在第 2 阶段保存 `CODEX_SESSION`，在第 3 和第 5 阶段使用 `resume`。
+`[Modo: Ideación]` - Análisis liderado por Codex
 
-***
+**DEBE llamar a Codex**:
+- Análisis de viabilidad técnica, soluciones recomendadas (al menos 2), evaluación de riesgos
 
-## 沟通准则
+**Guardar SESSION_ID** (`CODEX_SESSION`) para reutilización en fases posteriores.
 
-1. 在回复开头使用模式标签 `[Mode: X]`，初始值为 `[Mode: Research]`
-2. 遵循严格序列：`Research → Ideation → Plan → Execute → Optimize → Review`
-3. 需要时（例如确认/选择/批准）使用 `AskUserQuestion` 工具进行用户交互
+Presentar soluciones (al menos 2), esperar selección del usuario.
 
-***
+### Fase 3: Planificación
 
-## 核心工作流程
+`[Modo: Plan]` - Planificación liderada por Codex
 
-### 阶段 0：提示词增强（可选）
+**DEBE llamar a Codex** (usar `resume <CODEX_SESSION>`):
+- Estructura de archivos, diseño de funciones/clases, relaciones de dependencia
 
-`[Mode: Prepare]` - 如果 ace-tool MCP 可用，调用 `mcp__ace-tool__enhance_prompt`，**将原始的 $ARGUMENTS 替换为增强后的结果，用于后续的 Codex 调用**。如果不可用，则按原样使用 `$ARGUMENTS`。
+Claude sintetiza el plan, guardar en `.claude/plan/nombre-tarea.md` después de aprobación del usuario.
 
-### 阶段 1：研究
+### Fase 4: Implementación
 
-`[Mode: Research]` - 理解需求并收集上下文
+`[Modo: Ejecutar]` - Desarrollo de código
 
-1. **代码检索**（如果 ace-tool MCP 可用）：调用 `mcp__ace-tool__search_context` 来检索现有的 API、数据模型、服务架构。如果不可用，则使用内置工具：`Glob` 用于文件发现，`Grep` 用于符号/API 搜索，`Read` 用于上下文收集，`Task`（探索代理）用于更深入的探索。
-2. 需求完整性评分（0-10）：>=7 继续，<7 停止并补充
+- Seguir estrictamente el plan aprobado
+- Seguir los estándares de código existentes del proyecto
+- Asegurar manejo de errores, seguridad, optimización de rendimiento
 
-### 阶段 2：构思
+### Fase 5: Optimización
 
-`[Mode: Ideation]` - Codex 主导的分析
+`[Modo: Optimizar]` - Revisión liderada por Codex
 
-**必须调用 Codex**（遵循上述调用规范）：
+**DEBE llamar a Codex**:
+- Lista de problemas de seguridad, rendimiento, manejo de errores, cumplimiento de API
 
-* ROLE\_FILE：`~/.claude/.ccg/prompts/codex/analyzer.md`
-* 需求：增强后的需求（或未增强时的 $ARGUMENTS）
-* 上下文：来自阶段 1 的项目上下文
-* 输出：技术可行性分析、推荐解决方案（至少 2 个）、风险评估
+Integrar retroalimentación de la revisión, ejecutar optimización después de confirmación del usuario.
 
-**保存 SESSION\_ID**（`CODEX_SESSION`）以供后续阶段复用。
+### Fase 6: Revisión de Calidad
 
-输出解决方案（至少 2 个），等待用户选择。
+`[Modo: Revisión]` - Evaluación final
 
-### 阶段 3：规划
+- Verificar completitud contra el plan
+- Ejecutar pruebas para verificar la funcionalidad
+- Reportar problemas y recomendaciones
 
-`[Mode: Plan]` - Codex 主导的规划
+---
 
-**必须调用 Codex**（使用 `resume <CODEX_SESSION>` 以复用会话）：
+## Reglas Clave
 
-* ROLE\_FILE：`~/.claude/.ccg/prompts/codex/architect.md`
-* 需求：用户选择的解决方案
-* 上下文：阶段 2 的分析结果
-* 输出：文件结构、函数/类设计、依赖关系
-
-Claude 综合规划，在用户批准后保存到 `.claude/plan/task-name.md`。
-
-### 阶段 4：实施
-
-`[Mode: Execute]` - 代码开发
-
-* 严格遵循已批准的规划
-* 遵循现有项目的代码规范
-* 确保错误处理、安全性、性能优化
-
-### 阶段 5：优化
-
-`[Mode: Optimize]` - Codex 主导的评审
-
-**必须调用 Codex**（遵循上述调用规范）：
-
-* ROLE\_FILE：`~/.claude/.ccg/prompts/codex/reviewer.md`
-* 需求：评审以下后端代码变更
-* 上下文：git diff 或代码内容
-* 输出：安全性、性能、错误处理、API 合规性问题列表
-
-整合评审反馈，在用户确认后执行优化。
-
-### 阶段 6：质量评审
-
-`[Mode: Review]` - 最终评估
-
-* 对照规划检查完成情况
-* 运行测试以验证功能
-* 报告问题和建议
-
-***
-
-## 关键规则
-
-1. **Codex 的后端意见是可信赖的**
-2. **Gemini 的后端意见仅供参考**
-3. 外部模型**对文件系统零写入权限**
-4. Claude 处理所有代码写入和文件操作
+1. **Las opiniones de backend de Codex son confiables**
+2. **Las opiniones de backend de Gemini son solo de referencia**
+3. Los modelos externos tienen **cero acceso de escritura al sistema de archivos**
+4. Claude maneja todas las escrituras de código y operaciones de archivos

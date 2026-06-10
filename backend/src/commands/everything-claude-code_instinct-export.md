@@ -1,46 +1,45 @@
 ---
 name: instinct-export
-description: 将项目/全局范围的本能导出到文件
+description: Exportar instintos del alcance del proyecto/global a un archivo
 command: /instinct-export
 ---
 
-# 本能导出命令
+# Comando Instinct Export
 
-将本能导出为可共享的格式。非常适合：
+Exporta los instintos a un formato compartible. Perfecto para:
+- Compartir con compañeros de equipo
+- Transferir a una nueva máquina
+- Contribuir a las convenciones del proyecto
 
-* 与团队成员分享
-* 转移到新机器
-* 贡献给项目约定
-
-## 用法
+## Uso
 
 ```
-/instinct-export                           # 导出所有个人本能
-/instinct-export --domain testing          # 仅导出测试相关本能
-/instinct-export --min-confidence 0.7      # 仅导出高置信度本能
+/instinct-export                           # Exportar todos los instintos personales
+/instinct-export --domain testing          # Exportar solo instintos de testing
+/instinct-export --min-confidence 0.7      # Solo exportar instintos de alta confianza
 /instinct-export --output team-instincts.yaml
 /instinct-export --scope project --output project-instincts.yaml
 ```
 
-## 操作步骤
+## Qué Hacer
 
-1. 检测当前项目上下文
-2. 按选定范围加载本能：
-   * `project`: 仅限当前项目
-   * `global`: 仅限全局
-   * `all`: 项目与全局合并（默认）
-3. 应用过滤器（`--domain`, `--min-confidence`）
-4. 将 YAML 格式的导出写入文件（如果未提供输出路径，则写入标准输出）
+1. Detectar el contexto actual del proyecto
+2. Cargar instintos por alcance seleccionado:
+   - `project`: solo el proyecto actual
+   - `global`: solo global
+   - `all`: proyecto + global fusionados (por defecto)
+3. Aplicar filtros (`--domain`, `--min-confidence`)
+4. Escribir la exportación en formato YAML al archivo (o stdout si no se proporciona ruta de salida)
 
-## 输出格式
+## Formato de Salida
 
-创建一个 YAML 文件：
+Crea un archivo YAML:
 
 ```yaml
-# Instincts Export
-# Generated: 2025-01-22
-# Source: personal
-# Count: 12 instincts
+# Exportación de Instintos
+# Generado: 2025-01-22
+# Fuente: personal
+# Cantidad: 12 instintos
 
 ---
 id: prefer-functional-style
@@ -53,15 +52,15 @@ project_id: a1b2c3d4e5f6
 project_name: my-app
 ---
 
-# Prefer Functional Style
+# Preferir Estilo Funcional
 
-## Action
-Use functional patterns over classes.
+## Acción
+Usar patrones funcionales sobre clases.
 ```
 
-## 标志
+## Flags
 
-* `--domain <name>`: 仅导出指定领域
-* `--min-confidence <n>`: 最低置信度阈值
-* `--output <file>`: 输出文件路径（省略时打印到标准输出）
-* `--scope <project|global|all>`: 导出范围（默认：`all`）
+- `--domain <nombre>`: Exportar solo el dominio especificado
+- `--min-confidence <n>`: Umbral mínimo de confianza
+- `--output <archivo>`: Ruta del archivo de salida (imprime a stdout si se omite)
+- `--scope <project|global|all>`: Alcance de exportación (por defecto: `all`)

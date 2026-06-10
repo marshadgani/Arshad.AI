@@ -1,117 +1,112 @@
 ---
-description: "从会话中提取可重用模式，在保存前自我评估质量，并确定正确的保存位置（全局与项目）。"
+description: "Extraer patrones reutilizables de la sesión, autoevaluar la calidad antes de guardar y determinar la ubicación correcta (Global vs. Proyecto)."
 ---
 
-# /learn-eval - 提取、评估、然后保存
+# /learn-eval - Extraer, Evaluar y luego Guardar
 
-扩展 `/learn`，在编写任何技能文件之前，加入质量门控、保存位置决策和知识放置意识。
+Extiende `/learn` con una puerta de calidad, decisión de ubicación de guardado y conciencia de colocación del conocimiento antes de escribir cualquier archivo de skill.
 
-## 提取内容
+## Qué Extraer
 
-寻找：
+Buscar:
 
-1. **错误解决模式** — 根本原因 + 修复方法 + 可重用性
-2. **调试技术** — 非显而易见的步骤、工具组合
-3. **变通方法** — 库的怪癖、API 限制、特定版本的修复
-4. **项目特定模式** — 约定、架构决策、集成模式
+1. **Patrones de Resolución de Errores** — causa raíz + corrección + reutilizabilidad
+2. **Técnicas de Depuración** — pasos no obvios, combinaciones de herramientas
+3. **Soluciones Alternativas** — peculiaridades de librerías, limitaciones de API, correcciones específicas de versión
+4. **Patrones Específicos del Proyecto** — convenciones, decisiones arquitectónicas, patrones de integración
 
-## 流程
+## Proceso
 
-1. 回顾会话，寻找可提取的模式
+1. Revisar la sesión en busca de patrones extraíbles
+2. Identificar el insight más valioso/reutilizable
 
-2. 识别最有价值/可重用的见解
+3. **Determinar la ubicación de guardado:**
+   - Preguntar: "¿Este patrón sería útil en un proyecto diferente?"
+   - **Global** (`~/.claude/skills/learned/`): Patrones genéricos usables en 2+ proyectos (compatibilidad bash, comportamiento de API LLM, técnicas de depuración, etc.)
+   - **Proyecto** (`.claude/skills/learned/` en el proyecto actual): Conocimiento específico del proyecto (peculiaridades de un archivo de configuración particular, decisiones de arquitectura específicas del proyecto, etc.)
+   - Ante la duda, elegir Global (mover Global → Proyecto es más fácil que al revés)
 
-3. **确定保存位置：**
-   * 提问："这个模式在其他项目中会有用吗？"
-   * **全局** (`~/.claude/skills/learned/`)：可在 2 个以上项目中使用的通用模式（bash 兼容性、LLM API 行为、调试技术等）
-   * **项目** (当前项目中的 `.claude/skills/learned/`)：项目特定的知识（特定配置文件的怪癖、项目特定的架构决策等）
-   * 不确定时，选择全局（将全局 → 项目移动比反向操作更容易）
-
-4. 使用此格式起草技能文件：
+4. Redactar el archivo de skill usando este formato:
 
 ```markdown
 ---
-name: pattern-name
-description: "Under 130 characters"
+name: nombre-del-patron
+description: "Menos de 130 caracteres"
 user-invocable: false
 origin: auto-extracted
 ---
 
-# [描述性模式名称]
+# [Nombre Descriptivo del Patrón]
 
-**提取日期：** [日期]
-**上下文：** [简要描述此模式适用的场景]
+**Extraído:** [Fecha]
+**Contexto:** [Breve descripción de cuándo aplica]
 
-## 问题
-[此模式解决的具体问题 - 请详细说明]
+## Problema
+[Qué problema resuelve - ser específico]
 
-## 解决方案
-[模式/技术/变通方案 - 附带代码示例]
+## Solución
+[El patrón/técnica/solución alternativa - con ejemplos de código]
 
-## 何时使用
-[触发条件]
+## Cuándo Usar
+[Condiciones de activación]
 ```
 
-5. **质量门控 — 清单 + 整体裁决**
+5. **Puerta de calidad — Lista de verificación + Veredicto holístico**
 
-   ### 5a. 必需清单（通过实际阅读文件进行验证）
+   ### 5a. Lista de verificación requerida (verificar leyendo los archivos reales)
 
-   在评估草案**之前**，执行以下所有操作：
+   Ejecutar **todos** los siguientes antes de evaluar el borrador:
 
-   * \[ ] 使用关键字在 `~/.claude/skills/` 和相关项目的 `.claude/skills/` 文件中进行 grep 搜索，检查内容重叠
-   * \[ ] 检查 MEMORY.md（项目级和全局级）以查找重叠内容
-   * \[ ] 考虑是否追加到现有技能即可满足需求
-   * \[ ] 确认这是一个可复用的模式，而非一次性修复
+   - [ ] Hacer grep en `~/.claude/skills/` y archivos relevantes de `.claude/skills/` del proyecto por palabras clave para verificar superposición de contenido
+   - [ ] Verificar MEMORY.md (tanto del proyecto como global) para superposición
+   - [ ] Considerar si añadir a una skill existente sería suficiente
+   - [ ] Confirmar que este es un patrón reutilizable, no una corrección puntual
 
-   ### 5b. 整体裁决
+   ### 5b. Veredicto holístico
 
-   综合清单结果和草案质量，然后选择**以下一项**：
+   Sintetizar los resultados de la lista de verificación y la calidad del borrador, luego elegir **uno** de los siguientes:
 
-   | 裁决 | 含义 | 下一步行动 |
-   |---------|---------|-------------|
-   | **保存** | 独特、具体、范围明确 | 进行到步骤 6 |
-   | **改进后保存** | 有价值但需要改进 | 列出改进项 → 修订 → 重新评估（一次） |
-   | **吸收到 \[X]** | 应追加到现有技能 | 显示目标技能和添加内容 → 步骤 6 |
-   | **放弃** | 琐碎、冗余或过于抽象 | 解释原因并停止 |
+   | Veredicto | Significado | Próxima Acción |
+   |-----------|-------------|---------------|
+   | **Guardar** | Único, específico, bien delimitado | Proceder al Paso 6 |
+   | **Mejorar y luego Guardar** | Valioso pero necesita refinamiento | Listar mejoras → revisar → re-evaluar (una vez) |
+   | **Absorber en [X]** | Debe añadirse a una skill existente | Mostrar skill objetivo y adiciones → Paso 6 |
+   | **Descartar** | Trivial, redundante o demasiado abstracto | Explicar razonamiento y parar |
 
-**指导维度**（用于告知裁决，不进行评分）：
+**Dimensiones de guía** (informando el veredicto, no puntuadas):
 
-* **具体性和可操作性**：包含可立即使用的代码示例或命令
-* **范围契合度**：名称、触发条件和内容保持一致，并专注于单一模式
-* **独特性**：提供现有技能未涵盖的价值（基于清单结果）
-* **可复用性**：在未来的会话中存在现实的触发场景
+- **Especificidad y Accionabilidad**: Contiene ejemplos de código o comandos que son utilizables inmediatamente
+- **Ajuste de Alcance**: El nombre, las condiciones de activación y el contenido están alineados y enfocados en un solo patrón
+- **Unicidad**: Proporciona valor no cubierto por skills existentes (informado por los resultados de la lista de verificación)
+- **Reutilizabilidad**: Existen escenarios de activación realistas en sesiones futuras
 
-6. **裁决特定的确认流程**
+6. **Flujo de confirmación específico por veredicto**
 
-   * **改进后保存**：呈现必需的改进项 + 修订后的草案 + 一次重新评估后的更新清单/裁决；如果修订后的裁决是**保存**，则在用户确认后保存，否则遵循新的裁决
-   * **保存**：呈现保存路径 + 清单结果 + 1行裁决理由 + 完整草案 → 在用户确认后保存
-   * **吸收到 \[X]**：呈现目标路径 + 添加内容（diff格式） + 清单结果 + 裁决理由 → 在用户确认后追加
-   * **放弃**：仅显示清单结果 + 推理（无需确认）
+- **Mejorar y luego Guardar**: Presentar las mejoras requeridas + borrador revisado + lista de verificación/veredicto actualizado después de una re-evaluación; si el veredicto revisado es **Guardar**, guardar después de confirmación del usuario, de lo contrario seguir el nuevo veredicto
+- **Guardar**: Presentar ruta de guardado + resultados de lista de verificación + razón de veredicto de 1 línea + borrador completo → guardar después de confirmación del usuario
+- **Absorber en [X]**: Presentar ruta objetivo + adiciones (formato diff) + resultados de lista de verificación + razón del veredicto → añadir después de confirmación del usuario
+- **Descartar**: Mostrar solo resultados de lista de verificación + razonamiento (sin necesidad de confirmación)
 
-7. 保存 / 吸收到确定的位置
+7. Guardar / Absorber en la ubicación determinada
 
-## 步骤 5 的输出格式
+## Formato de Salida para el Paso 5
 
 ```
-### 检查清单
-- [x] skills/ grep: 无重叠 (或: 发现重叠 → 详情)
-- [x] MEMORY.md: 无重叠 (或: 发现重叠 → 详情)
-- [x] 现有技能追加: 新文件合适 (或: 应追加到 [X])
-- [x] 可复用性: 已确认 (或: 一次性 → 丢弃)
+### Lista de Verificación
+- [x] grep de skills/: sin superposición (o: superposición encontrada → detalles)
+- [x] MEMORY.md: sin superposición (o: superposición encontrada → detalles)
+- [x] Añadir a skill existente: nuevo archivo apropiado (o: debería añadirse a [X])
+- [x] Reutilizabilidad: confirmada (o: caso único → Descartar)
 
-### 裁决: 保存 / 改进后保存 / 吸收到 [X] / 丢弃
+### Veredicto: Guardar / Mejorar y luego Guardar / Absorber en [X] / Descartar
 
-**理由:** (用 1-2 句话解释裁决)
+**Razonamiento:** (1-2 oraciones explicando el veredicto)
 ```
 
-## 设计原理
+## Notas
 
-此版本用基于清单的整体裁决系统取代了之前的 5 维度数字评分标准（具体性、可操作性、范围契合度、非冗余性、覆盖度，评分 1-5）。现代前沿模型（Opus 4.6+）具有强大的情境判断能力 —— 将丰富的定性信号强行压缩为数字评分会丢失细微差别，并可能产生误导性的总分。整体方法让模型自然地权衡所有因素，产生更准确的保存/放弃决策，同时明确的清单确保不会跳过任何关键检查。
-
-## 注意事项
-
-* 不要提取琐碎的修复（拼写错误、简单的语法错误）
-* 不要提取一次性问题（特定的 API 中断等）
-* 专注于那些将在未来会话中节省时间的模式
-* 保持技能聚焦 —— 每个技能一个模式
-* 当裁决为“吸收”时，追加到现有技能，而不是创建新文件
+- No extraer correcciones triviales (typos, errores de sintaxis simples)
+- No extraer problemas puntuales (interrupciones específicas de API, etc.)
+- Enfocarse en patrones que ahorrarán tiempo en sesiones futuras
+- Mantener las skills enfocadas — un patrón por skill
+- Cuando el veredicto es Absorber, añadir a la skill existente en lugar de crear un archivo nuevo
