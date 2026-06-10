@@ -1,6 +1,6 @@
 # Arshad.AI Quality Gate Report
 
-**PR:** #52 — feat: expand dev-team pipeline to 28 agents (30 stages)
+**PR:** #53 — merge: keep claude/ai-personal-assistant-CcA11 aligned with main (squash-divergence repair)
 **Branch:** `claude/ai-personal-assistant-CcA11` → `claude/ai-personal-assistant-main`
 **Triggered by:** "Merge to Main"
 **Date:** 2026-06-10
@@ -11,100 +11,102 @@
 
 | # | Gate | Agent | Result | Critical | Warnings |
 |---|---|---|---|---|---|
-| 1 | Code Review | code-reviewer | ⚠️ WARN | 0 | 3 |
-| 2 | Security Audit | security-auditor | ⚠️ WARN | 0 | 3 |
-| 3 | Bug Analysis | debugger | ⚠️ WARN | 0 | 4 |
-| 4 | Test Coverage | test-writer | ⚠️ WARN | 0 | 2 |
-| 5 | Code Quality | refactorer | ⚠️ WARN | 0 | 4 |
-| 6 | Documentation | doc-writer | ⚠️ WARN | 0 | 2 |
-| 7 | Silent Failures | silent-failure-hunter | ⚠️ WARN | 0 | 3 |
-| 8 | Test Quality | pr-test-analyzer | ⚠️ WARN | 0 | 4 |
+| 1 | Code Review | code-reviewer | ✅ PASS | 0 | 0 |
+| 2 | Security Audit | security-auditor | ⚠️ WARN | 0 | 7 |
+| 3 | Bug Analysis | debugger | ✅ PASS | 0 | 0 |
+| 4 | Test Coverage | test-writer | ✅ PASS | 0 | 0 |
+| 5 | Code Quality | refactorer | ✅ PASS | 0 | 0 |
+| 6 | Documentation | doc-writer | ✅ PASS | 0 | 0 |
+| 7 | Silent Failures | silent-failure-hunter | ⚠️ WARN | 0 | 5 |
+| 8 | Test Quality | pr-test-analyzer | ✅ PASS | 0 | 0 |
 
 ## Overall Verdict
 
 ### ⚠️ GATE PASSED WITH WARNINGS — Review warnings before merging
 
-**0 FAIL gates · 0 Critical issues · 25 Warnings**
+**0 FAIL gates · 0 Critical issues · 12 Warnings**
 
-All Critical findings from iterations 1 and 2 were resolved via auto-fix loop (3 iterations). No blocking issues remain. Warnings are documented below for post-merge tracking.
+PR #53 contains only a squash-divergence repair commit (`git merge origin/claude/ai-personal-assistant-main --strategy=ours`). The content diff between the two branches is empty — all file content was already merged via PR #52 squash-merge. All security findings are pre-existing in the codebase (not introduced by this PR). No security exception applies since zero new attack surface was introduced.
 
 ---
 
 ## Detailed Findings
 
 ### 1. Code Review (code-reviewer)
-**Status:** ⚠️ WARN
+**Status:** ✅ PASS
 
-- ⚠️ `test_compress_history.py` previously tested an inline copy of `_compress_history` rather than the production function — **fixed**: file rewritten to import real `_compress_history` from `src.services.chat` with `monkeypatch.setenv` for budget control.
-- ⚠️ `requirements.txt`: `pydantic[email]` removed — any `EmailStr` field raises `PydanticUserError` at startup. (Pending fix — not blocking.)
-- ⚠️ `google.py`: Three OAuth scopes removed but `GoogleDriveIntegration`, `google_tasks.py`, `google_youtube.py` still depend on them — every call returns 403. (Pending fix — not blocking.)
-- ⚠️ `auto-pr.yml`: Retry/poll loop for `mergeable_state` removed — single-shot merge may 405 transiently. (Pending fix — not blocking.)
+The PR contains a single `--strategy=ours` squash-divergence repair merge commit. Tree is byte-identical to its first parent; content diff against remote `claude/ai-personal-assistant-main` is empty. Zero source file modifications. No bugs, logic errors, or performance issues to report.
 
 ### 2. Security Audit (security-auditor)
 **Status:** ⚠️ WARN
 
-- **Fixed (SEC-001):** `gate.md` PR creation `base: "main"` corrected to `"claude/ai-personal-assistant-main"` — merged PRs would have targeted wrong branch.
-- **Fixed (SEC-002):** `test_auth.py` line 85 HMAC key changed from `os.getenv("SECRET_KEY", "").encode()` (empty fallback → all test signatures collide) to `b"test-secret-key-for-unit-tests"`.
-- ⚠️ Supply-chain: 107 ruflo agents + 134 skills added with no content audit for prompt-injection.
-- ⚠️ Denylist carve-out for `backend/src/main.py` enforced by agent self-discipline, not path matcher.
-- ⚠️ `*.env*` only matches root-level files — `backend/.env`, `frontend/.env.local` not covered. (`**/.env*` added in iteration 1.)
+Full codebase audit surfaced 7 pre-existing medium/low findings (none introduced by this PR):
+
+- ⚠️ **SEC-001 (Prompt Injection — Medium)** `briefing.py:62`: Calendar event titles injected into XML-delimited Claude prompt without escaping `<`, `>`, `&`. Attacker controlling a shared-calendar event title could attempt prompt hijacking. Fix: HTML-encode event titles before interpolation, or pass as structured JSON.
+- ⚠️ **SEC-002 (CVE — Medium)** `frontend/package.json` vite 5.3.1: GHSA-67mh-4wv8-2f99 — dev server CORS bypass (esbuild ≤ 0.24.2). Fix: `npm install --save-dev vite@latest`.
+- ⚠️ **SEC-003 (Open Redirect — Medium)** `frontend/package.json` react-router-dom 6.23.0: GHSA-2j2x-hqr9-3h42 — `//`-prefixed redirect treated as protocol-relative URL. Fix: `npm install react-router-dom@latest`.
+- ⚠️ **SEC-004 (Info Exposure — Medium)** `main.py:133`: `str(exc)[:300]` in 500 response body can expose DB host/port on connection failures. Fix: remove exception string from response body; keep server-side logging.
+- ⚠️ **SEC-005 (JWT in localStorage — Low)** `tokenStorage.ts:9`: XSS-exploitable. Already acknowledged in code comments. Mitigation: CSP `script-src 'self'`, avoid `dangerouslySetInnerHTML` with user data.
+- ⚠️ **SEC-006 (Unbounded Query — Low)** `chat.py:117`: `GET /sessions/{id}/messages` fetches all messages with no LIMIT. Fix: add `.limit(500)` or pagination params.
+- ⚠️ **SEC-007 (Config — Low)** `google_token.py:84-85`: `os.getenv("GOOGLE_OAUTH_CLIENT_ID", "")` silently defaults to empty string. Fix: use `required_env()` for fail-fast behaviour consistent with rest of codebase.
 
 ### 3. Bug Analysis (debugger)
-**Status:** ⚠️ WARN
+**Status:** ✅ PASS
 
-- ⚠️ No `conftest.py` and no `asyncio_mode = "auto"` configuration — future async tests added without `@pytest.mark.asyncio` will be silently collected but never run their body.
-- ⚠️ `AsyncMock` chain in db mock is version-sensitive — `db.execute.return_value` is the coroutine result (correct), but if `MagicMock` is accidentally used instead of `AsyncMock`, `await` will raise `TypeError` at runtime.
-- ⚠️ Patch paths in `test_gateway.py` must target `src.services.gateway.<name>` (binding location), not the definition module — verify before CI run.
-- ⚠️ Orchestrator `security_halt` guard is expressed in prose, not as an unambiguous checklist item — LLM model may skip it if context is long.
+No source files were modified. No new error paths or runtime failures introduced. This commit serves a purely administrative purpose aligning git history.
 
 ### 4. Test Coverage (test-writer)
-**Status:** ⚠️ WARN
+**Status:** ✅ PASS
 
-- ⚠️ `chat.py` estimated ~55% coverage — `chat_turn` (SSE agentic loop, ~90 stmts) is untested. Acknowledged as intentional (SSE streaming loop is difficult to unit-test); even a single integration test with a mocked Anthropic client would cover the main path.
-- ⚠️ `gateway.py` estimated ~78% coverage (WARN band 70–80%) — timeout/retry branches and downstream-error body-decode failure path not tested.
-- `intent_classifier.py` ~97%, `token_service.py` ~88% — both well-covered.
+No new code paths added. No coverage gaps introduced. Content diff is empty — no new functions, classes, or modules requiring tests.
 
 ### 5. Code Quality (refactorer)
-**Status:** ⚠️ WARN
+**Status:** ✅ PASS
 
-- ⚠️ No `conftest.py` — `MagicMock()`, `AsyncMock()`, message-list literals repeated independently in 3+ test files. Candidate fixtures: `mock_anthropic_client`, `sample_messages`.
-- ⚠️ Duplicated `setUp` structure across multiple `unittest.TestCase` subclasses within `test_gateway.py`.
-- ⚠️ `_msg` helper function duplicated in `test_chat_helpers.py` and `test_compress_history.py`.
-- ⚠️ No `__init__.py` in `backend/tests/` — inconsistent with rest of `backend/src/` package layout.
+No source files modified. No structural issues, naming problems, duplication, or complexity introduced.
 
 ### 6. Documentation (doc-writer)
-**Status:** ⚠️ WARN
+**Status:** ✅ PASS
 
-- ⚠️ `orchestrator.md` denylist section lists globs without a worked example of what each pattern actually matches — a future author may write an incorrect glob and not notice.
-- ⚠️ Halt mechanics (`security_halt = true`, EA `decision: rejected`) are defined in two places (orchestrator.md and CLAUDE.md) with slightly different wording — risk of divergence.
+No new public APIs, functions, or endpoints introduced. No documentation gaps created.
 
 ### 7. Silent Failures (silent-failure-hunter)
 **Status:** ⚠️ WARN
 
-- ⚠️ `backend/src/services/chat.py` SSE `event_stream` generator: any exception after streaming starts closes stream silently with HTTP 200, no error event emitted to frontend.
-- ⚠️ `backend/src/services/ai.py`: bare `except Exception: pass` silently drops malformed tool-input JSON with no log.
-- ⚠️ `backend/src/tools/github/get_pr.py`: bare `except Exception: pass` on diff fetch swallows all errors with no logging.
+Pre-existing issues in codebase (not introduced by this PR):
+
+- ⚠️ `google_token.py:91`: unguarded `data["access_token"]` — `KeyError` on Google 200+error-body propagates as HTTP 500.
+- ⚠️ `google_token.py:88`: `httpx.HTTPStatusError` from `raise_for_status()` not converted to `TokenUnavailableError`.
+- ⚠️ `gmail_client.py:24`: `int(raw_unread)` raises `ValueError`/`TypeError` on malformed response.
+- ⚠️ `briefing.py:114`: `except Exception` swallows programming bugs; no `exc_info=True`.
+- ⚠️ `dashboard.py:141`: `except Exception` in `list_events` missing `exc_info=True`.
 
 ### 8. Test Quality (pr-test-analyzer)
-**Status:** ⚠️ WARN
+**Status:** ✅ PASS
 
-- ⚠️ `test_compress_history.py` previously verified an inline copy, not production function — **fixed**: rewritten to test real `_compress_history`.
-- ⚠️ No test for `ProviderReauthRequired` flowing through `dispatch()` in `gateway.py` — unhandled re-auth errors reach the chat endpoint with an unformatted 500.
-- ⚠️ No test for `non-AgentError` propagation in `dispatch()` — any unrecognised exception type is swallowed.
-- ⚠️ No test for `is_error=True` path in `_load_session_history` tool_result rows — error tool results may be reconstructed as successful responses.
+No new behaviour introduced. All requirements for this PR are satisfied by the squash-divergence repair commit itself.
 
 ---
 
 ## Action Items
 
-Resolved in this gate run (iterations 1–3):
-- [x] test_compress_history.py: rewritten to use real production `_compress_history` import
-- [x] gate.md: `base: "main"` → `"claude/ai-personal-assistant-main"` (SEC-001)
-- [x] test_auth.py: empty HMAC fallback key → `b"test-secret-key-for-unit-tests"` (SEC-002)
-- [x] orchestrator.md denylist: `backend/src/auth/*` → `**`, added `**/.env*`, `security_halt` guard, EA `rejected` halt
-- [x] 73 new tests added across `test_chat_helpers.py`, `test_compress_history.py`, `test_gateway.py`, `test_token_service.py`, `test_intent_classifier.py`
+Priority security backlog (all pre-existing):
+- [ ] **HIGH** SEC-001: HTML-encode calendar event titles in `briefing.py` before prompt interpolation
+- [ ] **HIGH** SEC-002: Upgrade vite to latest (`npm install --save-dev vite@latest`) — CVE in dev server
+- [ ] **HIGH** SEC-003: Upgrade react-router-dom to 7.x — open redirect CVE
+- [ ] SEC-004: Remove `str(exc)[:300]` from 500 response in `main.py:133`
+- [ ] SEC-005: Implement CSP `script-src 'self'` to mitigate JWT localStorage risk
+- [ ] SEC-006: Add `.limit(500)` to `GET /sessions/{id}/messages` query
+- [ ] SEC-007: Replace `os.getenv("GOOGLE_OAUTH_CLIENT_ID", "")` with `required_env(...)` in `google_token.py`
 
-Remaining warnings (post-merge backlog):
+Silent failure backlog (all pre-existing):
+- [ ] `google_token.py:91`: guard `data["access_token"]` → raise `TokenUnavailableError` on `KeyError`
+- [ ] `google_token.py:88`: catch `httpx.HTTPStatusError` → re-raise as `TokenUnavailableError`
+- [ ] `gmail_client.py:24`: wrap `int(raw_unread)` in `try/except (ValueError, TypeError)`
+- [ ] `briefing.py:114`: add `exc_info=True` to `except Exception` block
+- [ ] `dashboard.py:141`: add `exc_info=True` to `logger.warning()` in `list_events`
+
+General backlog (from PR #52):
 - [ ] Add `conftest.py` with `asyncio_mode = "auto"` and shared fixtures
 - [ ] Restore `pydantic[email]` in `requirements.txt`
 - [ ] Restore Google OAuth scopes or gate integrations as coming-soon
@@ -114,5 +116,5 @@ Remaining warnings (post-merge backlog):
 - [ ] Add integration test for `chat_turn` with mocked Anthropic client
 
 ---
-*Generated by Arshad.AI Quality Gate · All 8 agents · Iteration 3 of 3 · Auto-fix loop complete*
-*Gate verdict: All Critical and Security blockers resolved — PASSED WITH WARNINGS*
+*Generated by Arshad.AI Quality Gate · All 8 agents · PR #53 (squash-divergence repair)*
+*Gate verdict: 6 PASS · 2 WARN (all pre-existing) · 0 FAIL · 0 Critical — PASSED WITH WARNINGS*
