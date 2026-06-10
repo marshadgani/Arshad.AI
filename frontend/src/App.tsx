@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-route
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import AppLayout from './components/AppLayout';
 import AuthCallback from './pages/AuthCallback';
+import AiEcosystem from './pages/AiEcosystem';
 import Chat from './pages/Chat';
 import Dashboard from './pages/Dashboard';
 import HealthFitness from './pages/HealthFitness';
@@ -74,6 +75,7 @@ function ProtectedRoutes() {
         <Route path="/home-iot"           element={<HomeIoT />} />
         <Route path="/travel"             element={<Travel />} />
         <Route path="/integrations"       element={<Integrations />} />
+        <Route path="/ai-ecosystem"       element={<AiEcosystem />} />
         <Route path="*"                   element={<Navigate to="/" replace />} />
       </Routes>
     </AppLayout>

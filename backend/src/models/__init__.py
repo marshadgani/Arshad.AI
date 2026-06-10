@@ -3,6 +3,7 @@ with ``Base.metadata`` so Alembic autogenerate sees them.
 """
 
 from . import (  # noqa: F401
+    ai_ecosystem,
     conversation,
     dag_trigger,
     dashboard,
