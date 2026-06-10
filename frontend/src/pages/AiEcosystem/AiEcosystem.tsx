@@ -39,7 +39,8 @@ function formatTokens(n: number): string {
 export default function AiEcosystem() {
   const [period, setPeriod] = useState<Period>('1d');
 
-  const { data: agentsData } = useFetch<AgentsResponse['data']>('/api/v1/ai-ecosystem/agents');
+  // Poll every 30 s so newly registered agents appear without a page refresh.
+  const { data: agentsData } = useFetch<AgentsResponse['data']>('/api/v1/ai-ecosystem/agents', 30_000);
   const { data: metricsData } = useFetch<MetricsInner>(`/api/v1/ai-ecosystem/metrics?period=${period}`);
   const { data: summaryData } = useFetch<SummaryInner>(`/api/v1/ai-ecosystem/summary?period=${period}`);
 

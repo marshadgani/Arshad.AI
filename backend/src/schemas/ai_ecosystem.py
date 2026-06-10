@@ -54,3 +54,13 @@ class LogRequest(ORMBase):
     duration_ms: int | None = None
     success: bool = True
     session_id: uuid.UUID | None = None
+
+
+class RegisterAgentRequest(ORMBase):
+    agent_name: str = Field(..., min_length=1, max_length=100)
+    display_name: str = Field(..., min_length=1, max_length=200)
+    purpose: str = Field(..., min_length=1)
+    model: str = Field(default="claude-sonnet-4-6", max_length=100)
+    category: AgentCategory = "other"
+    pipeline_stage: int | None = None
+    is_active: bool = True

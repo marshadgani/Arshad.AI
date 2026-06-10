@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, select
+from sqlalchemy import Float, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.auth.dependencies import get_current_user
 from src.models.ai_ecosystem import AgentRegistry, AgentUsageLog
@@ -224,3 +224,42 @@ async def get_summary(
             most_efficient_agent=efficient_row.agent_name if efficient_row else None,
         ).model_dump()
     }
+
+
+@router.post(
+    "/agents/register",
+    summary="Register or update an agent in the ecosystem",
+    status_code=201,
+)
+async def register_agent(
+    body: RegisterAgentRequest,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Upsert an agent into the registry. Called automatically after every agent installation."""
+    existing = await db.scalar(
+        select(AgentRegistry).where(AgentRegistry.agent_name == body.agent_name)
+    )
+    if existing:
+        existing.display_name = body.display_name
+        existing.purpose = body.purpose
+        existing.model = body.model
+        existing.category = body.category
+        existing.pipeline_stage = body.pipeline_stage
+        existing.is_active = body.is_active
+        action = "updated"
+    else:
+        db.add(
+            AgentRegistry(
+                id=uuid.uuid4(),
+                agent_name=body.agent_name,
+                display_name=body.display_name,
+                purpose=body.purpose,
+                model=body.model,
+                category=body.category,
+                pipeline_stage=body.pipeline_stage,
+                is_active=body.is_active,
+            )
+        )
+        action = "registered"
+    await db.commit()
+    return {"data": {"agent_name": body.agent_name, "action": action}}

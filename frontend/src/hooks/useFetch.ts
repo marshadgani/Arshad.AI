@@ -15,10 +15,21 @@ export interface UseFetchResult<T> {
 // Phase C: attaches Authorization: Bearer <jwt> from localStorage when
 // present. A 401 response wipes the token so the AuthContext effect
 // observes the change and bounces the user to /login.
-export function useFetch<T>(url: string): UseFetchResult<T> {
+//
+// Pass refreshInterval (ms) to poll the endpoint automatically — useful for
+// live data like the agent registry that changes outside the React session.
+export function useFetch<T>(url: string, refreshInterval?: number): UseFetchResult<T> {
   const [data, setData] = useState<T | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  // Incrementing this triggers a re-fetch without changing the URL.
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    if (!refreshInterval) return;
+    const id = setInterval(() => setTick((t) => t + 1), refreshInterval);
+    return () => clearInterval(id);
+  }, [refreshInterval]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -53,7 +64,8 @@ export function useFetch<T>(url: string): UseFetchResult<T> {
       });
 
     return () => controller.abort();
-  }, [url]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url, tick]);
 
   return { data, isLoading, error };
 }
