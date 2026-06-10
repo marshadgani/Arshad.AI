@@ -12,7 +12,7 @@
 | # | Gate | Agent | Result | Critical | Warnings |
 |---|---|---|---|---|---|
 | 1 | Code Review | code-reviewer | ✅ PASS | 0 | 0 |
-| 2 | Security Audit | security-auditor | ✅ PASS | 0 | 0 |
+| 2 | Security Audit | security-auditor | ⚠️ WARN | 0 | 7 |
 | 3 | Bug Analysis | debugger | ✅ PASS | 0 | 0 |
 | 4 | Test Coverage | test-writer | ✅ PASS | 0 | 0 |
 | 5 | Code Quality | refactorer | ✅ PASS | 0 | 0 |
@@ -24,9 +24,9 @@
 
 ### ⚠️ GATE PASSED WITH WARNINGS — Review warnings before merging
 
-**0 FAIL gates · 0 Critical issues · 5 Warnings**
+**0 FAIL gates · 0 Critical issues · 12 Warnings**
 
-PR #53 contains only a squash-divergence repair commit (`git merge origin/claude/ai-personal-assistant-main --strategy=ours`). The content diff between the two branches is empty — all file content was already merged via PR #52 squash-merge. All 7 gate agents returned PASS. Silent-failure-hunter found 5 pre-existing issues in the codebase (not introduced by this PR).
+PR #53 contains only a squash-divergence repair commit (`git merge origin/claude/ai-personal-assistant-main --strategy=ours`). The content diff between the two branches is empty — all file content was already merged via PR #52 squash-merge. All security findings are pre-existing in the codebase (not introduced by this PR). No security exception applies since zero new attack surface was introduced.
 
 ---
 
@@ -38,9 +38,17 @@ PR #53 contains only a squash-divergence repair commit (`git merge origin/claude
 The PR contains a single `--strategy=ours` squash-divergence repair merge commit. Tree is byte-identical to its first parent; content diff against remote `claude/ai-personal-assistant-main` is empty. Zero source file modifications. No bugs, logic errors, or performance issues to report.
 
 ### 2. Security Audit (security-auditor)
-**Status:** ✅ PASS
+**Status:** ⚠️ WARN
 
-Content diff is empty. HEAD commit is a merge commit adding `origin/claude/ai-personal-assistant-main` as an ancestor only. No source files modified. All substantive security findings were reviewed and resolved in PR #52. No new attack surface introduced.
+Full codebase audit surfaced 7 pre-existing medium/low findings (none introduced by this PR):
+
+- ⚠️ **SEC-001 (Prompt Injection — Medium)** `briefing.py:62`: Calendar event titles injected into XML-delimited Claude prompt without escaping `<`, `>`, `&`. Attacker controlling a shared-calendar event title could attempt prompt hijacking. Fix: HTML-encode event titles before interpolation, or pass as structured JSON.
+- ⚠️ **SEC-002 (CVE — Medium)** `frontend/package.json` vite 5.3.1: GHSA-67mh-4wv8-2f99 — dev server CORS bypass (esbuild ≤ 0.24.2). Fix: `npm install --save-dev vite@latest`.
+- ⚠️ **SEC-003 (Open Redirect — Medium)** `frontend/package.json` react-router-dom 6.23.0: GHSA-2j2x-hqr9-3h42 — `//`-prefixed redirect treated as protocol-relative URL. Fix: `npm install react-router-dom@latest`.
+- ⚠️ **SEC-004 (Info Exposure — Medium)** `main.py:133`: `str(exc)[:300]` in 500 response body can expose DB host/port on connection failures. Fix: remove exception string from response body; keep server-side logging.
+- ⚠️ **SEC-005 (JWT in localStorage — Low)** `tokenStorage.ts:9`: XSS-exploitable. Already acknowledged in code comments. Mitigation: CSP `script-src 'self'`, avoid `dangerouslySetInnerHTML` with user data.
+- ⚠️ **SEC-006 (Unbounded Query — Low)** `chat.py:117`: `GET /sessions/{id}/messages` fetches all messages with no LIMIT. Fix: add `.limit(500)` or pagination params.
+- ⚠️ **SEC-007 (Config — Low)** `google_token.py:84-85`: `os.getenv("GOOGLE_OAUTH_CLIENT_ID", "")` silently defaults to empty string. Fix: use `required_env()` for fail-fast behaviour consistent with rest of codebase.
 
 ### 3. Bug Analysis (debugger)
 **Status:** ✅ PASS
@@ -55,39 +63,50 @@ No new code paths added. No coverage gaps introduced. Content diff is empty — 
 ### 5. Code Quality (refactorer)
 **Status:** ✅ PASS
 
-No source files modified. No structural issues, naming problems, duplication, or complexity introduced. Commit is a git history alignment operation only.
+No source files modified. No structural issues, naming problems, duplication, or complexity introduced.
 
 ### 6. Documentation (doc-writer)
 **Status:** ✅ PASS
 
-No new public APIs, functions, or endpoints introduced. No documentation gaps created. Content diff is empty.
+No new public APIs, functions, or endpoints introduced. No documentation gaps created.
 
 ### 7. Silent Failures (silent-failure-hunter)
 **Status:** ⚠️ WARN
 
-Pre-existing issues found in codebase (not introduced by this PR — content diff is empty):
+Pre-existing issues in codebase (not introduced by this PR):
 
-- ⚠️ `backend/src/services/google_token.py` line 91: `data["access_token"]` unguarded dict lookup — Google occasionally returns HTTP 200 with `{"error": "invalid_grant"}` body; resulting `KeyError` propagates uncaught as HTTP 500 instead of graceful mock fallback. Fix: wrap in `try/except KeyError`, re-raise as `TokenUnavailableError`.
-- ⚠️ `backend/src/services/google_token.py` lines 84-85+88: `httpx.HTTPStatusError` from `resp.raise_for_status()` on 400/401 not converted to `TokenUnavailableError`. Callers only catch `TokenUnavailableError`; HTTP 400 (revoked token) produces HTTP 500 to user.
-- ⚠️ `backend/src/services/gmail_client.py` line 24: `int(raw_unread)` can raise `ValueError`/`TypeError` on non-numeric malformed API response — undocumented in contract.
-- ⚠️ `backend/src/services/briefing.py` line 114: `except Exception` broader than intended — swallows programming bugs in `_build_prompt` silently; no Sentry error ID attached.
-- ⚠️ `backend/src/api/v1/dashboard.py` line 141: `except Exception` in `list_events` logs without `exc_info=True` — stack traces invisible in production monitoring.
+- ⚠️ `google_token.py:91`: unguarded `data["access_token"]` — `KeyError` on Google 200+error-body propagates as HTTP 500.
+- ⚠️ `google_token.py:88`: `httpx.HTTPStatusError` from `raise_for_status()` not converted to `TokenUnavailableError`.
+- ⚠️ `gmail_client.py:24`: `int(raw_unread)` raises `ValueError`/`TypeError` on malformed response.
+- ⚠️ `briefing.py:114`: `except Exception` swallows programming bugs; no `exc_info=True`.
+- ⚠️ `dashboard.py:141`: `except Exception` in `list_events` missing `exc_info=True`.
 
 ### 8. Test Quality (pr-test-analyzer)
 **Status:** ✅ PASS
 
-PR contains only a git history alignment commit. No new behaviour was introduced that requires tests. All requirements for this PR are satisfied by the squash-divergence repair merge commit itself.
+No new behaviour introduced. All requirements for this PR are satisfied by the squash-divergence repair commit itself.
 
 ---
 
 ## Action Items
 
-Pre-existing warnings (post-merge backlog — carried forward from PR #52):
-- [ ] `google_token.py` line 91: guard `data["access_token"]` lookup — raise `TokenUnavailableError` on `KeyError`
-- [ ] `google_token.py` line 88: catch `httpx.HTTPStatusError` from `raise_for_status()` → re-raise as `TokenUnavailableError`
-- [ ] `gmail_client.py` line 24: wrap `int(raw_unread)` in `try/except (ValueError, TypeError)`
-- [ ] `briefing.py` line 114: add `exc_info=True` or `logger.exception()` to `except Exception` block
-- [ ] `dashboard.py` line 141: add `exc_info=True` to `logger.warning(...)` in `list_events`
+Priority security backlog (all pre-existing):
+- [ ] **HIGH** SEC-001: HTML-encode calendar event titles in `briefing.py` before prompt interpolation
+- [ ] **HIGH** SEC-002: Upgrade vite to latest (`npm install --save-dev vite@latest`) — CVE in dev server
+- [ ] **HIGH** SEC-003: Upgrade react-router-dom to 7.x — open redirect CVE
+- [ ] SEC-004: Remove `str(exc)[:300]` from 500 response in `main.py:133`
+- [ ] SEC-005: Implement CSP `script-src 'self'` to mitigate JWT localStorage risk
+- [ ] SEC-006: Add `.limit(500)` to `GET /sessions/{id}/messages` query
+- [ ] SEC-007: Replace `os.getenv("GOOGLE_OAUTH_CLIENT_ID", "")` with `required_env(...)` in `google_token.py`
+
+Silent failure backlog (all pre-existing):
+- [ ] `google_token.py:91`: guard `data["access_token"]` → raise `TokenUnavailableError` on `KeyError`
+- [ ] `google_token.py:88`: catch `httpx.HTTPStatusError` → re-raise as `TokenUnavailableError`
+- [ ] `gmail_client.py:24`: wrap `int(raw_unread)` in `try/except (ValueError, TypeError)`
+- [ ] `briefing.py:114`: add `exc_info=True` to `except Exception` block
+- [ ] `dashboard.py:141`: add `exc_info=True` to `logger.warning()` in `list_events`
+
+General backlog (from PR #52):
 - [ ] Add `conftest.py` with `asyncio_mode = "auto"` and shared fixtures
 - [ ] Restore `pydantic[email]` in `requirements.txt`
 - [ ] Restore Google OAuth scopes or gate integrations as coming-soon
@@ -97,5 +116,5 @@ Pre-existing warnings (post-merge backlog — carried forward from PR #52):
 - [ ] Add integration test for `chat_turn` with mocked Anthropic client
 
 ---
-*Generated by Arshad.AI Quality Gate · All 8 agents · PR #53 (squash-divergence repair) · Clean PASS*
-*Gate verdict: 7 PASS · 1 WARN (pre-existing) · 0 FAIL · 0 Critical — PASSED WITH WARNINGS*
+*Generated by Arshad.AI Quality Gate · All 8 agents · PR #53 (squash-divergence repair)*
+*Gate verdict: 6 PASS · 2 WARN (all pre-existing) · 0 FAIL · 0 Critical — PASSED WITH WARNINGS*
