@@ -951,3 +951,72 @@ The full report is **always posted to the GitHub PR as a comment**, regardless o
 Format: see `.claude/commands/gate.md § Step 2`.
 The report includes: agent-by-agent results table, detailed findings per agent, and a prioritised action-item checklist.
 
+---
+
+## 21. Agent Auto-Registration — AI Ecosystem Sync (PERMANENT)
+
+> This rule is ALWAYS active. Every agent installation triggers it — no exceptions.
+
+**Trigger:** Immediately after any agent `.md` file is added to `.claude/agents/` (or any subdirectory), whether via `/fetch-github-repo`, manual file creation, or the weekly skill sync.
+
+### What to extract from the `.md` file
+
+| Field | Source |
+|---|---|
+| `agent_name` | Filename without `.md` (e.g. `code-reviewer.md` → `code-reviewer`) |
+| `display_name` | First `# Heading` in the file; fallback: title-case of `agent_name` |
+| `purpose` | First non-empty, non-heading paragraph (strip markdown, truncate to 250 chars) |
+| `model` | Scan content for `opus` → `claude-opus-4-8`; `haiku` → `claude-haiku-4-5-20251001`; default `claude-sonnet-4-6` |
+| `category` | `development_team` if in `.claude/agents/dev-team/`; else `other` |
+| `pipeline_stage` | `null` for all non-dev-team agents |
+
+### Section mapping on the AI Ecosystem page
+
+| `category` value | Section shown |
+|---|---|
+| `development_team` | "Development Team" (sorted by pipeline_stage) |
+| `other` | "Other Agents" (sorted by display_name) |
+
+### How to register (two methods — use whichever applies)
+
+**Method A — CLI script (when Docker is running):**
+```bash
+# Auto-parse from the .md file:
+docker compose exec backend python -m scripts.register_agent \
+  --file /app/.claude/agents/<slug>/<filename>.md \
+  --category other
+
+# Or pass fields explicitly:
+docker compose exec backend python -m scripts.register_agent \
+  --name <agent_name> \
+  --display "<Display Name>" \
+  --purpose "<One-sentence purpose>" \
+  --model claude-sonnet-4-6 \
+  --category other
+```
+
+**Method B — API endpoint (when backend is running locally):**
+```bash
+curl -s -X POST http://localhost:8000/api/v1/ai-ecosystem/agents/register \
+  -H "Authorization: Bearer <JWT>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agent_name": "<slug>",
+    "display_name": "<Display Name>",
+    "purpose": "<purpose>",
+    "model": "claude-sonnet-4-6",
+    "category": "other"
+  }'
+```
+
+### When this rule fires
+
+1. **After `/fetch-github-repo`** — register every new agent `.md` file that was copied into `.claude/agents/`.
+2. **After any manual agent file creation** — register the new file immediately.
+3. **After the weekly skill sync** (`session-start.sh`) — if any agent files changed, re-register them (Method A or B).
+4. **After the dev-team pipeline adds a new dev-team agent** — register it with `category=development_team` and the correct `pipeline_stage`.
+
+### Idempotency
+
+The endpoint and script both **upsert** — calling them on an already-registered agent updates its metadata. Safe to re-run at any time.
+
