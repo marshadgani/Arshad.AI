@@ -1,21 +1,12 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useFetch } from '../../hooks/useFetch';
 import AgentCard, { AgentData, AgentMetric } from './AgentCard';
 import styles from './AiEcosystem.module.css';
 import TimePeriodFilter, { Period } from './TimePeriodFilter';
 
-interface AgentsResponse {
-  data: AgentData[];
-  total: number;
-}
-
 interface MetricsInner {
   period: Period;
   agents: AgentMetric[];
-}
-
-interface MetricsResponse {
-  data: MetricsInner;
 }
 
 interface SummaryInner {
@@ -24,10 +15,6 @@ interface SummaryInner {
   total_tokens: number;
   most_used_agent: string | null;
   most_efficient_agent: string | null;
-}
-
-interface SummaryResponse {
-  data: SummaryInner;
 }
 
 function formatTokens(n: number): string {
@@ -40,7 +27,7 @@ export default function AiEcosystem() {
   const [period, setPeriod] = useState<Period>('1d');
 
   // Poll every 30 s so newly registered agents appear without a page refresh.
-  const { data: agentsData } = useFetch<AgentsResponse['data']>('/api/v1/ai-ecosystem/agents', 30_000);
+  const { data: agentsData } = useFetch<AgentData[]>('/api/v1/ai-ecosystem/agents', 30_000);
   const { data: metricsData } = useFetch<MetricsInner>(`/api/v1/ai-ecosystem/metrics?period=${period}`);
   const { data: summaryData } = useFetch<SummaryInner>(`/api/v1/ai-ecosystem/summary?period=${period}`);
 

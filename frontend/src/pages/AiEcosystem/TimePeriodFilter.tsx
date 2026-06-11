@@ -1,4 +1,3 @@
-import React from 'react';
 import styles from './TimePeriodFilter.module.css';
 
 export type Period = '1h' | '1d' | '1w' | '1m' | '1y';
