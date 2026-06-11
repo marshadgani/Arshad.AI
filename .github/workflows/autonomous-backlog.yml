@@ -1,0 +1,115 @@
+name: Autonomous Backlog Executor
+
+# Runs every 2 hours and picks up the next pending autonomous task from
+# tasks/backlog.md, executes it via Claude claude-sonnet-4-6, commits the result
+# to a new branch, and pushes so the auto-pr workflow opens a PR for review.
+#
+# Tasks marked `requires_human: yes` are always skipped — they stay pending
+# until Arshad reviews them.
+#
+# Manual trigger: Actions → "Autonomous Backlog Executor" → Run workflow.
+
+on:
+  schedule:
+    - cron: "0 */2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  run-backlog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout main branch
+        uses: actions/checkout@v4
+        with:
+          ref: claude/ai-personal-assistant-main
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install anthropic SDK
+        run: pip install anthropic --quiet
+
+      - name: Execute next autonomous task
+        id: run
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set +e
+          python scripts/backlog_run.py
+          EXIT_CODE=$?
+          set -e
+
+          if [ "$EXIT_CODE" -eq 0 ]; then
+            TASK_ID=$(cat /tmp/task_id.txt 2>/dev/null || echo "")
+            if [ -z "$TASK_ID" ]; then
+              echo "no_task=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "no_task=false"  >> "$GITHUB_OUTPUT"
+              echo "task_id=${TASK_ID}" >> "$GITHUB_OUTPUT"
+              echo "task_title=$(cat /tmp/task_title.txt 2>/dev/null || echo 'autonomous task')" >> "$GITHUB_OUTPUT"
+              echo "blocked=false" >> "$GITHUB_OUTPUT"
+            fi
+          elif [ "$EXIT_CODE" -eq 2 ]; then
+            # BLOCKED — task left pending, no commit
+            echo "no_task=false"  >> "$GITHUB_OUTPUT"
+            echo "task_id=$(cat /tmp/task_id.txt 2>/dev/null || echo '?')" >> "$GITHUB_OUTPUT"
+            echo "task_title=$(cat /tmp/task_title.txt 2>/dev/null || echo 'blocked task')" >> "$GITHUB_OUTPUT"
+            echo "blocked=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Backlog executor failed with exit code $EXIT_CODE"
+            exit $EXIT_CODE
+          fi
+
+      - name: Skip — no autonomous tasks pending
+        if: steps.run.outputs.no_task == 'true'
+        run: echo "No autonomous tasks pending. Nothing to commit."
+
+      - name: Create branch and commit changes
+        if: steps.run.outputs.no_task == 'false' && steps.run.outputs.blocked == 'false'
+        env:
+          TASK_ID: ${{ steps.run.outputs.task_id }}
+          TASK_TITLE: ${{ steps.run.outputs.task_title }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          git config user.name  "Arshad.AI Autonomous Bot"
+          git config user.email "autonomous@arshad.ai"
+
+          BRANCH="autonomous/${TASK_ID}-$(date +%Y%m%d%H%M)"
+          git checkout -b "$BRANCH"
+
+          # Stage all changes (code + backlog status update)
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "No file changes detected — task may have been a no-op."
+            exit 0
+          fi
+
+          git commit -m "autonomous: ${TASK_TITLE} [${TASK_ID}]
+
+Executed by the autonomous backlog workflow.
+Run: https://github.com/${REPO}/actions/runs/${RUN_ID}"
+
+          git push -u origin "$BRANCH"
+          echo "Pushed branch: $BRANCH"
+
+      - name: Report blocked task
+        if: steps.run.outputs.blocked == 'true'
+        env:
+          TASK_ID: ${{ steps.run.outputs.task_id }}
+          TASK_TITLE: ${{ steps.run.outputs.task_title }}
+        run: |
+          echo "::warning::Task ${TASK_ID} ('${TASK_TITLE}') was BLOCKED — requires human input."
+          echo "Review tasks/backlog.md and either update the task description or set requires_human: yes."

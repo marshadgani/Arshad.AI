@@ -104,6 +104,25 @@ git log -1 --format='%h' tasks/handoff.md
 ```
 That's the SHA of the handoff commit Claude Code resumed from at session start (before this session's overwrite).
 
+### 3b. Queue incomplete tasks to backlog
+
+Before committing, scan the conversation for any work that was started but not finished (feature requests, bug fixes, refactors that ran out of time). For each incomplete item, decide:
+
+- **Can it be completed without human input?** → add with `--autonomous yes`
+- **Does it need Arshad's decision or approval?** → add with `--autonomous no` (it will show up in the backlog but the bot will skip it)
+
+```bash
+python scripts/backlog_add.py \
+  --title "<short title>" \
+  --description "<what exactly needs to be done, with file paths and acceptance criteria>" \
+  --context "<relevant files or dirs>" \
+  --autonomous yes|no
+```
+
+Run this for **every** incomplete item before closing out. The autonomous backlog workflow will pick up the `--autonomous yes` items every 2 hours.
+
+Skip this step if there are no incomplete items.
+
 ### 4. Commit
 
 Single commit covering both files:
