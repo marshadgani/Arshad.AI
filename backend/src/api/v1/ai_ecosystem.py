@@ -23,6 +23,7 @@ from src.schemas.ai_ecosystem import (
     AgentMetricResponse,
     AgentResponse,
     LogRequest,
+    RegisterAgentRequest,
     SummaryResponse,
 )
 

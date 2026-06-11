@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from src.agents.routers import router as agents_router
+from src.api.v1.ai_ecosystem import router as ai_ecosystem_router
 from src.api.v1.chat import router as chat_router
 from src.api.v1.dashboard import router as dashboard_router
 from src.api.v1.domains import router as domains_router

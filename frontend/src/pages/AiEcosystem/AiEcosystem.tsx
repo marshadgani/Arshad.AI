@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import useFetch from '../../hooks/useFetch';
+import { useFetch } from '../../hooks/useFetch';
 import AgentCard, { AgentData, AgentMetric } from './AgentCard';
 import styles from './AiEcosystem.module.css';
 import TimePeriodFilter, { Period } from './TimePeriodFilter';
