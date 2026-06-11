@@ -220,10 +220,21 @@ def _handle_tool(name: str, inp: dict) -> str:
             resolved.relative_to(REPO_ROOT.resolve())
         except ValueError:
             return f"ERROR: path escapes repo root: {inp['path']}"
-        # Denylist: never allow writes to CI config or the gate-report file (SEC-005)
-        _WRITE_DENYLIST = (".github/", "tasks/last-gate-report.md", ".git/")
-        rel = inp["path"].lstrip("/")
-        if any(rel == d.rstrip("/") or rel.startswith(d) for d in _WRITE_DENYLIST):
+        # Denylist using the resolved canonical path (immune to absolute-path bypass — SEC-NEW-001)
+        _WRITE_DENYLIST = (
+            ".github/",
+            "tasks/last-gate-report.md",
+            ".git/",
+            ".claude/",
+            "alembic/",
+            "scripts/",
+            "docker-compose.yml",
+            "backend/Dockerfile",
+        )
+        rel_str = str(resolved.relative_to(REPO_ROOT.resolve()))
+        if any(
+            rel_str == d.rstrip("/") or rel_str.startswith(d) for d in _WRITE_DENYLIST
+        ):
             return f"ERROR: write to protected path denied: {inp['path']}"
         p.parent.mkdir(parents=True, exist_ok=True)
         try:
@@ -254,19 +265,29 @@ def _handle_tool(name: str, inp: dict) -> str:
         # Guard against catastrophic backtracking via oversized patterns (SEC-007)
         if len(pattern) > 200:
             return "ERROR: pattern too long (max 200 chars)"
-        search_path = str(REPO_ROOT / inp.get("path", "."))
+        # Guard path traversal on search root (SEC-NEW-002)
+        raw_path = inp.get("path", ".")
+        sp = (REPO_ROOT / raw_path).resolve()
+        try:
+            sp.relative_to(REPO_ROOT.resolve())
+        except ValueError:
+            return f"ERROR: path escapes repo root: {raw_path}"
+        search_path = str(sp)
         file_glob = inp.get("file_glob", "")
         cmd = [
             "grep",
             "-rn",
             "--include=" + file_glob if file_glob else "",
             "-E",
+            "--",
             pattern,
             search_path,
         ]
         cmd = [c for c in cmd if c]
         try:
             res = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            if res.returncode not in (0, 1):
+                return f"ERROR: grep failed (exit {res.returncode}): {res.stderr.strip()[:200]}"
             return res.stdout[:5000] or "(no matches)"
         except subprocess.TimeoutExpired:
             return "ERROR: search timed out"

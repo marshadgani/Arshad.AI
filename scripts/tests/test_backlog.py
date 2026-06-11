@@ -260,9 +260,27 @@ def test_handle_tool_write_file_github_dir_blocked() -> None:
     assert result.startswith("ERROR")
 
 
+def test_handle_tool_write_file_github_dir_absolute_path_blocked() -> None:
+    """Denylist must use resolved path, not raw input (SEC-NEW-001 bypass vector)."""
+    import os
+
+    abs_path = os.path.join(
+        str(backlog_run.REPO_ROOT), ".github/workflows/malicious.yml"
+    )
+    result = backlog_run._handle_tool("write_file", {"path": abs_path, "content": "x"})
+    assert result.startswith("ERROR")
+
+
 def test_handle_tool_write_file_gate_report_blocked() -> None:
     result = backlog_run._handle_tool(
         "write_file", {"path": "tasks/last-gate-report.md", "content": "GATE PASSED"}
+    )
+    assert result.startswith("ERROR")
+
+
+def test_handle_tool_write_file_scripts_dir_blocked() -> None:
+    result = backlog_run._handle_tool(
+        "write_file", {"path": "scripts/backlog_run.py", "content": "# pwned"}
     )
     assert result.startswith("ERROR")
 
@@ -275,6 +293,14 @@ def test_handle_tool_list_directory_traversal_blocked() -> None:
 def test_handle_tool_search_code_pattern_too_long() -> None:
     long_pattern = "a" * 201
     result = backlog_run._handle_tool("search_code", {"pattern": long_pattern})
+    assert result.startswith("ERROR")
+
+
+def test_handle_tool_search_code_path_traversal_blocked() -> None:
+    """search_code path parameter must be traversal-guarded (SEC-NEW-002)."""
+    result = backlog_run._handle_tool(
+        "search_code", {"pattern": "foo", "path": "../../etc"}
+    )
     assert result.startswith("ERROR")
 
 
