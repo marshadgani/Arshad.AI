@@ -1,0 +1,152 @@
+name: Autonomous Backlog Executor
+
+# Runs every 2 hours and picks up the next pending autonomous task from
+# tasks/backlog.md, executes it via Claude claude-sonnet-4-6, commits the result
+# to a new branch, and opens a PR for review.
+#
+# Tasks marked `requires_human: yes` are always skipped — they stay pending
+# until Arshad reviews them.
+#
+# Manual trigger: Actions → "Autonomous Backlog Executor" → Run workflow.
+#
+# Note: GITHUB_TOKEN-authenticated pushes do not trigger on:push workflows
+# (GitHub loop-prevention). The PR is therefore opened explicitly via `gh pr create`
+# in the "Open PR" step rather than relying on auto-pr.yml.
+
+on:
+  schedule:
+    - cron: "0 */2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  run-backlog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout main branch
+        uses: actions/checkout@v4
+        with:
+          ref: claude/ai-personal-assistant-main
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install anthropic SDK
+        run: pip install anthropic --quiet
+
+      - name: Execute next autonomous task
+        id: run
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set +e
+          python scripts/backlog_run.py
+          EXIT_CODE=$?
+          set -e
+
+          if [ "$EXIT_CODE" -eq 0 ]; then
+            read -r TASK_ID < /tmp/task_id.txt 2>/dev/null || TASK_ID=""
+            if [ -z "$TASK_ID" ]; then
+              echo "no_task=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "no_task=false" >> "$GITHUB_OUTPUT"
+              printf 'task_id=%s\n' "$TASK_ID" >> "$GITHUB_OUTPUT"
+              read -r TASK_TITLE < /tmp/task_title.txt 2>/dev/null || TASK_TITLE="autonomous task"
+              printf 'task_title=%s\n' "$TASK_TITLE" >> "$GITHUB_OUTPUT"
+              echo "blocked=false" >> "$GITHUB_OUTPUT"
+            fi
+          elif [ "$EXIT_CODE" -eq 2 ]; then
+            # BLOCKED — task left pending, no commit
+            echo "no_task=false" >> "$GITHUB_OUTPUT"
+            read -r TASK_ID < /tmp/task_id.txt 2>/dev/null || TASK_ID="?"
+            printf 'task_id=%s\n' "$TASK_ID" >> "$GITHUB_OUTPUT"
+            read -r TASK_TITLE < /tmp/task_title.txt 2>/dev/null || TASK_TITLE="blocked task"
+            printf 'task_title=%s\n' "$TASK_TITLE" >> "$GITHUB_OUTPUT"
+            echo "blocked=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Backlog executor failed with exit code $EXIT_CODE"
+            exit $EXIT_CODE
+          fi
+
+      - name: Skip — no autonomous tasks pending
+        if: steps.run.outputs.no_task == 'true'
+        run: echo "No autonomous tasks pending. Nothing to commit."
+
+      - name: Create branch and commit changes
+        if: steps.run.outputs.no_task == 'false' && steps.run.outputs.blocked == 'false'
+        id: commit
+        env:
+          TASK_ID: ${{ steps.run.outputs.task_id }}
+          TASK_TITLE: ${{ steps.run.outputs.task_title }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          git config user.name  "Arshad.AI Autonomous Bot"
+          git config user.email "autonomous@arshad.ai"
+
+          BRANCH="autonomous/${TASK_ID}-$(date +%Y%m%d%H%M)"
+          git checkout -b "$BRANCH"
+
+          # Stage only safe application paths — never CI config or gate-report (SEC-005/006)
+          git add -- frontend/ backend/ data-pipelines/ tasks/backlog.md 2>/dev/null || true
+          # Also stage any new scripts the task may have added (but not backlog_run.py itself)
+          git add -- scripts/ 2>/dev/null || true
+          git reset -- scripts/backlog_run.py .github/ tasks/last-gate-report.md 2>/dev/null || true
+
+          if git diff --cached --quiet; then
+            echo "No file changes detected — task may have been a no-op."
+            echo "branch=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Write commit message to a file to avoid shell injection via TASK_TITLE (SEC-003)
+          printf 'autonomous: %s [%s]\n\nExecuted by the autonomous backlog workflow.\nRun: https://github.com/%s/actions/runs/%s\n' \
+            "$TASK_TITLE" "$TASK_ID" "$REPO" "$RUN_ID" > /tmp/commitmsg.txt
+
+          git commit -F /tmp/commitmsg.txt
+
+          git push -u origin "$BRANCH"
+          echo "Pushed branch: $BRANCH"
+          printf 'branch=%s\n' "$BRANCH" >> "$GITHUB_OUTPUT"
+
+      - name: Open PR for review
+        if: steps.commit.outputs.branch != '' && steps.commit.outputs.branch != null
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TASK_ID: ${{ steps.run.outputs.task_id }}
+          TASK_TITLE: ${{ steps.run.outputs.task_title }}
+          BRANCH: ${{ steps.commit.outputs.branch }}
+          RUN_ID: ${{ github.run_id }}
+          REPO: ${{ github.repository }}
+        run: |
+          # GITHUB_TOKEN pushes don't trigger on:push workflows, so open the PR explicitly.
+          gh pr create \
+            --repo "$REPO" \
+            --head "$BRANCH" \
+            --base "claude/ai-personal-assistant-main" \
+            --title "autonomous: ${TASK_TITLE} [${TASK_ID}]" \
+            --body "Autonomous backlog task completed.
+
+**Task ID:** ${TASK_ID}
+**Workflow run:** https://github.com/${REPO}/actions/runs/${RUN_ID}
+
+Review the diff before merging. This PR was opened automatically by the autonomous backlog executor." \
+            || echo "PR already exists or could not be created — see workflow log."
+
+      - name: Report blocked task
+        if: steps.run.outputs.blocked == 'true'
+        env:
+          TASK_ID: ${{ steps.run.outputs.task_id }}
+          TASK_TITLE: ${{ steps.run.outputs.task_title }}
+        run: |
+          printf '::warning::Task %s ("%s") was BLOCKED — requires human input.\n' "$TASK_ID" "$TASK_TITLE"
+          echo "Review tasks/backlog.md and either update the task description or set requires_human: yes."

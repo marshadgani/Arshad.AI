@@ -1020,3 +1020,67 @@ curl -s -X POST http://localhost:8000/api/v1/ai-ecosystem/agents/register \
 
 The endpoint and script both **upsert** — calling them on an already-registered agent updates its metadata. Safe to re-run at any time.
 
+---
+
+## 22. Autonomous Backlog System (PERMANENT)
+
+> Keep incomplete work alive across session limits.
+> This rule is ALWAYS active — it fires at the end of every session.
+
+### How it works
+
+1. **Backlog file:** `tasks/backlog.md` — structured list of pending tasks.
+2. **Executor script:** `scripts/backlog_run.py` — calls Claude claude-sonnet-4-6 via the Anthropic API with file-manipulation tools to execute one task per run.
+3. **Scheduled workflow:** `.github/workflows/autonomous-backlog.yml` — fires every 2 hours, picks the next autonomous pending task, commits changes to a new `autonomous/TASK-NNN-*` branch, and pushes so `auto-pr.yml` opens a PR.
+4. **Session-end hook:** `/session-end` (step 3b) queues every incomplete item before closing out.
+
+### Adding tasks to the backlog
+
+```bash
+# Autonomous (bot can execute without asking you):
+python scripts/backlog_add.py \
+  --title "Add error state to AiEcosystem page" \
+  --description "When useFetch returns an error, show a red banner instead of silently keeping stale data." \
+  --context "frontend/src/pages/AiEcosystem/AiEcosystem.tsx" \
+  --autonomous yes
+
+# Requires human input (bot skips, Arshad decides):
+python scripts/backlog_add.py \
+  --title "Choose rate-limiting strategy" \
+  --description "Decide between token-bucket and sliding-window for /api/v1/chat." \
+  --autonomous no
+```
+
+### Autonomy filter — the hard rule
+
+**NEVER auto-execute a task that requires a human decision.**
+
+A task `requires_human: yes` means: it involves architectural decisions, user-facing behaviour changes that need approval, security-sensitive changes, or anything Arshad needs to sign off on.
+
+When in doubt: `--autonomous no`. The task stays in the backlog, visible on the next session.
+
+### Task lifecycle
+
+```
+pending → (bot picks up) → in_progress → done
+                        ↘ blocked (BLOCKED: reason in summary)
+```
+
+Blocked tasks stay `pending` in the file — the bot logs a warning and skips to the next task. Arshad fixes the description or sets `requires_human: yes` when he returns.
+
+### When this rule fires
+
+- **At every `/session-end`** — step 3b queues all incomplete session work.
+- **Whenever Claude detects a session limit approaching** — proactively queue the current in-flight task with full context before the session expires.
+- **After any dev-team pipeline run** — if the pipeline left TODOs or deferred items, queue them.
+
+### Files involved
+
+| File | Purpose |
+|---|---|
+| `tasks/backlog.md` | The backlog. Human-readable. Committed to the repo. |
+| `scripts/backlog_add.py` | CLI to append tasks |
+| `scripts/backlog_run.py` | Executor — called by the workflow |
+| `.github/workflows/autonomous-backlog.yml` | Scheduled workflow (every 2 h) |
+| `.claude/commands/session-end.md` | Step 3b queues incomplete tasks |
+
