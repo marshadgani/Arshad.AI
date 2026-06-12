@@ -924,6 +924,13 @@ NAV_ITEMS: list[dict[str, Any]] = [
         "ord": 6,
     },
     {"path": "/travel", "label": "Travel", "icon": "✈️", "domain": "travel", "ord": 7},
+    {
+        "path": "/ai-ecosystem",
+        "label": "AI Ecosystem",
+        "icon": "🤖",
+        "domain": None,
+        "ord": 8,
+    },
 ]
 
 

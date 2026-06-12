@@ -2,7 +2,11 @@ name: Autonomous Backlog Executor
 
 # Runs every 2 hours and picks up the next pending autonomous task from
 # tasks/backlog.md, executes it via Claude claude-sonnet-4-6, commits the result
-# to a new branch, and opens a PR for review.
+# directly to claude/ai-personal-assistant-CcA11 (the active dev branch), and
+# opens/updates a PR from that branch → claude/ai-personal-assistant-main.
+#
+# This means every autonomous commit is visible to Claude when a session resumes
+# on claude/ai-personal-assistant-CcA11 — the full dev history is in one place.
 #
 # Tasks marked `requires_human: yes` are always skipped — they stay pending
 # until Arshad reviews them.
@@ -28,10 +32,10 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - name: Checkout main branch
+      - name: Checkout dev branch
         uses: actions/checkout@v4
         with:
-          ref: claude/ai-personal-assistant-main
+          ref: claude/ai-personal-assistant-CcA11
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -81,7 +85,7 @@ jobs:
         if: steps.run.outputs.no_task == 'true'
         run: echo "No autonomous tasks pending. Nothing to commit."
 
-      - name: Create branch and commit changes
+      - name: Commit changes to dev branch
         if: steps.run.outputs.no_task == 'false' && steps.run.outputs.blocked == 'false'
         id: commit
         env:
@@ -93,9 +97,6 @@ jobs:
           git config user.name  "Arshad.AI Autonomous Bot"
           git config user.email "autonomous@arshad.ai"
 
-          BRANCH="autonomous/${TASK_ID}-$(date +%Y%m%d%H%M)"
-          git checkout -b "$BRANCH"
-
           # Stage only safe application paths — never CI config or gate-report (SEC-005/006)
           git add -- frontend/ backend/ data-pipelines/ tasks/backlog.md 2>/dev/null || true
           # Also stage any new scripts the task may have added (but not backlog_run.py itself)
@@ -104,7 +105,7 @@ jobs:
 
           if git diff --cached --quiet; then
             echo "No file changes detected — task may have been a no-op."
-            echo "branch=" >> "$GITHUB_OUTPUT"
+            echo "committed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -114,33 +115,35 @@ jobs:
 
           git commit -F /tmp/commitmsg.txt
 
-          git push -u origin "$BRANCH"
-          echo "Pushed branch: $BRANCH"
-          printf 'branch=%s\n' "$BRANCH" >> "$GITHUB_OUTPUT"
+          git push -u origin claude/ai-personal-assistant-CcA11
+          echo "Pushed to dev branch: claude/ai-personal-assistant-CcA11"
+          echo "committed=true" >> "$GITHUB_OUTPUT"
 
-      - name: Open PR for review
-        if: steps.commit.outputs.branch != '' && steps.commit.outputs.branch != null
+      - name: Open or update PR for review
+        if: steps.commit.outputs.committed == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TASK_ID: ${{ steps.run.outputs.task_id }}
           TASK_TITLE: ${{ steps.run.outputs.task_title }}
-          BRANCH: ${{ steps.commit.outputs.branch }}
           RUN_ID: ${{ github.run_id }}
           REPO: ${{ github.repository }}
         run: |
-          # GITHUB_TOKEN pushes don't trigger on:push workflows, so open the PR explicitly.
+          # Open PR from dev branch → main. If it already exists, gh pr create exits non-zero
+          # but the existing PR picks up the new commit automatically — that's fine.
           gh pr create \
             --repo "$REPO" \
-            --head "$BRANCH" \
+            --head "claude/ai-personal-assistant-CcA11" \
             --base "claude/ai-personal-assistant-main" \
-            --title "autonomous: ${TASK_TITLE} [${TASK_ID}]" \
-            --body "Autonomous backlog task completed.
+            --title "dev: autonomous tasks — claude/ai-personal-assistant-CcA11" \
+            --body "Rolling PR for autonomous backlog tasks executed on the dev branch.
 
-**Task ID:** ${TASK_ID}
-**Workflow run:** https://github.com/${REPO}/actions/runs/${RUN_ID}
+Each commit on this PR corresponds to one completed backlog task.
+Review the individual commits to see what each task did.
 
-Review the diff before merging. This PR was opened automatically by the autonomous backlog executor." \
-            || echo "PR already exists or could not be created — see workflow log."
+**Latest task:** ${TASK_TITLE} [${TASK_ID}]
+**Workflow run:** https://github.com/${REPO}/actions/runs/${RUN_ID}" \
+            2>/dev/null \
+            || echo "PR already open — new commit added to existing PR."
 
       - name: Report blocked task
         if: steps.run.outputs.blocked == 'true'
