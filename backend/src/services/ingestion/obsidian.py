@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...models.obsidian import IngestedObsidianNote
 from ...models.user import User
+from ...tools.base import ToolError
 from .. import event_bus
 from ..obsidian_client import ProviderReauthRequired, fetch_blob, fetch_tree, vault_repo
 from .runner import IngestionError

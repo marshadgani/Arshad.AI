@@ -128,6 +128,12 @@ async def list_notes(
 ) -> dict[str, Any]:
     if limit > 100:
         limit = 100
+    if q and len(q) > 1000:
+        raise _err(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "query_too_long",
+            "Search query must be ≤ 1000 characters.",
+        )
 
     stmt = select(IngestedObsidianNote).where(IngestedObsidianNote.user_id == user.id)
 
@@ -199,7 +205,7 @@ async def get_note(
 
 class CreateNoteRequest(BaseModel):
     path: str = Field(min_length=1, max_length=500)
-    content: str
+    content: str = Field(max_length=500_000)
 
 
 @router.post("/notes", status_code=status.HTTP_201_CREATED, summary="Create a new note")
@@ -225,7 +231,7 @@ async def create_note(
 
 
 class UpdateNoteRequest(BaseModel):
-    content: str
+    content: str = Field(max_length=500_000)
 
 
 @router.patch("/notes/{note_id}", summary="Update a note's content")

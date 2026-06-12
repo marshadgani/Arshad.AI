@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { clearToken, getToken } from '../../auth/tokenStorage';
 import { useFetch } from '../../hooks/useFetch';
 import styles from './Obsidian.module.css';
 
@@ -54,11 +55,25 @@ export default function Obsidian() {
   const { data: notesData } = useFetch<{ data: NoteSummary[]; total: number }>(notesUrl);
   const notes = notesData?.data ?? [];
 
+  function authHeaders(): Record<string, string> {
+    const token = getToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }
+
+  function handle401() {
+    clearToken();
+    window.location.href = '/login';
+  }
+
   async function handleSync() {
     setSyncing(true);
     setSyncError(null);
     try {
-      const resp = await fetch('/api/v1/obsidian/sync', { method: 'POST' });
+      const resp = await fetch('/api/v1/obsidian/sync', {
+        method: 'POST',
+        headers: authHeaders(),
+      });
+      if (resp.status === 401) { handle401(); return; }
       if (!resp.ok) setSyncError(`Sync failed (${resp.status})`);
     } catch {
       setSyncError('Sync failed: network error');
@@ -70,7 +85,8 @@ export default function Obsidian() {
   async function openNote(id: string) {
     setNoteError(null);
     try {
-      const resp = await fetch(`/api/v1/obsidian/notes/${id}`);
+      const resp = await fetch(`/api/v1/obsidian/notes/${id}`, { headers: authHeaders() });
+      if (resp.status === 401) { handle401(); return; }
       if (resp.ok) {
         const json = await resp.json();
         setSelectedNote(json.data as NoteFull);
