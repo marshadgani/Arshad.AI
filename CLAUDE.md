@@ -1031,7 +1031,7 @@ The endpoint and script both **upsert** — calling them on an already-registere
 
 1. **Backlog file:** `tasks/backlog.md` — structured list of pending tasks.
 2. **Executor script:** `scripts/backlog_run.py` — calls Claude claude-sonnet-4-6 via the Anthropic API with file-manipulation tools to execute one task per run.
-3. **Scheduled workflow:** `.github/workflows/autonomous-backlog.yml` — fires every 2 hours, picks the next autonomous pending task, commits changes to a new `autonomous/TASK-NNN-*` branch, and pushes so `auto-pr.yml` opens a PR.
+3. **Scheduled workflow:** `.github/workflows/autonomous-backlog.yml` — fires every 2 hours, picks the next autonomous pending task, commits changes directly to `claude/ai-personal-assistant-CcA11` (the active dev branch), and opens/updates a rolling PR from that branch → `claude/ai-personal-assistant-main`. All autonomous commits accumulate on the dev branch so they are visible to Claude when a session resumes.
 4. **Session-end hook:** `/session-end` (step 3b) queues every incomplete item before closing out.
 
 ### Adding tasks to the backlog
