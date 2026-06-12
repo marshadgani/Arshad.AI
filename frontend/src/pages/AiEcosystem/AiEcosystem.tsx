@@ -17,6 +17,23 @@ interface SummaryInner {
   most_efficient_agent: string | null;
 }
 
+type FilterKey = 'development' | 'cicd' | 'other';
+
+const FILTERS: { key: FilterKey; label: string }[] = [
+  { key: 'development', label: 'Development' },
+  { key: 'cicd', label: 'CI/CD' },
+  { key: 'other', label: 'Other' },
+];
+
+const CICD_KEYWORDS = ['cicd', 'devops', 'deploy', 'pipeline', 'workflow', 'release', 'infra', 'kubernetes', 'docker', 'monitor', 'heal'];
+
+function resolveFilter(agent: AgentData): FilterKey {
+  if (agent.category === 'development_team') return 'development';
+  const name = agent.agent_name.toLowerCase();
+  if (CICD_KEYWORDS.some((kw) => name.includes(kw))) return 'cicd';
+  return 'other';
+}
+
 function formatTokens(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
@@ -25,8 +42,10 @@ function formatTokens(n: number): string {
 
 export default function AiEcosystem() {
   const [period, setPeriod] = useState<Period>('1d');
+  const [activeFilters, setActiveFilters] = useState<Set<FilterKey>>(
+    new Set(['development', 'cicd', 'other'])
+  );
 
-  // Poll every 30 s so newly registered agents appear without a page refresh.
   const { data: agentsData } = useFetch<AgentData[]>('/api/v1/ai-ecosystem/agents', 30_000);
   const { data: metricsData } = useFetch<MetricsInner>(`/api/v1/ai-ecosystem/metrics?period=${period}`);
   const { data: summaryData } = useFetch<SummaryInner>(`/api/v1/ai-ecosystem/summary?period=${period}`);
@@ -36,13 +55,28 @@ export default function AiEcosystem() {
     (metricsData?.agents ?? []).map((m) => [m.agent_name, m])
   );
 
-  const devTeam = agents
-    .filter((a) => a.category === 'development_team')
-    .sort((a, b) => (a.pipeline_stage ?? 999) - (b.pipeline_stage ?? 999));
+  const visibleAgents = agents
+    .filter((a) => activeFilters.has(resolveFilter(a)))
+    .sort((a, b) => {
+      // dev team sorted by pipeline stage, everything else alphabetically
+      if (a.category === 'development_team' && b.category === 'development_team') {
+        return (a.pipeline_stage ?? 999) - (b.pipeline_stage ?? 999);
+      }
+      return a.display_name.localeCompare(b.display_name);
+    });
 
-  const otherAgents = agents
-    .filter((a) => a.category === 'other')
-    .sort((a, b) => a.display_name.localeCompare(b.display_name));
+  function toggleFilter(key: FilterKey) {
+    setActiveFilters((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        // keep at least one active
+        if (next.size > 1) next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }
 
   return (
     <div className={styles.page}>
@@ -71,46 +105,39 @@ export default function AiEcosystem() {
         )}
       </div>
 
-      <TimePeriodFilter value={period} onChange={setPeriod} />
+      <div className={styles.controls}>
+        <div className={styles.filterBar}>
+          {FILTERS.map(({ key, label }) => (
+            <button
+              key={key}
+              type="button"
+              className={`${styles.filterBtn} ${activeFilters.has(key) ? styles.filterBtnActive : ''}`}
+              onClick={() => toggleFilter(key)}
+            >
+              {label}
+              <span className={styles.filterCount}>
+                {agents.filter((a) => resolveFilter(a) === key).length}
+              </span>
+            </button>
+          ))}
+        </div>
+        <TimePeriodFilter value={period} onChange={setPeriod} />
+      </div>
 
-      {devTeam.length > 0 && (
-        <section className={styles.section}>
-          <div className={styles.sectionHeader}>
-            <h2 className={styles.sectionTitle}>Development Team</h2>
-            <span className={styles.sectionCount}>{devTeam.length} agents</span>
-          </div>
-          <div className={styles.grid}>
-            {devTeam.map((agent) => (
-              <AgentCard
-                key={agent.agent_name}
-                agent={agent}
-                metric={metricMap.get(agent.agent_name)}
-              />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {otherAgents.length > 0 && (
-        <section className={styles.section}>
-          <div className={styles.sectionHeader}>
-            <h2 className={styles.sectionTitle}>Other Agents</h2>
-            <span className={styles.sectionCount}>{otherAgents.length} agents</span>
-          </div>
-          <div className={styles.grid}>
-            {otherAgents.map((agent) => (
-              <AgentCard
-                key={agent.agent_name}
-                agent={agent}
-                metric={metricMap.get(agent.agent_name)}
-              />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {agents.length === 0 && (
-        <div className={styles.empty}>Loading agents…</div>
+      {visibleAgents.length > 0 ? (
+        <div className={styles.grid}>
+          {visibleAgents.map((agent) => (
+            <AgentCard
+              key={agent.agent_name}
+              agent={agent}
+              metric={metricMap.get(agent.agent_name)}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className={styles.empty}>
+          {agents.length === 0 ? 'Loading agents…' : 'No agents match the selected filters.'}
+        </div>
       )}
     </div>
   );

@@ -55,5 +55,9 @@ async def run(
         from . import analytics as analytics_runner
 
         return await analytics_runner.compute(user=user, db=db, payload=payload)
+    if dag_id == "obsidian_ingestor":
+        from . import obsidian as obsidian_runner
+
+        return await obsidian_runner.ingest(user=user, db=db, payload=payload)
 
     raise IngestionError(f"unknown_dag_id: {dag_id}")

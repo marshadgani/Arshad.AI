@@ -14,9 +14,15 @@ from typing import Literal
 
 from . import ai
 
-Intent = Literal["calendar", "email", "github", "general"]
+Intent = Literal["calendar", "email", "github", "obsidian", "general"]
 
-_VALID_INTENTS: tuple[Intent, ...] = ("calendar", "email", "github", "general")
+_VALID_INTENTS: tuple[Intent, ...] = (
+    "calendar",
+    "email",
+    "github",
+    "obsidian",
+    "general",
+)
 
 _FAST_PATH_KEYWORDS: dict[Intent, tuple[str, ...]] = {
     "calendar": (
@@ -51,6 +57,17 @@ _FAST_PATH_KEYWORDS: dict[Intent, tuple[str, ...]] = {
         "commit",
         "diff",
     ),
+    "obsidian": (
+        "obsidian",
+        "vault",
+        "my note",
+        "my notes",
+        "my writing",
+        "second brain",
+        "knowledge base",
+        "what did i write",
+        "i wrote",
+    ),
 }
 
 
@@ -60,6 +77,7 @@ Classify the user's last message into one domain. Reply with EXACTLY ONE word fr
   calendar  - if it's about meetings, events, scheduling, availability
   email     - if it's about Gmail, threads, drafting, labels
   github    - if it's about repos, issues, PRs, commits, code review
+  obsidian  - if it's about notes, vault, knowledge base, second brain, or asking what the user wrote
   general   - if it doesn't fit any of the above
 
 Output the single word, nothing else. No punctuation, no explanation.

@@ -95,6 +95,16 @@ def _tool_subset(intent: str) -> tuple[list[str], list[str]]:
             tool_names,
             ["github_pr_reviewer", "github_code_summarizer", "github_repo_monitor"],
         )
+    if intent == "obsidian":
+        return (
+            [
+                "obsidian_search_notes",
+                "obsidian_get_note",
+                "obsidian_create_note",
+                "obsidian_update_note",
+            ],
+            [],
+        )
     return ([], ["ai_core_council_chairman"])
 
 

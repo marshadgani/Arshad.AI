@@ -19,7 +19,7 @@ from ..models.database import get_db
 from ..models.user import User
 
 # Import sub-packages so their @register decorators run at module load time.
-from . import calendar, github, gmail  # noqa: F401,E402
+from . import calendar, github, gmail, obsidian  # noqa: F401,E402
 from .base import ProviderNotLinked, ProviderReauthRequired, ToolError
 from .registry import TOOL_REGISTRY, get_tool
 

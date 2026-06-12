@@ -86,7 +86,7 @@ The orchestrator runs these agents in strict sequence. Every agent output feeds 
 | 8.9 | `production-validator` | Sonnet | Final production-readiness check — no stubs, no TODOs, all endpoints functional, no debug code |
 | 9 | `enterprise-architect` *(post)* | Sonnet | Final architectural verdict — always runs |
 
-**Orchestrator model: `claude-opus-4-8`** — it controls all 28 agents.
+**Orchestrator model: `claude-fable-5`** — it controls all 28 agents.
 
 ### Model Tiers
 

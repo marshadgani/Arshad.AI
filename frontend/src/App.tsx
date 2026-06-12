@@ -5,6 +5,7 @@ import AppLayout from './components/AppLayout';
 import AuthCallback from './pages/AuthCallback';
 import AiEcosystem from './pages/AiEcosystem';
 import Chat from './pages/Chat';
+import Obsidian from './pages/Obsidian';
 import Dashboard from './pages/Dashboard';
 import HealthFitness from './pages/HealthFitness';
 import HomeIoT from './pages/HomeIoT';
@@ -76,6 +77,7 @@ function ProtectedRoutes() {
         <Route path="/travel"             element={<Travel />} />
         <Route path="/integrations"       element={<Integrations />} />
         <Route path="/ai-ecosystem"       element={<AiEcosystem />} />
+        <Route path="/obsidian"           element={<Obsidian />} />
         <Route path="*"                   element={<Navigate to="/" replace />} />
       </Routes>
     </AppLayout>

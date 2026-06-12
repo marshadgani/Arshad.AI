@@ -2,7 +2,7 @@
   padding: 24px 28px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 20px;
   max-width: 1400px;
 }
 
@@ -54,35 +54,55 @@
   letter-spacing: 0.06em;
 }
 
-.section {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
+/* ── Controls row: filter pills + time period ── */
 
-.sectionHeader {
+.controls {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--border, #30363d);
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
-.sectionTitle {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--text, #e6edf3);
-  margin: 0;
+.filterBar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
-.sectionCount {
-  font-size: 0.75rem;
-  color: var(--text-muted, #8b949e);
-  background: var(--surface-hover, #21262d);
+.filterBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
   border: 1px solid var(--border, #30363d);
-  padding: 2px 8px;
-  border-radius: 10px;
+  background: transparent;
+  color: var(--text-muted, #8b949e);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 120ms, color 120ms, border-color 120ms;
 }
+
+.filterBtn:hover {
+  border-color: var(--accent, #58a6ff);
+  color: var(--text, #e6edf3);
+}
+
+.filterBtnActive {
+  background: var(--accent-bg, rgba(88, 166, 255, 0.1));
+  border-color: var(--accent, #58a6ff);
+  color: var(--accent, #58a6ff);
+}
+
+.filterCount {
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+
+/* ── Agent grid ── */
 
 .grid {
   display: grid;
