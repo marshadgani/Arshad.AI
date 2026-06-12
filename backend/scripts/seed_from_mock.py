@@ -934,6 +934,157 @@ NAV_ITEMS: list[dict[str, Any]] = [
 ]
 
 
+# ── Agent disk-sync helpers ────────────────────────────────────────
+
+_DEV_TEAM_STAGES: dict[str, int] = {
+    "dev-team-orchestrator": 0,
+    "code-explorer": 5,
+    "business-analyst": 100,
+    "enterprise-architect": 200,
+    "ai-engineer": 250,
+    "solution-architect": 300,
+    "architecture-critic": 310,
+    "system-engineer": 330,
+    "engineer": 350,
+    "developer": 400,
+    "database-specialist": 415,
+    "python-specialist": 416,
+    "code-reviewer": 420,
+    "frontend-engineer": 430,
+    "type-design-analyzer": 440,
+    "senior-engineer": 450,
+    "software-architect": 460,
+    "silent-failure-hunter": 470,
+    "code-simplifier": 480,
+    "process-organiser": 500,
+    "test-architect": 590,
+    "test-script-writer": 600,
+    "pr-test-analyzer": 610,
+    "tester": 700,
+    "bug-fixer": 800,
+    "debugger": 850,
+    "performance-optimisation-engineer": 860,
+    "security-auditor": 870,
+    "devops-engineer": 880,
+    "production-validator": 890,
+}
+
+_MODEL_MAP = {
+    "opus": "claude-opus-4-8",
+    "sonnet": "claude-sonnet-4-6",
+    "haiku": "claude-haiku-4-5-20251001",
+    "fable": "claude-fable-5",
+}
+
+
+def _normalize_model(raw: str) -> str:
+    raw = raw.strip().lower()
+    if raw in _MODEL_MAP:
+        return _MODEL_MAP[raw]
+    for key, value in _MODEL_MAP.items():
+        if key in raw:
+            return value
+    if raw in ("inherit", "default", ""):
+        return "claude-sonnet-4-6"
+    return raw or "claude-sonnet-4-6"
+
+
+def _parse_frontmatter(path: Path) -> dict[str, str] | None:
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    if not text.startswith("---"):
+        return None
+    end = text.find("\n---", 3)
+    if end == -1:
+        return None
+    block = text[3:end]
+    result: dict[str, str] = {}
+    for line in block.splitlines():
+        m = re.match(r'^(\w[\w-]*):\s*"?([^"]*)"?\s*$', line)
+        if m:
+            result[m.group(1)] = m.group(2).strip()
+    return result or None
+
+
+def _agent_row(path: Path, is_dev_team: bool) -> dict[str, Any] | None:
+    fm = _parse_frontmatter(path)
+    if not fm:
+        return None
+    agent_name = fm.get("name", "").strip()
+    if not agent_name:
+        return None
+    raw_desc = fm.get("description", "").strip()
+    purpose = raw_desc[:250] if raw_desc else f"{agent_name} agent"
+    display_name = agent_name.replace("-", " ").title()
+    model = _normalize_model(fm.get("model", ""))
+    category = "development_team" if is_dev_team else "other"
+    pipeline_stage = _DEV_TEAM_STAGES.get(agent_name) if is_dev_team else None
+    return {
+        "agent_name": agent_name,
+        "display_name": display_name,
+        "purpose": purpose,
+        "model": model,
+        "category": category,
+        "pipeline_stage": pipeline_stage,
+        "is_active": True,
+    }
+
+
+async def sync_agents_from_disk(s: Any) -> int:
+    """Upsert every agent .md file found on disk into AgentRegistry."""
+    scripts_dir = Path(__file__).parent
+    backend_dir = scripts_dir.parent
+    project_root = backend_dir.parent
+
+    rows: dict[str, dict[str, Any]] = {}
+
+    # 1. backend/src/agents/ — vendored/external agents (all 'other')
+    backend_agents = backend_dir / "src" / "agents"
+    if backend_agents.is_dir():
+        for md in backend_agents.rglob("*.md"):
+            row = _agent_row(md, is_dev_team=False)
+            if row:
+                rows[row["agent_name"]] = row
+
+    # 2. .claude/agents/ non-dev-team — first-party 'other' agents
+    claude_agents = project_root / ".claude" / "agents"
+    dev_team_dir = claude_agents / "dev-team"
+    if claude_agents.is_dir():
+        for md in claude_agents.rglob("*.md"):
+            if dev_team_dir in md.parents:
+                continue  # handled in pass 3
+            row = _agent_row(md, is_dev_team=False)
+            if row:
+                rows[row["agent_name"]] = row
+
+    # 3. .claude/agents/dev-team/ — pipeline agents; always win on name conflict
+    if dev_team_dir.is_dir():
+        for md in dev_team_dir.glob("*.md"):
+            row = _agent_row(md, is_dev_team=True)
+            if row:
+                rows[row["agent_name"]] = row
+
+    if not rows:
+        return 0
+
+    stmt = pg_insert(AgentRegistry).values(list(rows.values()))
+    stmt = stmt.on_conflict_do_update(
+        index_elements=["agent_name"],
+        set_={
+            "display_name": stmt.excluded.display_name,
+            "purpose": stmt.excluded.purpose,
+            "model": stmt.excluded.model,
+            "category": stmt.excluded.category,
+            "pipeline_stage": stmt.excluded.pipeline_stage,
+            "is_active": stmt.excluded.is_active,
+        },
+    )
+    await s.execute(stmt)
+    return len(rows)
+
+
 # ── Seed runner ────────────────────────────────────────────────────
 async def seed() -> None:
     async with AsyncSessionLocal() as s:
@@ -1000,8 +1151,15 @@ async def seed() -> None:
         s.add_all([dom.NavItem(**n) for n in NAV_ITEMS])
 
         await s.commit()
+
+        # Sync all agent .md files from disk into AgentRegistry (upsert)
+        agent_count = await sync_agents_from_disk(s)
+        await s.commit()
+
         print(
-            f"Seed complete: {len(DOMAINS)} domains, {len(TASKS)} tasks, {len(EVENTS)} events, {len(NAV_ITEMS)} nav items."
+            f"Seed complete: {len(DOMAINS)} domains, {len(TASKS)} tasks, "
+            f"{len(EVENTS)} events, {len(NAV_ITEMS)} nav items, "
+            f"{agent_count} agents synced."
         )
 
 
