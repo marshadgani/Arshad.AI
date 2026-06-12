@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import json
+
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select, text
+from sqlalchemy import cast as sa_cast
+from sqlalchemy import select, text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...models.obsidian import IngestedObsidianNote
@@ -66,9 +70,10 @@ class ObsidianSearchNotes(Tool):
 
         if payload.tags:
             for tag in payload.tags:
+                # json.dumps handles escaping; sa_cast gives Postgres the correct type.
                 stmt = stmt.where(
                     IngestedObsidianNote.tags.op("@>")(
-                        func.cast(f'["{tag}"]', type_=None)
+                        sa_cast(json.dumps([tag]), JSONB)
                     )
                 )
 

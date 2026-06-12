@@ -256,3 +256,17 @@
   word-break: break-word;
   margin: 0;
 }
+
+/* ── Error states ── */
+
+.syncError {
+  font-size: 0.8rem;
+  color: var(--error, #f85149);
+  margin: 4px 0 0;
+}
+
+.noteError {
+  font-size: 0.85rem;
+  color: var(--error, #f85149);
+  margin: 0;
+}

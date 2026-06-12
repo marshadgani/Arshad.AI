@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import uuid
 from datetime import datetime, timezone
+from pathlib import PurePosixPath
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ...models.obsidian import IngestedObsidianNote
 from ...models.user import User
 from ...services import obsidian_client as gh
-from ..base import Tool
+from ..base import Tool, ToolError
 from ..registry import register
 
 
@@ -53,6 +53,14 @@ class ObsidianCreateNote(Tool):
 
         repo = gh.vault_repo()
         path = payload.path if payload.path.endswith(".md") else payload.path + ".md"
+
+        # Reject path traversal attempts.
+        norm = PurePosixPath(path)
+        if ".." in norm.parts or norm.is_absolute():
+            raise ToolError(
+                "invalid_path",
+                "Note path must not contain '..' components or be absolute.",
+            )
 
         result = await gh.write_file(
             db=db,
@@ -94,10 +102,9 @@ class ObsidianCreateNote(Tool):
                 k: stmt.excluded[k] for k in row if k not in ("user_id", "github_path")
             },
         )
-        result_row = (await db.execute(stmt)).fetchone()
+        await db.execute(stmt)
         await db.commit()
 
-        # Retrieve the generated ID
         from sqlalchemy import select
 
         note = await db.scalar(
@@ -106,10 +113,14 @@ class ObsidianCreateNote(Tool):
                 IngestedObsidianNote.github_path == path,
             )
         )
-        note_id = str(note.id) if note else str(uuid.uuid4())
+        if note is None:
+            raise ToolError(
+                "create_note_db_error",
+                "Note was written to GitHub but could not be confirmed in the database.",
+            )
 
         return CreateNoteOutput(
-            id=note_id,
+            id=str(note.id),
             title=title,
             path=path,
             blob_sha=result["sha"],

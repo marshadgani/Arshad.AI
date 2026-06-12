@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
+from sqlalchemy import cast as sa_cast
 from sqlalchemy import func, select, text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...auth.dependencies import get_current_user
@@ -139,8 +142,9 @@ async def list_notes(
 
     if tags:
         for tag in (t.strip() for t in tags.split(",") if t.strip()):
+            # json.dumps handles escaping; sa_cast gives Postgres the correct JSONB type.
             stmt = stmt.where(
-                IngestedObsidianNote.tags.op("@>")(func.cast(f'["{tag}"]', type_=None))
+                IngestedObsidianNote.tags.op("@>")(sa_cast(json.dumps([tag]), JSONB))
             )
 
     count_stmt = select(func.count()).select_from(stmt.subquery())

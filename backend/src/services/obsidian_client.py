@@ -7,8 +7,11 @@ GitHub tools). The vault repo path comes from OBSIDIAN_GITHUB_REPO env var.
 from __future__ import annotations
 
 import base64
+import logging
 import os
+import re
 from typing import Any
+from urllib.parse import quote as url_quote
 
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,6 +22,8 @@ from ..tools.token_service import get_access_token
 
 _BASE = "https://api.github.com"
 _TIMEOUT = 20.0
+_REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+logger = logging.getLogger(__name__)
 
 
 def vault_repo() -> str:
@@ -28,6 +33,11 @@ def vault_repo() -> str:
             "obsidian_not_configured",
             "OBSIDIAN_GITHUB_REPO is not set. "
             "Set it to your vault GitHub repo, e.g. yourusername/obsidian-vault.",
+        )
+    if not _REPO_RE.match(repo):
+        raise ToolError(
+            "obsidian_not_configured",
+            "OBSIDIAN_GITHUB_REPO must be in 'owner/repo' format.",
         )
     return repo
 
@@ -47,11 +57,11 @@ def _raise_for_status(resp: httpx.Response, context: str) -> None:
     if resp.status_code == 404:
         raise ToolError("obsidian_not_found", f"{context}: resource not found.")
     if resp.status_code == 403:
-        raise ToolError("github_forbidden", f"{context}: {resp.text[:200]}")
+        raise ToolError("github_forbidden", f"{context}: access denied.")
     if resp.status_code >= 400:
         raise ToolError(
             "obsidian_api_error",
-            f"{context}: GitHub returned {resp.status_code}: {resp.text[:200]}",
+            f"{context}: GitHub returned {resp.status_code}.",
         )
 
 
@@ -75,10 +85,11 @@ async def fetch_blob(
 ) -> tuple[str, str]:
     """Returns (decoded_content, blob_sha) for a file in the vault."""
     headers = await _auth_headers(db, user)
+    encoded_path = url_quote(path, safe="/")
     async with httpx.AsyncClient(
         timeout=_TIMEOUT, base_url=_BASE, headers=headers
     ) as client:
-        resp = await client.get(f"/repos/{repo}/contents/{path}")
+        resp = await client.get(f"/repos/{repo}/contents/{encoded_path}")
     _raise_for_status(resp, f"fetch_blob({path})")
     data = resp.json()
     raw_b64 = data.get("content", "").replace("\n", "")
@@ -97,6 +108,7 @@ async def write_file(
 ) -> dict[str, Any]:
     """Create or update a file in the vault. Returns {sha, path, html_url}."""
     headers = await _auth_headers(db, user)
+    encoded_path = url_quote(path, safe="/")
     body: dict[str, Any] = {
         "message": commit_message,
         "content": base64.b64encode(content.encode("utf-8")).decode("ascii"),
@@ -106,7 +118,7 @@ async def write_file(
     async with httpx.AsyncClient(
         timeout=_TIMEOUT, base_url=_BASE, headers=headers
     ) as client:
-        resp = await client.put(f"/repos/{repo}/contents/{path}", json=body)
+        resp = await client.put(f"/repos/{repo}/contents/{encoded_path}", json=body)
     _raise_for_status(resp, f"write_file({path})")
     file_data = resp.json().get("content", {})
     return {

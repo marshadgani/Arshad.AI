@@ -42,6 +42,8 @@ export default function Obsidian() {
   const [query, setQuery] = useState('');
   const [selectedNote, setSelectedNote] = useState<NoteFull | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [noteError, setNoteError] = useState<string | null>(null);
 
   const { data: statsData } = useFetch<{ data: NoteStats }>('/api/v1/obsidian/stats', 30_000);
   const stats = statsData?.data;
@@ -54,18 +56,29 @@ export default function Obsidian() {
 
   async function handleSync() {
     setSyncing(true);
+    setSyncError(null);
     try {
-      await fetch('/api/v1/obsidian/sync', { method: 'POST' });
+      const resp = await fetch('/api/v1/obsidian/sync', { method: 'POST' });
+      if (!resp.ok) setSyncError(`Sync failed (${resp.status})`);
+    } catch {
+      setSyncError('Sync failed: network error');
     } finally {
       setTimeout(() => setSyncing(false), 2000);
     }
   }
 
   async function openNote(id: string) {
-    const resp = await fetch(`/api/v1/obsidian/notes/${id}`);
-    if (resp.ok) {
-      const json = await resp.json();
-      setSelectedNote(json.data as NoteFull);
+    setNoteError(null);
+    try {
+      const resp = await fetch(`/api/v1/obsidian/notes/${id}`);
+      if (resp.ok) {
+        const json = await resp.json();
+        setSelectedNote(json.data as NoteFull);
+      } else {
+        setNoteError('Could not load note.');
+      }
+    } catch {
+      setNoteError('Could not load note: network error.');
     }
   }
 
@@ -81,14 +94,17 @@ export default function Obsidian() {
               : 'Loading vault…'}
           </p>
         </div>
-        <button
-          type="button"
-          className={`${styles.syncBtn} ${syncing ? styles.syncBtnActive : ''}`}
-          onClick={handleSync}
-          disabled={syncing}
-        >
-          {syncing ? 'Syncing…' : '↺ Sync Vault'}
-        </button>
+        <div>
+          <button
+            type="button"
+            className={`${styles.syncBtn} ${syncing ? styles.syncBtnActive : ''}`}
+            onClick={handleSync}
+            disabled={syncing}
+          >
+            {syncing ? 'Syncing…' : '↺ Sync Vault'}
+          </button>
+          {syncError && <p className={styles.syncError}>{syncError}</p>}
+        </div>
       </div>
 
       {/* Search */}
@@ -106,6 +122,8 @@ export default function Obsidian() {
           </span>
         )}
       </div>
+
+      {noteError && <p className={styles.noteError}>{noteError}</p>}
 
       <div className={styles.layout}>
         {/* Note list */}

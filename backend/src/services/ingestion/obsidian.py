@@ -7,6 +7,7 @@ changed/new files into ingested_obsidian_notes.
 
 from __future__ import annotations
 
+import logging
 import re
 from datetime import datetime, timezone
 from pathlib import PurePosixPath
@@ -19,16 +20,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ...models.obsidian import IngestedObsidianNote
 from ...models.user import User
 from .. import event_bus
-from ..obsidian_client import fetch_blob, fetch_tree, vault_repo
+from ..obsidian_client import ProviderReauthRequired, fetch_blob, fetch_tree, vault_repo
 from .runner import IngestionError
+
+logger = logging.getLogger(__name__)
 
 # ── Frontmatter + metadata helpers ────────────────────────────────
 
 
 def _parse_frontmatter(content: str) -> tuple[dict[str, Any], str]:
-    """Split YAML frontmatter from body. Returns (fm_dict, body_text).
-    No PyYAML dependency — uses regex for the keys Obsidian actually emits.
-    """
+    """Split YAML frontmatter from body. Returns (fm_dict, body_text)."""
     if not content.startswith("---"):
         return {}, content
     end = content.find("\n---", 3)
@@ -42,7 +43,6 @@ def _parse_frontmatter(content: str) -> tuple[dict[str, Any], str]:
         if not m:
             continue
         key, val = m.group(1), m.group(2).strip()
-        # YAML list shorthand: tags: [a, b]
         if val.startswith("[") and val.endswith("]"):
             inner = val[1:-1]
             fm[key] = [
@@ -58,7 +58,6 @@ def _extract_tags(fm: dict[str, Any], body: str) -> list[str]:
     if isinstance(raw, str):
         raw = [t.strip() for t in raw.replace(",", " ").split() if t.strip()]
     tags = [str(t).lstrip("#") for t in (raw if isinstance(raw, list) else [])]
-    # Also pick up inline #tags from the body
     inline = re.findall(r"(?<!\w)#([\w/-]+)", body)
     seen = set(tags)
     for t in inline:
@@ -93,7 +92,6 @@ async def ingest(
     if not tree:
         raise IngestionError(f"obsidian_empty_vault: no .md files found in {repo}")
 
-    # Build a map of path → stored blob_sha for fast skip-check
     existing: dict[str, str] = {}
     rows = await db.execute(
         select(IngestedObsidianNote.github_path, IngestedObsidianNote.blob_sha).where(
@@ -106,6 +104,7 @@ async def ingest(
     now = datetime.now(timezone.utc)
     upserted: list[dict[str, Any]] = []
     skipped = 0
+    failed = 0
 
     for item in tree:
         path: str = item["path"]
@@ -115,7 +114,13 @@ async def ingest(
             skipped += 1
             continue
 
-        content, blob_sha = await fetch_blob(db, user, repo, path)
+        try:
+            content, blob_sha = await fetch_blob(db, user, repo, path)
+        except (ToolError, ProviderReauthRequired, Exception) as exc:
+            logger.warning("obsidian ingest: failed to fetch %s — %s", path, exc)
+            failed += 1
+            continue
+
         fm, body = _parse_frontmatter(content)
         title = _extract_title(fm, body, path)
         tags = _extract_tags(fm, body)
@@ -153,14 +158,24 @@ async def ingest(
         await db.execute(stmt)
         await db.commit()
 
-    await event_bus.publish(
-        "events.obsidian.ingested",
-        {
-            "user_id": str(user.id),
-            "total": len(tree),
-            "updated": len(upserted),
-            "skipped": skipped,
-            "repo": repo,
-        },
-    )
-    return {"total": len(tree), "updated": len(upserted), "skipped": skipped}
+    try:
+        await event_bus.publish(
+            "events.obsidian.ingested",
+            {
+                "user_id": str(user.id),
+                "total": len(tree),
+                "updated": len(upserted),
+                "skipped": skipped,
+                "failed": failed,
+                "repo": repo,
+            },
+        )
+    except Exception as exc:
+        logger.warning("obsidian ingest: event publish failed — %s", exc)
+
+    return {
+        "total": len(tree),
+        "updated": len(upserted),
+        "skipped": skipped,
+        "failed": failed,
+    }
