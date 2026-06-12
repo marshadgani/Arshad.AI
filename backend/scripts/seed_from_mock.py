@@ -931,6 +931,13 @@ NAV_ITEMS: list[dict[str, Any]] = [
         "domain": None,
         "ord": 8,
     },
+    {
+        "path": "/obsidian",
+        "label": "Obsidian",
+        "icon": "🔮",
+        "domain": None,
+        "ord": 9,
+    },
 ]
 
 

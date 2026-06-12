@@ -12,6 +12,7 @@ from . import (  # noqa: F401
     integration,
     oauth_account,
     oauth_token,
+    obsidian,
     user,
 )
 from .database import AsyncSessionLocal, Base, engine, get_db  # noqa: F401
