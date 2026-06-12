@@ -13,6 +13,7 @@ from src.api.v1.ai_ecosystem import router as ai_ecosystem_router
 from src.api.v1.chat import router as chat_router
 from src.api.v1.dashboard import router as dashboard_router
 from src.api.v1.domains import router as domains_router
+from src.api.v1.obsidian import router as obsidian_router
 from src.auth.routers import router as auth_router
 from src.middleware.cache import close_redis
 from src.models.database import AsyncSessionLocal
