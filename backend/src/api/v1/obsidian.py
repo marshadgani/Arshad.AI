@@ -164,8 +164,10 @@ async def list_notes(
     rows = (await db.execute(stmt)).scalars().all()
 
     return {
-        "data": [_note_summary(n) for n in rows],
-        "total": total,
+        "data": {
+            "notes": [_note_summary(n) for n in rows],
+            "total": total,
+        },
     }
 
 

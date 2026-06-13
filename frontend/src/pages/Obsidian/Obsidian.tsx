@@ -46,14 +46,13 @@ export default function Obsidian() {
   const [syncError, setSyncError] = useState<string | null>(null);
   const [noteError, setNoteError] = useState<string | null>(null);
 
-  const { data: statsData } = useFetch<{ data: NoteStats }>('/api/v1/obsidian/stats', 30_000);
-  const stats = statsData?.data;
+  const { data: stats } = useFetch<NoteStats>('/api/v1/obsidian/stats', 30_000);
 
   const notesUrl = query.trim()
     ? `/api/v1/obsidian/notes?q=${encodeURIComponent(query)}&limit=50`
     : '/api/v1/obsidian/notes?limit=50';
-  const { data: notesData } = useFetch<{ data: NoteSummary[]; total: number }>(notesUrl);
-  const notes = notesData?.data ?? [];
+  const { data: notesData } = useFetch<{ notes: NoteSummary[]; total: number }>(notesUrl);
+  const notes = notesData?.notes ?? [];
 
   function authHeaders(): Record<string, string> {
     const token = getToken();
