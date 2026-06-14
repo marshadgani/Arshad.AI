@@ -1,12 +1,6 @@
 ---
 name: flow-nexus-swarm
 description: Cloud-based AI swarm deployment and event-driven workflow automation with Flow Nexus platform
-category: orchestration
-tags: [swarm, workflow, cloud, agents, automation, message-queue]
-version: 1.0.0
-requires:
-  - flow-nexus MCP server
-  - Active Flow Nexus account (register at flow-nexus.ruv.io)
 ---
 
 # Flow Nexus Swarm & Workflow Orchestration
@@ -601,9 +595,9 @@ claude mcp add flow-nexus npx flow-nexus@latest mcp start
 
 ## Support & Resources
 
-- **Platform**: https:/$flow-nexus.ruv.io
-- **Documentation**: https:/$github.com$ruvnet$flow-nexus
-- **Issues**: https:/$github.com$ruvnet$flow-nexus$issues
+- **Platform**: https://flow-nexus.ruv.io
+- **Documentation**: https://github.com/ruvnet/flow-nexus
+- **Issues**: https://github.com/ruvnet/flow-nexus/issues
 
 ---
 

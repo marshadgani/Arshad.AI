@@ -699,57 +699,60 @@
       }
     },
     "agent-skills": {
-      "url": "https://github.com/addyosmani/agent-skills",
+      "url": "https://github.com/addyosmani/agent-skills.git",
       "name": "agent-skills",
-      "last_fetched": "2026-06-13",
+      "last_fetched": "2026-06-14 19:54 UTC",
       "components": {
         "skills": [
-          "api-and-interface-design",
-          "browser-testing-with-devtools",
-          "ci-cd-and-automation",
-          "code-review-and-quality",
-          "code-simplification",
-          "context-engineering",
-          "debugging-and-error-recovery",
-          "deprecation-and-migration",
-          "documentation-and-adrs",
-          "doubt-driven-development",
-          "frontend-ui-engineering",
-          "git-workflow-and-versioning",
-          "idea-refine",
-          "incremental-implementation",
           "interview-me",
+          "frontend-ui-engineering",
+          "code-review-and-quality",
+          "incremental-implementation",
           "observability-and-instrumentation",
+          "api-and-interface-design",
           "performance-optimization",
+          "git-workflow-and-versioning",
+          "documentation-and-adrs",
           "planning-and-task-breakdown",
-          "security-and-hardening",
-          "shipping-and-launch",
           "source-driven-development",
+          "code-simplification",
           "spec-driven-development",
+          "context-engineering",
+          "idea-refine",
+          "security-and-hardening",
+          "deprecation-and-migration",
           "test-driven-development",
-          "using-agent-skills"
+          "browser-testing-with-devtools",
+          "using-agent-skills",
+          "debugging-and-error-recovery",
+          "doubt-driven-development",
+          "shipping-and-launch",
+          "ci-cd-and-automation"
         ],
         "agents": [
-          "code-reviewer",
           "security-auditor",
-          "test-engineer",
-          "web-performance-auditor"
+          "README",
+          "web-performance-auditor",
+          "code-reviewer",
+          "test-engineer"
         ],
         "commands": [
-          "build",
-          "code-simplify",
-          "plan",
-          "review",
-          "ship",
-          "spec",
           "test",
-          "webperf"
+          "webperf",
+          "review",
+          "spec",
+          "build",
+          "plan",
+          "code-simplify",
+          "ship"
         ],
         "hooks": [
-          "sdd-cache-post.sh",
           "sdd-cache-pre.sh",
+          "sdd-cache-post.sh",
+          "simplify-ignore.sh",
+          "simplify-ignore-test.sh",
           "session-start.sh",
-          "simplify-ignore.sh"
+          "session-start-test.sh"
         ],
         "token_optimization": []
       }
