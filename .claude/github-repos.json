@@ -757,6 +757,26 @@
         "token_optimization": []
       }
     },
+    "agent-browser": {
+      "url": "https://github.com/vercel-labs/agent-browser",
+      "name": "agent-browser",
+      "last_fetched": "2026-06-20",
+      "components": {
+        "skills": [
+          "agent-browser",
+          "agent-browser-core",
+          "agent-browser-slack",
+          "agent-browser-electron",
+          "agent-browser-dogfood",
+          "agent-browser-vercel-sandbox",
+          "agent-browser-agentcore"
+        ],
+        "agents": [],
+        "commands": [],
+        "hooks": [],
+        "token_optimization": []
+      }
+    },
     "ui-ux-pro-max-skill": {
       "url": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git",
       "name": "ui-ux-pro-max-skill",
