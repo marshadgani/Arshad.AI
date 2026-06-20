@@ -1,8 +1,8 @@
 # Arshad.AI Quality Gate Report
 
-**PR:** (auto-created) — feat(skills): integrate vercel-labs/agent-browser (7 skills)
+**PR:** (auto-created) — fix(db): Supabase pooler detection + keep-alive workflow
 **Branch:** `claude/ai-personal-assistant-CcA11` → `claude/ai-personal-assistant-main`
-**Triggered by:** "Merge to Main"
+**Triggered by:** "Completef" (Merge to Main)
 **Date:** 2026-06-20
 
 ---
@@ -14,35 +14,36 @@
 | 1 | Code Review | code-reviewer | ⚠️ WARN | 0 | 2 |
 | 2 | Security Audit | security-auditor | ⚠️ WARN | 0 | 2 |
 | 3 | Bug Analysis | debugger | ⚠️ WARN | 0 | 2 |
-| 4 | Test Coverage | test-writer | ✅ PASS | 0 | 1 |
-| 5 | Code Quality | refactorer | ✅ PASS | 0 | 2 |
-| 6 | Documentation | doc-writer | ⚠️ WARN | 0 | 3 |
-| 7 | Silent Failures | silent-failure-hunter | ⚠️ WARN | 0 | 4 |
-| 8 | Test Quality | pr-test-analyzer | ✅ PASS | 0 | 1 |
+| 4 | Test Coverage | test-writer | ⚠️ WARN | 0 | 2 |
+| 5 | Code Quality | refactorer | ⚠️ WARN | 0 | 2 |
+| 6 | Documentation | doc-writer | ✅ PASS | 0 | 2 |
+| 7 | Silent Failures | silent-failure-hunter | ✅ PASS (post-fix) | 0 | 1 |
+| 8 | Test Quality | pr-test-analyzer | ⚠️ WARN | 0 | 2 |
 
 ## Overall Verdict
 
 ### ⚠️ GATE PASSED WITH WARNINGS — Ready for merge
 
-Zero FAIL gates. Zero Critical issues. All 8 agents approved. Merge may proceed.
+Zero FAIL gates. Zero Critical issues after iteration 1 auto-fix. All 8 agents approved.
 
-*Security exception (WARN → FAIL) not triggered — both security findings are in dormant, unregistered shell hooks that are not wired into `.claude/settings.json`; neither is OWASP-class. Precedent: same ruling applied in last gate report (SEC-001/002/003 → WARN, not FAIL).*
+**Auto-fix applied (iteration 1):**
+Silent-failure-hunter found Critical: `curl | jq` pipe swallowed curl's exit code in the keep-alive workflow — a wrong SUPABASE_ACCESS_TOKEN produced `STATUS=UNKNOWN` and the job exited 0 silently. Fixed by:
+- `set -euo pipefail` in all three `run:` blocks
+- Splitting curl + jq into two steps (capture body first, then parse)
+- Explicit HTTP code validation on the restore step (`exit 1` on non-2xx)
+- Added `permissions: {}` and PROJECT_REF comment as bonus hardening
 
 ---
 
-## What Changed in This Branch
+## What Changed in This Branch (since last gate)
 
-**Primary change (this session):**
-- `vercel-labs/agent-browser` integration — 7 SKILL.md files + 8 reference docs in `.claude/skills/agent-browser*/`, registry + CLAUDE.md updated
+**2 new commits reviewed:**
 
-**Carry-over from previous gate (already reviewed):**
-- `backend/src/api/v1/obsidian.py` — `list_notes` response shape fixed
-- `frontend/src/pages/Obsidian/Obsidian.tsx` — useFetch type annotations fixed
-- `backend/tests/test_obsidian_api.py` — 14 contract tests (all pass)
-- `.claude/skills/agent-skills/`, `.claude/agents/agent-skills/`, `.claude/commands/agent-skills/`, `.claude/hooks/agent-skills/` — addyosmani/agent-skills (already gated)
-- Weekly skill sync artifacts (agent/command/hook .md files in `backend/src/`)
+1. `fix(db)` — `backend/src/models/database.py`: fail fast at startup when `DATABASE_URL` points at Supabase's connection pooler (Supavisor). Detects both URL patterns: `pooler.supabase.com` host AND `postgres.PROJECT_REF` username prefix. Raises `RuntimeError` with a 6-step actionable fix.
 
-**No production Python or TypeScript application code changed in this session.**
+2. `feat(infra)` — `.github/workflows/supabase-keep-alive.yml`: GitHub Actions cron (every 5 days) that checks Supabase project status via Management API and restores it if paused. Waits up to 3 minutes for `ACTIVE_HEALTHY`. Supports manual dispatch.
+
+Also in this push: `backend/.env.example` updated with symptom, wrong/correct URL format, and dashboard path.
 
 ---
 
@@ -51,109 +52,107 @@ Zero FAIL gates. Zero Critical issues. All 8 agents approved. Merge may proceed.
 ### 1. Code Review (code-reviewer)
 **Status:** ⚠️ WARN
 
-Shell hooks are well-written: all use `set -euo pipefail`, graceful degradation on missing dependencies, atomic writes via tmp+mv, and no command injection surfaces. Files confirmed safe.
+Pooler-detection logic is correct for all realistic URL formats. No crash paths. Error message safely strips credentials (host:port only). Workflow cron achieves the stated goal (longest gap is 6 days, within the 7-day pause window).
 
 **Warnings:**
-- **CR-001** — `github-repos.json` agent-browser entry URL missing `.git` suffix (all 13 other entries end in `.git`). The weekly update script normalises this at line 36 (`[[ "$REPO_URL" == *.git ]] || REPO_URL="${REPO_URL}.git"`), so no functional breakage. Cosmetic inconsistency.
-- **CR-002** — `github-repos.json` agent-browser entry omits the `type` field present in some other entries. No runtime impact; minor registry inconsistency.
+- **CR-001** — The username-extraction chain in `_is_pooler` (`_db_url.split("@")[0].rsplit(":", 1)[0].split("/")[-1].startswith("postgres.")`) is too dense. Should be extracted to a named helper `_username_from_db_url()` for readability.
+- **CR-002** — Restore step originally did not validate HTTP code (fixed in auto-fix iteration 1).
 
 ---
 
 ### 2. Security Audit (security-auditor)
 **Status:** ⚠️ WARN
 
-No production application code changed. No OWASP Top 10 attack surfaces introduced. The 7 SKILL.md files are documentation-only with no embedded malicious payloads or prompt injection. The `github-repos.json` update contains only the expected `vercel-labs/agent-browser` URL.
+No exploitable vulnerabilities. `database.py` error message strips credentials correctly. Workflow secret handling is correct (`SUPABASE_ACCESS_TOKEN` never echoed). `PROJECT_REF` is a non-secret public identifier.
 
 **Warnings:**
-- **SEC-001 (Low)** — `agent-skills_sdd-cache-pre.sh` and `agent-skills_sdd-cache-post.sh` issue `curl HEAD` requests to the URL being WebFetched for cache revalidation. If Claude is directed to fetch an attacker-controlled URL, the hook leaks the host's real IP via the HEAD request. *Mitigations: HEAD only (no body); bounded by `--max-time 5`; hooks are DORMANT — not registered in `.claude/settings.json`; risk only materialises if hooks are later activated.*
-- **SEC-002 (Low)** — `agent-skills_simplify-ignore-test.sh` uses `eval "$(sed ...)"` to extract a function from the hook for testing. Test-only file, not wired as a hook, negligible production risk.
+- **SEC-001 (Low)** — Workflow originally had no `permissions:` block. Fixed in auto-fix (added `permissions: {}`).
+- **SEC-002 (Low)** — `${{ steps.status.outputs.status }}` interpolated directly into a `run:` string (GitHub Actions anti-pattern). In practice harmless — the value is Supabase's own controlled API output used only in `echo`. Documented pattern to avoid in future.
 
-*Security exception (WARN → FAIL upgrade) not triggered: neither finding is OWASP-class; both are in dormant, unregistered development-environment scripts.*
+*Security exception (WARN → FAIL) not triggered — neither finding is OWASP-class.*
 
 ---
 
 ### 3. Bug Analysis (debugger)
 **Status:** ⚠️ WARN
 
-All 4 hook scripts use `set -euo pipefail` and handle errors correctly. None are registered as active hooks (`.claude/settings.json` wires only `session-start.sh`, `bash-guard.sh`, `post-edit-format.sh`). Shell scripts in `backend/src/hooks/` are not in the Python import path; `.md` files in `backend/src/agents/` and `backend/src/commands/` cannot shadow Python modules.
+All edge cases in `database.py` traced: None URL, no-`@` URL, `DATABASE_URL_DIRECT` set to pooler URL, local Docker URL — all handled correctly. Workflow failure paths verified: missing token → `curl -sf` exits non-zero (now visible with `set -euo pipefail`); timeout → `exit 1`; restore failure → `exit 1` (added in auto-fix).
 
 **Warnings:**
-- **BUG-001** — `agent-skills_session-start.sh` derives its `SKILLS_DIR` as `$(dirname $SCRIPT_DIR)/skills`, which resolves to a non-existent path when invoked from `backend/src/hooks/`. Hook exits 0 (graceful) but its meta-skill injection would never fire. Low risk: hook is currently inactive.
-- **BUG-002** — `agent-skills_simplify-ignore.sh` depends on `perl` for trailing-newline trimming. Perl is present on this system but is not listed in any requirements file. If absent in a future container, trailing-newline normalisation silently skips without crashing (`set -e` is bypassed by the `&&` chain).
+- **BUG-001** — Originally restore step silently continued after a non-2xx response. Fixed in auto-fix.
+- **BUG-002** — `jq` on empty stdin (from curl failure) would output `"UNKNOWN"` with exit 0, masking the error. Fixed in auto-fix (two-step curl-then-parse).
 
 ---
 
 ### 4. Test Coverage (test-writer)
-**Status:** ✅ PASS
+**Status:** ⚠️ WARN
 
-All changed files are documentation, shell scripts, and registry updates — no executable application logic. Coverage FAIL threshold (< 70% on changed files) is N/A for this diff. The existing `backend/tests/test_obsidian_api.py` contract test suite (140 lines, 14 tests) is intact and unaffected.
+No production application code changed beyond the startup guard in `database.py`. The guard is testable via `monkeypatch.setenv` + `importlib.reload(database)` but no tests exist for it. Workflow files do not require pytest.
 
-**Warning:**
-- **TST-001** — `github-repos.json` agent-browser entry URL missing `.git` suffix (consistent with what code-reviewer found; no test exists to validate registry entries — pre-existing gap).
+**Warnings:**
+- **TST-001** — No test for pooler URL detection raising `RuntimeError`.
+- **TST-002** — No test for happy path (direct URL passes through without error).
 
 ---
 
 ### 5. Code Quality (refactorer)
-**Status:** ✅ PASS
+**Status:** ⚠️ WARN
 
-Shell scripts are well-structured, clearly commented, and maintainable. Pre-existing conventions for placing `.sh` files in `backend/src/hooks/` and `.md` files in `backend/src/agents/`/`backend/src/commands/` are followed consistently. `github-repos.json` entry is well-formed.
+Workflow YAML is clean and well-structured. `.env.example` documentation is exemplary. `database.py` has one readability issue.
 
 **Warnings:**
-- **REF-001** — `hash_key()` function is duplicated identically between `sdd-cache-pre.sh` and `sdd-cache-post.sh`. Both files are from upstream `addyosmani/agent-skills` and not authored in-repo; this is an upstream duplication note, not a local defect. If modified in-place, drift risk exists.
-- **REF-002** — `github-repos.json` agent-browser `last_fetched` value is date-only (`"2026-06-20"`) while most other entries use `"YYYY-MM-DD HH:MM UTC"`. One other entry (`ui-ux-pro-max`) also uses date-only, so this is inconsistent with the majority but not unique.
+- **REF-001** — `_is_pooler` boolean expression contains a chained-split chain that should be a named helper function.
+- **REF-002** — Cron comment says "every 5 days" but `*/5` fires on fixed calendar days (5, 10, 15, ...), not a rolling interval. Misleading comment; safe in practice.
 
 ---
 
 ### 6. Documentation (doc-writer)
-**Status:** ⚠️ WARN
+**Status:** ✅ PASS
 
-`agent-browser/SKILL.md` is correctly structured as a discovery stub with valid frontmatter. `agent-browser-core/SKILL.md` is comprehensive (460 lines covering the full workflow). All 8 reference docs are present on disk. CLAUDE.md registry row and `github-repos.json` entry are accurate.
+All three files (`database.py`, `.env.example`, `supabase-keep-alive.yml`) are accurately documented. `.env.example` is a model of clarity: shows exact error symptom, wrong URL format vs correct format, and step-by-step dashboard path. Workflow comment block fully explains the schedule, behaviour, and manual-trigger capability.
 
-**Warnings:**
-- **DOC-001** — `agent-browser-dogfood/SKILL.md` references `references/issue-taxonomy.md` and `templates/dogfood-report-template.md` that do not exist on disk. Any agent following the dogfood workflow will fail at the "copy report template" step. These are upstream files the CLI serves dynamically (`agent-browser skills get dogfood`) — they're not bundled in the static skill copy.
-- **DOC-002** — `agent-browser-vercel-sandbox/SKILL.md` is missing the `allowed-tools:` frontmatter field present in all peer skills. Claude Code's permission system will not pre-approve `agent-browser` commands when this skill is active.
-- **DOC-003** — `.claude/skills/INDEX.md` does not include any entry for the 7 new agent-browser skills. Agents must know to look for these skills explicitly rather than being routed via the index.
+**Minor notes (non-blocking):**
+- `PROJECT_REF` comment added in auto-fix noting it is non-secret.
+- `statement_cache_size=0` comment slightly overstates its effectiveness when using the direct connection (it's a no-op there).
 
 ---
 
 ### 7. Silent Failures (silent-failure-hunter)
-**Status:** ⚠️ WARN
+**Status:** ✅ PASS (post-fix — Critical resolved in iteration 1)
 
-All 4 scripts use `set -euo pipefail` with no genuinely dangerous error swallowing. All warnings are in designed fallback paths of dormant hooks.
+**Original Critical (now fixed):**
+- `curl -sf ... | jq -r '...'` in bash: the pipe causes bash to use `jq`'s exit code, not `curl`'s. A 401/403/network error produced `STATUS=UNKNOWN` (jq fallback) and the step exited 0. A misconfigured `SUPABASE_ACCESS_TOKEN` would never alert.
 
-**Warnings (all in dormant hooks):**
-- **SFH-001** — `sdd-cache-post.sh` line 82: `curl 2>/dev/null || true` — network errors silently discard the cache entry with no log (intentional by design for a non-critical optimisation hook).
-- **SFH-002** — `sdd-cache-pre.sh` line 71-74: `curl || echo "000"` — curl failure falls through as a cache miss; correct degradation but fully invisible in non-debug mode.
-- **SFH-003** — `agent-skills_simplify-ignore.sh`: `perl` pipeline failure silently skips trailing-newline normalisation when perl is absent (bypasses `set -e` via `&&` chain).
-- **SFH-004** — `agent-skills_simplify-ignore.sh` line 156: `rmdir "$CACHE/${fid}.lock" 2>/dev/null` — lock directory removal errors suppressed. A stuck lock would go unnoticed, potentially blocking future Read hooks.
+**Fix applied:** `set -euo pipefail` + two-step curl-then-parse in all three `run:` blocks. Restore step now explicitly validates HTTP code.
+
+**Remaining warning (post-fix):**
+- **SFH-001** — `-s` (silent mode) on curl suppresses curl's own error messages. Combined with `set -euo pipefail` the step will fail correctly, but the log won't show curl's error text. Minor diagnosability issue.
 
 ---
 
 ### 8. Test Quality (pr-test-analyzer)
-**Status:** ✅ PASS
+**Status:** ⚠️ WARN
 
-`backend/tests/test_obsidian_api.py` confirmed intact: 140 lines, 14 test methods across two classes (`TestNoteSummaryShape`: 7 tests, `TestListNotesResponseEnvelope`: 7 tests). All existing test files unaffected. No new BPDD business requirements introduced by this diff — documentation/tooling only.
+Workflow has `workflow_dispatch:` so it can be manually tested from GitHub Actions UI. No pytest required for infra workflows. The database.py pooler check is the only untested application logic.
 
-**Warning:**
-- **PTA-001** — agent-browser `github-repos.json` URL missing `.git` suffix (same as CR-001; cosmetic only, no app test can pin this).
+**Warnings:**
+- **PTA-001** — BPDD requirement "correctly reject pooler URLs at startup" has no regression test. A future refactor of the detection could accidentally block valid direct URLs.
+- **PTA-002** — No test covering the `postgres.PROJECT_REF` username-pattern branch specifically (different from the `pooler.supabase.com` host check).
 
 ---
 
 ## Action Items (Warnings — non-blocking)
 
-**From this gate:**
-- [ ] Add `allowed-tools: Bash(agent-browser:*), Bash(npx agent-browser:*)` to `.claude/skills/agent-browser-vercel-sandbox/SKILL.md` frontmatter (DOC-002)
-- [ ] Add `.git` suffix to agent-browser URL in `github-repos.json` (CR-001 / cosmetic)
-- [ ] Update `.claude/skills/INDEX.md` with agent-browser skill routing entries (DOC-003)
-- [ ] Note in `agent-browser-dogfood/SKILL.md` that `references/` and `templates/` are served by the live CLI, not bundled (DOC-001)
+- [ ] Add unit tests for `database.py` pooler detection: pooler host URL → `RuntimeError`, pooler username URL → `RuntimeError`, direct URL → no error (TST-001/002, PTA-001/002)
+- [ ] Extract `_username_from_db_url(url)` helper from `_is_pooler` boolean (REF-001)
+- [ ] Update cron comment from "every 5 days" to "fires on calendar days 5,10,15,20,25,30 each month" (REF-002)
 
-**Carried forward from previous gate (non-blocking):**
-- [ ] Add `response_model` to `GET /api/v1/obsidian/notes` route (OpenAPI docs show `{}`)
-- [ ] Update `api.md` to document nested-object collection shape
-- [ ] Add error/isLoading handling to Obsidian page (error banner instead of "Loading vault…")
-- [ ] Bind caught errors in `handleSync`/`openNote` instead of discarding
+**Carried from previous gates (non-blocking):**
+- [ ] Add `response_model` to `GET /api/v1/obsidian/notes`
+- [ ] Update `api.md` for nested-object collection shape
+- [ ] Add error/isLoading handling to Obsidian page
 - [ ] Set up frontend test infrastructure (vitest + RTL)
-- [ ] Sanitise `github_path` at ingest time (SEC-003 from previous gate)
+- [ ] Sanitise `github_path` at ingest time
 
 ---
-*Generated by Arshad.AI Quality Gate · 8 agents · 0 manual cross-checks needed · 0 auto-fix iterations (zero Critical findings)*
+*Generated by Arshad.AI Quality Gate · 8 agents · 1 auto-fix iteration (Critical: curl pipe swallowed exit code in keep-alive workflow)*
