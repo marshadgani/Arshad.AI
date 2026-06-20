@@ -23,6 +23,30 @@ if not _db_url:
         "Copy backend/.env.example to backend/.env and fill in DATABASE_URL."
     )
 
+# Supabase pooler URLs contain 'pooler.supabase.com' as the host, or use
+# the username format 'postgres.PROJECT_REF' (Supavisor session/transaction
+# mode). asyncpg is incompatible with Supavisor: the pooler rejects the
+# prepared-statement protocol and may return ENOTFOUND on tenant lookup.
+# Fail fast at startup with an actionable message rather than a cryptic
+# asyncpg InternalServerError at first request.
+_is_pooler = "pooler.supabase.com" in _db_url or (
+    "@" in _db_url
+    and _db_url.split("@")[0].rsplit(":", 1)[0].split("/")[-1].startswith("postgres.")
+)
+if _is_pooler:
+    raise RuntimeError(
+        "DATABASE_URL points at Supabase's connection pooler "
+        f"({_db_url.split('@')[-1].split('/')[0]}), which is incompatible "
+        "with asyncpg.\n\n"
+        "Fix on Render:\n"
+        "  1. Go to Supabase dashboard → Project Settings → Database → Connection string\n"
+        "  2. Select 'Direct connection' (NOT 'Connection pooler')\n"
+        "  3. Copy the URI (format: postgresql://postgres:PASSWORD@db.PROJECT.supabase.co:5432/postgres)\n"
+        "  4. Add +asyncpg after postgresql: → postgresql+asyncpg://...\n"
+        "  5. Set DATABASE_URL_DIRECT to that value in Render → Environment\n"
+        "  6. Leave DATABASE_URL as-is for local Docker (it uses a local postgres container)\n"
+    )
+
 _engine_kwargs: dict = {
     "echo": False,
     "pool_pre_ping": True,
