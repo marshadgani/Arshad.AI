@@ -18,41 +18,50 @@ jobs:
   keep-alive:
     name: Wake Supabase if paused
     runs-on: ubuntu-latest
+    permissions: {}           # no GitHub write permissions needed — outbound HTTP only
     env:
-      PROJECT_REF: dslnjhuciypccowyiwaa
+      PROJECT_REF: dslnjhuciypccowyiwaa   # non-secret Supabase project reference
       API: https://api.supabase.com/v1
 
     steps:
       - name: Check project status
         id: status
         run: |
-          STATUS=$(curl -sf \
+          set -euo pipefail   # propagate curl exit code through the pipe to jq
+          BODY=$(curl -sf \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_ACCESS_TOKEN }}" \
-            "$API/projects/$PROJECT_REF" \
-            | jq -r '.status // "UNKNOWN"')
+            "$API/projects/$PROJECT_REF")
+          STATUS=$(echo "$BODY" | jq -r '.status // "UNKNOWN"')
           echo "status=$STATUS" >> "$GITHUB_OUTPUT"
           echo "Project status: $STATUS"
 
       - name: Restore if paused
         if: steps.status.outputs.status != 'ACTIVE_HEALTHY'
         run: |
+          set -euo pipefail
           echo "Status is '${{ steps.status.outputs.status }}' — sending restore request..."
-          HTTP=$(curl -sf -o /dev/null -w "%{http_code}" -X POST \
+          BODY=$(curl -s -w "\n%{http_code}" -X POST \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_ACCESS_TOKEN }}" \
             -H "Content-Type: application/json" \
             "$API/projects/$PROJECT_REF/restore")
+          HTTP=$(echo "$BODY" | tail -1)
           echo "Restore API response: HTTP $HTTP"
+          if [ "$HTTP" -lt 200 ] || [ "$HTTP" -ge 300 ]; then
+            echo "Restore call failed — check SUPABASE_ACCESS_TOKEN and project ref."
+            exit 1
+          fi
 
       - name: Wait for healthy
         if: steps.status.outputs.status != 'ACTIVE_HEALTHY'
         run: |
+          set -euo pipefail
           echo "Waiting for project to become ACTIVE_HEALTHY..."
           for i in $(seq 1 18); do
             sleep 10
-            STATUS=$(curl -sf \
+            BODY=$(curl -sf \
               -H "Authorization: Bearer ${{ secrets.SUPABASE_ACCESS_TOKEN }}" \
-              "$API/projects/$PROJECT_REF" \
-              | jq -r '.status // "UNKNOWN"')
+              "$API/projects/$PROJECT_REF")
+            STATUS=$(echo "$BODY" | jq -r '.status // "UNKNOWN"')
             echo "  attempt $i/18 — status: $STATUS"
             if [ "$STATUS" = "ACTIVE_HEALTHY" ]; then
               echo "Project is healthy."
