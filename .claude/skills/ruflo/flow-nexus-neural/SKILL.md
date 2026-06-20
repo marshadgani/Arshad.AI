@@ -1,17 +1,6 @@
 ---
 name: flow-nexus-neural
 description: Train and deploy neural networks in distributed E2B sandboxes with Flow Nexus
-version: 1.0.0
-category: ai-ml
-tags:
-  - neural-networks
-  - distributed-training
-  - machine-learning
-  - deep-learning
-  - flow-nexus
-  - e2b-sandboxes
-requires_auth: true
-mcp_server: flow-nexus
 ---
 
 # Flow Nexus Neural Networks
@@ -728,11 +717,11 @@ await mcp__flow-nexus__neural_cluster_terminate({
 
 ## Resources
 
-- Flow Nexus Docs: https:/$flow-nexus.ruv.io$docs
-- Neural Network Guide: https:/$flow-nexus.ruv.io$docs$neural
-- Template Marketplace: https:/$flow-nexus.ruv.io$templates
-- API Reference: https:/$flow-nexus.ruv.io$api
+- Flow Nexus Docs: https://flow-nexus.ruv.io/docs
+- Neural Network Guide: https://flow-nexus.ruv.io/docs/neural
+- Template Marketplace: https://flow-nexus.ruv.io/templates
+- API Reference: https://flow-nexus.ruv.io/api
 
 ---
 
-**Note**: Distributed training requires authentication. Register at https:/$flow-nexus.ruv.io or use `npx flow-nexus@latest register`.
+**Note**: Distributed training requires authentication. Register at https://flow-nexus.ruv.io or use `npx flow-nexus@latest register`.

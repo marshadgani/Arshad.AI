@@ -1,14 +1,7 @@
 ---
 name: worker-integration
 description: Worker-Agent integration for intelligent task dispatch and performance tracking
-version: 1.0.0
-invocable: true
-author: agentic-flow
-capabilities:
-  - agent_selection
-  - performance_tracking
-  - memory_coordination
-  - self_learning
+user-invocable: true
 ---
 
 # Worker-Agent Integration Skill
@@ -69,10 +62,10 @@ Workers store results using consistent patterns:
 {trigger}/{topic}/{phase}
 
 Examples:
-- ultralearn$auth-module$analysis
-- optimize$database$performance
-- audit$payment$vulnerabilities
-- benchmark$api$metrics
+- ultralearn/auth-module/analysis
+- optimize/database/performance
+- audit/payment/vulnerabilities
+- benchmark/api/metrics
 ```
 
 ## Benchmark Thresholds
@@ -101,7 +94,7 @@ Agents are monitored against performance thresholds:
 Workers provide feedback for continuous improvement:
 
 ```typescript
-import { workerAgentIntegration } from 'agentic-flow$workers$worker-agent-integration';
+import { workerAgentIntegration } from 'agentic-flow/workers/worker-agent-integration';
 
 // Record execution feedback
 workerAgentIntegration.recordFeedback(
@@ -137,7 +130,7 @@ Hit Rate: 96.5%
 
 ## Configuration
 
-Enable integration features in `.claude$settings.json`:
+Enable integration features in `.claude/settings.json`:
 
 ```json
 {

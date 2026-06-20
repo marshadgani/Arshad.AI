@@ -1,10 +1,7 @@
 ---
 name: swarm-advanced
-description: Advanced swarm orchestration patterns for research, development, testing, and complex distributed workflows
-version: 2.0.0
-category: orchestration
-tags: [swarm, distributed, parallel, research, testing, development, coordination]
-author: Claude Flow Team
+description: |
+  Advanced swarm orchestration patterns for research, development, testing, and complex distributed workflows
 ---
 
 # Advanced Swarm Orchestration
@@ -206,7 +203,7 @@ mcp__claude-flow__memory_usage({
   "action": "store",
   "key": "knowledge-graph-X",
   "value": JSON.stringify(knowledgeGraph),
-  "namespace": "research$graphs",
+  "namespace": "research/graphs",
   "ttl": 2592000 // 30 days
 })
 ```
@@ -302,7 +299,7 @@ mcp__claude-flow__memory_usage({
   "action": "store",
   "key": "architecture-decisions",
   "value": JSON.stringify(architectureDoc),
-  "namespace": "development$design"
+  "namespace": "development/design"
 })
 ```
 
@@ -486,7 +483,7 @@ mcp__claude-flow__memory_usage({
   "action": "store",
   "key": "test-plan-" + Date.now(),
   "value": JSON.stringify(testPlan),
-  "namespace": "testing$plans"
+  "namespace": "testing/plans"
 })
 ```
 
@@ -731,7 +728,7 @@ mcp__claude-flow__context_restore({
 
 // Backup memory stores
 mcp__claude-flow__memory_backup({
-  "path": "$workspaces$claude-code-flow$backups$swarm-memory.json"
+  "path": "/workspaces/claude-code-flow/backups/swarm-memory.json"
 })
 ```
 
@@ -960,10 +957,10 @@ mcp__claude-flow__swarm_init({ topology: "mesh", maxAgents: 4 })
 
 ## References
 
-- [Claude Flow Documentation](https:/$github.com$ruvnet$claude-flow)
-- [Swarm Orchestration Guide](https:/$github.com$ruvnet$claude-flow$wiki$swarm)
-- [MCP Tools Reference](https:/$github.com$ruvnet$claude-flow$wiki$mcp)
-- [Performance Optimization](https:/$github.com$ruvnet$claude-flow$wiki$performance)
+- [Claude Flow Documentation](https://github.com/ruvnet/claude-flow)
+- [Swarm Orchestration Guide](https://github.com/ruvnet/claude-flow/wiki/swarm)
+- [MCP Tools Reference](https://github.com/ruvnet/claude-flow/wiki/mcp)
+- [Performance Optimization](https://github.com/ruvnet/claude-flow/wiki/performance)
 
 ---
 

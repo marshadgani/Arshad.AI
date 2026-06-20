@@ -1,6 +1,6 @@
 ---
 name: Pair Programming
-description: AI-assisted pair programming with multiple modes (driver$navigator$switch), real-time verification, quality monitoring, and comprehensive testing. Supports TDD, debugging, refactoring, and learning sessions. Features automatic role switching, continuous code review, security scanning, and performance optimization with truth-score verification.
+description: AI-assisted pair programming with multiple modes (driver/navigator/switch), real-time verification, quality monitoring, and comprehensive testing. Supports TDD, debugging, refactoring, and learning sessions. Features automatic role switching, continuous code review, security scanning, and performance optimization with truth-score verification.
 ---
 
 # Pair Programming
@@ -9,12 +9,12 @@ Collaborative AI pair programming with intelligent role management, real-time qu
 
 ## What This Skill Does
 
-This skill provides professional pair programming capabilities with AI assistance, supporting multiple collaboration modes, continuous verification, and integrated testing. It manages driver$navigator roles, performs real-time code review, tracks quality metrics, and ensures high standards through truth-score verification.
+This skill provides professional pair programming capabilities with AI assistance, supporting multiple collaboration modes, continuous verification, and integrated testing. It manages driver/navigator roles, performs real-time code review, tracks quality metrics, and ensures high standards through truth-score verification.
 
 **Key Capabilities:**
 - **Multiple Modes**: Driver, Navigator, Switch, TDD, Review, Mentor, Debug
 - **Real-Time Verification**: Automatic quality scoring with rollback on failures
-- **Role Management**: Seamless switching between driver$navigator roles
+- **Role Management**: Seamless switching between driver/navigator roles
 - **Testing Integration**: Auto-generate tests, track coverage, continuous testing
 - **Code Review**: Security scanning, performance analysis, best practice enforcement
 - **Session Persistence**: Auto-save, recovery, export, and sharing
@@ -87,10 +87,10 @@ claude-flow pair --status
 claude-flow pair --history
 
 # Pause session
-$pause [--reason <reason>]
+/pause [--reason <reason>]
 
 # Resume session
-$resume
+/resume
 
 # End session
 claude-flow pair --end [--save] [--report]
@@ -126,11 +126,11 @@ claude-flow pair --start --mode driver
 
 **Commands:**
 ```
-$suggest     - Get implementation suggestions
-$review      - Request code review
-$explain     - Ask for explanations
-$optimize    - Request optimization ideas
-$patterns    - Get pattern recommendations
+/suggest     - Get implementation suggestions
+/review      - Request code review
+/explain     - Ask for explanations
+/optimize    - Request optimization ideas
+/patterns    - Get pattern recommendations
 ```
 
 #### Navigator Mode
@@ -161,11 +161,11 @@ claude-flow pair --start --mode navigator
 
 **Commands:**
 ```
-$implement   - Direct implementation
-$refactor    - Request refactoring
-$test        - Generate tests
-$document    - Add documentation
-$alternate   - See alternative approaches
+/implement   - Direct implementation
+/refactor    - Request refactoring
+/test        - Generate tests
+/document    - Add documentation
+/alternate   - See alternative approaches
 ```
 
 #### Switch Mode
@@ -237,160 +237,160 @@ Features: Issue identification, root cause analysis, fix suggestions
 
 #### Code Commands
 ```
-$explain [--level basic|detailed|expert]
+/explain [--level basic|detailed|expert]
   Explain the current code or selection
 
-$suggest [--type refactor|optimize|security|style]
+/suggest [--type refactor|optimize|security|style]
   Get improvement suggestions
 
-$implement <description>
+/implement <description>
   Request implementation (navigator mode)
 
-$refactor [--pattern <pattern>] [--scope function|file|module]
+/refactor [--pattern <pattern>] [--scope function|file|module]
   Refactor selected code
 
-$optimize [--target speed|memory|both]
+/optimize [--target speed|memory|both]
   Optimize code for performance
 
-$document [--format jsdoc|markdown|inline]
+/document [--format jsdoc|markdown|inline]
   Add documentation to code
 
-$comment [--verbose]
+/comment [--verbose]
   Add inline comments
 
-$pattern <pattern-name> [--example]
+/pattern <pattern-name> [--example]
   Apply a design pattern
 ```
 
 #### Testing Commands
 ```
-$test [--watch] [--coverage] [--only <pattern>]
+/test [--watch] [--coverage] [--only <pattern>]
   Run test suite
 
-$test-gen [--type unit|integration|e2e]
+/test-gen [--type unit|integration|e2e]
   Generate tests for current code
 
-$coverage [--report html|json|terminal]
+/coverage [--report html|json|terminal]
   Check test coverage
 
-$mock <target> [--realistic]
+/mock <target> [--realistic]
   Generate mock data or functions
 
-$test-watch [--on-save]
+/test-watch [--on-save]
   Enable test watching
 
-$snapshot [--update]
+/snapshot [--update]
   Create test snapshots
 ```
 
 #### Review Commands
 ```
-$review [--scope current|file|changes] [--strict]
+/review [--scope current|file|changes] [--strict]
   Perform code review
 
-$security [--deep] [--fix]
+/security [--deep] [--fix]
   Security analysis
 
-$perf [--profile] [--suggestions]
+/perf [--profile] [--suggestions]
   Performance analysis
 
-$quality [--detailed]
+/quality [--detailed]
   Check code quality metrics
 
-$lint [--fix] [--config <config>]
+/lint [--fix] [--config <config>]
   Run linters
 
-$complexity [--threshold <value>]
+/complexity [--threshold <value>]
   Analyze code complexity
 ```
 
 #### Navigation Commands
 ```
-$goto <file>[:line[:column]]
+/goto <file>[:line[:column]]
   Navigate to file or location
 
-$find <pattern> [--regex] [--case-sensitive]
+/find <pattern> [--regex] [--case-sensitive]
   Search in project
 
-$recent [--limit <n>]
+/recent [--limit <n>]
   Show recent files
 
-$bookmark [add|list|goto|remove] [<name>]
+/bookmark [add|list|goto|remove] [<name>]
   Manage bookmarks
 
-$history [--limit <n>] [--filter <pattern>]
+/history [--limit <n>] [--filter <pattern>]
   Show command history
 
-$tree [--depth <n>] [--filter <pattern>]
+/tree [--depth <n>] [--filter <pattern>]
   Show project structure
 ```
 
 #### Git Commands
 ```
-$diff [--staged] [--file <file>]
+/diff [--staged] [--file <file>]
   Show git diff
 
-$commit [--message <msg>] [--amend]
+/commit [--message <msg>] [--amend]
   Commit with verification
 
-$branch [create|switch|delete|list] [<name>]
+/branch [create|switch|delete|list] [<name>]
   Branch operations
 
-$stash [save|pop|list|apply] [<message>]
+/stash [save|pop|list|apply] [<message>]
   Stash operations
 
-$log [--oneline] [--limit <n>]
+/log [--oneline] [--limit <n>]
   View git log
 
-$blame [<file>]
+/blame [<file>]
   Show git blame
 ```
 
 #### AI Partner Commands
 ```
-$agent [switch|info|config] [<agent-name>]
+/agent [switch|info|config] [<agent-name>]
   Manage AI agent
 
-$teach <preference>
+/teach <preference>
   Teach the AI your preferences
 
-$feedback [positive|negative] <message>
+/feedback [positive|negative] <message>
   Provide feedback to AI
 
-$personality [professional|friendly|concise|verbose]
+/personality [professional|friendly|concise|verbose]
   Adjust AI personality
 
-$expertise [add|remove|list] [<domain>]
+/expertise [add|remove|list] [<domain>]
   Set AI expertise focus
 ```
 
 #### Metrics Commands
 ```
-$metrics [--period today|session|week|all]
+/metrics [--period today|session|week|all]
   Show session metrics
 
-$score [--breakdown]
+/score [--breakdown]
   Show quality scores
 
-$productivity [--chart]
+/productivity [--chart]
   Show productivity metrics
 
-$leaderboard [--personal|team]
+/leaderboard [--personal|team]
   Show improvement leaderboard
 ```
 
 #### Role & Mode Commands
 ```
-$switch [--immediate]
-  Switch driver$navigator roles
+/switch [--immediate]
+  Switch driver/navigator roles
 
-$mode <type>
+/mode <type>
   Change mode (driver|navigator|switch|tdd|review|mentor|debug)
 
-$role
+/role
   Show current role
 
-$handoff
+/handoff
   Prepare role handoff
 ```
 
@@ -398,21 +398,21 @@ $handoff
 
 | Alias | Full Command |
 |-------|-------------|
-| `$s` | `$suggest` |
-| `$e` | `$explain` |
-| `$t` | `$test` |
-| `$r` | `$review` |
-| `$c` | `$commit` |
-| `$g` | `$goto` |
-| `$f` | `$find` |
-| `$h` | `$help` |
-| `$sw` | `$switch` |
-| `$st` | `$status` |
+| `/s` | `/suggest` |
+| `/e` | `/explain` |
+| `/t` | `/test` |
+| `/r` | `/review` |
+| `/c` | `/commit` |
+| `/g` | `/goto` |
+| `/f` | `/find` |
+| `/h` | `/help` |
+| `/sw` | `/switch` |
+| `/st` | `/status` |
 
 ### Configuration
 
 #### Basic Configuration
-Create `.claude-flow$pair-config.json`:
+Create `.claude-flow/pair-config.json`:
 
 ```json
 {
@@ -642,10 +642,10 @@ claude-flow pair --start \
 👥 Starting pair programming for authentication feature...
 
 [DRIVER: You - 10 minutes]
-$explain JWT authentication flow
+/explain JWT authentication flow
 > AI explains JWT concepts and best practices
 
-$suggest implementation approach
+/suggest implementation approach
 > AI suggests using middleware pattern with refresh tokens
 
 # You write the basic auth middleware structure
@@ -653,20 +653,20 @@ $suggest implementation approach
 [SWITCH TO NAVIGATOR]
 
 [NAVIGATOR: AI - 10 minutes]
-$implement JWT token generation with refresh tokens
+/implement JWT token generation with refresh tokens
 > AI generates secure token implementation
 
-$test-gen
+/test-gen
 > AI creates comprehensive test suite
 
 [SWITCH TO DRIVER]
 
 [DRIVER: You - 10 minutes]
 # You refine the implementation
-$review --security
+/review --security
 > AI performs security review, suggests improvements
 
-$commit --message "feat: JWT authentication with refresh tokens"
+/commit --message "feat: JWT authentication with refresh tokens"
 ✅ Truth Score: 0.98 - Committed successfully
 ```
 
@@ -687,28 +687,28 @@ claude-flow pair --start \
 ```
 👥 Starting debugging session...
 
-$status
+/status
 > Analyzing application for memory issues...
 
-$perf --profile
+/perf --profile
 > Memory usage growing: 150MB → 450MB over 10 minutes
 
-$find "new EventEmitter" --regex
+/find "new EventEmitter" --regex
 > Found 3 instances of EventEmitter creation
 
-$inspect eventEmitters --deep
+/inspect eventEmitters --deep
 > Discovering listeners not being removed
 
-$suggest fix for memory leak
+/suggest fix for memory leak
 > AI suggests: "Add removeListener in cleanup functions"
 
-$implement cleanup functions for all event emitters
+/implement cleanup functions for all event emitters
 > AI generates proper cleanup code
 
-$test
+/test
 > Memory stable at 150MB ✅
 
-$commit --message "fix: memory leak in event emitters"
+/commit --message "fix: memory leak in event emitters"
 ```
 
 #### Example 3: TDD Session
@@ -728,28 +728,28 @@ claude-flow pair --start \
 👥 TDD Session: Shopping Cart Feature
 
 [RED PHASE]
-$test-gen "add item to cart"
+/test-gen "add item to cart"
 > AI writes failing test:
   ✗ should add item to cart
   ✗ should update quantity for existing item
   ✗ should calculate total price
 
 [GREEN PHASE]
-$implement minimal cart functionality
+/implement minimal cart functionality
 > You write just enough code to pass tests
 
-$test
+/test
 > Tests passing: 3/3 ✅
 
 [REFACTOR PHASE]
-$refactor --pattern repository
+/refactor --pattern repository
 > AI refactors to repository pattern
 
-$test
+/test
 > Tests still passing: 3/3 ✅
 
 [NEXT CYCLE]
-$test-gen "remove item from cart"
+/test-gen "remove item from cart"
 > AI writes new failing tests...
 ```
 
@@ -770,35 +770,35 @@ claude-flow pair --start \
 ```
 👥 Refactoring Session: Modernizing UserService
 
-$analyze UserService.js
+/analyze UserService.js
 > AI identifies:
   - Callback hell (5 levels deep)
   - No error handling
   - Tight coupling
   - No tests
 
-$suggest refactoring plan
+/suggest refactoring plan
 > AI suggests:
-  1. Convert callbacks to async$await
+  1. Convert callbacks to async/await
   2. Add error boundaries
   3. Extract dependencies
   4. Add unit tests
 
-$test-gen --before-refactor
+/test-gen --before-refactor
 > AI generates tests for current behavior
 
-$refactor callbacks to async$await
+/refactor callbacks to async/await
 # You refactor with AI guidance
 
-$test
+/test
 > All tests passing ✅
 
-$review --compare
-> AI shows before$after comparison
+/review --compare
+> AI shows before/after comparison
 > Code complexity: 35 → 12
 > Truth score: 0.99 ✅
 
-$commit --message "refactor: modernize UserService with async$await"
+/commit --message "refactor: modernize UserService with async/await"
 ```
 
 #### Example 5: Performance Optimization
@@ -818,32 +818,32 @@ claude-flow pair --start \
 ```
 👥 Performance Optimization Session
 
-$perf --profile
+/perf --profile
 > React DevTools Profiler Results:
   - ProductList: 450ms render
   - CartSummary: 200ms render
   - Unnecessary re-renders: 15
 
-$suggest optimizations for ProductList
+/suggest optimizations for ProductList
 > AI suggests:
   1. Add React.memo
   2. Use useMemo for expensive calculations
   3. Implement virtualization for long lists
 
-$implement React.memo and useMemo
+/implement React.memo and useMemo
 # You implement with AI guidance
 
-$perf --profile
+/perf --profile
 > ProductList: 45ms render (90% improvement!) ✅
 
-$implement virtualization with react-window
+/implement virtualization with react-window
 > AI implements virtual scrolling
 
-$perf --profile
+/perf --profile
 > ProductList: 12ms render (97% improvement!) ✅
 > FPS: 60 stable ✅
 
-$commit --message "perf: optimize ProductList with memoization and virtualization"
+/commit --message "perf: optimize ProductList with memoization and virtualization"
 ```
 
 #### Example 6: API Development
@@ -863,31 +863,31 @@ claude-flow pair --start \
 ```
 👥 API Development Session
 
-$design REST API for blog platform
+/design REST API for blog platform
 > AI designs endpoints:
-  POST   $api$posts
-  GET    $api$posts
-  GET    $api$posts/:id
-  PUT    $api$posts/:id
-  DELETE $api$posts/:id
+  POST   /api/posts
+  GET    /api/posts
+  GET    /api/posts/:id
+  PUT    /api/posts/:id
+  DELETE /api/posts/:id
 
-$implement CRUD endpoints with validation
+/implement CRUD endpoints with validation
 > AI implements with Express + Joi validation
 
-$test-gen --integration
+/test-gen --integration
 > AI generates integration tests
 
-$security --api
+/security --api
 > AI adds:
   - Rate limiting
   - Input sanitization
   - JWT authentication
   - CORS configuration
 
-$document --openapi
+/document --openapi
 > AI generates OpenAPI documentation
 
-$test --integration
+/test --integration
 > All endpoints tested: 15/15 ✅
 ```
 
@@ -956,7 +956,7 @@ Next Switch: in 3 minutes
 └── Commits: 3
 
 🎯 Focus: Implementation
-📝 Current File: src$auth$login.js
+📝 Current File: src/auth/login.js
 ```
 
 #### Session History
@@ -1030,24 +1030,24 @@ Define in configuration:
 ```json
 {
   "customCommands": {
-    "tdd": "$test-gen && $test --watch",
-    "full-review": "$lint --fix && $test && $review --strict",
-    "quick-fix": "$suggest --type fix && $implement && $test"
+    "tdd": "/test-gen && /test --watch",
+    "full-review": "/lint --fix && /test && /review --strict",
+    "quick-fix": "/suggest --type fix && /implement && /test"
   }
 }
 ```
 
 Use custom commands:
 ```
-$custom tdd
-$custom full-review
+/custom tdd
+/custom full-review
 ```
 
 #### Command Chaining
 
 ```
-$test && $commit && $push
-$lint --fix && $test && $review --strict
+/test && /commit && /push
+/lint --fix && /test && /review --strict
 ```
 
 #### Session Recording
@@ -1094,7 +1094,7 @@ claude-flow pair --start --ide vscode
 1. **Test Early** - Run tests after each change
 2. **Verify Before Commit** - Check truth scores
 3. **Review Security** - Always for sensitive code
-4. **Profile Performance** - Use `$perf` for optimization
+4. **Profile Performance** - Use `/perf` for optimization
 5. **Save Sessions** - For complex work
 6. **Learn from AI** - Ask questions frequently
 
