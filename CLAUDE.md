@@ -661,6 +661,7 @@ This registry is the source of truth for weekly auto-updates.
 | `ruflo` | https://github.com/ruvnet/ruflo.git | skills+agents | 134 skills, 107 agents | 2026-06-07 |
 | `agent-skills` | https://github.com/addyosmani/agent-skills | skills+agents+commands+hooks | 24 skills, 4 agents, 8 commands, 4 hooks | 2026-06-13 |
 | `agent-browser` | https://github.com/vercel-labs/agent-browser | skills | 7 skills (core + 6 specialized) | 2026-06-20 |
+| `headroom` | https://github.com/chopratejas/headroom | skills+hooks+token-optim | 1 skill, 1 hooks.json, 2 token-optim files | 2026-06-20 |
 
 > This table is updated automatically by `scripts/fetch-github-repo.sh` when a new repo is integrated.
 
