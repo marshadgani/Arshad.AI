@@ -757,6 +757,18 @@
         "token_optimization": []
       }
     },
+    "headroom": {
+      "url": "https://github.com/chopratejas/headroom",
+      "name": "headroom",
+      "last_fetched": "2026-06-20",
+      "components": {
+        "skills": ["headroom"],
+        "agents": [],
+        "commands": [],
+        "hooks": ["hooks.json"],
+        "token_optimization": ["claude_analysis_ttl.py", "llms.txt"]
+      }
+    },
     "agent-browser": {
       "url": "https://github.com/vercel-labs/agent-browser",
       "name": "agent-browser",

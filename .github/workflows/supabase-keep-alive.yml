@@ -1,0 +1,76 @@
+name: Supabase Keep-Alive
+
+# Runs every 5 days — well within the 7-day free-tier pause window.
+# If the project is already ACTIVE_HEALTHY, the restore call is a no-op.
+# If it's paused (INACTIVE), the restore call wakes it up and the job
+# waits up to 3 minutes for it to come back healthy before exiting.
+#
+# Required GitHub secret:
+#   SUPABASE_ACCESS_TOKEN  — personal access token from
+#                            https://supabase.com/dashboard/account/tokens
+#                            (NOT the project anon/service key)
+on:
+  schedule:
+    - cron: '0 6 */5 * *'   # 06:00 UTC every 5 days
+  workflow_dispatch:          # allow manual trigger from GitHub Actions UI
+
+jobs:
+  keep-alive:
+    name: Wake Supabase if paused
+    runs-on: ubuntu-latest
+    permissions: {}           # no GitHub write permissions needed — outbound HTTP only
+    env:
+      PROJECT_REF: dslnjhuciypccowyiwaa   # non-secret Supabase project reference
+      API: https://api.supabase.com/v1
+
+    steps:
+      - name: Check project status
+        id: status
+        run: |
+          set -euo pipefail   # propagate curl exit code through the pipe to jq
+          BODY=$(curl -sf \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ACCESS_TOKEN }}" \
+            "$API/projects/$PROJECT_REF")
+          STATUS=$(echo "$BODY" | jq -r '.status // "UNKNOWN"')
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+          echo "Project status: $STATUS"
+
+      - name: Restore if paused
+        if: steps.status.outputs.status != 'ACTIVE_HEALTHY'
+        run: |
+          set -euo pipefail
+          echo "Status is '${{ steps.status.outputs.status }}' — sending restore request..."
+          BODY=$(curl -s -w "\n%{http_code}" -X POST \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ACCESS_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            "$API/projects/$PROJECT_REF/restore")
+          HTTP=$(echo "$BODY" | tail -1)
+          echo "Restore API response: HTTP $HTTP"
+          if [ "$HTTP" -lt 200 ] || [ "$HTTP" -ge 300 ]; then
+            echo "Restore call failed — check SUPABASE_ACCESS_TOKEN and project ref."
+            exit 1
+          fi
+
+      - name: Wait for healthy
+        if: steps.status.outputs.status != 'ACTIVE_HEALTHY'
+        run: |
+          set -euo pipefail
+          echo "Waiting for project to become ACTIVE_HEALTHY..."
+          for i in $(seq 1 18); do
+            sleep 10
+            BODY=$(curl -sf \
+              -H "Authorization: Bearer ${{ secrets.SUPABASE_ACCESS_TOKEN }}" \
+              "$API/projects/$PROJECT_REF")
+            STATUS=$(echo "$BODY" | jq -r '.status // "UNKNOWN"')
+            echo "  attempt $i/18 — status: $STATUS"
+            if [ "$STATUS" = "ACTIVE_HEALTHY" ]; then
+              echo "Project is healthy."
+              exit 0
+            fi
+          done
+          echo "Project did not become healthy within 3 minutes."
+          exit 1
+
+      - name: Already healthy
+        if: steps.status.outputs.status == 'ACTIVE_HEALTHY'
+        run: echo "Project is already ACTIVE_HEALTHY — nothing to do."
