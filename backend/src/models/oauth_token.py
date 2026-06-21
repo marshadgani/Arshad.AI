@@ -5,7 +5,7 @@ from sqlalchemy import ARRAY, ForeignKey, LargeBinary, String
 from sqlalchemy.dialects.postgresql import TIMESTAMP, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from .database import Base, TimestampedMixin
+from .base import Base, TimestampedMixin
 
 
 class OAuthToken(Base, TimestampedMixin):

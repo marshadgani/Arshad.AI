@@ -13,11 +13,20 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND_ROOT))
 
-from src.models import (  # noqa: F401, E402  — register models with Base.metadata
+from src.models import (  # noqa: F401, E402  — register all models with Base.metadata
+    ai_ecosystem,
+    conversation,
+    dag_trigger,
     dashboard,
     domain,
+    ingested,
+    integration,
+    oauth_account,
+    oauth_token,
+    obsidian,
+    user,
 )
-from src.models.database import Base  # noqa: E402
+from src.models.base import Base  # noqa: E402 — guard-free; no engine created here
 
 config = context.config
 
