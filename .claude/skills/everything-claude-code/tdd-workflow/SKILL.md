@@ -1,7 +1,6 @@
 ---
 name: tdd-workflow
 description: Use this skill when writing new features, fixing bugs, or refactoring code. Enforces test-driven development with 80%+ coverage including unit, integration, and E2E tests.
-origin: ECC
 ---
 
 # Test-Driven Development Workflow
@@ -47,20 +46,35 @@ ALWAYS write tests first, then implement code to make tests pass.
 - Browser automation
 - UI interactions
 
-### 4. Git Checkpoints
-- If the repository is under Git, create a checkpoint commit after each TDD stage
-- Do not squash or rewrite these checkpoint commits until the workflow is complete
-- Each checkpoint commit message must describe the stage and the exact evidence captured
-- Count only commits created on the current active branch for the current task
-- Do not treat commits from other branches, earlier unrelated work, or distant branch history as valid checkpoint evidence
-- Before treating a checkpoint as satisfied, verify that the commit is reachable from the current `HEAD` on the active branch and belongs to the current task sequence
-- The preferred compact workflow is:
-  - one commit for failing test added and RED validated
-  - one commit for minimal fix applied and GREEN validated
-  - one optional commit for refactor complete
-- Separate evidence-only commits are not required if the test commit clearly corresponds to RED and the fix commit clearly corresponds to GREEN
-
 ## TDD Workflow Steps
+
+### Step 0: Detect the Test Runner
+
+Do not assume `npm test`. The commands in the steps and examples below use `<test>`, `<test-watch>`, and `<coverage>` as placeholders for the project's actual runner. Resolve them once before starting:
+
+1. **Run the package-manager detector** (ships with ECC):
+
+   ```bash
+   node scripts/setup-package-manager.js --detect
+   ```
+
+   It resolves the package manager (npm / pnpm / yarn / bun) from, in order: `CLAUDE_PACKAGE_MANAGER`, `.claude/package-manager.json`, the `package.json` `packageManager` field, the lockfile, then global config.
+
+2. **Distinguish the package manager from the test runner — they are not the same.** A project can use Bun to install dependencies yet still run Jest or Vitest. Inspect `package.json` `scripts.test` and the test files:
+   - `scripts.test` invokes `jest` / `vitest` -> run through the detected PM (`npm test`, `pnpm test`, `yarn test`, or `bun run test`).
+   - `scripts.test` is `bun test`, or test files `import { test, expect } from "bun:test"`, or there is no jest/vitest config but Bun is present -> use **Bun's native runner** (`bun test`). See [Bun Native Test Pattern](#bun-native-test-pattern-buntest) below.
+
+Runner command matrix:
+
+| Runner | `<test>` | `<test-watch>` | `<coverage>` | `<lint>` |
+|--------|----------|----------------|--------------|----------|
+| npm | `npm test` | `npm test -- --watch` | `npm run test:coverage` | `npm run lint` |
+| pnpm | `pnpm test` | `pnpm test --watch` | `pnpm test:coverage` | `pnpm lint` |
+| yarn | `yarn test` | `yarn test --watch` | `yarn test:coverage` | `yarn lint` |
+| Bun (script runs jest/vitest) | `bun run test` | `bun run test --watch` | `bun run test:coverage` | `bun run lint` |
+| Bun (native `bun:test`) | `bun test` | `bun test --watch` | `bun test --coverage` | `bun run lint` |
+
+> `bun test` (Bun's built-in runner) is **not** the same as `bun run test` (which runs the `package.json` `test` script). Picking the wrong one is a common failure — e.g. invoking Jest through `npx`/`bun run` in an ESM-only project breaks, while `bun test` runs the suite natively. Confirm which the project expects before the RED gate, then substitute `<test>` / `<coverage>` everywhere `npm test` appears below.
 
 ### Step 1: Write User Journeys
 ```
@@ -96,32 +110,9 @@ describe('Semantic Search', () => {
 
 ### Step 3: Run Tests (They Should Fail)
 ```bash
-npm test
+<test>
 # Tests should fail - we haven't implemented yet
 ```
-
-This step is mandatory and is the RED gate for all production changes.
-
-Before modifying business logic or other production code, you must verify a valid RED state via one of these paths:
-- Runtime RED:
-  - The relevant test target compiles successfully
-  - The new or changed test is actually executed
-  - The result is RED
-- Compile-time RED:
-  - The new test newly instantiates, references, or exercises the buggy code path
-  - The compile failure is itself the intended RED signal
-- In either case, the failure is caused by the intended business-logic bug, undefined behavior, or missing implementation
-- The failure is not caused only by unrelated syntax errors, broken test setup, missing dependencies, or unrelated regressions
-
-A test that was only written but not compiled and executed does not count as RED.
-
-Do not edit production code until this RED state is confirmed.
-
-If the repository is under Git, create a checkpoint commit immediately after this stage is validated.
-Recommended commit message format:
-- `test: add reproducer for <feature or bug>`
-- This commit may also serve as the RED validation checkpoint if the reproducer was compiled and executed and failed for the intended reason
-- Verify that this checkpoint commit is on the current active branch before continuing
 
 ### Step 4: Implement Code
 Write minimal code to make tests pass:
@@ -133,23 +124,11 @@ export async function searchMarkets(query: string) {
 }
 ```
 
-If the repository is under Git, stage the minimal fix now but defer the checkpoint commit until GREEN is validated in Step 5.
-
 ### Step 5: Run Tests Again
 ```bash
-npm test
+<test>
 # Tests should now pass
 ```
-
-Rerun the same relevant test target after the fix and confirm the previously failing test is now GREEN.
-
-Only after a valid GREEN result may you proceed to refactor.
-
-If the repository is under Git, create a checkpoint commit immediately after GREEN is validated.
-Recommended commit message format:
-- `fix: <feature or bug>`
-- The fix commit may also serve as the GREEN validation checkpoint if the same relevant test target was rerun and passed
-- Verify that this checkpoint commit is on the current active branch before continuing
 
 ### Step 6: Refactor
 Improve code quality while keeping tests green:
@@ -158,14 +137,9 @@ Improve code quality while keeping tests green:
 - Optimize performance
 - Enhance readability
 
-If the repository is under Git, create a checkpoint commit immediately after refactoring is complete and tests remain green.
-Recommended commit message format:
-- `refactor: clean up after <feature or bug> implementation`
-- Verify that this checkpoint commit is on the current active branch before considering the TDD cycle complete
-
 ### Step 7: Verify Coverage
 ```bash
-npm run test:coverage
+<coverage>
 # Verify 80%+ coverage achieved
 ```
 
@@ -197,6 +171,35 @@ describe('Button Component', () => {
   })
 })
 ```
+
+### Bun Native Test Pattern (`bun:test`)
+
+When the project uses Bun's built-in runner (see [Step 0](#step-0-detect-the-test-runner)), import from `bun:test` and run with `bun test` — not `bun run test`. The API is Jest-like, so `describe` / `it` / `expect` and most matchers carry over. See the `bun-runtime` skill for runtime, install, and bundler details.
+
+```typescript
+import { describe, it, expect, mock } from 'bun:test'
+import { searchMarkets } from './search'
+
+describe('searchMarkets', () => {
+  it('returns an empty list for an empty query', async () => {
+    expect(await searchMarkets('')).toEqual([])
+  })
+
+  it('sorts results by similarity score', async () => {
+    const results = await searchMarkets('election')
+    expect(results).toEqual([...results].sort((a, b) => b.score - a.score))
+  })
+})
+```
+
+```bash
+bun test              # run once (RED/GREEN gate)
+bun test --watch      # watch mode during development
+bun test --coverage   # coverage report
+```
+
+- Mock modules with `mock.module(...)` / `mock(...)` from `bun:test` instead of `jest.mock(...)`.
+- Configure coverage thresholds in `bunfig.toml` under `[test]` (e.g. `coverageThreshold`) rather than the Jest `coverageThresholds` config block.
 
 ### API Integration Test Pattern
 ```typescript
@@ -346,7 +349,7 @@ jest.mock('@/lib/openai', () => ({
 
 ### Run Coverage Report
 ```bash
-npm run test:coverage
+<coverage>
 ```
 
 ### Coverage Thresholds
@@ -417,21 +420,21 @@ test('updates user', () => {
 
 ### Watch Mode During Development
 ```bash
-npm test -- --watch
+<test-watch>
 # Tests run automatically on file changes
 ```
 
 ### Pre-Commit Hook
 ```bash
 # Runs before every commit
-npm test && npm run lint
+<test> && <lint>
 ```
 
 ### CI/CD Integration
 ```yaml
 # GitHub Actions
 - name: Run Tests
-  run: npm test -- --coverage
+  run: <coverage>
 - name: Upload Coverage
   uses: codecov/codecov-action@v3
 ```
