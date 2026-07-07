@@ -55,13 +55,14 @@
     "claude-mem": {
       "url": "https://github.com/thedotmack/claude-mem.git",
       "name": "claude-mem",
-      "last_fetched": "2026-06-14 19:53 UTC",
+      "last_fetched": "2026-07-07 23:18 UTC",
       "components": {
         "skills": [
           "weekly-digests",
           "pathfinder",
           "oh-my-issues",
           "learn-codebase",
+          "what-the",
           "smart-explore",
           "mem-search",
           "timeline-report",
