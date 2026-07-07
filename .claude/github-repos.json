@@ -769,37 +769,41 @@
       }
     },
     "headroom": {
-      "url": "https://github.com/chopratejas/headroom",
+      "url": "https://github.com/chopratejas/headroom.git",
       "name": "headroom",
-      "last_fetched": "2026-06-20",
+      "last_fetched": "2026-07-07 23:19 UTC",
       "components": {
-        "skills": [
-          "headroom"
-        ],
+        "skills": [],
         "agents": [],
         "commands": [],
-        "hooks": [
-          "hooks.json"
-        ],
+        "hooks": [],
         "token_optimization": [
-          "claude_analysis_ttl.py",
-          "llms.txt"
+          "configuration.md",
+          "agno.md",
+          "ccr.md",
+          "transforms.md",
+          "langchain.md",
+          "integration-guide.md",
+          "ARCHITECTURE.md",
+          "index.md",
+          "README.md",
+          "test_ccr.py"
         ]
       }
     },
     "agent-browser": {
-      "url": "https://github.com/vercel-labs/agent-browser",
+      "url": "https://github.com/vercel-labs/agent-browser.git",
       "name": "agent-browser",
-      "last_fetched": "2026-06-20",
+      "last_fetched": "2026-07-07 23:19 UTC",
       "components": {
         "skills": [
           "agent-browser",
-          "agent-browser-core",
-          "agent-browser-slack",
-          "agent-browser-electron",
-          "agent-browser-dogfood",
-          "agent-browser-vercel-sandbox",
-          "agent-browser-agentcore"
+          "dogfood",
+          "vercel-sandbox",
+          "agentcore",
+          "electron",
+          "slack",
+          "core"
         ],
         "agents": [],
         "commands": [],
