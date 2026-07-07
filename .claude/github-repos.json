@@ -93,7 +93,7 @@
     "obsidian-skills": {
       "url": "https://github.com/kepano/obsidian-skills.git",
       "name": "obsidian-skills",
-      "last_fetched": "2026-06-14 19:53 UTC",
+      "last_fetched": "2026-07-07 23:18 UTC",
       "components": {
         "skills": [
           "obsidian-cli",
@@ -111,16 +111,24 @@
     "n8n-mcp": {
       "url": "https://github.com/czlonkowski/n8n-mcp.git",
       "name": "n8n-mcp",
-      "last_fetched": "2026-06-14 19:53 UTC",
+      "last_fetched": "2026-07-07 23:18 UTC",
       "components": {
         "skills": [
           "n8n-code-python",
           "n8n-node-configuration",
+          "n8n-agents",
+          "n8n-self-hosting",
           "n8n-mcp-tools-expert",
+          "n8n-code-tool",
+          "n8n-error-handling",
+          "using-n8n-mcp-skills",
           "n8n-validation-expert",
+          "n8n-subworkflows",
           "n8n-expression-syntax",
+          "n8n-multi-instance",
           "n8n-code-javascript",
-          "n8n-workflow-patterns"
+          "n8n-workflow-patterns",
+          "n8n-binary-and-data"
         ],
         "agents": [
           "technical-researcher",
@@ -135,7 +143,6 @@
         "commands": [],
         "hooks": [],
         "token_optimization": [
-          "competitive-analysis-may-2026.md",
           "N8N_AI_WORKFLOW_BUILDER_ANALYSIS.md",
           "context-manager.md"
         ]
