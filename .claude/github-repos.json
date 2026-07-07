@@ -6,7 +6,7 @@
     "superpowers": {
       "url": "https://github.com/obra/superpowers.git",
       "name": "superpowers",
-      "last_fetched": "2026-06-14 19:53 UTC",
+      "last_fetched": "2026-07-07 23:18 UTC",
       "components": {
         "skills": [
           "using-superpowers",
@@ -26,10 +26,10 @@
         ],
         "agents": [],
         "commands": [],
-        "hooks": [],
-        "token_optimization": [
-          "testing.md"
-        ]
+        "hooks": [
+          "test-session-start.sh"
+        ],
+        "token_optimization": []
       }
     },
     "ui-ux-pro-max": {
@@ -762,11 +762,18 @@
       "name": "headroom",
       "last_fetched": "2026-06-20",
       "components": {
-        "skills": ["headroom"],
+        "skills": [
+          "headroom"
+        ],
         "agents": [],
         "commands": [],
-        "hooks": ["hooks.json"],
-        "token_optimization": ["claude_analysis_ttl.py", "llms.txt"]
+        "hooks": [
+          "hooks.json"
+        ],
+        "token_optimization": [
+          "claude_analysis_ttl.py",
+          "llms.txt"
+        ]
       }
     },
     "agent-browser": {
