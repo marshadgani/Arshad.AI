@@ -713,7 +713,7 @@
     "agent-skills": {
       "url": "https://github.com/addyosmani/agent-skills.git",
       "name": "agent-skills",
-      "last_fetched": "2026-06-14 19:54 UTC",
+      "last_fetched": "2026-07-07 23:19 UTC",
       "components": {
         "skills": [
           "interview-me",
@@ -743,7 +743,6 @@
         ],
         "agents": [
           "security-auditor",
-          "README",
           "web-performance-auditor",
           "code-reviewer",
           "test-engineer"
