@@ -9,7 +9,7 @@ from .base import Base, TimestampedMixin  # noqa: F401 — re-exported for backw
 # asyncpg's prepared statement protocol: the pooler routes each statement to an
 # arbitrary backend, so PREPARE and DEALLOCATE can land on different backends,
 # leaving stale named statements (e.g. __asyncpg_stmt_5__) that collide with
-# counter-counter names from the next asyncpg connection object.
+# counter-based names from the next asyncpg connection object.
 #
 # The only reliable fix is to bypass the pooler and connect directly to Postgres
 # (db.PROJECT_REF.supabase.co:5432).  Set DATABASE_URL_DIRECT to that URL on
