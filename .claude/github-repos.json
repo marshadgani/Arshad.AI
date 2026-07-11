@@ -6,7 +6,7 @@
     "superpowers": {
       "url": "https://github.com/obra/superpowers.git",
       "name": "superpowers",
-      "last_fetched": "2026-06-14 19:53 UTC",
+      "last_fetched": "2026-07-07 23:18 UTC",
       "components": {
         "skills": [
           "using-superpowers",
@@ -26,10 +26,10 @@
         ],
         "agents": [],
         "commands": [],
-        "hooks": [],
-        "token_optimization": [
-          "testing.md"
-        ]
+        "hooks": [
+          "test-session-start.sh"
+        ],
+        "token_optimization": []
       }
     },
     "ui-ux-pro-max": {
@@ -55,13 +55,14 @@
     "claude-mem": {
       "url": "https://github.com/thedotmack/claude-mem.git",
       "name": "claude-mem",
-      "last_fetched": "2026-06-14 19:53 UTC",
+      "last_fetched": "2026-07-07 23:18 UTC",
       "components": {
         "skills": [
           "weekly-digests",
           "pathfinder",
           "oh-my-issues",
           "learn-codebase",
+          "what-the",
           "smart-explore",
           "mem-search",
           "timeline-report",
@@ -92,7 +93,7 @@
     "obsidian-skills": {
       "url": "https://github.com/kepano/obsidian-skills.git",
       "name": "obsidian-skills",
-      "last_fetched": "2026-06-14 19:53 UTC",
+      "last_fetched": "2026-07-07 23:18 UTC",
       "components": {
         "skills": [
           "obsidian-cli",
@@ -110,16 +111,24 @@
     "n8n-mcp": {
       "url": "https://github.com/czlonkowski/n8n-mcp.git",
       "name": "n8n-mcp",
-      "last_fetched": "2026-06-14 19:53 UTC",
+      "last_fetched": "2026-07-07 23:18 UTC",
       "components": {
         "skills": [
           "n8n-code-python",
           "n8n-node-configuration",
+          "n8n-agents",
+          "n8n-self-hosting",
           "n8n-mcp-tools-expert",
+          "n8n-code-tool",
+          "n8n-error-handling",
+          "using-n8n-mcp-skills",
           "n8n-validation-expert",
+          "n8n-subworkflows",
           "n8n-expression-syntax",
+          "n8n-multi-instance",
           "n8n-code-javascript",
-          "n8n-workflow-patterns"
+          "n8n-workflow-patterns",
+          "n8n-binary-and-data"
         ],
         "agents": [
           "technical-researcher",
@@ -134,7 +143,6 @@
         "commands": [],
         "hooks": [],
         "token_optimization": [
-          "competitive-analysis-may-2026.md",
           "N8N_AI_WORKFLOW_BUILDER_ANALYSIS.md",
           "context-manager.md"
         ]
@@ -143,7 +151,7 @@
     "get-shit-done": {
       "url": "https://github.com/gsd-build/get-shit-done.git",
       "name": "get-shit-done",
-      "last_fetched": "2026-06-14 19:53 UTC",
+      "last_fetched": "2026-07-07 23:18 UTC",
       "components": {
         "skills": [],
         "agents": [
@@ -271,21 +279,21 @@
     "awesome-claude-code": {
       "url": "https://github.com/hesreallyhim/awesome-claude-code.git",
       "name": "awesome-claude-code",
-      "last_fetched": "2026-06-14 19:53 UTC",
+      "last_fetched": "2026-07-07 23:18 UTC",
       "components": {
         "skills": [],
         "agents": [],
-        "commands": [
-          "evaluate-repository"
-        ],
+        "commands": [],
         "hooks": [],
-        "token_optimization": []
+        "token_optimization": [
+          "README.md"
+        ]
       }
     },
     "context7": {
       "url": "https://github.com/upstash/context7.git",
       "name": "context7",
-      "last_fetched": "2026-06-14 19:53 UTC",
+      "last_fetched": "2026-07-07 23:18 UTC",
       "components": {
         "skills": [
           "context7-mcp",
@@ -360,7 +368,7 @@
     "claude-plugins-official": {
       "url": "https://github.com/anthropics/claude-plugins-official.git",
       "name": "claude-plugins-official",
-      "last_fetched": "2026-06-14 19:53 UTC",
+      "last_fetched": "2026-07-07 23:18 UTC",
       "components": {
         "skills": [
           "access",
@@ -376,6 +384,7 @@
           "writing-rules",
           "example-command",
           "example-skill",
+          "project-artifact",
           "plugin-settings",
           "mcp-integration",
           "command-development",
@@ -406,10 +415,12 @@
           "plugin-validator",
           "agent-creator",
           "skill-reviewer",
+          "version-delta-analyst",
           "security-auditor",
           "legacy-analyst",
           "business-rules-extractor",
           "architecture-critic",
+          "scaffolder",
           "test-engineer",
           "comment-analyzer",
           "type-design-analyzer",
@@ -439,6 +450,7 @@
           "modernize-preflight",
           "modernize-transform",
           "modernize-reimagine",
+          "modernize-uplift",
           "modernize-brief",
           "code-review",
           "review-pr",
@@ -701,7 +713,7 @@
     "agent-skills": {
       "url": "https://github.com/addyosmani/agent-skills.git",
       "name": "agent-skills",
-      "last_fetched": "2026-06-14 19:54 UTC",
+      "last_fetched": "2026-07-07 23:19 UTC",
       "components": {
         "skills": [
           "interview-me",
@@ -731,7 +743,6 @@
         ],
         "agents": [
           "security-auditor",
-          "README",
           "web-performance-auditor",
           "code-reviewer",
           "test-engineer"
@@ -758,31 +769,54 @@
       }
     },
     "headroom": {
-      "url": "https://github.com/chopratejas/headroom",
+      "url": "https://github.com/chopratejas/headroom.git",
       "name": "headroom",
-      "last_fetched": "2026-06-20",
+      "last_fetched": "2026-07-07 23:19 UTC",
       "components": {
-        "skills": ["headroom"],
+        "skills": [],
         "agents": [],
         "commands": [],
-        "hooks": ["hooks.json"],
-        "token_optimization": ["claude_analysis_ttl.py", "llms.txt"]
+        "hooks": [],
+        "token_optimization": [
+          "configuration.md",
+          "agno.md",
+          "ccr.md",
+          "transforms.md",
+          "langchain.md",
+          "integration-guide.md",
+          "ARCHITECTURE.md",
+          "index.md",
+          "README.md",
+          "test_ccr.py"
+        ]
       }
     },
     "agent-browser": {
-      "url": "https://github.com/vercel-labs/agent-browser",
+      "url": "https://github.com/vercel-labs/agent-browser.git",
       "name": "agent-browser",
-      "last_fetched": "2026-06-20",
+      "last_fetched": "2026-07-07 23:19 UTC",
       "components": {
         "skills": [
           "agent-browser",
-          "agent-browser-core",
-          "agent-browser-slack",
-          "agent-browser-electron",
-          "agent-browser-dogfood",
-          "agent-browser-vercel-sandbox",
-          "agent-browser-agentcore"
+          "dogfood",
+          "vercel-sandbox",
+          "agentcore",
+          "electron",
+          "slack",
+          "core"
         ],
+        "agents": [],
+        "commands": [],
+        "hooks": [],
+        "token_optimization": []
+      }
+    },
+    "andrej-karpathy-skills": {
+      "url": "https://github.com/multica-ai/andrej-karpathy-skills.git",
+      "name": "andrej-karpathy-skills",
+      "last_fetched": "2026-07-11",
+      "components": {
+        "skills": ["karpathy-guidelines"],
         "agents": [],
         "commands": [],
         "hooks": [],
@@ -792,9 +826,15 @@
     "ui-ux-pro-max-skill": {
       "url": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git",
       "name": "ui-ux-pro-max-skill",
-      "last_fetched": "2026-06-14 19:54 UTC",
+      "last_fetched": "2026-07-07 23:19 UTC",
       "components": {
         "skills": [
+          "banner-design",
+          "design-system",
+          "brand",
+          "design",
+          "slides",
+          "ui-styling",
           "banner-design",
           "design-system",
           "brand",
@@ -807,6 +847,8 @@
         "commands": [],
         "hooks": [],
         "token_optimization": [
+          "search.py",
+          "search.py",
           "search.py",
           "search.py",
           "search.py"

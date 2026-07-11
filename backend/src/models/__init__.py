@@ -15,4 +15,4 @@ from . import (  # noqa: F401
     obsidian,
     user,
 )
-from .database import AsyncSessionLocal, Base, engine, get_db  # noqa: F401
+from .base import Base  # noqa: F401 — ensures Base is importable from src.models

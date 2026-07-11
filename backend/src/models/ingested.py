@@ -17,7 +17,7 @@ from sqlalchemy import ForeignKey, Index, Numeric, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from .database import Base
+from .base import Base
 
 
 class IngestedCalendarEvent(Base):

@@ -16,7 +16,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .dashboard import AgentHealthEnum  # reuse the enum across model files
-from .database import Base, TimestampedMixin
+from .base import Base, TimestampedMixin
 
 
 APPLICATION_STATUS_VALUES = ("live", "beta", "planned")

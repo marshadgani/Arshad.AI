@@ -15,7 +15,7 @@ from sqlalchemy import ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import ARRAY, BYTEA, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from .database import Base, TimestampedMixin
+from .base import Base, TimestampedMixin
 
 
 class Integration(Base, TimestampedMixin):

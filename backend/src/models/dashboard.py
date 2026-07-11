@@ -17,7 +17,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from .database import Base, TimestampedMixin
+from .base import Base, TimestampedMixin
 
 # ── Enums ──────────────────────────────────────────────────────────
 SOURCE_VALUES = ("github", "gmail", "notion", "linear", "slack", "calendar")

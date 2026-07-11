@@ -19,7 +19,7 @@ from sqlalchemy import ForeignKey, Index, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from .database import Base
+from .base import Base
 
 
 class ConversationSession(Base):

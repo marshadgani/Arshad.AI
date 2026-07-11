@@ -15,7 +15,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 
-from .database import Base, TimestampedMixin
+from .base import Base, TimestampedMixin
 
 
 class AgentRegistry(TimestampedMixin, Base):
