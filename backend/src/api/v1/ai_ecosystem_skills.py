@@ -15,7 +15,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.auth.dependencies import get_current_user
 from src.models.database import get_db
 from src.models.skill import SkillRegistry
-from src.schemas.ai_ecosystem import RegisterSkillRequest, SkillResponse
+from src.schemas.ai_ecosystem import (
+    RegisterSkillRequest,
+    SkillListResponse,
+    SkillRegisterResponse,
+    SkillResponse,
+)
 
 router = APIRouter(
     prefix="/api/v1/ai-ecosystem",
@@ -24,8 +29,12 @@ router = APIRouter(
 )
 
 
-@router.get("/skills", summary="List all registered skills")
-async def list_skills(db: AsyncSession = Depends(get_db)) -> dict:
+@router.get(
+    "/skills",
+    summary="List all registered skills",
+    response_model=SkillListResponse,
+)
+async def list_skills(db: AsyncSession = Depends(get_db)) -> SkillListResponse:
     rows = (
         (
             await db.execute(
@@ -38,21 +47,20 @@ async def list_skills(db: AsyncSession = Depends(get_db)) -> dict:
         .scalars()
         .all()
     )
-    return {
-        "data": [SkillResponse.model_validate(r).model_dump() for r in rows],
-        "total": len(rows),
-    }
+    skills = [SkillResponse.model_validate(r) for r in rows]
+    return SkillListResponse(data=skills, total=len(skills))
 
 
 @router.post(
     "/skills/register",
     summary="Register or update a skill in the ecosystem",
     status_code=201,
+    response_model=SkillRegisterResponse,
 )
 async def register_skill(
     body: RegisterSkillRequest,
     db: AsyncSession = Depends(get_db),
-) -> dict:
+) -> SkillRegisterResponse:
     """Upsert a skill into the registry. Called automatically after every skill installation."""
     existing = await db.scalar(
         select(SkillRegistry).where(SkillRegistry.skill_name == body.skill_name)
@@ -76,4 +84,4 @@ async def register_skill(
         )
         action = "registered"
     await db.commit()
-    return {"data": {"skill_name": body.skill_name, "action": action}}
+    return SkillRegisterResponse(skill_name=body.skill_name, action=action)

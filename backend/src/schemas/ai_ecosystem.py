@@ -82,6 +82,16 @@ class SkillResponse(ORMBase):
 class RegisterSkillRequest(ORMBase):
     skill_name: str = Field(..., min_length=1, max_length=100)
     display_name: str = Field(..., min_length=1, max_length=200)
-    description: str = Field(..., min_length=1)
+    description: str = Field(..., min_length=1, max_length=5000)
     source_repo: str = Field(default="unknown", max_length=100)
     category: SkillCategory = "other"
+
+
+class SkillListResponse(ORMBase):
+    data: list[SkillResponse]
+    total: int
+
+
+class SkillRegisterResponse(ORMBase):
+    skill_name: str
+    action: Literal["registered", "updated"]
