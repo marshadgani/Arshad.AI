@@ -1006,10 +1006,9 @@
       "last_fetched": "2026-07-12 22:01 UTC",
       "components": {
         "skills": [
-          "doctor",
           "deep-research",
-          "run-skill-generator",
-          "dataviz"
+          "doctor",
+          "run-skill-generator"
         ],
         "agents": [],
         "commands": [],
@@ -1023,6 +1022,72 @@
           "claude-code-2.1.172-fable-5.md",
           "claude-api.md",
           "amp-code.md"
+        ]
+      }
+    },
+    "awesome-openclaw-skills": {
+      "url": "https://github.com/VoltAgent/awesome-openclaw-skills.git",
+      "name": "awesome-openclaw-skills",
+      "last_fetched": "2026-07-12 22:01 UTC",
+      "components": {
+        "skills": [],
+        "agents": [],
+        "commands": [],
+        "hooks": [],
+        "token_optimization": [
+          "coding-agents-and-ides.md",
+          "web-and-frontend-development.md"
+        ]
+      }
+    },
+    "awesome-ai-agents": {
+      "url": "https://github.com/e2b-dev/awesome-ai-agents.git",
+      "name": "awesome-ai-agents",
+      "last_fetched": "2026-07-12 22:01 UTC",
+      "components": {
+        "skills": [],
+        "agents": [],
+        "commands": [],
+        "hooks": [],
+        "token_optimization": []
+      }
+    },
+    "awesome-agent-skills": {
+      "url": "https://github.com/VoltAgent/awesome-agent-skills.git",
+      "name": "awesome-agent-skills",
+      "last_fetched": "2026-07-12 22:01 UTC",
+      "components": {
+        "skills": [],
+        "agents": [],
+        "commands": [],
+        "hooks": [],
+        "token_optimization": [
+          "README.md"
+        ]
+      }
+    },
+    "awesome-claude-code-subagents": {
+      "url": "https://github.com/VoltAgent/awesome-claude-code-subagents.git",
+      "name": "awesome-claude-code-subagents",
+      "last_fetched": "2026-07-12 22:01 UTC",
+      "components": {
+        "skills": [],
+        "agents": [
+          "01-core-development",
+          "02-language-specialists",
+          "03-infrastructure",
+          "04-quality-security",
+          "05-data-ai",
+          "06-developer-experience",
+          "07-specialized-domains",
+          "08-business-product",
+          "09-meta-orchestration",
+          "10-research-analysis"
+        ],
+        "commands": [],
+        "hooks": [],
+        "token_optimization": [
+          "llm-architect.md"
         ]
       }
     }

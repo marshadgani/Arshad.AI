@@ -668,6 +668,11 @@ This registry is the source of truth for weekly auto-updates.
 | `repomix` | https://github.com/yamadashy/repomix | skills+agents+commands | 5 skills, 7 reviewer agents, 17 commands | 2026-07-12 |
 | `ruflo` | https://github.com/ruvnet/ruflo | skills+agents | ~230 skills (updated), 107 agents | 2026-07-12 |
 | `claude-cookbooks` | https://github.com/anthropics/claude-cookbooks | skills+agents+commands | 1 skill (cookbook-audit), 1 agent, 7 commands, 89 notebooks | 2026-07-12 |
+| `system-prompts-leaks` | https://github.com/asgeirtj/system_prompts_leaks | skills | 3 skills (deep-research, doctor, run-skill-generator) | 2026-07-12 |
+| `awesome-openclaw-skills` | https://github.com/VoltAgent/awesome-openclaw-skills | reference | curated OpenClaw skills list (no SKILL.md extractables) | 2026-07-12 |
+| `awesome-ai-agents` | https://github.com/e2b-dev/awesome-ai-agents | reference | curated AI agents directory (no extractables) | 2026-07-12 |
+| `awesome-agent-skills` | https://github.com/VoltAgent/awesome-agent-skills | reference | curated agent skills list (no extractables) | 2026-07-12 |
+| `awesome-claude-code-subagents` | https://github.com/VoltAgent/awesome-claude-code-subagents | agents | 154 Claude Code subagents across 10 categories | 2026-07-12 |
 
 > This table is updated automatically by `scripts/fetch-github-repo.sh` when a new repo is integrated.
 
