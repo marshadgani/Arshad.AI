@@ -769,14 +769,15 @@
       }
     },
     "headroom": {
-      "url": "https://github.com/chopratejas/headroom.git",
+      "url": "https://github.com/headroomlabs-ai/headroom",
+      "url_previous": "https://github.com/chopratejas/headroom.git",
       "name": "headroom",
-      "last_fetched": "2026-07-07 23:19 UTC",
+      "last_fetched": "2026-07-12",
       "components": {
-        "skills": [],
+        "skills": ["headroom"],
         "agents": [],
         "commands": [],
-        "hooks": [],
+        "hooks": ["headroom-agent-hooks/hooks.json"],
         "token_optimization": [
           "configuration.md",
           "agno.md",
@@ -787,7 +788,8 @@
           "ARCHITECTURE.md",
           "index.md",
           "README.md",
-          "test_ccr.py"
+          "examples/07-context-compression.ipynb",
+          "examples/context_compression_demo.py"
         ]
       }
     },
