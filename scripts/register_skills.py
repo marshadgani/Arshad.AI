@@ -58,56 +58,49 @@ def _infer_category(slug: str) -> str:
 # ── SKILL.md parsing ──────────────────────────────────────────────────────────
 
 
-def _parse_skill_md(path: Path) -> tuple[str, str]:
-    """Return (display_name, description) from a SKILL.md file."""
-    text = path.read_text(encoding="utf-8", errors="replace")
-    lines = text.splitlines()
+def _skip_frontmatter(lines: list[str]) -> int:
+    """Return index of first line after the closing --- of YAML frontmatter, or 0."""
+    if not lines or lines[0].strip() != "---":
+        return 0
+    for i in range(1, len(lines)):
+        if lines[i].strip() == "---":
+            return i + 1
+    return 0
 
-    display_name = ""
-    description = ""
-    in_frontmatter = False
-    frontmatter_done = False
-    i = 0
 
-    # Skip YAML frontmatter (--- ... ---)
-    if lines and lines[0].strip() == "---":
-        in_frontmatter = True
-        i = 1
-        while i < len(lines):
-            if lines[i].strip() == "---":
-                frontmatter_done = True
-                i += 1
-                break
-            i += 1
-    else:
-        frontmatter_done = True
+def _find_heading(lines: list[str], start: int) -> tuple[str, int]:
+    """Return (h1_text, next_line_index) for the first # heading at or after start."""
+    for i in range(start, len(lines)):
+        if lines[i].startswith("# "):
+            return lines[i][2:].strip(), i + 1
+    return "", start
 
-    # Find first # heading
-    for j in range(i, len(lines)):
-        if lines[j].startswith("# "):
-            display_name = lines[j][2:].strip()
-            i = j + 1
-            break
 
-    # Find first non-empty, non-heading paragraph after the heading
+def _extract_paragraph(lines: list[str], start: int) -> str:
+    """Return the first non-empty, non-heading paragraph as a plain string."""
     para_lines: list[str] = []
-    for j in range(i, len(lines)):
-        line = lines[j].strip()
-        if line.startswith("#"):
+    for line in lines[start:]:
+        stripped = line.strip()
+        if stripped.startswith("#"):
             if para_lines:
                 break
             continue
-        if line:
-            para_lines.append(line)
+        if stripped:
+            para_lines.append(stripped)
         elif para_lines:
             break
+    raw = " ".join(para_lines)
+    raw = re.sub(r"\*+([^*]+)\*+", r"\1", raw)
+    raw = re.sub(r"`([^`]+)`", r"\1", raw)
+    return raw[:250].strip()
 
-    raw_desc = " ".join(para_lines)
-    # Strip markdown bold/italic/code
-    raw_desc = re.sub(r"\*+([^*]+)\*+", r"\1", raw_desc)
-    raw_desc = re.sub(r"`([^`]+)`", r"\1", raw_desc)
-    description = raw_desc[:250].strip()
 
+def _parse_skill_md(path: Path) -> tuple[str, str]:
+    """Return (display_name, description) from a SKILL.md file."""
+    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    body_start = _skip_frontmatter(lines)
+    display_name, para_start = _find_heading(lines, body_start)
+    description = _extract_paragraph(lines, para_start)
     return display_name or path.parent.name, description or "No description."
 
 
