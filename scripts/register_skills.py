@@ -142,8 +142,10 @@ async def _sync_skills(skills_dir: Path, registry_path: Path) -> None:
 
     db_url = os.getenv("DATABASE_URL")
     if not db_url:
-        log.warning("DATABASE_URL not set — skipping DB sync")
-        return
+        log.error(
+            "DATABASE_URL not set — skills DB sync skipped; set DATABASE_URL to enable"
+        )
+        sys.exit(1)
 
     # Import model (path must be on sys.path — caller sets PYTHONPATH or cwd)
     try:
@@ -227,7 +229,8 @@ def main() -> None:
     try:
         asyncio.run(_sync_skills(skills_dir, registry_path))
     except Exception as exc:
-        log.warning("Skills DB sync failed (non-fatal): %s", exc)
+        log.error("Skills DB sync failed: %s", exc)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
