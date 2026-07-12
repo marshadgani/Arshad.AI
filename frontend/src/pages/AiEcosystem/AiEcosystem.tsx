@@ -63,10 +63,10 @@ export default function AiEcosystem() {
   const { data: agentsData } = useFetch<AgentData[]>('/api/v1/ai-ecosystem/agents', 30_000);
   const { data: metricsData } = useFetch<MetricsInner>(`/api/v1/ai-ecosystem/metrics?period=${period}`);
   const { data: summaryData } = useFetch<SummaryInner>(`/api/v1/ai-ecosystem/summary?period=${period}`);
-  const { data: skillsResponse } = useFetch<{ data: SkillData[]; total: number }>('/api/v1/ai-ecosystem/skills', 30_000);
+  const { data: skillsData, isLoading: skillsLoading, error: skillsError } = useFetch<SkillData[]>('/api/v1/ai-ecosystem/skills', 30_000);
 
   const agents = agentsData ?? [];
-  const skills = skillsResponse?.data ?? [];
+  const skills = skillsData ?? [];
   const metricMap = new Map<string, AgentMetric>(
     (metricsData?.agents ?? []).map((m) => [m.agent_name, m])
   );
@@ -216,7 +216,9 @@ export default function AiEcosystem() {
             </div>
           </div>
 
-          {visibleSkills.length > 0 ? (
+          {skillsError ? (
+            <div className={styles.empty}>Failed to load skills — {skillsError.message}</div>
+          ) : visibleSkills.length > 0 ? (
             <div className={styles.grid}>
               {visibleSkills.map((skill) => (
                 <SkillCard key={skill.skill_name} skill={skill} />
@@ -224,7 +226,7 @@ export default function AiEcosystem() {
             </div>
           ) : (
             <div className={styles.empty}>
-              {skills.length === 0 ? 'Loading skills…' : 'No skills match the selected filters.'}
+              {skillsLoading ? 'Loading skills…' : skills.length === 0 ? 'No skills registered yet.' : 'No skills match the selected filters.'}
             </div>
           )}
         </>
