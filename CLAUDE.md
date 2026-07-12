@@ -663,6 +663,9 @@ This registry is the source of truth for weekly auto-updates.
 | `agent-browser` | https://github.com/vercel-labs/agent-browser | skills | 7 skills (core + 6 specialized) | 2026-06-20 |
 | `headroom` | https://github.com/headroomlabs-ai/headroom | skills+hooks+token-optim | 1 skill, 1 hooks.json, 11 token-optim files | 2026-07-12 |
 | `andrej-karpathy-skills` | https://github.com/multica-ai/andrej-karpathy-skills | skills | 1 skill (karpathy-guidelines) | 2026-07-11 |
+| `claude-code` | https://github.com/anthropics/claude-code | skills+agents+commands+hooks | 10 skills, 14 agents, 16 commands, 7 hooks | 2026-07-12 |
+| `anthropics-skills` | https://github.com/anthropics/skills | skills | 17 skills (pdf, docx, pptx, xlsx, mcp-builder, canvas-design, webapp-testing, +10) | 2026-07-12 |
+| `repomix` | https://github.com/yamadashy/repomix | skills+agents+commands | 5 skills, 7 reviewer agents, 17 commands | 2026-07-12 |
 
 > This table is updated automatically by `scripts/fetch-github-repo.sh` when a new repo is integrated.
 
