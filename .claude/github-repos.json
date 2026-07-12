@@ -605,9 +605,9 @@
       }
     },
     "ruflo": {
-      "url": "https://github.com/ruvnet/ruflo.git",
+      "url": "https://github.com/ruvnet/ruflo",
       "name": "ruflo",
-      "last_fetched": "2026-06-07 UTC",
+      "last_fetched": "2026-07-12",
       "components": {
         "skills": [
           "adaptive-coordinator",

@@ -666,6 +666,8 @@ This registry is the source of truth for weekly auto-updates.
 | `claude-code` | https://github.com/anthropics/claude-code | skills+agents+commands+hooks | 10 skills, 14 agents, 16 commands, 7 hooks | 2026-07-12 |
 | `anthropics-skills` | https://github.com/anthropics/skills | skills | 17 skills (pdf, docx, pptx, xlsx, mcp-builder, canvas-design, webapp-testing, +10) | 2026-07-12 |
 | `repomix` | https://github.com/yamadashy/repomix | skills+agents+commands | 5 skills, 7 reviewer agents, 17 commands | 2026-07-12 |
+| `ruflo` | https://github.com/ruvnet/ruflo | skills+agents | ~230 skills (updated), 107 agents | 2026-07-12 |
+| `claude-cookbooks` | https://github.com/anthropics/claude-cookbooks | skills+agents+commands | 1 skill (cookbook-audit), 1 agent, 7 commands, 89 notebooks | 2026-07-12 |
 
 > This table is updated automatically by `scripts/fetch-github-repo.sh` when a new repo is integrated.
 
