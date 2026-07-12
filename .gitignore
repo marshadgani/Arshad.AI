@@ -1,3 +1,6 @@
+# Temporary repo-fetch clone directories (created by /fetch-github-repo, should live in /tmp)
+repo-fetch-*/
+
 # Environment
 .env
 .env.local
