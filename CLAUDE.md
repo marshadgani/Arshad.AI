@@ -962,11 +962,13 @@ The report includes: agent-by-agent results table, detailed findings per agent, 
 
 ---
 
-## 21. Agent Auto-Registration — AI Ecosystem Sync (PERMANENT)
+## 21. Agent & Skill Auto-Registration — AI Ecosystem Sync (PERMANENT)
 
-> This rule is ALWAYS active. Every agent installation triggers it — no exceptions.
+> This rule is ALWAYS active. Every agent or skill installation triggers it — no exceptions.
 
-**Trigger:** Immediately after any agent `.md` file is added to `.claude/agents/` (or any subdirectory), whether via `/fetch-github-repo`, manual file creation, or the weekly skill sync.
+**Trigger (agents):** Immediately after any agent `.md` file is added to `.claude/agents/` (or any subdirectory), whether via `/fetch-github-repo`, manual file creation, or the weekly skill sync.
+
+**Trigger (skills):** Immediately after any skill directory is added to `.claude/skills/`, run `scripts/register_skills.py` to sync the full skills directory to the DB. Skills appear in the **Skills tab** of the AI Ecosystem page.
 
 ### What to extract from the `.md` file
 
@@ -1018,16 +1020,44 @@ curl -s -X POST http://localhost:8000/api/v1/ai-ecosystem/agents/register \
   }'
 ```
 
+### Skill registration
+
+**Script:** `scripts/register_skills.py` — scans `.claude/skills/*/SKILL.md`, infers category from slug, looks up `source_repo` from `.claude/github-repos.json`, upserts into `skill_registry` table.
+
+```bash
+# From repo root (DB must be reachable via DATABASE_URL):
+cd backend && DATABASE_URL="$DATABASE_URL" PYTHONPATH=. python3 ../scripts/register_skills.py
+
+# Optional flags:
+python3 scripts/register_skills.py --skills-dir /path/to/.claude/skills --registry /path/to/github-repos.json
+```
+
+**API endpoint** (requires JWT):
+```bash
+curl -s -X POST http://localhost:8000/api/v1/ai-ecosystem/skills/register \
+  -H "Authorization: Bearer <JWT>" \
+  -H "Content-Type: application/json" \
+  -d '{"skill_name": "cookbook-audit", "display_name": "Cookbook Audit", "description": "...", "source_repo": "claude-cookbooks", "category": "development"}'
+```
+
+**Category inference** (from slug keywords):
+| Keywords in slug | Category |
+|---|---|
+| `security`, `audit`, `vuln` | `security` |
+| `test`, `tdd`, `agent`, `skill`, `command`, `hook`, `mcp`, `dev`, `code`, `review` | `development` |
+| `data`, `pipeline`, `ingest`, `etl`, `db`, `sql` | `data` |
+| (everything else) | `other` |
+
 ### When this rule fires
 
-1. **After `/fetch-github-repo`** — register every new agent `.md` file that was copied into `.claude/agents/`.
-2. **After any manual agent file creation** — register the new file immediately.
-3. **After the weekly skill sync** (`session-start.sh`) — if any agent files changed, re-register them (Method A or B).
+1. **After `/fetch-github-repo`** — `fetch-github-repo.sh` automatically calls `register_skills.py` after installing skills. Also register every new agent `.md` file that was copied into `.claude/agents/`.
+2. **After any manual agent/skill file creation** — register the new file/skill immediately.
+3. **After the weekly skill sync** (`session-start.sh`) — if any agent or skill files changed, re-register them.
 4. **After the dev-team pipeline adds a new dev-team agent** — register it with `category=development_team` and the correct `pipeline_stage`.
 
 ### Idempotency
 
-The endpoint and script both **upsert** — calling them on an already-registered agent updates its metadata. Safe to re-run at any time.
+All endpoints and scripts **upsert** — calling them on an already-registered agent or skill updates its metadata. Safe to re-run at any time.
 
 ---
 

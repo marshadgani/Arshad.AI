@@ -64,3 +64,24 @@ class RegisterAgentRequest(ORMBase):
     category: AgentCategory = "other"
     pipeline_stage: int | None = None
     is_active: bool = True
+
+
+# ── Skills ────────────────────────────────────────────────────────────────────
+
+SkillCategory = Literal["development", "security", "data", "other"]
+
+
+class SkillResponse(ORMBase):
+    skill_name: str
+    display_name: str
+    description: str
+    source_repo: str
+    category: str
+
+
+class RegisterSkillRequest(ORMBase):
+    skill_name: str = Field(..., min_length=1, max_length=100)
+    display_name: str = Field(..., min_length=1, max_length=200)
+    description: str = Field(..., min_length=1)
+    source_repo: str = Field(default="unknown", max_length=100)
+    category: SkillCategory = "other"
