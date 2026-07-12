@@ -54,6 +54,43 @@
   letter-spacing: 0.06em;
 }
 
+/* ── View switcher: Agents / Skills ── */
+
+.viewSwitcher {
+  display: flex;
+  gap: 4px;
+  background: var(--bg, #0d1117);
+  border: 1px solid var(--border, #30363d);
+  border-radius: 999px;
+  padding: 3px;
+  width: fit-content;
+}
+
+.viewBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 16px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted, #8b949e);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 120ms, color 120ms;
+}
+
+.viewBtn:hover {
+  color: var(--text, #e6edf3);
+}
+
+.viewBtnActive {
+  background: var(--surface, #161b22);
+  color: var(--text, #e6edf3);
+  font-weight: 600;
+}
+
 /* ── Controls row: filter pills + time period ── */
 
 .controls {

@@ -661,8 +661,18 @@ This registry is the source of truth for weekly auto-updates.
 | `ruflo` | https://github.com/ruvnet/ruflo.git | skills+agents | 134 skills, 107 agents | 2026-06-07 |
 | `agent-skills` | https://github.com/addyosmani/agent-skills | skills+agents+commands+hooks | 24 skills, 4 agents, 8 commands, 4 hooks | 2026-06-13 |
 | `agent-browser` | https://github.com/vercel-labs/agent-browser | skills | 7 skills (core + 6 specialized) | 2026-06-20 |
-| `headroom` | https://github.com/chopratejas/headroom | skills+hooks+token-optim | 1 skill, 1 hooks.json, 2 token-optim files | 2026-06-20 |
+| `headroom` | https://github.com/headroomlabs-ai/headroom | skills+hooks+token-optim | 1 skill, 1 hooks.json, 11 token-optim files | 2026-07-12 |
 | `andrej-karpathy-skills` | https://github.com/multica-ai/andrej-karpathy-skills | skills | 1 skill (karpathy-guidelines) | 2026-07-11 |
+| `claude-code` | https://github.com/anthropics/claude-code | skills+agents+commands+hooks | 10 skills, 14 agents, 16 commands, 7 hooks | 2026-07-12 |
+| `anthropics-skills` | https://github.com/anthropics/skills | skills | 17 skills (pdf, docx, pptx, xlsx, mcp-builder, canvas-design, webapp-testing, +10) | 2026-07-12 |
+| `repomix` | https://github.com/yamadashy/repomix | skills+agents+commands | 5 skills, 7 reviewer agents, 17 commands | 2026-07-12 |
+| `ruflo` | https://github.com/ruvnet/ruflo | skills+agents | ~230 skills (updated), 107 agents | 2026-07-12 |
+| `claude-cookbooks` | https://github.com/anthropics/claude-cookbooks | skills+agents+commands | 1 skill (cookbook-audit), 1 agent, 7 commands, 89 notebooks | 2026-07-12 |
+| `system-prompts-leaks` | https://github.com/asgeirtj/system_prompts_leaks | skills | 3 skills (deep-research, doctor, run-skill-generator) | 2026-07-12 |
+| `awesome-openclaw-skills` | https://github.com/VoltAgent/awesome-openclaw-skills | reference | curated OpenClaw skills list (no SKILL.md extractables) | 2026-07-12 |
+| `awesome-ai-agents` | https://github.com/e2b-dev/awesome-ai-agents | reference | curated AI agents directory (no extractables) | 2026-07-12 |
+| `awesome-agent-skills` | https://github.com/VoltAgent/awesome-agent-skills | reference | curated agent skills list (no extractables) | 2026-07-12 |
+| `awesome-claude-code-subagents` | https://github.com/VoltAgent/awesome-claude-code-subagents | agents | 154 Claude Code subagents across 10 categories | 2026-07-12 |
 
 > This table is updated automatically by `scripts/fetch-github-repo.sh` when a new repo is integrated.
 
@@ -957,11 +967,13 @@ The report includes: agent-by-agent results table, detailed findings per agent, 
 
 ---
 
-## 21. Agent Auto-Registration — AI Ecosystem Sync (PERMANENT)
+## 21. Agent & Skill Auto-Registration — AI Ecosystem Sync (PERMANENT)
 
-> This rule is ALWAYS active. Every agent installation triggers it — no exceptions.
+> This rule is ALWAYS active. Every agent or skill installation triggers it — no exceptions.
 
-**Trigger:** Immediately after any agent `.md` file is added to `.claude/agents/` (or any subdirectory), whether via `/fetch-github-repo`, manual file creation, or the weekly skill sync.
+**Trigger (agents):** Immediately after any agent `.md` file is added to `.claude/agents/` (or any subdirectory), whether via `/fetch-github-repo`, manual file creation, or the weekly skill sync.
+
+**Trigger (skills):** Immediately after any skill directory is added to `.claude/skills/`, run `scripts/register_skills.py` to sync the full skills directory to the DB. Skills appear in the **Skills tab** of the AI Ecosystem page.
 
 ### What to extract from the `.md` file
 
@@ -1013,16 +1025,44 @@ curl -s -X POST http://localhost:8000/api/v1/ai-ecosystem/agents/register \
   }'
 ```
 
+### Skill registration
+
+**Script:** `scripts/register_skills.py` — scans `.claude/skills/*/SKILL.md`, infers category from slug, looks up `source_repo` from `.claude/github-repos.json`, upserts into `skill_registry` table.
+
+```bash
+# From repo root (DB must be reachable via DATABASE_URL):
+cd backend && DATABASE_URL="$DATABASE_URL" PYTHONPATH=. python3 ../scripts/register_skills.py
+
+# Optional flags:
+python3 scripts/register_skills.py --skills-dir /path/to/.claude/skills --registry /path/to/github-repos.json
+```
+
+**API endpoint** (requires JWT):
+```bash
+curl -s -X POST http://localhost:8000/api/v1/ai-ecosystem/skills/register \
+  -H "Authorization: Bearer <JWT>" \
+  -H "Content-Type: application/json" \
+  -d '{"skill_name": "cookbook-audit", "display_name": "Cookbook Audit", "description": "...", "source_repo": "claude-cookbooks", "category": "development"}'
+```
+
+**Category inference** (from slug keywords):
+| Keywords in slug | Category |
+|---|---|
+| `security`, `audit`, `vuln` | `security` |
+| `test`, `tdd`, `agent`, `skill`, `command`, `hook`, `mcp`, `dev`, `code`, `review` | `development` |
+| `data`, `pipeline`, `ingest`, `etl`, `db`, `sql` | `data` |
+| (everything else) | `other` |
+
 ### When this rule fires
 
-1. **After `/fetch-github-repo`** — register every new agent `.md` file that was copied into `.claude/agents/`.
-2. **After any manual agent file creation** — register the new file immediately.
-3. **After the weekly skill sync** (`session-start.sh`) — if any agent files changed, re-register them (Method A or B).
+1. **After `/fetch-github-repo`** — `fetch-github-repo.sh` automatically calls `register_skills.py` after installing skills. Also register every new agent `.md` file that was copied into `.claude/agents/`.
+2. **After any manual agent/skill file creation** — register the new file/skill immediately.
+3. **After the weekly skill sync** (`session-start.sh`) — if any agent or skill files changed, re-register them.
 4. **After the dev-team pipeline adds a new dev-team agent** — register it with `category=development_team` and the correct `pipeline_stage`.
 
 ### Idempotency
 
-The endpoint and script both **upsert** — calling them on an already-registered agent updates its metadata. Safe to re-run at any time.
+All endpoints and scripts **upsert** — calling them on an already-registered agent or skill updates its metadata. Safe to re-run at any time.
 
 ---
 

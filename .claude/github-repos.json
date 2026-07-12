@@ -3,10 +3,147 @@
   "weekly_update_day": "Monday",
   "weekly_update_time": "00:00 UTC",
   "repos": {
+    "claude-code": {
+      "url": "https://github.com/anthropics/claude-code",
+      "name": "claude-code",
+      "last_fetched": "2026-07-12",
+      "components": {
+        "skills": [
+          "claude-opus-4-5-migration",
+          "frontend-design",
+          "writing-rules",
+          "agent-development",
+          "command-development",
+          "hook-development",
+          "mcp-integration",
+          "plugin-settings",
+          "plugin-structure",
+          "skill-development"
+        ],
+        "agents": [
+          "agent-sdk-verifier-py",
+          "agent-sdk-verifier-ts",
+          "code-architect",
+          "code-explorer",
+          "code-reviewer",
+          "conversation-analyzer",
+          "agent-creator",
+          "plugin-validator",
+          "skill-reviewer",
+          "code-simplifier",
+          "comment-analyzer",
+          "pr-test-analyzer",
+          "silent-failure-hunter",
+          "type-design-analyzer"
+        ],
+        "commands": [
+          "commit-push-pr",
+          "dedupe",
+          "triage-issue",
+          "new-sdk-app",
+          "code-review",
+          "clean_gone",
+          "commit",
+          "feature-dev",
+          "configure",
+          "help",
+          "hookify",
+          "list",
+          "create-plugin",
+          "review-pr",
+          "cancel-ralph",
+          "ralph-loop"
+        ],
+        "hooks": [
+          "explanatory-output-style/hooks.json",
+          "hookify/hooks.json",
+          "learning-output-style/hooks.json",
+          "ralph-wiggum/hooks.json",
+          "security-guidance/hooks.json",
+          "sg-python.sh",
+          "stop-hook.sh"
+        ],
+        "token_optimization": []
+      }
+    },
+    "anthropics-skills": {
+      "url": "https://github.com/anthropics/skills",
+      "name": "skills",
+      "last_fetched": "2026-07-12",
+      "components": {
+        "skills": [
+          "algorithmic-art",
+          "brand-guidelines",
+          "canvas-design",
+          "claude-api",
+          "doc-coauthoring",
+          "docx",
+          "frontend-design",
+          "internal-comms",
+          "mcp-builder",
+          "pdf",
+          "pptx",
+          "skill-creator",
+          "slack-gif-creator",
+          "theme-factory",
+          "web-artifacts-builder",
+          "webapp-testing",
+          "xlsx"
+        ],
+        "agents": [],
+        "commands": [],
+        "hooks": [],
+        "token_optimization": []
+      }
+    },
+    "repomix": {
+      "url": "https://github.com/yamadashy/repomix",
+      "name": "repomix",
+      "last_fetched": "2026-07-12",
+      "components": {
+        "skills": [
+          "repomix-explorer",
+          "contextual-commit",
+          "agent-carnet",
+          "browser-extension-developer",
+          "website-maintainer"
+        ],
+        "agents": [
+          "explorer",
+          "reviewer-code-quality",
+          "reviewer-conventions",
+          "reviewer-holistic",
+          "reviewer-performance",
+          "reviewer-security",
+          "reviewer-test-coverage"
+        ],
+        "commands": [
+          "pack-local",
+          "pack-remote",
+          "explore-local",
+          "explore-remote",
+          "lint-fix",
+          "perf-tuning",
+          "review-loop",
+          "codex-review-loop",
+          "claude-rule-update",
+          "gemini-discuss",
+          "git-commit-push",
+          "git-commit",
+          "pr-address-feedback",
+          "pr-create",
+          "pr-prepare",
+          "pr-review",
+          "release-note-generate"
+        ],
+        "hooks": [],
+        "token_optimization": []
+      }
+    },
     "superpowers": {
       "url": "https://github.com/obra/superpowers.git",
       "name": "superpowers",
-      "last_fetched": "2026-07-07 23:18 UTC",
+      "last_fetched": "2026-07-12",
       "components": {
         "skills": [
           "using-superpowers",
@@ -277,9 +414,9 @@
       }
     },
     "awesome-claude-code": {
-      "url": "https://github.com/hesreallyhim/awesome-claude-code.git",
+      "url": "https://github.com/hesreallyhim/awesome-claude-code",
       "name": "awesome-claude-code",
-      "last_fetched": "2026-07-07 23:18 UTC",
+      "last_fetched": "2026-07-12",
       "components": {
         "skills": [],
         "agents": [],
@@ -468,9 +605,9 @@
       }
     },
     "ruflo": {
-      "url": "https://github.com/ruvnet/ruflo.git",
+      "url": "https://github.com/ruvnet/ruflo",
       "name": "ruflo",
-      "last_fetched": "2026-06-07 UTC",
+      "last_fetched": "2026-07-12",
       "components": {
         "skills": [
           "adaptive-coordinator",
@@ -769,14 +906,19 @@
       }
     },
     "headroom": {
-      "url": "https://github.com/chopratejas/headroom.git",
+      "url": "https://github.com/headroomlabs-ai/headroom",
+      "url_previous": "https://github.com/chopratejas/headroom.git",
       "name": "headroom",
-      "last_fetched": "2026-07-07 23:19 UTC",
+      "last_fetched": "2026-07-12",
       "components": {
-        "skills": [],
+        "skills": [
+          "headroom"
+        ],
         "agents": [],
         "commands": [],
-        "hooks": [],
+        "hooks": [
+          "headroom-agent-hooks/hooks.json"
+        ],
         "token_optimization": [
           "configuration.md",
           "agno.md",
@@ -787,7 +929,8 @@
           "ARCHITECTURE.md",
           "index.md",
           "README.md",
-          "test_ccr.py"
+          "examples/07-context-compression.ipynb",
+          "examples/context_compression_demo.py"
         ]
       }
     },
@@ -816,7 +959,9 @@
       "name": "andrej-karpathy-skills",
       "last_fetched": "2026-07-11",
       "components": {
-        "skills": ["karpathy-guidelines"],
+        "skills": [
+          "karpathy-guidelines"
+        ],
         "agents": [],
         "commands": [],
         "hooks": [],
@@ -852,6 +997,97 @@
           "search.py",
           "search.py",
           "search.py"
+        ]
+      }
+    },
+    "system-prompts-leaks": {
+      "url": "https://github.com/asgeirtj/system_prompts_leaks.git",
+      "name": "system_prompts_leaks",
+      "last_fetched": "2026-07-12 22:01 UTC",
+      "components": {
+        "skills": [
+          "deep-research",
+          "doctor",
+          "run-skill-generator"
+        ],
+        "agents": [],
+        "commands": [],
+        "hooks": [],
+        "token_optimization": [
+          "claude-code-opus-4.6.md",
+          "claude-code-opus-4.8.md",
+          "claude-code-2.1.172-opus-4.6.md",
+          "claude-code-2.1.172-opus-4.8.md",
+          "deferred-tools.md",
+          "claude-code-2.1.172-fable-5.md",
+          "claude-api.md",
+          "amp-code.md"
+        ]
+      }
+    },
+    "awesome-openclaw-skills": {
+      "url": "https://github.com/VoltAgent/awesome-openclaw-skills.git",
+      "name": "awesome-openclaw-skills",
+      "last_fetched": "2026-07-12 22:01 UTC",
+      "components": {
+        "skills": [],
+        "agents": [],
+        "commands": [],
+        "hooks": [],
+        "token_optimization": [
+          "coding-agents-and-ides.md",
+          "web-and-frontend-development.md"
+        ]
+      }
+    },
+    "awesome-ai-agents": {
+      "url": "https://github.com/e2b-dev/awesome-ai-agents.git",
+      "name": "awesome-ai-agents",
+      "last_fetched": "2026-07-12 22:01 UTC",
+      "components": {
+        "skills": [],
+        "agents": [],
+        "commands": [],
+        "hooks": [],
+        "token_optimization": []
+      }
+    },
+    "awesome-agent-skills": {
+      "url": "https://github.com/VoltAgent/awesome-agent-skills.git",
+      "name": "awesome-agent-skills",
+      "last_fetched": "2026-07-12 22:01 UTC",
+      "components": {
+        "skills": [],
+        "agents": [],
+        "commands": [],
+        "hooks": [],
+        "token_optimization": [
+          "README.md"
+        ]
+      }
+    },
+    "awesome-claude-code-subagents": {
+      "url": "https://github.com/VoltAgent/awesome-claude-code-subagents.git",
+      "name": "awesome-claude-code-subagents",
+      "last_fetched": "2026-07-12 22:01 UTC",
+      "components": {
+        "skills": [],
+        "agents": [
+          "01-core-development",
+          "02-language-specialists",
+          "03-infrastructure",
+          "04-quality-security",
+          "05-data-ai",
+          "06-developer-experience",
+          "07-specialized-domains",
+          "08-business-product",
+          "09-meta-orchestration",
+          "10-research-analysis"
+        ],
+        "commands": [],
+        "hooks": [],
+        "token_optimization": [
+          "llm-architect.md"
         ]
       }
     }

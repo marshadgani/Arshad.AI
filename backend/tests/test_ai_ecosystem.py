@@ -12,6 +12,7 @@ from __future__ import annotations
 import os
 import tempfile
 from datetime import datetime, timezone
+from pathlib import Path
 
 import pytest
 
@@ -202,3 +203,152 @@ class TestAgentMetricResponse:
 
         with pytest.raises(ValidationError):
             self._make(efficiency_score=-1)
+
+
+# ---------------------------------------------------------------------------
+# RegisterSkillRequest schema
+# ---------------------------------------------------------------------------
+
+
+class TestRegisterSkillRequest:
+    def _make(self, **kwargs):
+        from src.schemas.ai_ecosystem import RegisterSkillRequest
+
+        defaults = {
+            "skill_name": "deep-research",
+            "display_name": "Deep Research",
+            "description": "Runs multi-source research across the web.",
+        }
+        return RegisterSkillRequest(**(defaults | kwargs))
+
+    def test_valid_request_accepted(self):
+        req = self._make()
+        assert req.skill_name == "deep-research"
+        assert req.category == "other"
+        assert req.source_repo == "unknown"
+
+    def test_empty_skill_name_rejected(self):
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            self._make(skill_name="")
+
+    def test_empty_description_rejected(self):
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            self._make(description="")
+
+    def test_description_over_5000_chars_rejected(self):
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            self._make(description="x" * 5001)
+
+    def test_invalid_category_rejected(self):
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            self._make(category="unknown_category")
+
+    def test_development_category_accepted(self):
+        req = self._make(category="development")
+        assert req.category == "development"
+
+    def test_security_category_accepted(self):
+        req = self._make(category="security")
+        assert req.category == "security"
+
+    def test_data_category_accepted(self):
+        req = self._make(category="data")
+        assert req.category == "data"
+
+
+# ---------------------------------------------------------------------------
+# _infer_category (register_skills.py)
+# ---------------------------------------------------------------------------
+
+
+class TestInferCategory:
+    def _infer(self, slug: str) -> str:
+        from scripts.register_skills import _infer_category
+
+        return _infer_category(slug)
+
+    def test_security_keyword_returns_security(self):
+        assert self._infer("security-review") == "security"
+
+    def test_audit_keyword_returns_security(self):
+        assert self._infer("audit-helper") == "security"
+
+    def test_dev_keyword_returns_development(self):
+        assert self._infer("code-linter") == "development"
+
+    def test_test_keyword_returns_development(self):
+        assert self._infer("tdd-workflow") == "development"
+
+    def test_data_keyword_returns_data(self):
+        assert self._infer("etl-pipeline") == "data"
+
+    def test_sql_keyword_returns_data(self):
+        assert self._infer("sql-optimizer") == "data"
+
+    def test_unknown_slug_returns_other(self):
+        assert self._infer("brainstorming") == "other"
+
+    def test_security_beats_data(self):
+        # slug contains both security and data keywords
+        assert self._infer("security-data-audit") == "security"
+
+
+# ---------------------------------------------------------------------------
+# _skip_frontmatter / _find_heading / _extract_paragraph / _parse_skill_md
+# ---------------------------------------------------------------------------
+
+
+class TestParseSkillMd:
+    def _parse(self, content: str, filename: str = "my-skill") -> tuple[str, str]:
+        import tempfile
+
+        from scripts.register_skills import _parse_skill_md
+
+        with tempfile.TemporaryDirectory() as d:
+            skill_dir = Path(d) / filename
+            skill_dir.mkdir()
+            (skill_dir / "SKILL.md").write_text(content, encoding="utf-8")
+            return _parse_skill_md(skill_dir / "SKILL.md")
+
+    def test_extracts_h1_as_display_name(self):
+        name, _ = self._parse("# Deep Research\nSearches the web.")
+        assert name == "Deep Research"
+
+    def test_extracts_first_paragraph_as_description(self):
+        _, desc = self._parse("# Title\nThis is the description.")
+        assert desc == "This is the description."
+
+    def test_skips_yaml_frontmatter(self):
+        content = "---\nname: skill\n---\n# Real Title\nReal description."
+        name, _ = self._parse(content)
+        assert name == "Real Title"
+
+    def test_falls_back_to_directory_name_when_no_heading(self):
+        name, _ = self._parse("No heading here.", filename="my-skill")
+        assert name == "my-skill"
+
+    def test_empty_file_returns_safe_defaults(self):
+        name, desc = self._parse("", filename="empty-skill")
+        assert name == "empty-skill"
+        assert desc == "No description."
+
+    def test_description_truncated_to_250_chars(self):
+        _, desc = self._parse(f"# T\n{'A' * 300}")
+        assert len(desc) <= 250
+
+    def test_strips_markdown_bold(self):
+        _, desc = self._parse("# T\n**bold text** here")
+        assert "**" not in desc
+        assert "bold text" in desc
+
+    def test_description_stops_at_next_heading(self):
+        _, desc = self._parse("# T\nFirst para.\n\n## Section\nShould not appear.")
+        assert "Should not appear" not in desc

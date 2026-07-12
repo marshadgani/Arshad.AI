@@ -13,6 +13,7 @@ from . import (  # noqa: F401
     oauth_account,
     oauth_token,
     obsidian,
+    skill,
     user,
 )
 from .base import Base  # noqa: F401 — ensures Base is importable from src.models
