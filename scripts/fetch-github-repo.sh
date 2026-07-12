@@ -271,7 +271,7 @@ fi
 
 # ── Sync skills to DB (best-effort — non-fatal if DB not reachable) ───────────
 if [ "$CHANGED" -eq 1 ] && [ "$DRY_RUN" != "--dry-run" ]; then
-  REGISTER_SCRIPT="$REPO_ROOT/scripts/register_skills.py"
+  REGISTER_SCRIPT="$REPO_ROOT/backend/scripts/register_skills.py"
   if [ -f "$REGISTER_SCRIPT" ]; then
     log "Syncing skills to DB via register_skills.py..."
     (cd "$REPO_ROOT/backend" && DATABASE_URL="${DATABASE_URL:-}" PYTHONPATH=. python3 "$REGISTER_SCRIPT" 2>&1) \
