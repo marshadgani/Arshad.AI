@@ -511,7 +511,7 @@
     "claude-plugins-official": {
       "url": "https://github.com/anthropics/claude-plugins-official.git",
       "name": "claude-plugins-official",
-      "last_fetched": "2026-07-07 23:18 UTC",
+      "last_fetched": "2026-07-29 09:52 UTC",
       "components": {
         "skills": [
           "access",
@@ -528,6 +528,7 @@
           "example-command",
           "example-skill",
           "project-artifact",
+          "claude-security",
           "plugin-settings",
           "mcp-integration",
           "command-development",
@@ -535,6 +536,7 @@
           "plugin-structure",
           "hook-development",
           "skill-development",
+          "receipts",
           "frontend-design",
           "math-olympiad",
           "claude-md-improver",
@@ -555,11 +557,19 @@
           "agent-sdk-verifier-py",
           "agent-sdk-verifier-ts",
           "conversation-analyzer",
+          "scan-researcher",
+          "patch-generator",
+          "scan-inventory",
+          "patch-verifier",
+          "claude-security",
+          "scan-verifier",
+          "explore",
           "plugin-validator",
           "agent-creator",
           "skill-reviewer",
           "version-delta-analyst",
           "security-auditor",
+          "uplift-migrator",
           "legacy-analyst",
           "business-rules-extractor",
           "architecture-critic",
@@ -605,6 +615,7 @@
         ],
         "hooks": [
           "sg-python.sh",
+          "banner_hook.sh",
           "stop-hook.sh"
         ],
         "token_optimization": []

@@ -1,6 +1,8 @@
 ---
 name: coding-standards
 description: Baseline cross-project coding conventions for naming, readability, immutability, and code-quality review. Use detailed frontend or backend skills for framework-specific patterns.
+metadata:
+  origin: ECC
 ---
 
 # Coding Standards & Best Practices
@@ -322,7 +324,7 @@ export async function POST(request: Request) {
       return NextResponse.json({
         success: false,
         error: 'Validation failed',
-        details: error.errors
+        details: error.issues
       }, { status: 400 })
     }
   }
