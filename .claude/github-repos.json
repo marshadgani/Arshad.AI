@@ -975,7 +975,7 @@
     "ui-ux-pro-max-skill": {
       "url": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git",
       "name": "ui-ux-pro-max-skill",
-      "last_fetched": "2026-07-07 23:19 UTC",
+      "last_fetched": "2026-07-29 09:52 UTC",
       "components": {
         "skills": [
           "banner-design",
@@ -992,8 +992,13 @@
           "ui-ux-pro-max",
           "ui-styling"
         ],
-        "agents": [],
-        "commands": [],
+        "agents": [
+          "design-review"
+        ],
+        "commands": [
+          "design-plan",
+          "design-review"
+        ],
         "hooks": [],
         "token_optimization": [
           "search.py",
