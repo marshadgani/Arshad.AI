@@ -294,7 +294,7 @@
     "get-shit-done": {
       "url": "https://github.com/gsd-build/get-shit-done.git",
       "name": "get-shit-done",
-      "last_fetched": "2026-07-07 23:18 UTC",
+      "last_fetched": "2026-07-29 09:52 UTC",
       "components": {
         "skills": [],
         "agents": [
@@ -420,9 +420,9 @@
       }
     },
     "awesome-claude-code": {
-      "url": "https://github.com/hesreallyhim/awesome-claude-code",
+      "url": "https://github.com/hesreallyhim/awesome-claude-code.git",
       "name": "awesome-claude-code",
-      "last_fetched": "2026-07-12",
+      "last_fetched": "2026-07-29 09:52 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -436,7 +436,7 @@
     "context7": {
       "url": "https://github.com/upstash/context7.git",
       "name": "context7",
-      "last_fetched": "2026-07-07 23:18 UTC",
+      "last_fetched": "2026-07-29 09:52 UTC",
       "components": {
         "skills": [
           "context7-mcp",
