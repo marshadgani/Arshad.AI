@@ -4,66 +4,66 @@
   "weekly_update_time": "00:00 UTC",
   "repos": {
     "claude-code": {
-      "url": "https://github.com/anthropics/claude-code",
+      "url": "https://github.com/anthropics/claude-code.git",
       "name": "claude-code",
-      "last_fetched": "2026-07-12",
+      "last_fetched": "2026-07-29 09:51 UTC",
       "components": {
         "skills": [
-          "claude-opus-4-5-migration",
-          "frontend-design",
           "writing-rules",
-          "agent-development",
-          "command-development",
-          "hook-development",
-          "mcp-integration",
           "plugin-settings",
+          "mcp-integration",
+          "command-development",
+          "agent-development",
           "plugin-structure",
-          "skill-development"
+          "hook-development",
+          "skill-development",
+          "claude-opus-4-5-migration",
+          "frontend-design"
         ],
         "agents": [
+          "code-explorer",
+          "code-architect",
+          "code-reviewer",
           "agent-sdk-verifier-py",
           "agent-sdk-verifier-ts",
-          "code-architect",
-          "code-explorer",
-          "code-reviewer",
           "conversation-analyzer",
-          "agent-creator",
           "plugin-validator",
+          "agent-creator",
           "skill-reviewer",
-          "code-simplifier",
           "comment-analyzer",
+          "type-design-analyzer",
+          "code-simplifier",
           "pr-test-analyzer",
-          "silent-failure-hunter",
-          "type-design-analyzer"
+          "code-reviewer",
+          "silent-failure-hunter"
         ],
         "commands": [
+          "feature-dev",
+          "new-sdk-app",
+          "help",
+          "configure",
+          "list",
+          "hookify",
+          "create-plugin",
+          "help",
+          "ralph-loop",
+          "cancel-ralph",
+          "code-review",
+          "review-pr",
+          "clean_gone",
+          "commit",
           "commit-push-pr",
           "dedupe",
           "triage-issue",
-          "new-sdk-app",
-          "code-review",
-          "clean_gone",
-          "commit",
-          "feature-dev",
-          "configure",
-          "help",
-          "hookify",
-          "list",
-          "create-plugin",
-          "review-pr",
-          "cancel-ralph",
-          "ralph-loop"
+          "commit-push-pr"
         ],
         "hooks": [
-          "explanatory-output-style/hooks.json",
-          "hookify/hooks.json",
-          "learning-output-style/hooks.json",
-          "ralph-wiggum/hooks.json",
-          "security-guidance/hooks.json",
           "sg-python.sh",
           "stop-hook.sh"
         ],
-        "token_optimization": []
+        "token_optimization": [
+          "CHANGELOG.md"
+        ]
       }
     },
     "anthropics-skills": {
