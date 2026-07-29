@@ -1020,25 +1020,44 @@
     "system-prompts-leaks": {
       "url": "https://github.com/asgeirtj/system_prompts_leaks.git",
       "name": "system_prompts_leaks",
-      "last_fetched": "2026-07-12 22:01 UTC",
+      "last_fetched": "2026-07-29 09:53 UTC",
       "components": {
         "skills": [
           "deep-research",
-          "doctor",
-          "run-skill-generator"
+          "claude-api",
+          "run-skill-generator",
+          "code-review",
+          "dataviz",
+          "design-sync",
+          "non-storybook",
+          "storybook",
+          "claude-code-docs"
         ],
-        "agents": [],
+        "agents": [
+          "Explore",
+          "claude-agent",
+          "Plan",
+          "general-purpose",
+          "workflow-subagent",
+          "worker",
+          "claude-code-guide",
+          "statusline-setup",
+          "observer",
+          "teammate"
+        ],
         "commands": [],
         "hooks": [],
         "token_optimization": [
           "claude-code-opus-4.6.md",
           "claude-code-opus-4.8.md",
-          "claude-code-2.1.172-opus-4.6.md",
-          "claude-code-2.1.172-opus-4.8.md",
-          "deferred-tools.md",
-          "claude-code-2.1.172-fable-5.md",
-          "claude-api.md",
-          "amp-code.md"
+          "claude-code-guide.md",
+          "claude-code-sonnet-4.6.md",
+          "claude-code-fable-5.md",
+          "claude-code-haiku-4.5.md",
+          "platform-availability.md",
+          "prompt-caching.md",
+          "live-sources.md",
+          "model-migration.md"
         ]
       }
     },
