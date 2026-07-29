@@ -923,19 +923,14 @@
       }
     },
     "headroom": {
-      "url": "https://github.com/headroomlabs-ai/headroom",
-      "url_previous": "https://github.com/chopratejas/headroom.git",
+      "url": "https://github.com/headroomlabs-ai/headroom.git",
       "name": "headroom",
-      "last_fetched": "2026-07-12",
+      "last_fetched": "2026-07-29 09:53 UTC",
       "components": {
-        "skills": [
-          "headroom"
-        ],
+        "skills": [],
         "agents": [],
         "commands": [],
-        "hooks": [
-          "headroom-agent-hooks/hooks.json"
-        ],
+        "hooks": [],
         "token_optimization": [
           "configuration.md",
           "agno.md",
@@ -946,18 +941,18 @@
           "ARCHITECTURE.md",
           "index.md",
           "README.md",
-          "examples/07-context-compression.ipynb",
-          "examples/context_compression_demo.py"
+          "test_ccr.py"
         ]
       }
     },
     "agent-browser": {
       "url": "https://github.com/vercel-labs/agent-browser.git",
       "name": "agent-browser",
-      "last_fetched": "2026-07-07 23:19 UTC",
+      "last_fetched": "2026-07-29 09:53 UTC",
       "components": {
         "skills": [
           "agent-browser",
+          "derive-client",
           "dogfood",
           "vercel-sandbox",
           "agentcore",
