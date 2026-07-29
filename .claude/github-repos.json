@@ -97,47 +97,51 @@
       }
     },
     "repomix": {
-      "url": "https://github.com/yamadashy/repomix",
+      "url": "https://github.com/yamadashy/repomix.git",
       "name": "repomix",
-      "last_fetched": "2026-07-12",
+      "last_fetched": "2026-07-29 09:51 UTC",
       "components": {
         "skills": [
           "repomix-explorer",
+          "browser-extension-developer",
+          "website-maintainer",
           "contextual-commit",
           "agent-carnet",
-          "browser-extension-developer",
-          "website-maintainer"
+          "clawhub"
         ],
         "agents": [
           "explorer",
-          "reviewer-code-quality",
           "reviewer-conventions",
-          "reviewer-holistic",
           "reviewer-performance",
-          "reviewer-security",
-          "reviewer-test-coverage"
+          "reviewer-code-quality",
+          "reviewer-test-coverage",
+          "reviewer-holistic",
+          "reviewer-security"
         ],
         "commands": [
-          "pack-local",
-          "pack-remote",
           "explore-local",
           "explore-remote",
+          "pack-local",
+          "pack-remote",
+          "claude-rule-update",
+          "gemini-discuss",
+          "codex-review-loop",
           "lint-fix",
           "perf-tuning",
           "review-loop",
-          "codex-review-loop",
-          "claude-rule-update",
-          "gemini-discuss",
-          "git-commit-push",
           "git-commit",
-          "pr-address-feedback",
           "pr-create",
           "pr-prepare",
           "pr-review",
-          "release-note-generate"
+          "git-commit-push",
+          "release-note-generate",
+          "pr-address-feedback"
         ],
         "hooks": [],
-        "token_optimization": []
+        "token_optimization": [
+          "v1.2.0.md",
+          "release-note-generate.md"
+        ]
       }
     },
     "superpowers": {
