@@ -236,7 +236,7 @@
     "obsidian-skills": {
       "url": "https://github.com/kepano/obsidian-skills.git",
       "name": "obsidian-skills",
-      "last_fetched": "2026-07-07 23:18 UTC",
+      "last_fetched": "2026-07-29 09:52 UTC",
       "components": {
         "skills": [
           "obsidian-cli",
@@ -254,7 +254,7 @@
     "n8n-mcp": {
       "url": "https://github.com/czlonkowski/n8n-mcp.git",
       "name": "n8n-mcp",
-      "last_fetched": "2026-07-07 23:18 UTC",
+      "last_fetched": "2026-07-29 09:52 UTC",
       "components": {
         "skills": [
           "n8n-code-python",

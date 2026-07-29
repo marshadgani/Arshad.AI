@@ -219,7 +219,7 @@ See [VALIDATION_GUIDE.md](VALIDATION_GUIDE.md) for:
 ### Workflow Management
 See [WORKFLOW_GUIDE.md](WORKFLOW_GUIDE.md) for:
 - n8n_create_workflow
-- n8n_update_partial_workflow (19 operation types including patchNodeField!)
+- n8n_update_partial_workflow (20 operation types including patchNodeField and setNodeGroups!)
 - Smart parameters (branch, case)
 - AI connection types (8 types)
 - Workflow activation (activateWorkflow/deactivateWorkflow)
@@ -293,6 +293,7 @@ See [OPERATIONS_GUIDE.md](OPERATIONS_GUIDE.md) for examples.
 - n8n_list_workflows, n8n_get_workflow, n8n_delete_workflow
 - n8n_test_workflow
 - n8n_executions
+- n8n_evaluations (n8n 2.30+; read evaluation test runs — API key must be created on 2.30+ for testRun scopes)
 - n8n_deploy_template
 - n8n_workflow_versions
 - n8n_autofix_workflow
