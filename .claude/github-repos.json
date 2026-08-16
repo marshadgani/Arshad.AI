@@ -99,7 +99,7 @@
     "repomix": {
       "url": "https://github.com/yamadashy/repomix.git",
       "name": "repomix",
-      "last_fetched": "2026-07-29 09:51 UTC",
+      "last_fetched": "2026-08-16 20:29 UTC",
       "components": {
         "skills": [
           "repomix-explorer",
