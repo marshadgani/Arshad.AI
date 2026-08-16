@@ -295,7 +295,7 @@
     "get-shit-done": {
       "url": "https://github.com/gsd-build/get-shit-done.git",
       "name": "get-shit-done",
-      "last_fetched": "2026-07-29 09:52 UTC",
+      "last_fetched": "2026-08-16 20:30 UTC",
       "components": {
         "skills": [],
         "agents": [
@@ -423,7 +423,7 @@
     "awesome-claude-code": {
       "url": "https://github.com/hesreallyhim/awesome-claude-code.git",
       "name": "awesome-claude-code",
-      "last_fetched": "2026-07-29 09:52 UTC",
+      "last_fetched": "2026-08-16 20:30 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -437,13 +437,14 @@
     "context7": {
       "url": "https://github.com/upstash/context7.git",
       "name": "context7",
-      "last_fetched": "2026-07-29 09:52 UTC",
+      "last_fetched": "2026-08-16 20:30 UTC",
       "components": {
         "skills": [
           "context7-mcp",
           "context7-cli",
           "find-docs",
           "context7-docs",
+          "context7-mcp",
           "context7-mcp",
           "context7-mcp",
           "context7-mcp",
@@ -512,7 +513,7 @@
     "claude-plugins-official": {
       "url": "https://github.com/anthropics/claude-plugins-official.git",
       "name": "claude-plugins-official",
-      "last_fetched": "2026-07-29 09:52 UTC",
+      "last_fetched": "2026-08-16 20:30 UTC",
       "components": {
         "skills": [
           "access",
@@ -584,6 +585,7 @@
           "silent-failure-hunter"
         ],
         "commands": [
+          "asana-setup",
           "feature-dev",
           "new-sdk-app",
           "help",
