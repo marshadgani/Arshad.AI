@@ -196,7 +196,7 @@
     "claude-mem": {
       "url": "https://github.com/thedotmack/claude-mem.git",
       "name": "claude-mem",
-      "last_fetched": "2026-07-29 09:52 UTC",
+      "last_fetched": "2026-08-16 20:30 UTC",
       "components": {
         "skills": [
           "weekly-digests",
@@ -205,6 +205,7 @@
           "learn-codebase",
           "what-the",
           "smart-explore",
+          "mode-creator",
           "mem-search",
           "cloud-sync",
           "timeline-report",
