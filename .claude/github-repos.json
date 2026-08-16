@@ -1023,7 +1023,7 @@
     "system-prompts-leaks": {
       "url": "https://github.com/asgeirtj/system_prompts_leaks.git",
       "name": "system_prompts_leaks",
-      "last_fetched": "2026-07-29 09:53 UTC",
+      "last_fetched": "2026-08-16 20:31 UTC",
       "components": {
         "skills": [
           "deep-research",
@@ -1037,8 +1037,8 @@
           "claude-code-docs"
         ],
         "agents": [
+          "claude",
           "Explore",
-          "claude-agent",
           "Plan",
           "general-purpose",
           "workflow-subagent",
@@ -1057,10 +1057,10 @@
           "claude-code-sonnet-4.6.md",
           "claude-code-fable-5.md",
           "claude-code-haiku-4.5.md",
+          "claude-code-desktop-fable-5.md",
           "platform-availability.md",
           "prompt-caching.md",
-          "live-sources.md",
-          "model-migration.md"
+          "live-sources.md"
         ]
       }
     },
