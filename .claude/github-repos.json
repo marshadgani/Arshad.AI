@@ -147,7 +147,7 @@
     "superpowers": {
       "url": "https://github.com/obra/superpowers.git",
       "name": "superpowers",
-      "last_fetched": "2026-07-29 09:52 UTC",
+      "last_fetched": "2026-08-16 20:29 UTC",
       "components": {
         "skills": [
           "using-superpowers",
@@ -983,7 +983,7 @@
     "ui-ux-pro-max-skill": {
       "url": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git",
       "name": "ui-ux-pro-max-skill",
-      "last_fetched": "2026-07-29 09:53 UTC",
+      "last_fetched": "2026-08-16 20:29 UTC",
       "components": {
         "skills": [
           "banner-design",
