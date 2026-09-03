@@ -99,7 +99,7 @@
     "repomix": {
       "url": "https://github.com/yamadashy/repomix.git",
       "name": "repomix",
-      "last_fetched": "2026-08-16 20:29 UTC",
+      "last_fetched": "2026-09-03 21:18 UTC",
       "components": {
         "skills": [
           "repomix-explorer",
@@ -113,9 +113,11 @@
           "explorer",
           "reviewer-conventions",
           "reviewer-performance",
+          "reviewer-docs-i18n",
           "reviewer-code-quality",
           "reviewer-test-coverage",
           "reviewer-holistic",
+          "reviewer-cross-platform",
           "reviewer-security"
         ],
         "commands": [
