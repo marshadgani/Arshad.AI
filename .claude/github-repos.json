@@ -304,7 +304,7 @@
     "get-shit-done": {
       "url": "https://github.com/gsd-build/get-shit-done.git",
       "name": "get-shit-done",
-      "last_fetched": "2026-08-16 20:30 UTC",
+      "last_fetched": "2026-09-03 21:19 UTC",
       "components": {
         "skills": [],
         "agents": [
@@ -432,7 +432,7 @@
     "awesome-claude-code": {
       "url": "https://github.com/hesreallyhim/awesome-claude-code.git",
       "name": "awesome-claude-code",
-      "last_fetched": "2026-08-16 20:30 UTC",
+      "last_fetched": "2026-09-03 21:19 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -446,13 +446,14 @@
     "context7": {
       "url": "https://github.com/upstash/context7.git",
       "name": "context7",
-      "last_fetched": "2026-08-16 20:30 UTC",
+      "last_fetched": "2026-09-03 21:19 UTC",
       "components": {
         "skills": [
           "context7-mcp",
           "context7-cli",
           "find-docs",
           "context7-docs",
+          "context7-mcp",
           "context7-mcp",
           "context7-mcp",
           "context7-mcp",
@@ -522,7 +523,7 @@
     "claude-plugins-official": {
       "url": "https://github.com/anthropics/claude-plugins-official.git",
       "name": "claude-plugins-official",
-      "last_fetched": "2026-08-16 20:30 UTC",
+      "last_fetched": "2026-09-03 21:19 UTC",
       "components": {
         "skills": [
           "access",
@@ -574,6 +575,7 @@
           "patch-verifier",
           "claude-security",
           "scan-verifier",
+          "scan-loader",
           "explore",
           "plugin-validator",
           "agent-creator",
@@ -627,7 +629,7 @@
         ],
         "hooks": [
           "sg-python.sh",
-          "banner_hook.sh",
+          "hooks.sh",
           "stop-hook.sh"
         ],
         "token_optimization": []
