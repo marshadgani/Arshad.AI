@@ -941,7 +941,7 @@
     "headroom": {
       "url": "https://github.com/headroomlabs-ai/headroom.git",
       "name": "headroom",
-      "last_fetched": "2026-08-16 20:30 UTC",
+      "last_fetched": "2026-09-03 21:19 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -964,17 +964,19 @@
     "agent-browser": {
       "url": "https://github.com/vercel-labs/agent-browser.git",
       "name": "agent-browser",
-      "last_fetched": "2026-08-16 20:31 UTC",
+      "last_fetched": "2026-09-03 21:19 UTC",
       "components": {
         "skills": [
           "agent-browser",
           "derive-client",
           "dogfood",
+          "webmcp-gen",
           "vercel-sandbox",
           "agentcore",
           "electron",
           "slack",
-          "core"
+          "core",
+          "protected-vercel-deployments"
         ],
         "agents": [],
         "commands": [],
