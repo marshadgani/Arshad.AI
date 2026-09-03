@@ -6,7 +6,7 @@
     "claude-code": {
       "url": "https://github.com/anthropics/claude-code.git",
       "name": "claude-code",
-      "last_fetched": "2026-08-16 20:29 UTC",
+      "last_fetched": "2026-09-03 21:18 UTC",
       "components": {
         "skills": [
           "writing-rules",
