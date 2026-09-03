@@ -426,3 +426,88 @@ class LinearIntegration(OAuthIntegrationProvider):
             summary=f"Linear: {len(nodes)} recent issues refreshed",
             duration_ms=int((time.perf_counter() - started) * 1000),
         )
+
+
+# ── Whoop ─────────────────────────────────────────────────────────────────
+
+
+@register
+class WhoopIntegration(OAuthIntegrationProvider):
+    slug = "whoop"
+    display_name = "Whoop"
+    category = "Health"
+    description = "Recovery scores, sleep analysis, strain, HRV, and workouts."
+    docs_url = "https://developer.whoop.com"
+    icon = "whoop"
+    auth_url = "https://api.prod.whoop.com/oauth/oauth2/auth"
+    token_url = "https://api.prod.whoop.com/oauth/oauth2/token"
+    scopes = [
+        "read:recovery",
+        "read:sleep",
+        "read:strain",
+        "read:workout",
+        "read:body_measurement",
+        "read:profile",
+        "offline",
+    ]
+    client_id_env = "WHOOP_CLIENT_ID"
+    client_secret_env = "WHOOP_CLIENT_SECRET"
+
+    _BASE = "https://api.prod.whoop.com/developer/v1"
+
+    async def fetch_profile(self, access_token: str) -> dict[str, Any]:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(
+                f"{self._BASE}/user/profile/basic",
+                headers={"Authorization": f"Bearer {access_token}"},
+            )
+            resp.raise_for_status()
+            body = resp.json() or {}
+        return {
+            "whoop_user_id": body.get("user_id"),
+            "email": body.get("email"),
+            "first_name": body.get("first_name"),
+        }
+
+    async def sync(self, *, integration, db) -> "SyncResult":
+        import time as _time
+        from datetime import date, timedelta
+
+        from ..base import IntegrationError, SyncResult
+
+        started = _time.perf_counter()
+        access_token = await self.get_access_token(integration=integration, db=db)
+        start = (date.today() - timedelta(days=1)).isoformat()
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.get(
+                    f"{self._BASE}/recovery",
+                    headers={"Authorization": f"Bearer {access_token}"},
+                    params={"limit": 1, "start": start},
+                )
+                resp.raise_for_status()
+                body = resp.json() or {}
+        except Exception as exc:  # noqa: BLE001
+            integration.status = "error"
+            integration.last_error = f"{type(exc).__name__}: {exc}"[:500]
+            await db.commit()
+            raise IntegrationError("sync_failed", f"{type(exc).__name__}: {exc}")
+        records = body.get("records") or []
+        latest = records[0] if records else {}
+        score = latest.get("score") or {}
+        integration.config = {
+            **(integration.config or {}),
+            "latest_recovery_score": score.get("recovery_score"),
+            "latest_hrv_rmssd": score.get("hrv_rmssd_milli"),
+            "latest_resting_hr": score.get("resting_heart_rate"),
+            "window_start": start,
+        }
+        integration.last_synced_at = datetime.now(timezone.utc)
+        integration.last_error = None
+        integration.status = "connected"
+        await db.commit()
+        return SyncResult(
+            rows_written=len(records),
+            summary="Whoop: recovery score refreshed.",
+            duration_ms=int((_time.perf_counter() - started) * 1000),
+        )
