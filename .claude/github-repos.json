@@ -1122,13 +1122,15 @@
     "skills": {
       "url": "https://github.com/anthropics/skills.git",
       "name": "skills",
-      "last_fetched": "2026-08-16 20:31 UTC",
+      "last_fetched": "2026-09-03 21:18 UTC",
       "components": {
         "skills": [
           "canvas-design",
           "slack-gif-creator",
+          "academy-guide",
           "web-artifacts-builder",
           "mcp-builder",
+          "discernment-nudge",
           "skill-creator",
           "algorithmic-art",
           "webapp-testing",
@@ -1155,13 +1157,13 @@
           "prompt-audit.md",
           "platform-availability.md",
           "prompt-caching.md",
+          "cost-optimization.md",
           "managed-agents-multiagent.md",
           "models.md",
           "live-sources.md",
           "model-migration.md",
           "agent-design.md",
-          "tool-use-concepts.md",
-          "README.md"
+          "tool-use-concepts.md"
         ]
       }
     }
