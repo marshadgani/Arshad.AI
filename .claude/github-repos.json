@@ -198,9 +198,11 @@
     "claude-mem": {
       "url": "https://github.com/thedotmack/claude-mem.git",
       "name": "claude-mem",
-      "last_fetched": "2026-08-16 20:30 UTC",
+      "last_fetched": "2026-09-03 21:18 UTC",
       "components": {
         "skills": [
+          "mem-setup",
+          "mem-search",
           "weekly-digests",
           "pathfinder",
           "oh-my-issues",
@@ -222,7 +224,12 @@
           "knowledge-agent",
           "make-plan",
           "do",
-          "openclaw"
+          "openclaw",
+          "host-observer",
+          "install",
+          "mem-search",
+          "install",
+          "mem-search"
         ],
         "agents": [],
         "commands": [
