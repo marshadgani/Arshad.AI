@@ -1,4 +1,4 @@
-# Tool Use — Ruby
+# Tool Use - Ruby
 
 For conceptual overview (tool definitions, tool choice, tips), see [shared/tool-use-concepts.md](../../shared/tool-use-concepts.md).
 
@@ -24,7 +24,7 @@ class GetWeather < Anthropic::BaseTool
 end
 
 client.beta.messages.tool_runner(
-  model: :"claude-opus-4-8",
+  model: :"claude-opus-5",
   max_tokens: 16000,
   tools: [GetWeather.new],
   messages: [{ role: "user", content: "What's the weather in San Francisco?" }]
@@ -38,4 +38,3 @@ end
 See the [shared tool use concepts](../../shared/tool-use-concepts.md) for the tool definition format and agentic loop pattern.
 
 ---
-

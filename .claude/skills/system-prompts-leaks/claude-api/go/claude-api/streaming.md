@@ -1,4 +1,4 @@
-# Streaming — Go
+# Streaming - Go
 
 ## Streaming
 
@@ -40,4 +40,3 @@ if err := stream.Err(); err != nil { log.Fatal(err) }
 
 
 ---
-

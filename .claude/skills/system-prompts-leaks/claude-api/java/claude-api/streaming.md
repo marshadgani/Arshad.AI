@@ -1,4 +1,4 @@
-# Streaming — Java
+# Streaming - Java
 
 ## Streaming
 
@@ -21,4 +21,3 @@ try (StreamResponse<RawMessageStreamEvent> streamResponse = client.messages().cr
 ```
 
 ---
-
