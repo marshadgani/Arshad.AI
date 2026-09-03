@@ -1,8 +1,6 @@
 ---
 name: security-review
 description: Use this skill when adding authentication, handling user input, working with secrets, creating API endpoints, or implementing payment/sensitive features. Provides comprehensive security checklist and patterns.
-metadata:
-  origin: ECC
 ---
 
 # Security Review Skill
@@ -67,7 +65,7 @@ export async function createUser(input: unknown) {
     return await db.users.create(validated)
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return { success: false, errors: error.issues }
+      return { success: false, errors: error.errors }
     }
     throw error
   }
@@ -209,11 +207,6 @@ function renderUserContent(html: string) {
 ```
 
 #### Content Security Policy
-
-Start strict and loosen only with a documented removal plan. Do not default to
-`'unsafe-inline'` or `'unsafe-eval'`; they neutralize much of CSP's protection
-and should be treated as temporary compatibility debt.
-
 ```typescript
 // next.config.js
 const securityHeaders = [
@@ -221,11 +214,8 @@ const securityHeaders = [
     key: 'Content-Security-Policy',
     value: `
       default-src 'self';
-      base-uri 'self';
-      object-src 'none';
-      frame-ancestors 'none';
-      script-src 'self';
-      style-src 'self';
+      script-src 'self' 'unsafe-eval' 'unsafe-inline';
+      style-src 'self' 'unsafe-inline';
       img-src 'self' data: https:;
       font-src 'self';
       connect-src 'self' https://api.example.com;
