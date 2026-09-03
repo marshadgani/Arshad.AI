@@ -881,7 +881,7 @@
     "agent-skills": {
       "url": "https://github.com/addyosmani/agent-skills.git",
       "name": "agent-skills",
-      "last_fetched": "2026-08-16 20:30 UTC",
+      "last_fetched": "2026-09-03 21:19 UTC",
       "components": {
         "skills": [
           "interview-me",
@@ -895,6 +895,7 @@
           "documentation-and-adrs",
           "planning-and-task-breakdown",
           "source-driven-development",
+          "constraint-driven-development",
           "code-simplification",
           "spec-driven-development",
           "context-engineering",
@@ -917,6 +918,7 @@
         ],
         "commands": [
           "test",
+          "constraints",
           "webperf",
           "review",
           "spec",
