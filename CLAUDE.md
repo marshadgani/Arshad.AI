@@ -277,6 +277,14 @@ All services start with `docker compose up --build`.
 | PostgreSQL  | 5432 | — |
 | Redis       | 6379 | — |
 
+### Production URLs
+
+| Service | URL |
+|---|---|
+| Frontend (Vercel) | https://arshad-ai-seven.vercel.app |
+| Frontend health check | https://arshad-ai-seven.vercel.app/health |
+| Backend (Render) | https://arshad-ai.onrender.com |
+
 ---
 
 ## 5. Project File Map
