@@ -10,10 +10,10 @@
   top: 0;
   left: 0;
   bottom: 0;
-  z-index: 30;
+  z-index: var(--z-drawer);
 }
 
-/* breakpoints: mobile below 768px — off-canvas drawer */
+/* breakpoints.ts: mobile — off-canvas drawer */
 @media (max-width: 767.98px) {
   .sidebar {
     width: min(var(--sidebar-w), 84vw);
@@ -40,7 +40,7 @@
   backdrop-filter: blur(2px);
   border: 0;
   padding: 0;
-  z-index: 20;
+  z-index: var(--z-scrim);
 }
 
 .brand {

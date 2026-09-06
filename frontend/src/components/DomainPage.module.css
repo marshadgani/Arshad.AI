@@ -134,6 +134,7 @@
   .agents { grid-template-columns: repeat(2, 1fr); }
 }
 
+/* breakpoints.ts: mobile */
 @media (max-width: 767.98px) {
   .header { grid-template-columns: 1fr; }
   .kpis { grid-template-columns: repeat(2, 1fr); }

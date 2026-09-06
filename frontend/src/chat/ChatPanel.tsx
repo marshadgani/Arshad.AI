@@ -1,39 +1,25 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 
+import { ChatComposer } from './ChatComposer';
+import { MessageRow } from './MessageRow';
 import { ToolCallChip } from './ToolCallChip';
 import styles from './ChatPanel.module.css';
+import { useChatHistory } from './useChatHistory';
 import { useChatStream } from './useChatStream';
 
-interface PersistedMessage {
-  id: string;
-  role: string;
-  content: { text?: string; tool?: string; output?: unknown; is_error?: boolean };
-  created_at: string | null;
+export interface ChatPanelProps {
+  sessionId: string;
 }
 
-export function ChatPanel({ sessionId }: { sessionId: string }) {
+// Composition root for the chat surface: it wires persisted history
+// (useChatHistory) to the live stream (useChatStream) and renders the four
+// states. Transport, draft state and message markup live in siblings.
+export function ChatPanel({ sessionId }: ChatPanelProps) {
   const stream = useChatStream(sessionId);
-  const [history, setHistory] = useState<PersistedMessage[]>([]);
-  const [draft, setDraft] = useState('');
+  const history = useChatHistory(sessionId);
   const scrollerRef = useRef<HTMLDivElement>(null);
 
-  // Load persisted history when session changes.
-  useEffect(() => {
-    let active = true;
-    fetch(`/api/v1/chat/sessions/${sessionId}/messages`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('arshad.ai:jwt') ?? ''}` },
-    })
-      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`${res.status}`))))
-      .then((body) => {
-        if (active) setHistory((body.data ?? []) as PersistedMessage[]);
-      })
-      .catch(() => {
-        if (active) setHistory([]);
-      });
-    return () => {
-      active = false;
-    };
-  }, [sessionId]);
+  const hasStreamOutput = Boolean(stream.assistantText) || stream.toolCalls.length > 0;
 
   // Autoscroll on new content.
   useEffect(() => {
@@ -41,45 +27,67 @@ export function ChatPanel({ sessionId }: { sessionId: string }) {
       top: scrollerRef.current.scrollHeight,
       behavior: 'smooth',
     });
-  }, [history.length, stream.assistantText, stream.toolCalls.length]);
+  }, [history.messages.length, stream.assistantText, stream.toolCalls.length]);
 
-  const onSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!draft.trim() || stream.isStreaming) return;
-    const text = draft;
-    setDraft('');
-    // Optimistically append the user message.
-    setHistory((h) => [
-      ...h,
-      {
-        id: `optimistic-${Date.now()}`,
-        role: 'user',
-        content: { text },
-        created_at: null,
-      },
-    ]);
-    void stream.send(text);
-  };
-
-  // After streaming finishes, refresh history so the assistant message is canonical.
+  // Once streaming finishes, pull the canonical rows so the optimistic user
+  // message and the transient assistant text are replaced by persisted ones.
   useEffect(() => {
-    if (stream.isStreaming) return;
-    if (!stream.assistantText && stream.toolCalls.length === 0) return;
-    fetch(`/api/v1/chat/sessions/${sessionId}/messages`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('arshad.ai:jwt') ?? ''}` },
-    })
-      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`${res.status}`))))
-      .then((body) => setHistory((body.data ?? []) as PersistedMessage[]))
-      .catch(() => undefined);
+    if (stream.isStreaming || !hasStreamOutput) return;
+    history.refresh();
+    // Only the stream *ending* should trigger this — re-running as each token
+    // arrives would refetch the whole conversation per delta.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stream.isStreaming, sessionId]);
 
+  const handleSend = (text: string) => {
+    history.appendOptimistic(text);
+    void stream.send(text);
+  };
+
+  const showEmptyState =
+    !history.isLoading &&
+    !history.error &&
+    history.messages.length === 0 &&
+    !stream.isStreaming &&
+    !hasStreamOutput;
+
   return (
     <section className={styles.panel}>
+      <div className="sr-only" aria-live="polite">
+        {stream.isStreaming
+          ? 'Assistant is responding…'
+          : stream.error
+            ? `Error: ${stream.error}`
+            : ''}
+      </div>
+
       <div className={styles.scroller} ref={scrollerRef}>
-        {history.map((m) => (
-          <MessageRow key={m.id} message={m} />
-        ))}
+        {history.isLoading && (
+          <div className={styles.loadingState} role="status">
+            <span className={styles.spinner} aria-hidden="true" />
+            Loading conversation…
+          </div>
+        )}
+
+        {history.error && (
+          <div className={styles.historyError} role="alert">
+            <span>{history.error}</span>
+            <button type="button" className={styles.retryButton} onClick={history.reload}>
+              Retry
+            </button>
+          </div>
+        )}
+
+        {showEmptyState && (
+          <div className={styles.emptyState}>
+            <span className={styles.emptyGlyph} aria-hidden="true">✶</span>
+            <p>Ask Arshad.AI anything — calendar, email, GitHub, or just talk.</p>
+          </div>
+        )}
+
+        {!history.isLoading &&
+          !history.error &&
+          history.messages.map((m) => <MessageRow key={m.id} message={m} />)}
 
         {stream.isStreaming && (
           <div className={styles.streamingBlock}>
@@ -97,51 +105,13 @@ export function ChatPanel({ sessionId }: { sessionId: string }) {
         )}
 
         {stream.error && (
-          <div className={styles.error}>
+          <div className={styles.error} role="alert">
             <strong>error:</strong> {stream.error}
           </div>
         )}
       </div>
 
-      <form className={styles.composer} onSubmit={onSubmit}>
-        <input
-          className={styles.input}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder="Ask anything…"
-          disabled={stream.isStreaming}
-        />
-        <button
-          type="submit"
-          className={styles.send}
-          disabled={stream.isStreaming || !draft.trim()}
-        >
-          {stream.isStreaming ? 'Streaming…' : 'Send'}
-        </button>
-      </form>
+      <ChatComposer disabled={stream.isStreaming} onSubmit={handleSend} />
     </section>
   );
-}
-
-function MessageRow({ message }: { message: PersistedMessage }) {
-  if (message.role === 'user') {
-    return (
-      <div className={`${styles.bubble} ${styles.user}`}>{message.content.text}</div>
-    );
-  }
-  if (message.role === 'assistant') {
-    return (
-      <div className={`${styles.bubble} ${styles.assistant}`}>{message.content.text}</div>
-    );
-  }
-  if (message.role === 'tool_use') {
-    return (
-      <div className={styles.toolUseInline}>
-        <code>{message.content.tool ?? '(tool)'}</code>
-      </div>
-    );
-  }
-  // tool_result rows are not rendered separately; the assistant message
-  // immediately following them carries the user-visible response.
-  return null;
 }

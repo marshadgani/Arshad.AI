@@ -123,3 +123,111 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+.loadingState {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  align-self: center;
+  margin: auto 0;
+  padding: var(--s-6);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--accent);
+  animation: spin 700ms linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-3);
+  margin: auto 0;
+  padding: var(--s-8);
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.emptyGlyph {
+  font-size: 2rem;
+  color: var(--accent);
+  filter: drop-shadow(0 0 12px rgba(0, 234, 255, 0.35));
+}
+
+.historyError {
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  background: rgba(255, 77, 109, 0.15);
+  border: 1px solid var(--status-danger);
+  border-radius: var(--radius-md);
+  color: var(--status-danger);
+  font-size: 0.85rem;
+}
+
+.retryButton {
+  appearance: none;
+  border: 1px solid var(--status-danger);
+  background: transparent;
+  color: var(--status-danger);
+  padding: var(--s-1) var(--s-3);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.retryButton:hover,
+.retryButton:focus-visible {
+  background: rgba(255, 77, 109, 0.15);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 1.4s;
+  }
+  .caret {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+/* breakpoints.ts: mobile */
+@media (max-width: 767.98px) {
+  .scroller {
+    padding: var(--s-4);
+  }
+
+  .bubble {
+    max-width: 88%;
+  }
+
+  .composer {
+    padding: var(--s-3) var(--s-4);
+    padding-bottom: calc(var(--s-3) + env(safe-area-inset-bottom));
+  }
+
+  .input {
+    min-height: 44px;
+  }
+
+  .send {
+    min-height: 44px;
+    padding: var(--s-2) var(--s-4);
+  }
+}

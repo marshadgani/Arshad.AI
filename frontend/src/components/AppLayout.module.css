@@ -26,10 +26,10 @@
    AppLayout so /chat (where the FAB is hidden) never carries phantom
    bottom padding. */
 .contentFabPad {
-  padding-bottom: calc(56px + var(--s-6) + env(safe-area-inset-bottom));
+  padding-bottom: calc(var(--fab-size) + var(--s-6) + env(safe-area-inset-bottom));
 }
 
-/* breakpoints: mobile below 768px */
+/* breakpoints.ts: mobile */
 @media (max-width: 767.98px) {
   .main {
     margin-left: 0;

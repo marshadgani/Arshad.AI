@@ -50,10 +50,16 @@
   /* Layout */
   --sidebar-w:  240px;
   --topbar-h:   56px;
-}
+  --fab-size:   56px;
 
-/* z-index scale (FEAT-118) — the single source of truth for stacking order.
-   topbar(10) < FAB(15) < sidebar scrim(20) < sidebar drawer(30) */
+  /* Stacking order — the single source of truth. Consumers reference these
+     tokens rather than raw integers, so the ordering is enforced here
+     instead of being asserted in a comment and violated elsewhere. */
+  --z-topbar:  10;
+  --z-fab:     15;
+  --z-scrim:   20;
+  --z-drawer:  30;
+}
 
 /* HUD grid lines — applied to body via background pattern.
    Subtle, evokes a Stark-Industries readout. */

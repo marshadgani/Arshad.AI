@@ -253,6 +253,7 @@
   .qaGrid { grid-template-columns: repeat(3, 1fr); }
 }
 
+/* breakpoints.ts: mobile */
 @media (max-width: 767.98px) {
   .cols4 { grid-template-columns: 1fr; }
   .cols3 { grid-template-columns: 1fr; }

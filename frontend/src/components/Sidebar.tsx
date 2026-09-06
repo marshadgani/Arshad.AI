@@ -1,9 +1,13 @@
-import { useEffect, useRef } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { useRef } from 'react';
+import { NavLink } from 'react-router-dom';
 
 import type { NavItem } from '../data/mockData';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 import { useFetch } from '../hooks/useFetch';
-import { useIsMobile } from '../hooks/useMediaQuery';
+import { useFocusReturn } from '../hooks/useFocusReturn';
+import { useIsMobile } from '../hooks/useBreakpoint';
+import { useOnRouteChange } from '../hooks/useOnRouteChange';
 import styles from './Sidebar.module.css';
 
 export interface SidebarProps {
@@ -11,65 +15,46 @@ export interface SidebarProps {
   onClose: () => void;
 }
 
+function navItemClass({ isActive }: { isActive: boolean }): string {
+  return isActive ? `${styles.item} ${styles.itemActive}` : styles.item;
+}
+
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { data: navItems } = useFetch<NavItem[]>('/api/v1/nav');
-  const { pathname } = useLocation();
+  // Below the mobile breakpoint the sidebar is an off-canvas modal drawer;
+  // above it, a persistent landmark. Every modal-only behaviour hangs off
+  // this one predicate.
   const overlayMode = useIsMobile();
   const asideRef = useRef<HTMLElement>(null);
-  const priorFocusRef = useRef<Element | null>(null);
-  const priorOverflowRef = useRef<string>('');
+  const isModal = isOpen && overlayMode;
 
-  // Close the drawer whenever the route changes.
-  useEffect(() => {
+  useOnRouteChange(() => {
     if (isOpen) onClose();
-    // Only the route should re-trigger this — onClose/isOpen are stable
-    // enough per render and including them would close on every toggle.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname]);
-
-  // Escape closes the drawer, but only while it behaves as a modal overlay.
-  useEffect(() => {
-    if (!isOpen || !overlayMode) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isOpen, overlayMode, onClose]);
-
-  // Lock body scroll while the drawer covers the viewport on mobile. The
-  // prior value is captured so a desktop resize mid-open doesn't strand it.
-  useEffect(() => {
-    if (!isOpen || !overlayMode) return;
-    priorOverflowRef.current = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = priorOverflowRef.current;
-    };
-  }, [isOpen, overlayMode]);
-
-  // Modal focus handling: move focus into the drawer on open, return it to
-  // whatever triggered the open (the hamburger) on close.
-  useEffect(() => {
-    if (!overlayMode) return;
-    if (isOpen) {
-      priorFocusRef.current = document.activeElement;
-      asideRef.current?.focus();
-    } else if (priorFocusRef.current instanceof HTMLElement) {
-      priorFocusRef.current.focus();
-    }
-  }, [isOpen, overlayMode]);
+  });
+  useEscapeKey(isModal, onClose);
+  useBodyScrollLock(isModal);
+  useFocusReturn(overlayMode, isOpen, asideRef);
 
   // The desktop sidebar is a persistent landmark, not a dialog — dialog
   // semantics only apply while it behaves as a mobile modal overlay.
   const dialogProps = overlayMode
-    ? { role: 'dialog' as const, 'aria-modal': true as const, 'aria-label': 'Main navigation', tabIndex: -1 }
+    ? {
+        role: 'dialog' as const,
+        'aria-modal': true as const,
+        'aria-label': 'Main navigation',
+        tabIndex: -1,
+      }
     : {};
 
   return (
     <>
-      {overlayMode && isOpen && (
-        <button type="button" className={styles.scrim} aria-label="Close navigation" onClick={onClose} />
+      {isModal && (
+        <button
+          type="button"
+          className={styles.scrim}
+          aria-label="Close navigation"
+          onClick={onClose}
+        />
       )}
       <aside
         id="app-sidebar"
@@ -88,14 +73,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         <div className={styles.section}>
           <div className={styles.label}>Workspace</div>
           {(navItems ?? []).map((n) => (
-            <NavLink
-              key={n.to}
-              to={n.to}
-              end={n.to === '/'}
-              className={({ isActive }) =>
-                isActive ? `${styles.item} ${styles.itemActive}` : styles.item
-              }
-            >
+            <NavLink key={n.to} to={n.to} end={n.to === '/'} className={navItemClass}>
               <span className={styles.icon}>{n.icon}</span>
               <span>{n.label}</span>
             </NavLink>
@@ -105,12 +83,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         <div className={styles.section}>
           <div className={styles.label}>Account</div>
           <a className={styles.item} href="#"><span className={styles.icon}>⚙</span>Settings</a>
-          <NavLink
-            to="/integrations"
-            className={({ isActive }) =>
-              isActive ? `${styles.item} ${styles.itemActive}` : styles.item
-            }
-          >
+          <NavLink to="/integrations" className={navItemClass}>
             <span className={styles.icon}>⌗</span>Integrations
           </NavLink>
           <a className={styles.item} href="#"><span className={styles.icon}>📜</span>Activity log</a>

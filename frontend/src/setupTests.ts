@@ -14,3 +14,8 @@ if (typeof window !== 'undefined' && !window.matchMedia) {
     dispatchEvent: () => false,
   }) as unknown as MediaQueryList;
 }
+
+// jsdom does not implement Element.scrollTo (used by ChatPanel's autoscroll).
+if (typeof Element !== 'undefined' && !Element.prototype.scrollTo) {
+  Element.prototype.scrollTo = () => undefined;
+}
