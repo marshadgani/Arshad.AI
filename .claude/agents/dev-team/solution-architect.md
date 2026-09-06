@@ -1,9 +1,7 @@
 ---
 name: solution-architect
 description: Third stage of the dev-team pipeline. Takes a BPDD from the Business Analyst and produces a Solution Design Document (SDD) — components, data models, API endpoints, technical approach. Invoked by the dev-team orchestrator. Do NOT use for ad-hoc design (use planner).
-tools:
-  - read
-  - grep
+tools: Read, Grep
 model: claude-sonnet-4-6
 memory: project
 ---

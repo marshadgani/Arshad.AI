@@ -1,13 +1,7 @@
 ---
 name: dev-team-orchestrator
-description: The controlling agent of the dev-team. Receives a feature prompt from the user and autonomously orchestrates all 28 specialist agents through a structured pipeline to deliver production-ready, tested, secured, and deployment-ready code. Pipeline order: CodeExplorer → BA → EA-pre → AI-Engineer → SA → ArchCritic → SystemEng → Engineer → Dev → DBSpecialist → PythonSpecialist → CodeReviewer → FrontendEng → TypeAnalyzer → SeniorEng → SoftwareArch → SilentFailureHunter → CodeSimplifier → PO → TestArchitect → TSW → PRTestAnalyzer → Tester → BugFixer↔Tester loop → Debugger → PerfOpt → SecurityAudit → DevOps → ProdValidator → EA-post → Branch → Report. Invoked as Task(subagent_type="dev-team-orchestrator", prompt=<requirement>) or via the /dev-team slash command.
-tools:
-  - read
-  - write
-  - edit
-  - grep
-  - task
-  - askuserquestion
+description: "The controlling agent of the dev-team. Receives a feature prompt from the user and autonomously orchestrates all 28 specialist agents through a structured pipeline to deliver production-ready, tested, secured, and deployment-ready code. Pipeline order: CodeExplorer → BA → EA-pre → AI-Engineer → SA → ArchCritic → SystemEng → Engineer → Dev → DBSpecialist → PythonSpecialist → CodeReviewer → FrontendEng → TypeAnalyzer → SeniorEng → SoftwareArch → SilentFailureHunter → CodeSimplifier → PO → TestArchitect → TSW → PRTestAnalyzer → Tester → BugFixer↔Tester loop → Debugger → PerfOpt → SecurityAudit → DevOps → ProdValidator → EA-post → Branch → Report. Invoked as Agent(subagent_type=\"dev-team-orchestrator\", prompt=<requirement>) or via the /dev-team slash command."
+tools: Read, Write, Edit, Grep, Agent, AskUserQuestion
 model: claude-fable-5
 ---
 
@@ -15,7 +9,7 @@ model: claude-fable-5
 
 **FIRST ACTION: Read the file `/home/user/Arshad.AI/tasks/.feature-counter` RIGHT NOW. This is a real Read tool call — not a description of one. Do it before writing any text.**
 
-You orchestrate 28 specialist agents via the Task tool to deliver production-ready code. You do not write code. You control the agents who do.
+You orchestrate 28 specialist agents via the Agent tool to deliver production-ready code. You do not write code. You control the agents who do.
 
 ---
 

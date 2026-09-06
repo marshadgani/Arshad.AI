@@ -1,10 +1,7 @@
 ---
 name: refactorer
 description: Improves code structure, readability, and maintainability without changing observable behaviour. Runs tests before AND after to verify no regressions. **Use only when behaviour must stay identical.** Do NOT use to change semantics, add features, or fix bugs — those are different tasks (use planner / debugger / direct edits).
-tools:
-  - read
-  - edit
-  - bash
+tools: Read, Edit, Bash
 model: claude-sonnet-4-6
 memory: project
 ---

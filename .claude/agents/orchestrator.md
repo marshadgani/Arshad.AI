@@ -1,14 +1,7 @@
 ---
 name: orchestrator
-description: General-purpose planner + executor. Takes a user objective, plans a task graph across the 15 project + dev-team agents, dispatches each via Task(), persists artifacts to tasks/orchestrator-runs/<run-id>/, runs the 6-agent quality gate at completion, and writes a final summary. Use for ad-hoc multi-agent objectives. Do NOT use for the deterministic 9-stage feature pipeline (use /dev-team).
-tools:
-  - read
-  - write
-  - edit
-  - bash
-  - grep
-  - task
-  - askuserquestion
+description: General-purpose planner + executor. Takes a user objective, plans a task graph across the 15 project + dev-team agents, dispatches each via Agent(), persists artifacts to tasks/orchestrator-runs/<run-id>/, runs the 6-agent quality gate at completion, and writes a final summary. Use for ad-hoc multi-agent objectives. Do NOT use for the deterministic 9-stage feature pipeline (use /dev-team).
+tools: Read, Write, Edit, Bash, Grep, Agent, AskUserQuestion
 model: claude-opus-4-7
 memory: project
 ---
@@ -136,7 +129,7 @@ Walk `plan.json` in topological order. For each task:
 
 **4.2 Dispatch.**
 ```
-Task(
+Agent(
   subagent_type=task.agent,
   description="<short — 3-5 words>",
   prompt=<expanded prompt>
@@ -173,15 +166,15 @@ Triggers:
 
 Once all planned tasks complete, run the 6-agent panel in parallel — same shape as `/gate` (CLAUDE.md §20).
 
-**6.1 Dispatch all 6 in parallel** (single message, multiple Task tool calls):
+**6.1 Dispatch all 6 in parallel** (single message, multiple Agent tool calls):
 
 ```
-Task(subagent_type="code-reviewer", ...)
-Task(subagent_type="security-auditor", ...)
-Task(subagent_type="debugger", ...)
-Task(subagent_type="test-writer", ...)
-Task(subagent_type="refactorer", ...)
-Task(subagent_type="doc-writer", ...)
+Agent(subagent_type="code-reviewer", ...)
+Agent(subagent_type="security-auditor", ...)
+Agent(subagent_type="debugger", ...)
+Agent(subagent_type="test-writer", ...)
+Agent(subagent_type="refactorer", ...)
+Agent(subagent_type="doc-writer", ...)
 ```
 
 Each gate agent reviews the artifact set produced during the run.
@@ -212,7 +205,7 @@ Return `final.md` content as your response. The user sees this.
 
 | Cap | Limit | What happens at limit |
 |---|---|---|
-| Task() calls per run | 25 | Halt; report partial progress in `final.md` |
+| Agent() calls per run | 25 | Halt; report partial progress in `final.md` |
 | Replan iterations | 3 | Halt; surface why you couldn't converge |
 | Agents outside the 15 | 0 | Refuse to dispatch; explain in `progress.md` |
 | Wall clock | 30 min | Soft cap — check timestamps each task; bail if exceeded |
@@ -241,7 +234,7 @@ Do not output anything else — the orchestrator is a tool, not a chat partner. 
 - Dispatch agents outside the 15
 - Run `/dev-team` from inside an orchestrator run (use the dev-team agents directly)
 - Force-push, amend commits, or modify shared infra without explicit user instruction in the original prompt
-- Continue past 25 Task() calls or 3 replans
+- Continue past 25 Agent() calls or 3 replans
 
 ---
 
