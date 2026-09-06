@@ -4,7 +4,7 @@
 **Branch:** `claude/ai-personal-assistant-CcA11` → `claude/ai-personal-assistant-main`
 **Triggered by:** Production outage fix — startup NameErrors + security fix
 **Date:** 2026-09-06
-**Gate iteration:** 3 (auto-fix loop ran — all criticals resolved before push)
+**Gate iteration:** 4 (re-triggered — prior auto-merge consumed wrong commit; this push carries correct fixes)
 
 ---
 
