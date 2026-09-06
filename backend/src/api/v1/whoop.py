@@ -6,6 +6,7 @@ All endpoints require the user to have connected their Whoop account first.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import httpx
@@ -27,6 +28,8 @@ from src.schemas.whoop import (
 )
 
 router = APIRouter(prefix="/api/v1/whoop", tags=["whoop"])
+
+_log = logging.getLogger(__name__)
 
 _BASE = "https://api.prod.whoop.com/developer/v1"
 
@@ -86,14 +89,21 @@ _SPORT_NAMES: dict[int, str] = {
 
 
 async def _check_rate_limit(user_id: str) -> None:
-    """Sliding-window 30 req/min per user across all Whoop endpoints."""
-    redis = await get_redis()
-    if redis is None:
+    """Sliding-window 30 req/min per user across all Whoop endpoints.
+
+    Fails open on a Redis outage: losing rate limiting is acceptable,
+    losing the entire Health & Fitness page over a cache dependency is not.
+    """
+    try:
+        redis_client = await get_redis()
+        key = f"rl:whoop:{user_id}"
+        count = await redis_client.incr(key)
+        if count == 1:
+            await redis_client.expire(key, 60)
+    except redis.exceptions.RedisError as exc:
+        _log.warning("Whoop rate limiter degraded — Redis unreachable: %s", exc)
         return
-    key = f"rl:whoop:{user_id}"
-    count = await redis.incr(key)
-    if count == 1:
-        await redis.expire(key, 60)
+
     if count > 30:
         raise HTTPException(
             status_code=429,
