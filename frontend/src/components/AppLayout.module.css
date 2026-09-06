@@ -20,6 +20,13 @@
      ChatPanel's .scroller) own the scroll instead of the document. */
   flex: 1 1 auto;
   min-height: 0;
+  /* The height chain only reaches ChatPanel if this box is itself a column
+     flex container: .panel declares `flex: 1 1 auto`, which is inert unless
+     its parent formats it as a flex item. Without this, .scroller's
+     `overflow-y: auto` never engages, the message list grows the document,
+     and the composer is pushed below the fold. */
+  display: flex;
+  flex-direction: column;
 }
 
 /* Reserves room for the fixed ChatLauncher FAB. Applied conditionally by

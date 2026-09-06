@@ -18,7 +18,12 @@
   .sidebar {
     width: min(var(--sidebar-w), 84vw);
     transform: translateX(-100%);
-    transition: transform 200ms ease;
+    /* transform alone moves the drawer off-screen but leaves its links in
+       the tab order and in the accessibility tree. `visibility: hidden`
+       removes both; the 200ms delay holds it visible for the length of the
+       close animation so the drawer does not blink out mid-slide. */
+    visibility: hidden;
+    transition: transform 200ms ease, visibility 0s linear 200ms;
     will-change: transform;
     outline: none;
     /* Prevents scrolling to the end of the drawer's nav list from chaining
@@ -27,11 +32,14 @@
   }
   .sidebarOpen {
     transform: translateX(0);
+    visibility: visible;
+    transition: transform 200ms ease, visibility 0s linear 0s;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sidebar {
+  .sidebar,
+  .sidebarOpen {
     transition: none;
   }
 }
