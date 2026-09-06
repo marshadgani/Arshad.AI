@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import { vi } from 'vitest';
 
 import Sidebar from './Sidebar';
@@ -88,6 +88,30 @@ describe('Sidebar', () => {
     renderSidebar(false, onClose);
     await userEvent.keyboard('{Escape}');
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('calls onClose when the route changes', async () => {
+    mockMatchMedia(true);
+    const onClose = vi.fn();
+
+    function Harness() {
+      const navigate = useNavigate();
+      return (
+        <>
+          <button type="button" onClick={() => navigate('/other')}>go</button>
+          <Sidebar isOpen onClose={onClose} />
+        </>
+      );
+    }
+
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <Harness />
+      </MemoryRouter>,
+    );
+    await user.click(screen.getByRole('button', { name: 'go' }));
+    expect(onClose).toHaveBeenCalled();
   });
 
   it('restores body overflow after unmount', async () => {
