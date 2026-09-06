@@ -1,0 +1,9 @@
+.scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 8, 17, 0.6);
+  backdrop-filter: blur(2px);
+  border: 0;
+  padding: 0;
+  z-index: var(--z-scrim);
+}

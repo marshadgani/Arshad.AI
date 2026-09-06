@@ -35,16 +35,13 @@ function installMatchMedia() {
       onchange: null,
       addListener: (listener: Listener) => mql.addEventListener('change', listener),
       removeListener: (listener: Listener) => mql.removeEventListener('change', listener),
-      addEventListener: (_type: string, listener?: Listener) => {
-        const fn = typeof _type === 'function' ? (_type as unknown as Listener) : listener;
-        if (!fn) return;
-        if (!listenersByQuery.has(query)) listenersByQuery.set(query, new Set());
-        listenersByQuery.get(query)!.add(fn);
+      addEventListener: (_type: string, listener: Listener) => {
+        const listeners = listenersByQuery.get(query) ?? new Set<Listener>();
+        listeners.add(listener);
+        listenersByQuery.set(query, listeners);
       },
-      removeEventListener: (_type: string, listener?: Listener) => {
-        const fn = typeof _type === 'function' ? (_type as unknown as Listener) : listener;
-        if (!fn) return;
-        listenersByQuery.get(query)?.delete(fn);
+      removeEventListener: (_type: string, listener: Listener) => {
+        listenersByQuery.get(query)?.delete(listener);
       },
       dispatchEvent: () => false,
     } as unknown as MediaQueryList;

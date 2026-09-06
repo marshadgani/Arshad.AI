@@ -1,22 +1,15 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
-import { isChatPath, CHAT_PATH } from '../../routes/paths';
+import { CHAT_PATH } from '../../routes/paths';
+import { useChatLauncherVisible } from '../../hooks/useChatLauncherVisible';
 import styles from './ChatLauncher.module.css';
 
 export interface ChatLauncherProps {
   isNavOpen: boolean;
 }
 
-// Single source of truth for whether the FAB is on screen. AppLayout uses it
-// to reserve bottom padding; ChatLauncher uses it to decide whether to
-// render. Previously each re-derived the rule, so they could drift apart.
-export function useChatLauncherVisible(isNavOpen: boolean): boolean {
-  const { pathname } = useLocation();
-  // Never overlay the chat surface it links to, and never fight the nav
-  // drawer for the user's attention while it's open.
-  return !isChatPath(pathname) && !isNavOpen;
-}
-
+// Presentation only. The visibility rule is shared with the shell, so it
+// lives in hooks/useChatLauncherVisible rather than here.
 export default function ChatLauncher({ isNavOpen }: ChatLauncherProps) {
   const isVisible = useChatLauncherVisible(isNavOpen);
   if (!isVisible) return null;

@@ -74,6 +74,3 @@ body {
   background-position: 0 var(--topbar-h);
   background-attachment: fixed;
 }
-
-/* Hide HUD grid where panels cover the page. Panels paint over it
-   with their own opaque/translucent backgrounds. */

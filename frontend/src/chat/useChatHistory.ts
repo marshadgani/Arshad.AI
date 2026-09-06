@@ -47,12 +47,18 @@ export function useChatHistory(sessionId: string): ChatHistory {
   const reload = useCallback(() => setReloadToken((t) => t + 1), []);
 
   const refresh = useCallback(() => {
-    // Deliberately silent: this runs after a successful stream, where the
-    // user already has the assistant's reply on screen. A failed refresh
-    // leaves the optimistic view intact rather than flashing an error.
+    // Deliberately silent to the *user*: this runs after a successful
+    // stream, where they already have the assistant's reply on screen. A
+    // failed refresh leaves the optimistic view intact rather than flashing
+    // an error. It must not be silent to the *developer*, though — swallow
+    // it without a trace and a real backend regression here (e.g. the
+    // persisted-history endpoint breaking) would never surface anywhere.
     fetchChatMessages(sessionId)
       .then(setMessages)
-      .catch(() => undefined);
+      .catch((err: unknown) => {
+        // eslint-disable-next-line no-console
+        console.error('[useChatHistory] silent refresh failed', { sessionId, err });
+      });
   }, [sessionId]);
 
   const appendOptimistic = useCallback((text: string) => {

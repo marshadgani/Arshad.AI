@@ -1,6 +1,6 @@
 import { FormEvent, useState } from 'react';
 
-import styles from './ChatPanel.module.css';
+import styles from './ChatComposer.module.css';
 
 export interface ChatComposerProps {
   disabled: boolean;

@@ -1,0 +1,58 @@
+.composer {
+  display: flex;
+  gap: var(--s-2);
+  padding: var(--s-4) var(--s-8);
+  border-top: 1px solid var(--border-faint);
+  background: var(--bg-elevated);
+}
+
+.input {
+  flex: 1 1 auto;
+  background: var(--bg-deep);
+  color: inherit;
+  border: 1px solid var(--border-faint);
+  border-radius: var(--radius-md);
+  padding: var(--s-2) var(--s-3);
+  font-size: 0.95rem;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.send {
+  appearance: none;
+  border: 0;
+  background: var(--accent);
+  color: var(--bg-deep);
+  padding: var(--s-2) var(--s-5);
+  font-weight: 500;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.send:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* breakpoints.ts: mobile */
+@media (max-width: 767.98px) {
+  .composer {
+    padding: var(--s-3) var(--s-4);
+    padding-bottom: calc(var(--s-3) + env(safe-area-inset-bottom));
+  }
+
+  .input {
+    min-height: 44px;
+    /* 16px prevents iOS Safari from zooming the viewport on input focus,
+       which is the root cause of unwanted horizontal scroll on mobile. */
+    font-size: 16px;
+  }
+
+  .send {
+    min-height: 44px;
+    padding: var(--s-2) var(--s-4);
+  }
+}

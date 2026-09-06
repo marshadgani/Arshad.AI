@@ -1,0 +1,7 @@
+.toolUseInline {
+  align-self: flex-start;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  padding: 0.2rem var(--s-2);
+}

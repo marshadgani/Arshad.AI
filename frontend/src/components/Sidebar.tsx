@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { NavLink } from 'react-router-dom';
 
+import Scrim from './Scrim';
 import type { NavItem } from '../data/mockData';
 import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { useEscapeKey } from '../hooks/useEscapeKey';
@@ -20,10 +21,10 @@ function navItemClass({ isActive }: { isActive: boolean }): string {
 }
 
 export default function Sidebar({ isOpen, onClose, overlayMode }: SidebarProps) {
-  const { data: navItems } = useFetch<NavItem[]>('/api/v1/nav');
+  const { data: navItems, error: navError } = useFetch<NavItem[]>('/api/v1/nav');
   // Below the mobile breakpoint the sidebar is an off-canvas modal drawer;
   // above it, a persistent landmark. Every modal-only behaviour hangs off
-  // this one predicate, supplied by AppLayout — the sole breakpoint
+  // this one predicate, supplied by useAppShell — the sole breakpoint
   // subscriber in the tree — so Sidebar itself never reads the viewport.
   const asideRef = useRef<HTMLElement>(null);
   const isModal = isOpen && overlayMode;
@@ -51,14 +52,7 @@ export default function Sidebar({ isOpen, onClose, overlayMode }: SidebarProps) 
 
   return (
     <>
-      {isModal && (
-        <button
-          type="button"
-          className={styles.scrim}
-          aria-label="Close navigation"
-          onClick={onClose}
-        />
-      )}
+      {isModal && <Scrim label="Close navigation" onDismiss={onClose} />}
       <aside
         id="app-sidebar"
         ref={asideRef}
@@ -75,12 +69,22 @@ export default function Sidebar({ isOpen, onClose, overlayMode }: SidebarProps) 
 
         <div className={styles.section}>
           <div className={styles.label}>Workspace</div>
-          {(navItems ?? []).map((n) => (
-            <NavLink key={n.to} to={n.to} end={n.to === '/'} className={navItemClass}>
-              <span className={styles.icon}>{n.icon}</span>
-              <span>{n.label}</span>
-            </NavLink>
-          ))}
+          {navError ? (
+            // A dropped fetch here used to render an empty Workspace section
+            // with no signal that navigation had failed to load — the user
+            // would just see a sidebar missing all its links. Surface it
+            // instead of hiding it behind `navItems ?? []`.
+            <div className={styles.navError} role="alert">
+              Navigation failed to load.
+            </div>
+          ) : (
+            (navItems ?? []).map((n) => (
+              <NavLink key={n.to} to={n.to} end={n.to === '/'} className={navItemClass}>
+                <span className={styles.icon}>{n.icon}</span>
+                <span>{n.label}</span>
+              </NavLink>
+            ))
+          )}
         </div>
 
         <div className={styles.section}>

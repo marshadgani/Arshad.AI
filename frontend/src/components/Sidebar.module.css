@@ -44,15 +44,7 @@
   }
 }
 
-.scrim {
-  position: fixed;
-  inset: 0;
-  background: rgba(5, 8, 17, 0.6);
-  backdrop-filter: blur(2px);
-  border: 0;
-  padding: 0;
-  z-index: var(--z-scrim);
-}
+/* The dimmed backdrop is not a sidebar concern — see components/Scrim. */
 
 .brand {
   display: flex;
@@ -84,6 +76,13 @@
 .brandText span { font-size: 10px; color: var(--text-muted); font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.08em; }
 
 .section { display: flex; flex-direction: column; gap: 2px; }
+
+.navError {
+  padding: var(--s-2) var(--s-3);
+  font-size: 12px;
+  color: var(--status-danger);
+}
+
 .label {
   font-size: 10px;
   font-weight: 600;

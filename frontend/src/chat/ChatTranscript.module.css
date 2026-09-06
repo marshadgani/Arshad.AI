@@ -1,0 +1,118 @@
+.scroller {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--s-6) var(--s-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.streamingBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  align-items: flex-start;
+}
+
+.intent {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.error {
+  align-self: flex-start;
+  padding: var(--s-2) var(--s-3);
+  background: rgba(255, 77, 109, 0.15);
+  border: 1px solid var(--status-danger);
+  border-radius: var(--radius-md);
+  color: var(--status-danger);
+  font-size: 0.85rem;
+}
+
+.loadingState {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  align-self: center;
+  margin: auto 0;
+  padding: var(--s-6);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--accent);
+  animation: spin 700ms linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-3);
+  margin: auto 0;
+  padding: var(--s-8);
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.emptyGlyph {
+  font-size: 2rem;
+  color: var(--accent);
+  filter: drop-shadow(0 0 12px rgba(0, 234, 255, 0.35));
+}
+
+.historyError {
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4);
+  background: rgba(255, 77, 109, 0.15);
+  border: 1px solid var(--status-danger);
+  border-radius: var(--radius-md);
+  color: var(--status-danger);
+  font-size: 0.85rem;
+}
+
+.retryButton {
+  appearance: none;
+  border: 1px solid var(--status-danger);
+  background: transparent;
+  color: var(--status-danger);
+  padding: var(--s-1) var(--s-3);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.retryButton:hover,
+.retryButton:focus-visible {
+  background: rgba(255, 77, 109, 0.15);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 1.4s;
+  }
+}
+
+/* breakpoints.ts: mobile */
+@media (max-width: 767.98px) {
+  .scroller {
+    padding: var(--s-4);
+  }
+}

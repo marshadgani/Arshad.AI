@@ -1,56 +1,39 @@
-import { ReactNode, useEffect, useRef } from 'react';
+import { ReactNode, useRef } from 'react';
 
-import ChatLauncher, { useChatLauncherVisible } from './ChatLauncher';
+import ChatLauncher from './ChatLauncher';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
-import { useDisclosure } from '../hooks/useDisclosure';
-import { useInertWhile } from '../hooks/useInertWhile';
-import { useIsMobile } from '../hooks/useBreakpoint';
+import { useAppShell } from '../hooks/useAppShell';
 import styles from './AppLayout.module.css';
 
 export interface AppLayoutProps {
   children: ReactNode;
 }
 
-// Sole owner of the mobile/desktop breakpoint subscription and of every
-// cross-component modal effect it drives — this is the only component that
-// actually renders Sidebar, TopBar and <main>, so it is the only place that
-// can safely reach across them.
+// Composition only: it arranges the shell's three regions and hands each
+// the slice of shell state it needs. All behaviour — the breakpoint
+// subscription, drawer disclosure, background inertness and the
+// rotation-close repair — lives in useAppShell.
 export default function AppLayout({ children }: AppLayoutProps) {
-  const nav = useDisclosure();
-  const overlayMode = useIsMobile();
-  const showLauncher = useChatLauncherVisible(nav.isOpen);
   const mainRef = useRef<HTMLElement>(null);
+  const shell = useAppShell({ contentRef: mainRef });
 
-  // A drawer left open across a mobile-to-desktop transition (e.g. device
-  // rotation) would otherwise survive the scrim unmounting and permanently
-  // hide the FAB, since useChatLauncherVisible gates on nav.isOpen.
-  const wasOverlay = useRef(overlayMode);
-  useEffect(() => {
-    if (wasOverlay.current && !overlayMode) {
-      nav.close();
-    }
-    wasOverlay.current = overlayMode;
-  }, [overlayMode, nav]);
-
-  // The drawer is only a true modal while it is both open and rendered as
-  // an overlay (mobile). On desktop it is a persistent landmark and must
-  // never make the rest of the page inert.
-  const isNavModal = nav.isOpen && overlayMode;
-  useInertWhile(isNavModal, [mainRef]);
-
-  const contentClass = showLauncher
+  const contentClass = shell.showLauncher
     ? `${styles.content} ${styles.contentFabPad}`
     : styles.content;
 
   return (
     <div className={styles.app}>
-      <Sidebar isOpen={nav.isOpen} onClose={nav.close} overlayMode={overlayMode} />
-      <TopBar onMenuClick={nav.toggle} isNavOpen={nav.isOpen} />
+      <Sidebar
+        isOpen={shell.isNavOpen}
+        onClose={shell.closeNav}
+        overlayMode={shell.overlayMode}
+      />
+      <TopBar onMenuClick={shell.toggleNav} isNavOpen={shell.isNavOpen} />
       <main ref={mainRef} className={styles.main}>
         <div className={contentClass}>{children}</div>
       </main>
-      <ChatLauncher isNavOpen={nav.isOpen} />
+      <ChatLauncher isNavOpen={shell.isNavOpen} />
     </div>
   );
 }
