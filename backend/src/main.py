@@ -10,10 +10,12 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from src.agents.routers import router as agents_router
 from src.api.v1.ai_ecosystem import router as ai_ecosystem_router
+from src.api.v1.ai_ecosystem_skills import router as ai_ecosystem_skills_router
 from src.api.v1.chat import router as chat_router
 from src.api.v1.dashboard import router as dashboard_router
 from src.api.v1.domains import router as domains_router
 from src.api.v1.obsidian import router as obsidian_router
+from src.api.v1.whoop import router as whoop_router
 from src.auth.routers import router as auth_router
 from src.middleware.cache import close_redis
 from src.models.database import AsyncSessionLocal
@@ -175,6 +177,7 @@ app.include_router(chat_router)
 app.include_router(dashboard_router)
 app.include_router(domains_router)
 app.include_router(ai_ecosystem_router)
+app.include_router(ai_ecosystem_skills_router)
 app.include_router(obsidian_router)
 app.include_router(whoop_router)
 app.include_router(integrations_router)
