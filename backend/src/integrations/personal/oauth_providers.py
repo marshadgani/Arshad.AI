@@ -492,16 +492,8 @@ class WhoopIntegration(OAuthIntegrationProvider):
             integration.last_error = f"{type(exc).__name__}: {exc}"[:500]
             await db.commit()
             raise IntegrationError("sync_failed", f"{type(exc).__name__}: {exc}")
-        records = body.get("records") or []
-        latest = records[0] if records else {}
-        score = latest.get("score") or {}
-        integration.config = {
-            **(integration.config or {}),
-            "latest_recovery_score": score.get("recovery_score"),
-            "latest_hrv_rmssd": score.get("hrv_rmssd_milli"),
-            "latest_resting_hr": score.get("resting_heart_rate"),
-            "window_start": start,
-        }
+        # Biometric fields are fetched live per request — do not cache in cleartext config.
+        # Config stores only non-sensitive profile metadata (first_name) set during OAuth connect.
         integration.last_synced_at = datetime.now(timezone.utc)
         integration.last_error = None
         integration.status = "connected"
