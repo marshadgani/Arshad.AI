@@ -157,26 +157,26 @@ def _parse_strain(record: dict) -> WhoopStrain:
     )
 
 
-@router.get("/dashboard", response_model=WhoopDashboard)
+@router.get("/dashboard")
 async def get_dashboard(
     current_user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> WhoopDashboard:
+) -> JSONResponse:
     """Return today's recovery, sleep, and strain snapshot."""
     integration = await _get_whoop_integration(str(current_user.id), db)
     if not integration:
-        return WhoopDashboard(connected=False)
+        return JSONResponse({"data": WhoopDashboard(connected=False).model_dump()})
 
     try:
         token = await _get_token(integration, db)
         recovery_body, sleep_body, strain_body = await _fetch_dashboard_data(token)
-    except httpx.HTTPStatusError as exc:
+    except httpx.HTTPStatusError:
         raise HTTPException(
             status_code=502,
             detail={
                 "error": {
                     "code": "whoop_api_error",
-                    "message": f"Whoop API returned {exc.response.status_code}.",
+                    "message": "Upstream health service is unavailable. Please try again later.",
                     "details": {},
                 }
             },
@@ -187,13 +187,14 @@ async def get_dashboard(
     strain_records = strain_body.get("records") or []
 
     config = integration.config or {}
-    return WhoopDashboard(
+    dashboard = WhoopDashboard(
         connected=True,
         recovery=_parse_recovery(recovery_records[0]) if recovery_records else None,
         sleep=_parse_sleep(sleep_records[0]) if sleep_records else None,
         strain=_parse_strain(strain_records[0]) if strain_records else None,
         user_first_name=config.get("first_name"),
     )
+    return JSONResponse({"data": dashboard.model_dump()})
 
 
 async def _fetch_dashboard_data(token: str) -> tuple[Any, Any, Any]:
@@ -224,16 +225,13 @@ async def _parallel_get(
     return await asyncio.gather(*[fetch(p, q) for p, q in zip(paths, params_list)])
 
 
-@router.get("/hrv-trend", response_model=list[WhoopHRVPoint])
+@router.get("/hrv-trend")
 async def get_hrv_trend(
-    days: int = 14,
+    days: int = Query(default=14, ge=1, le=30),
     current_user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> list[WhoopHRVPoint]:
+) -> JSONResponse:
     """Return HRV data points for the last N days (max 30)."""
-    if days > 30:
-        days = 30
-
     integration = await _get_whoop_integration(str(current_user.id), db)
     if not integration:
         raise HTTPException(
@@ -254,26 +252,24 @@ async def get_hrv_trend(
     body = await _whoop_get("/recovery", token, {"limit": days, "start": start})
     records = body.get("records") or []
 
-    return [
+    points = [
         WhoopHRVPoint(
             date=r.get("created_at", "")[:10],
             hrv_rmssd_milli=(r.get("score") or {}).get("hrv_rmssd_milli"),
-        )
+        ).model_dump()
         for r in reversed(records)
         if r.get("created_at")
     ]
+    return JSONResponse({"data": points, "total": len(points)})
 
 
-@router.get("/workouts", response_model=list[WhoopWorkout])
+@router.get("/workouts")
 async def get_workouts(
-    limit: int = 10,
+    limit: int = Query(default=10, ge=1, le=25),
     current_user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> list[WhoopWorkout]:
+) -> JSONResponse:
     """Return recent workouts."""
-    if limit > 25:
-        limit = 25
-
     integration = await _get_whoop_integration(str(current_user.id), db)
     if not integration:
         raise HTTPException(
@@ -291,7 +287,7 @@ async def get_workouts(
     body = await _whoop_get("/workout", token, {"limit": limit})
     records = body.get("records") or []
 
-    return [
+    workouts = [
         WhoopWorkout(
             id=r.get("id"),
             sport_id=r.get("sport_id"),
@@ -302,6 +298,7 @@ async def get_workouts(
             average_heart_rate=(r.get("score") or {}).get("average_heart_rate"),
             max_heart_rate=(r.get("score") or {}).get("max_heart_rate"),
             kilojoule=(r.get("score") or {}).get("kilojoule"),
-        )
+        ).model_dump()
         for r in records
     ]
+    return JSONResponse({"data": workouts, "total": len(workouts)})
