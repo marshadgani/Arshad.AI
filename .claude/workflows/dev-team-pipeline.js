@@ -159,17 +159,17 @@ async function runFeaturePipeline(f) {
   }
 
   log_('System Engineer')
-  const sysEng = await withRole('system-engineer', () => agent(
+  const sysEng = await withRole('system-architect', () => agent(
     `${ctxHeader(f, 'System Engineer')}\nSDD: ${JSON.stringify(sdd)}\nArchitecture Critic concerns: ${JSON.stringify(archCritic)}\nDesign system architecture, component structure, data flow, schema, caching strategy. Return JSON: {system_design:{...}}.`,
-    { agentType: 'system-engineer', model: OPUS, phase: 'Design', schema: { type: 'object', properties: { system_design: { type: 'object' } }, required: ['system_design'] } }
+    { agentType: 'system-architect', model: OPUS, phase: 'Design', schema: { type: 'object', properties: { system_design: { type: 'object' } }, required: ['system_design'] } }
   ))
 
   phase('Build')
 
   log_('Engineer (MVP)')
-  const eng = await withRole('engineer', () => agent(
+  const eng = await withRole('fullstack-developer', () => agent(
     `${ctxHeader(f, 'Engineer')}\nSDD: ${JSON.stringify(sdd)}\nSystem design: ${JSON.stringify(sysEng)}\nCodebase context: ${JSON.stringify(codebase_context)}\nBuild a production-ready MVP. Return files (path+content) and a summary.`,
-    { agentType: 'engineer', phase: 'Build', schema: FILES_SCHEMA }
+    { agentType: 'fullstack-developer', phase: 'Build', schema: FILES_SCHEMA }
   ))
   code = mergeFiles(code, eng && eng.files)
   { const hits = denylistHits(eng && eng.files); if (hits.length) return { featId: f.featId, status: 'halted', reason: `Denylist violation at Engineer: ${hits.map(h => h.path).join(', ')}` } }
@@ -188,10 +188,10 @@ async function runFeaturePipeline(f) {
     { role: 'database-specialist', label: 'Database Specialist', ask: 'Audit every DB interaction — queries, indexes, ORM, migrations, N+1, unsafe SQL. Fix issues found (empty files array if none apply).' },
     { role: 'python-specialist', label: 'Python Specialist', ask: 'Audit async correctness, FastAPI DI, Pydantic v2, exceptions, type annotations. Fix issues found (empty files array if none apply).' },
     { role: 'code-reviewer', label: 'Code Reviewer', ask: 'Review against CLAUDE.md rules (api.md, database.md, frontend.md) — naming, error shapes, async patterns, UUIDs. Fix departures.', model: OPUS },
-    { role: 'frontend-engineer', label: 'Frontend Engineer', ask: 'Apply the frontend-design skill: bold aesthetic direction, distinctive typography/colour/motion, all 4 states (loading/empty/error/content), accessible, reusable.' },
+    { role: 'frontend-developer', label: 'Frontend Engineer', ask: 'Apply the frontend-design skill: bold aesthetic direction, distinctive typography/colour/motion, all 4 states (loading/empty/error/content), accessible, reusable.' },
     { role: 'type-design-analyzer', label: 'Type Design Analyzer', ask: 'Audit the type system for weak types, missing invariant encoding, illegal-state prevention. Improve types.' },
-    { role: 'senior-engineer', label: 'Senior Engineer', ask: 'Code quality audit — N+1, bad patterns, scalability risks. NO functionality changes.', model: OPUS },
-    { role: 'software-architect', label: 'Software Architect', ask: 'Restructure to separate concerns, reduce coupling, increase modularity. NO functionality changes.', model: OPUS },
+    { role: 'code-analyzer', label: 'Senior Engineer', ask: 'Code quality audit — N+1, bad patterns, scalability risks. NO functionality changes.', model: OPUS },
+    { role: 'refactoring-specialist', label: 'Software Architect', ask: 'Restructure to separate concerns, reduce coupling, increase modularity. NO functionality changes.', model: OPUS },
     { role: 'silent-failure-hunter', label: 'Silent Failure Hunter', ask: 'Find swallowed exceptions, HTTP 200 masking errors, missing propagation. Fix them.' },
     { role: 'code-simplifier', label: 'Code Simplifier', ask: 'Eliminate unnecessary abstraction, over-engineering, verbose constructs. Preserve all functionality.', model: OPUS },
   ]
@@ -276,9 +276,9 @@ async function runFeaturePipeline(f) {
   if (dbg && dbg.summary && /resolved|fixed|clear/i.test(dbg.summary)) halt = null
 
   log_('Performance Optimisation Engineer')
-  const perf = await withRole('performance-optimisation-engineer', () => agent(
+  const perf = await withRole('performance-engineer', () => agent(
     `${ctxHeader(f, 'Performance Optimisation Engineer')}\nEliminate bottlenecks — N+1, missing indexes, async gaps, memory leaks.\nCode:\n${dump(code)}`,
-    { agentType: 'performance-optimisation-engineer', phase: 'Harden', schema: FILES_SCHEMA }
+    { agentType: 'performance-engineer', phase: 'Harden', schema: FILES_SCHEMA }
   ))
   code = mergeFiles(code, perf && perf.files)
 
