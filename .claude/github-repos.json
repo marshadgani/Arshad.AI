@@ -4,66 +4,66 @@
   "weekly_update_time": "00:00 UTC",
   "repos": {
     "claude-code": {
-      "url": "https://github.com/anthropics/claude-code",
+      "url": "https://github.com/anthropics/claude-code.git",
       "name": "claude-code",
-      "last_fetched": "2026-07-12",
+      "last_fetched": "2026-09-03 21:18 UTC",
       "components": {
         "skills": [
-          "claude-opus-4-5-migration",
-          "frontend-design",
           "writing-rules",
-          "agent-development",
-          "command-development",
-          "hook-development",
-          "mcp-integration",
           "plugin-settings",
+          "mcp-integration",
+          "command-development",
+          "agent-development",
           "plugin-structure",
-          "skill-development"
+          "hook-development",
+          "skill-development",
+          "claude-opus-4-5-migration",
+          "frontend-design"
         ],
         "agents": [
+          "code-explorer",
+          "code-architect",
+          "code-reviewer",
           "agent-sdk-verifier-py",
           "agent-sdk-verifier-ts",
-          "code-architect",
-          "code-explorer",
-          "code-reviewer",
           "conversation-analyzer",
-          "agent-creator",
           "plugin-validator",
+          "agent-creator",
           "skill-reviewer",
-          "code-simplifier",
           "comment-analyzer",
+          "type-design-analyzer",
+          "code-simplifier",
           "pr-test-analyzer",
-          "silent-failure-hunter",
-          "type-design-analyzer"
+          "code-reviewer",
+          "silent-failure-hunter"
         ],
         "commands": [
+          "feature-dev",
+          "new-sdk-app",
+          "help",
+          "configure",
+          "list",
+          "hookify",
+          "create-plugin",
+          "help",
+          "ralph-loop",
+          "cancel-ralph",
+          "code-review",
+          "review-pr",
+          "clean_gone",
+          "commit",
           "commit-push-pr",
           "dedupe",
           "triage-issue",
-          "new-sdk-app",
-          "code-review",
-          "clean_gone",
-          "commit",
-          "feature-dev",
-          "configure",
-          "help",
-          "hookify",
-          "list",
-          "create-plugin",
-          "review-pr",
-          "cancel-ralph",
-          "ralph-loop"
+          "commit-push-pr"
         ],
         "hooks": [
-          "explanatory-output-style/hooks.json",
-          "hookify/hooks.json",
-          "learning-output-style/hooks.json",
-          "ralph-wiggum/hooks.json",
-          "security-guidance/hooks.json",
           "sg-python.sh",
           "stop-hook.sh"
         ],
-        "token_optimization": []
+        "token_optimization": [
+          "CHANGELOG.md"
+        ]
       }
     },
     "anthropics-skills": {
@@ -97,53 +97,59 @@
       }
     },
     "repomix": {
-      "url": "https://github.com/yamadashy/repomix",
+      "url": "https://github.com/yamadashy/repomix.git",
       "name": "repomix",
-      "last_fetched": "2026-07-12",
+      "last_fetched": "2026-09-03 21:18 UTC",
       "components": {
         "skills": [
           "repomix-explorer",
+          "browser-extension-developer",
+          "website-maintainer",
           "contextual-commit",
           "agent-carnet",
-          "browser-extension-developer",
-          "website-maintainer"
+          "clawhub"
         ],
         "agents": [
           "explorer",
-          "reviewer-code-quality",
           "reviewer-conventions",
-          "reviewer-holistic",
           "reviewer-performance",
-          "reviewer-security",
-          "reviewer-test-coverage"
+          "reviewer-docs-i18n",
+          "reviewer-code-quality",
+          "reviewer-test-coverage",
+          "reviewer-holistic",
+          "reviewer-cross-platform",
+          "reviewer-security"
         ],
         "commands": [
-          "pack-local",
-          "pack-remote",
           "explore-local",
           "explore-remote",
+          "pack-local",
+          "pack-remote",
+          "claude-rule-update",
+          "gemini-discuss",
+          "codex-review-loop",
           "lint-fix",
           "perf-tuning",
           "review-loop",
-          "codex-review-loop",
-          "claude-rule-update",
-          "gemini-discuss",
-          "git-commit-push",
           "git-commit",
-          "pr-address-feedback",
           "pr-create",
           "pr-prepare",
           "pr-review",
-          "release-note-generate"
+          "git-commit-push",
+          "release-note-generate",
+          "pr-address-feedback"
         ],
         "hooks": [],
-        "token_optimization": []
+        "token_optimization": [
+          "v1.2.0.md",
+          "release-note-generate.md"
+        ]
       }
     },
     "superpowers": {
       "url": "https://github.com/obra/superpowers.git",
       "name": "superpowers",
-      "last_fetched": "2026-07-12",
+      "last_fetched": "2026-09-03 21:18 UTC",
       "components": {
         "skills": [
           "using-superpowers",
@@ -192,16 +198,20 @@
     "claude-mem": {
       "url": "https://github.com/thedotmack/claude-mem.git",
       "name": "claude-mem",
-      "last_fetched": "2026-07-07 23:18 UTC",
+      "last_fetched": "2026-09-03 21:18 UTC",
       "components": {
         "skills": [
+          "mem-setup",
+          "mem-search",
           "weekly-digests",
           "pathfinder",
           "oh-my-issues",
           "learn-codebase",
           "what-the",
           "smart-explore",
+          "mode-creator",
           "mem-search",
+          "cloud-sync",
           "timeline-report",
           "design-is",
           "wowerpoint",
@@ -214,7 +224,12 @@
           "knowledge-agent",
           "make-plan",
           "do",
-          "openclaw"
+          "openclaw",
+          "host-observer",
+          "install",
+          "mem-search",
+          "install",
+          "mem-search"
         ],
         "agents": [],
         "commands": [
@@ -223,14 +238,15 @@
         "hooks": [],
         "token_optimization": [
           "npx-distribution.md",
-          "CHANGELOG.md"
+          "CHANGELOG.md",
+          "worker-configuration.d.ts"
         ]
       }
     },
     "obsidian-skills": {
       "url": "https://github.com/kepano/obsidian-skills.git",
       "name": "obsidian-skills",
-      "last_fetched": "2026-07-07 23:18 UTC",
+      "last_fetched": "2026-09-03 21:18 UTC",
       "components": {
         "skills": [
           "obsidian-cli",
@@ -248,7 +264,7 @@
     "n8n-mcp": {
       "url": "https://github.com/czlonkowski/n8n-mcp.git",
       "name": "n8n-mcp",
-      "last_fetched": "2026-07-07 23:18 UTC",
+      "last_fetched": "2026-09-03 21:18 UTC",
       "components": {
         "skills": [
           "n8n-code-python",
@@ -288,7 +304,7 @@
     "get-shit-done": {
       "url": "https://github.com/gsd-build/get-shit-done.git",
       "name": "get-shit-done",
-      "last_fetched": "2026-07-07 23:18 UTC",
+      "last_fetched": "2026-09-03 21:19 UTC",
       "components": {
         "skills": [],
         "agents": [
@@ -414,9 +430,9 @@
       }
     },
     "awesome-claude-code": {
-      "url": "https://github.com/hesreallyhim/awesome-claude-code",
+      "url": "https://github.com/hesreallyhim/awesome-claude-code.git",
       "name": "awesome-claude-code",
-      "last_fetched": "2026-07-12",
+      "last_fetched": "2026-09-03 21:19 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -430,13 +446,15 @@
     "context7": {
       "url": "https://github.com/upstash/context7.git",
       "name": "context7",
-      "last_fetched": "2026-07-07 23:18 UTC",
+      "last_fetched": "2026-09-03 21:19 UTC",
       "components": {
         "skills": [
           "context7-mcp",
           "context7-cli",
           "find-docs",
           "context7-docs",
+          "context7-mcp",
+          "context7-mcp",
           "context7-mcp",
           "context7-mcp",
           "context7-mcp",
@@ -505,7 +523,7 @@
     "claude-plugins-official": {
       "url": "https://github.com/anthropics/claude-plugins-official.git",
       "name": "claude-plugins-official",
-      "last_fetched": "2026-07-07 23:18 UTC",
+      "last_fetched": "2026-09-03 21:19 UTC",
       "components": {
         "skills": [
           "access",
@@ -522,6 +540,7 @@
           "example-command",
           "example-skill",
           "project-artifact",
+          "claude-security",
           "plugin-settings",
           "mcp-integration",
           "command-development",
@@ -529,6 +548,7 @@
           "plugin-structure",
           "hook-development",
           "skill-development",
+          "receipts",
           "frontend-design",
           "math-olympiad",
           "claude-md-improver",
@@ -549,11 +569,20 @@
           "agent-sdk-verifier-py",
           "agent-sdk-verifier-ts",
           "conversation-analyzer",
+          "scan-researcher",
+          "patch-generator",
+          "scan-inventory",
+          "patch-verifier",
+          "claude-security",
+          "scan-verifier",
+          "scan-loader",
+          "explore",
           "plugin-validator",
           "agent-creator",
           "skill-reviewer",
           "version-delta-analyst",
           "security-auditor",
+          "uplift-migrator",
           "legacy-analyst",
           "business-rules-extractor",
           "architecture-critic",
@@ -567,6 +596,7 @@
           "silent-failure-hunter"
         ],
         "commands": [
+          "asana-setup",
           "feature-dev",
           "new-sdk-app",
           "help",
@@ -599,6 +629,7 @@
         ],
         "hooks": [
           "sg-python.sh",
+          "hooks.sh",
           "stop-hook.sh"
         ],
         "token_optimization": []
@@ -850,7 +881,7 @@
     "agent-skills": {
       "url": "https://github.com/addyosmani/agent-skills.git",
       "name": "agent-skills",
-      "last_fetched": "2026-07-07 23:19 UTC",
+      "last_fetched": "2026-09-03 21:19 UTC",
       "components": {
         "skills": [
           "interview-me",
@@ -864,6 +895,7 @@
           "documentation-and-adrs",
           "planning-and-task-breakdown",
           "source-driven-development",
+          "constraint-driven-development",
           "code-simplification",
           "spec-driven-development",
           "context-engineering",
@@ -886,6 +918,7 @@
         ],
         "commands": [
           "test",
+          "constraints",
           "webperf",
           "review",
           "spec",
@@ -906,47 +939,44 @@
       }
     },
     "headroom": {
-      "url": "https://github.com/headroomlabs-ai/headroom",
-      "url_previous": "https://github.com/chopratejas/headroom.git",
+      "url": "https://github.com/headroomlabs-ai/headroom.git",
       "name": "headroom",
-      "last_fetched": "2026-07-12",
+      "last_fetched": "2026-09-03 21:19 UTC",
       "components": {
-        "skills": [
-          "headroom"
-        ],
+        "skills": [],
         "agents": [],
         "commands": [],
-        "hooks": [
-          "headroom-agent-hooks/hooks.json"
-        ],
+        "hooks": [],
         "token_optimization": [
           "configuration.md",
           "agno.md",
           "ccr.md",
           "transforms.md",
           "langchain.md",
-          "integration-guide.md",
           "ARCHITECTURE.md",
           "index.md",
           "README.md",
-          "examples/07-context-compression.ipynb",
-          "examples/context_compression_demo.py"
+          "test_ccr.py",
+          "context_compression_demo.py"
         ]
       }
     },
     "agent-browser": {
       "url": "https://github.com/vercel-labs/agent-browser.git",
       "name": "agent-browser",
-      "last_fetched": "2026-07-07 23:19 UTC",
+      "last_fetched": "2026-09-03 21:19 UTC",
       "components": {
         "skills": [
           "agent-browser",
+          "derive-client",
           "dogfood",
+          "webmcp-gen",
           "vercel-sandbox",
           "agentcore",
           "electron",
           "slack",
-          "core"
+          "core",
+          "protected-vercel-deployments"
         ],
         "agents": [],
         "commands": [],
@@ -957,7 +987,7 @@
     "andrej-karpathy-skills": {
       "url": "https://github.com/multica-ai/andrej-karpathy-skills.git",
       "name": "andrej-karpathy-skills",
-      "last_fetched": "2026-07-11",
+      "last_fetched": "2026-09-03 21:19 UTC",
       "components": {
         "skills": [
           "karpathy-guidelines"
@@ -971,7 +1001,7 @@
     "ui-ux-pro-max-skill": {
       "url": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git",
       "name": "ui-ux-pro-max-skill",
-      "last_fetched": "2026-07-07 23:19 UTC",
+      "last_fetched": "2026-09-03 21:19 UTC",
       "components": {
         "skills": [
           "banner-design",
@@ -988,8 +1018,13 @@
           "ui-ux-pro-max",
           "ui-styling"
         ],
-        "agents": [],
-        "commands": [],
+        "agents": [
+          "design-review"
+        ],
+        "commands": [
+          "design-plan",
+          "design-review"
+        ],
         "hooks": [],
         "token_optimization": [
           "search.py",
@@ -1003,32 +1038,92 @@
     "system-prompts-leaks": {
       "url": "https://github.com/asgeirtj/system_prompts_leaks.git",
       "name": "system_prompts_leaks",
-      "last_fetched": "2026-07-12 22:01 UTC",
+      "last_fetched": "2026-09-03 21:20 UTC",
       "components": {
         "skills": [
-          "deep-research",
+          "simplify",
           "doctor",
-          "run-skill-generator"
+          "debug",
+          "artifact-design",
+          "workflow-authoring",
+          "deep-research",
+          "design",
+          "update-config",
+          "claude-in-chrome",
+          "init",
+          "claude-api",
+          "keybindings-help",
+          "fewer-permission-prompts",
+          "artifact-diagramming",
+          "schedule",
+          "run-skill-generator",
+          "loop",
+          "code-review",
+          "artifact-capabilities",
+          "verify",
+          "run",
+          "security-review",
+          "batch",
+          "dataviz",
+          "design-sync",
+          "non-storybook",
+          "storybook",
+          "options",
+          "export-as-pptx-editable",
+          "make-a-deck",
+          "web-research",
+          "handoff-to-claude-code",
+          "export-as-pptx-screenshots",
+          "flier",
+          "make-tweakable",
+          "animated-video",
+          "create-design-system",
+          "claude-api-in-prototypes",
+          "html-email",
+          "save-as-standalone-html",
+          "hi-fi-design",
+          "maps-geography",
+          "save-as-pdf",
+          "wireframe",
+          "make-a-doc",
+          "3d-object",
+          "frontend-design",
+          "interactive-prototype",
+          "setup-writing-style",
+          "setup-cowork"
         ],
-        "agents": [],
-        "commands": [],
+        "agents": [
+          "claude",
+          "Explore",
+          "Plan",
+          "general-purpose",
+          "claude-code-guide",
+          "statusline-setup"
+        ],
+        "commands": [
+          "compact",
+          "rename",
+          "btw"
+        ],
         "hooks": [],
         "token_optimization": [
           "claude-code-opus-4.6.md",
-          "claude-code-opus-4.8.md",
-          "claude-code-2.1.172-opus-4.6.md",
-          "claude-code-2.1.172-opus-4.8.md",
-          "deferred-tools.md",
-          "claude-code-2.1.172-fable-5.md",
-          "claude-api.md",
-          "amp-code.md"
+          "prompt-audit.md",
+          "platform-availability.md",
+          "prompt-caching.md",
+          "cost-optimization.md",
+          "managed-agents-multiagent.md",
+          "models.md",
+          "cost-hillclimb.md",
+          "live-sources.md",
+          "model-migration.md"
         ]
       }
     },
     "awesome-openclaw-skills": {
       "url": "https://github.com/VoltAgent/awesome-openclaw-skills.git",
       "name": "awesome-openclaw-skills",
-      "last_fetched": "2026-07-12 22:01 UTC",
+      "last_fetched": "2026-09-03 21:20 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -1043,7 +1138,7 @@
     "awesome-ai-agents": {
       "url": "https://github.com/e2b-dev/awesome-ai-agents.git",
       "name": "awesome-ai-agents",
-      "last_fetched": "2026-07-12 22:01 UTC",
+      "last_fetched": "2026-09-03 21:20 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -1055,7 +1150,7 @@
     "awesome-agent-skills": {
       "url": "https://github.com/VoltAgent/awesome-agent-skills.git",
       "name": "awesome-agent-skills",
-      "last_fetched": "2026-07-12 22:01 UTC",
+      "last_fetched": "2026-09-03 21:20 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -1069,25 +1164,62 @@
     "awesome-claude-code-subagents": {
       "url": "https://github.com/VoltAgent/awesome-claude-code-subagents.git",
       "name": "awesome-claude-code-subagents",
-      "last_fetched": "2026-07-12 22:01 UTC",
+      "last_fetched": "2026-09-03 21:20 UTC",
       "components": {
         "skills": [],
-        "agents": [
-          "01-core-development",
-          "02-language-specialists",
-          "03-infrastructure",
-          "04-quality-security",
-          "05-data-ai",
-          "06-developer-experience",
-          "07-specialized-domains",
-          "08-business-product",
-          "09-meta-orchestration",
-          "10-research-analysis"
-        ],
+        "agents": [],
         "commands": [],
         "hooks": [],
         "token_optimization": [
           "llm-architect.md"
+        ]
+      }
+    },
+    "skills": {
+      "url": "https://github.com/anthropics/skills.git",
+      "name": "skills",
+      "last_fetched": "2026-09-03 21:20 UTC",
+      "components": {
+        "skills": [
+          "canvas-design",
+          "slack-gif-creator",
+          "academy-guide",
+          "web-artifacts-builder",
+          "mcp-builder",
+          "discernment-nudge",
+          "skill-creator",
+          "algorithmic-art",
+          "webapp-testing",
+          "internal-comms",
+          "brand-guidelines",
+          "claude-api",
+          "docx",
+          "theme-factory",
+          "frontend-design",
+          "xlsx",
+          "doc-coauthoring",
+          "pptx",
+          "pdf",
+          "template"
+        ],
+        "agents": [
+          "comparator",
+          "grader",
+          "analyzer"
+        ],
+        "commands": [],
+        "hooks": [],
+        "token_optimization": [
+          "prompt-audit.md",
+          "platform-availability.md",
+          "prompt-caching.md",
+          "cost-optimization.md",
+          "managed-agents-multiagent.md",
+          "models.md",
+          "live-sources.md",
+          "model-migration.md",
+          "agent-design.md",
+          "tool-use-concepts.md"
         ]
       }
     }

@@ -1,0 +1,313 @@
+.page {
+  padding: 2rem;
+  max-width: 1100px;
+  margin: 0 auto;
+  color: var(--text-primary);
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.subtitle {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+/* ── Connect CTA ─────────────────────────────────────────────────────── */
+
+.connectPanel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  padding: 4rem 2rem;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-faint);
+  border-radius: 12px;
+  text-align: center;
+}
+
+.connectIcon {
+  font-size: 3rem;
+  opacity: 0.6;
+}
+
+.connectTitle {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.connectDesc {
+  color: var(--text-secondary);
+  max-width: 380px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.connectBtn {
+  display: inline-block;
+  padding: 0.65rem 1.5rem;
+  background: var(--accent);
+  color: #050811;
+  font-weight: 700;
+  font-size: 0.9rem;
+  border-radius: 8px;
+  text-decoration: none;
+  transition: opacity 0.15s;
+}
+
+.connectBtn:hover {
+  opacity: 0.85;
+}
+
+/* ── Dashboard grid ──────────────────────────────────────────────────── */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.25rem;
+}
+
+.card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-faint);
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+
+.cardTitle {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin: 0 0 1rem 0;
+}
+
+/* ── Recovery ring ───────────────────────────────────────────────────── */
+
+.recoveryCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.ringWrap {
+  position: relative;
+  width: 120px;
+  height: 120px;
+}
+
+.ring {
+  transform: rotate(-90deg);
+  width: 120px;
+  height: 120px;
+}
+
+.ringBg {
+  fill: none;
+  stroke: var(--border-faint);
+  stroke-width: 10;
+}
+
+.ringFill {
+  fill: none;
+  stroke-width: 10;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.6s ease, stroke 0.3s ease;
+}
+
+.ringScore {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  line-height: 1;
+}
+
+.ringScoreNum {
+  font-size: 1.75rem;
+  font-weight: 800;
+}
+
+.ringScoreLabel {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.recoveryMeta {
+  display: flex;
+  gap: 1.5rem;
+  justify-content: center;
+}
+
+.metaStat {
+  text-align: center;
+}
+
+.metaVal {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.metaKey {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ── Sleep card ──────────────────────────────────────────────────────── */
+
+.sleepRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--border-faint);
+  font-size: 0.875rem;
+}
+
+.sleepRow:last-child {
+  border-bottom: none;
+}
+
+.sleepKey {
+  color: var(--text-secondary);
+}
+
+.sleepVal {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* ── HRV trend ───────────────────────────────────────────────────────── */
+
+.sparkline {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 64px;
+}
+
+.sparkBar {
+  flex: 1;
+  background: var(--accent);
+  opacity: 0.7;
+  border-radius: 2px 2px 0 0;
+  min-height: 4px;
+  transition: opacity 0.2s;
+}
+
+.sparkBar:hover {
+  opacity: 1;
+}
+
+.sparkLabels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  margin-top: 0.4rem;
+}
+
+/* ── Workouts list ───────────────────────────────────────────────────── */
+
+.workout {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border-faint);
+  font-size: 0.875rem;
+}
+
+.workout:last-child {
+  border-bottom: none;
+}
+
+.workoutName {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.workoutDate {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.workoutStrain {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--status-warn);
+}
+
+/* ── States ──────────────────────────────────────────────────────────── */
+
+.loading {
+  color: var(--text-muted);
+  text-align: center;
+  padding: 3rem;
+  font-size: 0.9rem;
+}
+
+.error {
+  color: var(--status-danger);
+  text-align: center;
+  padding: 2rem;
+  font-size: 0.9rem;
+}
+
+.empty {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 1rem 0;
+}
+
+/* ── Status pill ─────────────────────────────────────────────────────── */
+
+.pill {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.pillGreen {
+  background: rgba(0, 255, 156, 0.12);
+  color: var(--status-ok);
+}
+
+.pillYellow {
+  background: rgba(245, 166, 35, 0.12);
+  color: var(--status-warn);
+}
+
+.pillRed {
+  background: rgba(255, 77, 109, 0.12);
+  color: var(--status-danger);
+}

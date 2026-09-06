@@ -14,11 +14,15 @@ Usage::
 from __future__ import annotations
 
 import asyncio
+import re
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy import delete
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from src.models import dashboard as dm
 from src.models import domain as dom
+from src.models.ai_ecosystem import AgentRegistry
 from src.models.database import AsyncSessionLocal
 
 # ── Hand-translated mockData ───────────────────────────────────────

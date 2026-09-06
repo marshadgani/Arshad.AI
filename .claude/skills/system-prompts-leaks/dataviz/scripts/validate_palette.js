@@ -2,41 +2,51 @@
  * Validate a categorical chart palette against the computable data-viz checks.
  *
  * Design-system-agnostic: feed it ANY palette's hex values plus the mode and
- * surface, and it computes — never eyeballs — the four checks that can be
+ * surface, and it computes - never eyeballs - the five checks that can be
  * measured from color alone:
  *
- *   2. Lightness band   — OKLCH L within the mode's band
- *   3. Chroma floor     — OKLCH C >= floor (below it a hue reads as gray)
- *   4. CVD separation   — Machado-2009 ΔE between slots (protan/deutan/tritan);
- *                         adjacent pairs by default, pairs:"all" for scatter/bubble/maps
- *   5. Contrast vs surface — WCAG ratio of each mark against the chart surface
+ *   2. Lightness band   - OKLCH L within the mode's band
+ *   3. Chroma floor     - OKLCH C >= floor (below it a hue reads as gray)
+ *   4. CVD separation   - OKLab Delta E (×100) between slots under simulated protan/deutan
+ *                         (tritan reported); adjacent pairs by default, pairs:"all"
+ *                         for scatter/bubble/maps
+ *   4b. Normal-vision floor - worst OKLab Delta E (×100) on the active pairlist
+ *       (adjacent by default; all pairs with --pairs all) under unsimulated vision;
+ *                         full-color readers must be able to tell neighbors apart too
+ *   5. Contrast vs surface - WCAG ratio of each mark against the chart surface
  *
  * Checks 1 (fixed hue order) and 6 (values are from the documented palette) are
  * structural rules the skill enforces, not measurable from hexes alone.
  *
  * Usage (node):
- *   node validate_palette.js "#2a78d6,#1baf7a,#eda100,#008300,#4a3aa7,#e34948,#e87ba4,#eb6834" --mode light
+ *   node validate_palette.js "#2a78d6,#eb6834,#1baf7a,#eda100,#e87ba4,#008300,#4a3aa7,#e34948" --mode light
  *   node validate_palette.js "#256abf,#199e70,..." --mode dark --surface "#1a1a19"
- *   node validate_palette.js "#cde2fb,#9ec5f4,#6da7ec,#3987e5,#256abf" --ordinal
+ *   node validate_palette.js "#86b6ef,#5598e7,#256abf,#104281" --ordinal
  *
- * Usage (browser — as a module script):
- *   <body data-palette="#2a78d6,#1baf7a,..." data-mode="light">
+ * Usage (browser - as a module script):
+ *   <body data-palette="#2a78d6,#eb6834,..." data-mode="light">
  *   <script type="module" src="validate_palette.js"></script>
- *   → logs a console.table of the report and console.warn on any FAIL.
+ *   -> logs a console.table of the report and console.warn on any FAIL.
  *
  * Exit code 0 unless a check hard-FAILs; 1 on any FAIL. WARN bands do not fail:
- * adjacent CVD in the 8–12 floor band, and contrast in the sub-3:1 relief band,
+ * adjacent CVD in the 6-8 floor band, and contrast in the sub-3:1 relief band,
  * are reported as WARNs and still exit 0 (each is legal only with mandatory
- * secondary encoding: direct labels, gaps, or texture).
+ * secondary encoding: direct labels, gaps, or texture). The normal-vision floor
+ * is a hard gate: a worst unsimulated pair below 15 FAILs the run.
  */
 
-// ── thresholds ────────────────────────────────────────────────────────────────
+// -- thresholds ----------------------------------------------------------------
 const BAND = { light: [0.43, 0.77], dark: [0.48, 0.67] }; // OKLCH L
 const CHROMA_FLOOR = 0.10; // OKLCH C
-const CVD_TARGET = 12.0, CVD_FLOOR = 8.0; // CIE76 ΔE on adjacent pairs
+// Delta E is Euclidean distance in OKLab ×100. The CVD thresholds are calibrated to
+// the Machado-Oliveira-Fernandes (2009) severity-1.0 simulation below - the sim
+// model is part of the standard, not an implementation detail (swapping in e.g.
+// Viénot-1999 moves borderline pairs and would require recalibrating these).
+const CVD_TARGET = 8.0, CVD_FLOOR = 6.0; // OKLab Delta E×100, min(protan, deutan), adjacent pairs
+const NORMAL_FLOOR = 15.0; // OKLab Delta E×100, worst pair on the active pairlist, unsimulated vision
 const CONTRAST_MIN = 3.0; // WCAG vs surface
 const DEFAULT_SURFACE = { light: "#fcfcfb", dark: "#1a1a19" };
-const ORDINAL_MIN_DL = 0.06; // min OKLCH ΔL between adjacent steps
+const ORDINAL_MIN_DL = 0.06; // min OKLCH delta L between adjacent steps
 const ORDINAL_LIGHT_FLOOR = 2.0; // lightest step: WCAG contrast vs surface
 
 // Machado, Oliveira & Fernandes (2009) CVD transforms at severity 1.0 (linear RGB).
@@ -52,16 +62,30 @@ const MACHADO = {
            [0.004733, 0.691367, 0.303900]],
 };
 
-// ── color conversions ──────────────────────────────────────────────────────────
+// -- color conversions ----------------------------------------------------------
 const hex2srgb = (h) => { h = h.trim().replace(/^#/, ""); return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16) / 255); };
+
+// -- input boundary -- EVERY user-supplied color string (palette entries AND
+// the surface, CLI and browser alike) passes these before any math:
+// unguarded, parseInt propagates NaN through every check and the run fails
+// OPEN. Normalization is spelled out rather than engine-native: JS trim()
+// and Python str.strip() differ at the edges (trim() strips U+FEFF;
+// str.strip() strips U+001C-U+001F and U+0085), so the shared set is their
+// intersection - ASCII whitespace plus the Unicode space/separator
+// characters both engines strip, which also covers the NBSP/em-space
+// padding picked up when copy-pasting hex lists from rendered pages. Keep
+// these three definitions in lockstep with the Python twin.
+const WS_RUN = "[ \\t\\n\\v\\f\\r\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]+";
+const stripWs = (v) => v.replace(new RegExp(`^${WS_RUN}|${WS_RUN}$`, "g"), "");
+const splitColors = (raw) => (raw || "").split(",").map(stripWs).filter(Boolean);
+const isHexColor = (v) => /^#?[0-9a-fA-F]{6}$/.test(v);
 const s2lin = (c) => c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
 const lin2s = (c) => { c = Math.max(0, Math.min(1, c)); return c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055; };
 const lin = (h) => hex2srgb(h).map(s2lin);
 const relLum = (h) => { const [r, g, b] = lin(h); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
 export const contrast = (a, b) => { const [hi, lo] = [relLum(a), relLum(b)].sort((x, y) => y - x); return (hi + 0.05) / (lo + 0.05); };
 
-function oklab(h) {
-  const [r, g, b] = lin(h);
+function oklabFromLin([r, g, b]) {
   const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
   const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
   const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
@@ -71,18 +95,10 @@ function oklab(h) {
     0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s, // b
   ];
 }
+const oklab = (h) => oklabFromLin(lin(h));
 const oklch = (h) => { const [L, a, b] = oklab(h); return [L, Math.hypot(a, b)]; };
 const okhue = (h) => { const [, a, b] = oklab(h); return ((Math.atan2(b, a) * 180 / Math.PI) % 360 + 360) % 360; };
 
-// CIELAB (D65) for ΔE
-function lin2lab(r, g, b) {
-  const X = 0.4124564 * r + 0.3575761 * g + 0.1804375 * b;
-  const Y = 0.2126729 * r + 0.7151522 * g + 0.0721750 * b;
-  const Z = 0.0193339 * r + 0.1191920 * g + 0.9503041 * b;
-  const f = (t) => t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116;
-  const [fx, fy, fz] = [f(X / 0.95047), f(Y / 1.0), f(Z / 1.08883)];
-  return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
-}
 function simulate(h, kind) {
   const [r, g, b] = lin(h), M = MACHADO[kind];
   const clamp = (c) => Math.max(0, Math.min(1, c));
@@ -93,12 +109,13 @@ function simulate(h, kind) {
   ];
 }
 function deltaE(h1, h2, kind) {
-  const a = lin2lab(...(kind ? simulate(h1, kind) : lin(h1)));
-  const b = lin2lab(...(kind ? simulate(h2, kind) : lin(h2)));
-  return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+  // Euclidean distance in OKLab, ×100. No kind -> unsimulated (normal) vision.
+  const a = oklabFromLin(kind ? simulate(h1, kind) : lin(h1));
+  const b = oklabFromLin(kind ? simulate(h2, kind) : lin(h2));
+  return 100 * Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 }
 
-// ── checks ─────────────────────────────────────────────────────────────────────
+// -- checks ---------------------------------------------------------------------
 export function validate(palette, { mode = "light", surface, pairs = "adjacent" } = {}) {
   surface ??= DEFAULT_SURFACE[mode];
   const [lo, hi] = BAND[mode];
@@ -110,7 +127,7 @@ export function validate(palette, { mode = "light", surface, pairs = "adjacent" 
     .map(c => [c, +oklch(c)[0].toFixed(3)]);
   if (offband.length) ok = false;
   report.push(["Lightness band", !offband.length,
-    offband.length ? `outside band: ${JSON.stringify(offband)}` : `all ${palette.length} inside L ${lo}–${hi}`]);
+    offband.length ? `outside band: ${JSON.stringify(offband)}` : `all ${palette.length} inside L ${lo}\u2013${hi}`]);
 
   // 3. chroma floor
   const lowc = palette.filter(c => oklch(c)[1] < CHROMA_FLOOR).map(c => [c, +oklch(c)[1].toFixed(3)]);
@@ -118,7 +135,7 @@ export function validate(palette, { mode = "light", surface, pairs = "adjacent" 
   report.push(["Chroma floor", !lowc.length,
     lowc.length ? `below floor (reads gray): ${JSON.stringify(lowc)}` : `all ${palette.length} >= ${CHROMA_FLOOR}`]);
 
-  // 4. CVD separation — adjacent for stacks/bars/lines; ALL pairs for scatter/bubble/maps/small-multiples
+  // 4. CVD separation - adjacent for stacks/bars/lines; ALL pairs for scatter/bubble/maps/small-multiples
   const n = palette.length;
   const pairlist = pairs === "all"
     ? Array.from({ length: n }, (_, i) => Array.from({ length: n - i - 1 }, (_, k) => [i, i + 1 + k])).flat()
@@ -132,17 +149,34 @@ export function validate(palette, { mode = "light", surface, pairs = "adjacent" 
     }
   }
   const tri = pairlist.length ? Math.min(...pairlist.map(([i, j]) => deltaE(palette[i], palette[j], "tritan"))) : 99;
-  const nor = pairlist.length ? Math.min(...pairlist.map(([i, j]) => deltaE(palette[i], palette[j]))) : 99;
   const wd = worst ? worst[0] : 99;
   const cvdState = wd >= CVD_TARGET ? "pass" : wd >= CVD_FLOOR ? "floor" : "fail";
   if (cvdState === "fail") ok = false;
   report.push(["CVD separation", cvdState,
-    worst ? `worst ${label} ${worst[3]}↔${worst[2]} ΔE ${wd.toFixed(1)} (${worst[1]}) · tritan ${tri.toFixed(1)} · normal ${nor.toFixed(1)}` : "n/a"]);
+    worst ? `worst ${label} ${worst[3]}\u2194${worst[2]} \u0394E ${wd.toFixed(1)} (${worst[1]}) · tritan ${tri.toFixed(1)}` : "n/a"]);
 
-  // 5. contrast vs surface — sub-3:1 is a documented conditional relax (visible labels / table view), not a hard fail
+  // 4b. Normal-vision floor. The CVD gate protects dichromat readers; this one
+  //     protects everyone else - neighbors must stay easy to tell apart under
+  //     unsimulated vision too. A hard gate: secondary encoding does not
+  //     excuse it, and weak pairs are not masked to keep an existing palette
+  //     validating (this floor forced the first of the July 2026 re-orders
+  //     of the shipped set: same steps, re-ordered, clears 19.6/19.3).
+  let nworst = null;
+  for (const [i, j] of pairlist) {
+    const d = deltaE(palette[i], palette[j]);
+    if (nworst === null || d < nworst[0]) nworst = [d, palette[i], palette[j]];
+  }
+  const nd = nworst ? nworst[0] : 99;
+  const norState = nd >= NORMAL_FLOOR ? "pass" : "fail";
+  if (norState === "fail") ok = false;
+  report.push(["Normal-vision floor", norState,
+    nworst ? `worst ${label} ${nworst[2]}\u2194${nworst[1]} \u0394E ${nd.toFixed(1)} (normal)`
+      + (nd >= NORMAL_FLOOR ? "" : ` \u2014 below ${NORMAL_FLOOR.toFixed(0)}, hard to tell apart even with full color vision`) : "n/a"]);
+
+  // 5. contrast vs surface - sub-3:1 is a documented conditional relax (visible labels / table view), not a hard fail
   const low = palette.filter(c => contrast(c, surface) < CONTRAST_MIN).map(c => [c, +contrast(c, surface).toFixed(2)]);
   report.push(["Contrast vs surface", low.length ? "relief" : "pass",
-    low.length ? `below ${CONTRAST_MIN}:1 — relief required (visible labels or table view): ${JSON.stringify(low)}`
+    low.length ? `below ${CONTRAST_MIN}:1 \u2014 relief required (visible labels or table view): ${JSON.stringify(low)}`
                : `all ${palette.length} >= ${CONTRAST_MIN}:1`]);
 
   return { report, ok };
@@ -160,43 +194,45 @@ export function validateOrdinal(palette, { mode = "light", surface } = {}) {
   let ok = true;
   const Ls = palette.map(c => oklch(c)[0]);
 
-  // Monotone lightness — sorted by L must match input order (or its reverse).
+  // Monotone lightness - sorted by L must match input order (or its reverse).
   const order = [...Ls.keys()].sort((a, b) => Ls[a] - Ls[b]);
   const fwd = order.every((v, i) => v === i);
   const rev = order.every((v, i) => v === Ls.length - 1 - i);
   const mono = fwd || rev;
   if (!mono) ok = false;
   report.push(["Lightness monotone", mono,
-    mono ? "steps read light→dark" : `out of order — L values ${JSON.stringify(Ls.map(l => +l.toFixed(3)))}`]);
+    mono ? "steps read light\u2192dark" : `out of order \u2014 L values ${JSON.stringify(Ls.map(l => +l.toFixed(3)))}`]);
 
-  // Adjacent ΔL — each step must be visibly distinct from its neighbour.
+  // Adjacent delta L - each step must be visibly distinct from its neighbour.
   const gaps = Ls.slice(1).map((l, i) => Math.abs(l - Ls[i]));
-  const thin = gaps.map((g, i) => [palette[i], palette[i + 1], +g.toFixed(3)]).filter(([, , g]) => g < ORDINAL_MIN_DL);
+  // Filter on the RAW gap, then round for display - filtering the rounded
+  // value passes raw gaps in [0.0595, 0.06) that the Python twin fails.
+  const thin = gaps.map((g, i) => [palette[i], palette[i + 1], g]).filter(([, , g]) => g < ORDINAL_MIN_DL).map(([a, b, g]) => [a, b, +g.toFixed(3)]);
   if (thin.length) ok = false;
-  report.push(["Adjacent ΔL", !thin.length,
+  report.push(["Adjacent \u0394L", !thin.length,
     thin.length ? `steps too close: ${JSON.stringify(thin)}` : `all gaps >= ${ORDINAL_MIN_DL}`]);
 
-  // Lightest step vs surface — the pale end must still read as a mark.
+  // Lightest step vs surface - the pale end must still read as a mark.
   const byL = [...palette].sort((a, b) => oklch(a)[0] - oklch(b)[0]);
   const lightest = mode === "light" ? byL[byL.length - 1] : byL[0];
   const cr = contrast(lightest, surface);
   if (cr < ORDINAL_LIGHT_FLOOR) ok = false;
   report.push(["Light-end contrast", cr >= ORDINAL_LIGHT_FLOOR,
-    `${lightest} at ${cr.toFixed(2)}:1 vs surface` + (cr >= ORDINAL_LIGHT_FLOOR ? "" : ` — below ${ORDINAL_LIGHT_FLOOR}:1 floor`)]);
+    `${lightest} at ${cr.toFixed(2)}:1 vs surface` + (cr >= ORDINAL_LIGHT_FLOOR ? "" : ` \u2014 below ${ORDINAL_LIGHT_FLOOR}:1 floor`)]);
 
-  // Single hue — an ordinal ramp is one hue; a hue jump means it's categorical.
+  // Single hue - an ordinal ramp is one hue; a hue jump means it's categorical.
   const hues = palette.map(okhue);
   let spread = hues.length ? Math.max(...hues) - Math.min(...hues) : 0;
   if (spread > 180) spread = 360 - spread;
   const oneHue = spread <= 40;
   if (!oneHue) ok = false;
   report.push(["Single hue", oneHue,
-    `hue spread ${spread.toFixed(0)}°` + (oneHue ? "" : " — >40°, not a one-hue ramp")]);
+    `hue spread ${spread.toFixed(0)}°` + (oneHue ? "" : " \u2014 >40°, not a one-hue ramp")]);
 
   return { report, ok };
 }
 
-// ── entrypoints ────────────────────────────────────────────────────────────────
+// -- entrypoints ----------------------------------------------------------------
 const GLYPH = { true: "PASS", false: "FAIL", pass: "PASS", floor: "WARN", fail: "FAIL", relief: "WARN" };
 
 function printReport({ report, ok }, { mode, surface, ordinal, n }) {
@@ -206,11 +242,11 @@ function printReport({ report, ok }, { mode, surface, ordinal, n }) {
     console.log(`  [${(GLYPH[state] ?? state).padEnd(4)}] ${name.padEnd(22)} ${detail}`);
   }
   if (ordinal) {
-    console.log(`\n  → ${ok ? "ALL CHECKS PASS" : "FAILED — fix the marked checks"}`
+    console.log(`\n  \u2192 ${ok ? "ALL CHECKS PASS" : "FAILED \u2014 fix the marked checks"}`
       + "  (ordinal: one hue, monotone L, visible step gaps, light end clears surface)");
   } else {
-    console.log(`\n  → ${ok ? "ALL CHECKS PASS" : "FAILED — fix the marked checks"}`
-      + "  (CVD in the 8–12 floor band is legal ONLY with secondary encoding: direct labels, gaps, or texture)");
+    console.log(`\n  \u2192 ${ok ? "ALL CHECKS PASS" : "FAILED \u2014 fix the marked checks"}`
+      + "  (CVD in the 6\u20138 floor band is legal ONLY with secondary encoding: direct labels, gaps, or texture)");
     console.log("  scope: categorical palettes only. For a lone status/text color check WCAG"
       + " text contrast; for a sequential ramp, lightness monotonicity.\n");
   }
@@ -236,10 +272,15 @@ if (typeof process !== "undefined" && process.argv && process.argv[1] && process
       console.error(`--${k} must be one of: ${allowed.join(", ")} (got ${JSON.stringify(opts[k])})`); process.exit(2);
     }
   }
-  const palette = (positional || "").split(",").map(s => s.trim()).filter(Boolean);
+  const palette = splitColors(positional);
   if (!palette.length) { console.error("usage: node validate_palette.js \"#hex,#hex,...\" [--mode light|dark] [--surface #hex] [--pairs adjacent|all] [--ordinal]"); process.exit(2); }
   const mode = opts.mode || "light";
-  const surface = opts.surface || DEFAULT_SURFACE[mode];
+  // An empty/whitespace-only surface counts as absent (falls back to the
+  // default), preserving the pre-boundary falsy behavior.
+  const rawSurface = opts.surface != null ? stripWs(opts.surface) : "";
+  const surface = rawSurface || DEFAULT_SURFACE[mode];
+  const badHex = [...palette, surface].filter((c) => !isHexColor(c));
+  if (badHex.length) { console.error(`invalid hex value(s): ${badHex.join(", ")} \u2014 expected #rrggbb`); process.exit(2); }
   const pairs = opts.pairs || "adjacent";
   const result = opts.ordinal ? validateOrdinal(palette, { mode, surface }) : validate(palette, { mode, surface, pairs });
   printReport(result, { mode, surface, ordinal: !!opts.ordinal, n: palette.length });
@@ -251,12 +292,25 @@ if (typeof process !== "undefined" && process.argv && process.argv[1] && process
 if (typeof document !== "undefined") {
   const b = document.body;
   if (b?.dataset.palette) {
-    const palette = b.dataset.palette.split(",").map(s => s.trim()).filter(Boolean);
+    const palette = splitColors(b.dataset.palette);
     const mode = b.dataset.mode || "light";
-    const surface = b.dataset.surface || DEFAULT_SURFACE[mode];
+    const pairs = b.dataset.pairs || "adjacent";
+    const rawSurface = b.dataset.surface != null ? stripWs(b.dataset.surface) : "";
+    const surface = rawSurface || DEFAULT_SURFACE[mode];
     const ordinal = "ordinal" in b.dataset;
-    const result = ordinal ? validateOrdinal(palette, { mode, surface }) : validate(palette, { mode, surface, pairs: b.dataset.pairs || "adjacent" });
-    console.table(result.report.map(([name, state, detail]) => ({ check: name, result: GLYPH[state] ?? state, detail })));
-    if (!result.ok) console.warn("validate_palette: FAILED — fix the marked checks");
+    // Same input boundary as the CLI (stripWs/splitColors/isHexColor), plus
+    // the CLI's enum choices: a bad data-mode otherwise throws at BAND[mode],
+    // and a bad data-pairs silently downgrades to the weaker adjacent check.
+    const badEnum = !["light", "dark"].includes(mode) ? `data-mode ${JSON.stringify(mode)}`
+      : !["adjacent", "all"].includes(pairs) ? `data-pairs ${JSON.stringify(pairs)}` : null;
+    const badHex = [...palette, surface].filter((c) => !isHexColor(c));
+    if (!palette.length || badEnum || badHex.length) {
+      // Module top level - no `return` here; skip validating instead.
+      console.warn(`validate_palette: ${!palette.length ? "empty palette" : badEnum ? `unrecognized ${badEnum}` : `invalid hex value(s): ${badHex.join(", ")} \u2014 expected #rrggbb`} \u2014 not validating`);
+    } else {
+      const result = ordinal ? validateOrdinal(palette, { mode, surface }) : validate(palette, { mode, surface, pairs });
+      console.table(result.report.map(([name, state, detail]) => ({ check: name, result: GLYPH[state] ?? state, detail })));
+      if (!result.ok) console.warn("validate_palette: FAILED \u2014 fix the marked checks");
+    }
   }
 }
