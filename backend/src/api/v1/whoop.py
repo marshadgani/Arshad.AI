@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.auth.dependencies import get_current_user
+from src.middleware.cache import get_redis
 from src.models.database import get_db
 from src.models.integration import Integration
 from src.schemas.whoop import (
