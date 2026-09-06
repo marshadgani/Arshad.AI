@@ -27,20 +27,27 @@ from src.models import (  # noqa: F401, E402  — register all models with Base.
     user,
 )
 from src.models.base import Base  # noqa: E402 — guard-free; no engine created here
+from src.models.db_pooler_guard import (  # noqa: E402
+    is_pooler_url,
+    reject_transaction_mode_pooler,
+)
 
 config = context.config
 
-# Migrations must never run through Supabase's transaction pooler (port 6543)
-# because DDL statements require a real session-level connection.  Set
-# DATABASE_URL_DIRECT to the direct URL (port 5432, host db.REF.supabase.co)
-# or session pooler (port 5454) on Render.  Falls back to DATABASE_URL so
-# local docker-compose requires no extra config.
+# Migrations must never run through Supabase's Transaction mode pooler
+# (port 6543) because DDL statements require a real session-level
+# connection — see src/models/db_pooler_guard.py for the full rationale.
+# Set DATABASE_URL_DIRECT to the direct URL (port 5432, host
+# db.REF.supabase.co) or the Session mode pooler (port 5432) on Render.
+# Falls back to DATABASE_URL so local docker-compose requires no extra
+# config.
 database_url = os.getenv("DATABASE_URL_DIRECT") or os.getenv("DATABASE_URL")
 if not database_url:
     raise RuntimeError(
         "Neither DATABASE_URL_DIRECT nor DATABASE_URL is set. "
         "Copy backend/.env.example to backend/.env and fill in at least DATABASE_URL."
     )
+reject_transaction_mode_pooler(database_url)
 config.set_main_option("sqlalchemy.url", database_url)
 
 if config.config_file_name is not None:
@@ -63,13 +70,13 @@ def do_run_migrations(connection: Connection) -> None:
 async def run_async_migrations() -> None:
     section = config.get_section(config.config_ini_section, {})
     # Supabase/pgbouncer compat — match the runtime engine config in
-    # backend/src/models/database.py.
+    # backend/src/models/database.py. Note: asyncpg's connect() only
+    # accepts `statement_cache_size`; there is no separate
+    # `prepared_statement_cache_size` parameter (passing one raises
+    # TypeError at connection time).
     connect_args: dict = {}
-    if "pooler.supabase.com" in database_url or "pgbouncer" in database_url:
-        connect_args = {
-            "statement_cache_size": 0,
-            "prepared_statement_cache_size": 0,
-        }
+    if is_pooler_url(database_url) or "pgbouncer" in database_url:
+        connect_args = {"statement_cache_size": 0}
     connectable = async_engine_from_config(
         section,
         prefix="sqlalchemy.",
