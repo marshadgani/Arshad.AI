@@ -126,7 +126,7 @@
 .agentRun { color: var(--text-muted); }
 .agentConfig { color: var(--accent); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
 
-/* breakpoints: tablet 768-1024px, mobile below 768px.
+/* breakpoints.ts: tablet
    Desktop (min-width:1024px) column counts above are unchanged. */
 @media (max-width: 1023.98px) {
   .kpis { grid-template-columns: repeat(2, 1fr); }

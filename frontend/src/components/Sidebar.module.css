@@ -21,6 +21,9 @@
     transition: transform 200ms ease;
     will-change: transform;
     outline: none;
+    /* Prevents scrolling to the end of the drawer's nav list from chaining
+       into (and scrolling) the body locked underneath it. */
+    overscroll-behavior: contain;
   }
   .sidebarOpen {
     transform: translateX(0);

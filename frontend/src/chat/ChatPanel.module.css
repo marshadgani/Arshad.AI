@@ -224,6 +224,9 @@
 
   .input {
     min-height: 44px;
+    /* 16px prevents iOS Safari from zooming the viewport on input focus,
+       which is the root cause of unwanted horizontal scroll on mobile. */
+    font-size: 16px;
   }
 
   .send {

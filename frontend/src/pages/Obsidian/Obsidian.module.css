@@ -91,7 +91,8 @@
   align-items: start;
 }
 
-@media (max-width: 900px) {
+/* breakpoints.ts: mobile */
+@media (max-width: 767.98px) {
   .layout {
     grid-template-columns: 1fr;
   }

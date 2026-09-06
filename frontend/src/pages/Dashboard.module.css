@@ -243,7 +243,7 @@
 /* Quick actions */
 .qaGrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--s-2); }
 
-/* breakpoints: tablet 768-1024px, mobile below 768px.
+/* breakpoints.ts: tablet
    Desktop (min-width:1024px) column counts above are unchanged — no rule
    here applies at or above 1024px, so 1440px rendering is identical. */
 @media (max-width: 1023.98px) {

@@ -59,6 +59,8 @@
   --z-fab:     15;
   --z-scrim:   20;
   --z-drawer:  30;
+  --z-modal:   40;
+  --z-toast:   50;
 }
 
 /* HUD grid lines — applied to body via background pattern.

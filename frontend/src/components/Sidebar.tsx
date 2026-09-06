@@ -6,25 +6,25 @@ import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { useEscapeKey } from '../hooks/useEscapeKey';
 import { useFetch } from '../hooks/useFetch';
 import { useFocusReturn } from '../hooks/useFocusReturn';
-import { useIsMobile } from '../hooks/useBreakpoint';
 import { useOnRouteChange } from '../hooks/useOnRouteChange';
 import styles from './Sidebar.module.css';
 
 export interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
+  overlayMode: boolean;
 }
 
 function navItemClass({ isActive }: { isActive: boolean }): string {
   return isActive ? `${styles.item} ${styles.itemActive}` : styles.item;
 }
 
-export default function Sidebar({ isOpen, onClose }: SidebarProps) {
+export default function Sidebar({ isOpen, onClose, overlayMode }: SidebarProps) {
   const { data: navItems } = useFetch<NavItem[]>('/api/v1/nav');
   // Below the mobile breakpoint the sidebar is an off-canvas modal drawer;
   // above it, a persistent landmark. Every modal-only behaviour hangs off
-  // this one predicate.
-  const overlayMode = useIsMobile();
+  // this one predicate, supplied by AppLayout — the sole breakpoint
+  // subscriber in the tree — so Sidebar itself never reads the viewport.
   const asideRef = useRef<HTMLElement>(null);
   const isModal = isOpen && overlayMode;
 
@@ -35,9 +35,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   useBodyScrollLock(isModal);
   useFocusReturn(overlayMode, isOpen, asideRef);
 
-  // The desktop sidebar is a persistent landmark, not a dialog — dialog
-  // semantics only apply while it behaves as a mobile modal overlay.
-  const dialogProps = overlayMode
+  // Dialog semantics apply only while the sidebar is an OPEN mobile modal
+  // overlay. Gating on overlayMode alone (instead of isModal) would leave
+  // aria-modal="true" on the closed, off-canvas drawer, which tells
+  // assistive tech the rest of the page is inert even though nothing is
+  // visually blocking it.
+  const dialogProps = isModal
     ? {
         role: 'dialog' as const,
         'aria-modal': true as const,
