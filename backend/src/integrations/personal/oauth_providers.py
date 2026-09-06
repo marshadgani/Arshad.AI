@@ -471,7 +471,7 @@ class WhoopIntegration(OAuthIntegrationProvider):
 
     async def sync(self, *, integration, db) -> "SyncResult":
         import time as _time
-        from datetime import date, timedelta
+        from datetime import date, datetime, timedelta, timezone
 
         from ..base import IntegrationError, SyncResult
 
