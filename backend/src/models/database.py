@@ -4,17 +4,14 @@ from collections.abc import AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from .base import Base, TimestampedMixin  # noqa: F401 — re-exported for backward compat
+from .db_pooler_guard import reject_transaction_mode_pooler
 
-# Supabase's transaction pooler (Supavisor, port 6543) is incompatible with
-# asyncpg's prepared statement protocol: the pooler routes each statement to an
-# arbitrary backend, so PREPARE and DEALLOCATE can land on different backends,
-# leaving stale named statements (e.g. __asyncpg_stmt_5__) that collide with
-# counter-based names from the next asyncpg connection object.
-#
-# The only reliable fix is to bypass the pooler and connect directly to Postgres
-# (db.PROJECT_REF.supabase.co:5432).  Set DATABASE_URL_DIRECT to that URL on
-# Render; falls back to DATABASE_URL so local docker-compose needs no change.
-# statement_cache_size=0 is kept as a secondary safeguard.
+# Direct connections (db.PROJECT_REF.supabase.co) work too, but new Supabase
+# projects resolve that host to an IPv6-only address, which platforms with
+# IPv4-only egress (e.g. Render) can't reach — hence the Session mode pooler
+# (see db_pooler_guard.py) is the practical default here. statement_cache_size=0
+# is a second safeguard so asyncpg never caches/reuses a named prepared
+# statement across pooled connections.
 _db_url = os.getenv("DATABASE_URL_DIRECT") or os.getenv("DATABASE_URL")
 if not _db_url:
     raise RuntimeError(
@@ -22,29 +19,7 @@ if not _db_url:
         "Copy backend/.env.example to backend/.env and fill in DATABASE_URL."
     )
 
-# Supabase pooler URLs contain 'pooler.supabase.com' as the host, or use
-# the username format 'postgres.PROJECT_REF' (Supavisor session/transaction
-# mode). asyncpg is incompatible with Supavisor: the pooler rejects the
-# prepared-statement protocol and may return ENOTFOUND on tenant lookup.
-# Fail fast at startup with an actionable message rather than a cryptic
-# asyncpg InternalServerError at first request.
-_is_pooler = "pooler.supabase.com" in _db_url or (
-    "@" in _db_url
-    and _db_url.split("@")[0].rsplit(":", 1)[0].split("/")[-1].startswith("postgres.")
-)
-if _is_pooler:
-    raise RuntimeError(
-        "DATABASE_URL points at Supabase's connection pooler "
-        f"({_db_url.split('@')[-1].split('/')[0]}), which is incompatible "
-        "with asyncpg.\n\n"
-        "Fix on Render:\n"
-        "  1. Go to Supabase dashboard → Project Settings → Database → Connection string\n"
-        "  2. Select 'Direct connection' (NOT 'Connection pooler')\n"
-        "  3. Copy the URI (format: postgresql://postgres:PASSWORD@db.PROJECT.supabase.co:5432/postgres)\n"
-        "  4. Add +asyncpg after postgresql: → postgresql+asyncpg://...\n"
-        "  5. Set DATABASE_URL_DIRECT to that value in Render → Environment\n"
-        "  6. Leave DATABASE_URL as-is for local Docker (it uses a local postgres container)\n"
-    )
+reject_transaction_mode_pooler(_db_url)
 
 _engine_kwargs: dict = {
     "echo": False,
