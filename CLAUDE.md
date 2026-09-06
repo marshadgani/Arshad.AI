@@ -3,6 +3,49 @@
 > This file is the single source of truth for Claude working on this project.
 > Read it fully at the start of every session before touching any code.
 
+## 23. Deployment Verification Protocol (PERMANENT)
+
+> **Always use this method** to check whether a deployment is healthy after any push to `claude/ai-personal-assistant-main`.
+
+### Standard Check (run after every merge to main)
+
+```
+1. mcp__Render__list_workspaceId → tea-d7m98vegvqtc73a717og
+2. mcp__Render__list_logs(
+     resource=["srv-d7m9kub7uimc73cq9afg"],
+     workspaceId="tea-d7m98vegvqtc73a717og",
+     type=["app"],
+     level=["error", "critical", "warning"],
+     limit=30
+   )
+3. Read and diagnose every error/warning line
+4. If any ERROR or CRITICAL found → fix the root cause, commit, push
+5. Confirm health by checking for "Application startup complete" and "GET /health HTTP/1.1" 200 lines
+```
+
+### Service IDs (permanent — do not change)
+
+| Resource | ID |
+|---|---|
+| Workspace | `tea-d7m98vegvqtc73a717og` |
+| Backend web service (`arshad-ai`) | `srv-d7m9kub7uimc73cq9afg` |
+
+### Known recurring issues (check these first)
+
+| Error | Root cause | Fix |
+|---|---|---|
+| `Can't locate revision 'k1h2i3j4a5b6'` | `DATABASE_URL_DIRECT` not set on Render — Alembic using Supabase pooler | Set `DATABASE_URL_DIRECT` to direct Supabase connection (port 5432) on Render |
+| `seed skipped/failed — non-fatal` | Was `NameError: Path not defined` — fixed in `15f83a2`, needs merge to main | Merge dev branch to main |
+
+### Additional Render MCP tools available
+
+- `mcp__Render__list_deploys` — see recent deploy history and status
+- `mcp__Render__trigger_deploy` — force a new deploy
+- `mcp__Render__update_environment_variables` — set env vars (e.g. `DATABASE_URL_DIRECT`)
+- `mcp__Render__get_metrics` — CPU/memory
+
+---
+
 ## 🚨 DEVELOPMENT STRATEGY — READ THIS FIRST, EVERY SESSION
 
 > **This is the non-negotiable rule for ALL feature development on this project.**
