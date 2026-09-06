@@ -126,7 +126,7 @@ def _parse_recovery(record: dict) -> WhoopRecovery:
 
 def _parse_sleep(record: dict) -> WhoopSleep:
     score = record.get("score") or {}
-    stage = record.get("score", {}).get("stage_summary") or {}
+    stage = (score or {}).get("stage_summary") or {}
     return WhoopSleep(
         id=record.get("id"),
         start=record.get("start"),
