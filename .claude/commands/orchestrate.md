@@ -19,7 +19,7 @@ If the objective is "build feature X", route to `/dev-team`. If it's "audit Y", 
 
 ## What this command does
 
-1. Spawns the orchestrator subagent: `Task(subagent_type="orchestrator", prompt=<objective>)`
+1. Spawns the orchestrator subagent: `Agent(subagent_type="orchestrator", prompt=<objective>)`
 2. The orchestrator runs autonomously: plan → dispatch → gate → report
 3. Returns the orchestrator's `final.md` content to the user
 4. Path to full run artifacts is included in the return
