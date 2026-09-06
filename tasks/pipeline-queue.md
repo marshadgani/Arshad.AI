@@ -23,6 +23,12 @@
 5. Never run two Workflow invocations concurrently against the same run_id from two
    different conversation turns — check `/workflows` or this file's `active_run_id`
    field first.
+6. **Never launch a second, separate `Workflow` run while one is still active**, even
+   for unrelated new features — the per-role mutex lives in that run's own script
+   state and does NOT extend across separate invocations. If a run is active and a
+   new feature comes in, add it to the Queue table as `queued` and either wait for
+   the active run to settle before launching a combined resume, or let it sit for
+   the hourly Routine to pick up together with whatever's still pending then.
 
 ## Active run
 
@@ -55,7 +61,11 @@ queue below is empty.
 
 | FEAT_ID | Requirement (short) | Status | Branch | EA Decision | Notes |
 |---|---|---|---|---|---|
-| FEAT-118 | Chat window blocks screen (redesign) + app-wide mobile responsiveness | in_flight | dev-team/feat-118-* (TBD) | — | First run errored at System Engineer stage — 6 role names in the script (`system-engineer`, `engineer`, `frontend-engineer`, `senior-engineer`, `software-architect`, `performance-optimisation-engineer`) don't exist in this harness's agent registry. Fixed (see `.claude/agents/dev-team/` note below) and resumed on the same run_id `wf_14899418-22d` — first 5 stages replayed from cache. |
+| FEAT-118 | Chat window blocks screen (redesign) + app-wide mobile responsiveness | in_flight | dev-team/feat-118-* (TBD) | — | First run errored at System Engineer stage — 6 role names in the script (`system-engineer`, `engineer`, `frontend-engineer`, `senior-engineer`, `software-architect`, `performance-optimisation-engineer`) don't exist in this harness's agent registry. Fixed (see `.claude/agents/dev-team/` note below) and resumed on the same run_id `wf_14899418-22d` — first 5 stages replayed from cache. Ship stage is actively writing files (checkpointed via WIP commits so nothing is lost) as of 2026-09-06. **This feature already covers the "UI not mobile-friendly" request in full (REQ-118-04 through REQ-118-08) — not duplicated as a separate FEAT_ID.** |
+| FEAT-119 | Shopify integration — live store confirmed to have real orders. Populate `/shopify` domain page (currently a stub) with real KPIs (revenue, order count, conversion rate, low-stock count) and a live order feed, per the connector-analysis recommendation. | queued | — | — | Do NOT launch as a separate concurrent Workflow run while FEAT-118's run (`wf_14899418-22d`) is still active — the per-role mutex only holds within one Workflow invocation's shared lock state. Launch together with FEAT-118 in one `resumeFromRunId` call once FEAT-118 settles (completed/halted/error), or let the hourly Routine pick it up. |
+| FEAT-120 | Connect Whoop and Apple Fitness/Health data to populate the Health & Fitness dashboard section. Whoop already has partial backend integration (`backend/src/api/v1/whoop.py`, `backend/src/integrations/personal/oauth_providers.py`) — this feature should audit/complete it and add the missing Apple Health side (no existing integration found for Apple Health; will need research into what's actually available — HealthKit has no public REST API, so this likely means an export-file ingestion path or a third-party sync service, which Code Explorer/Solution Architect should investigate and flag as a decision point if ambiguous). | queued | — | — | Same launch-together constraint as FEAT-119. |
+
+**Important — concurrency constraint on launching:** Two or more features can only share the "same specialist role never runs concurrently" guarantee if they run inside the SAME `Workflow()` invocation (the `locks` object is local to one script execution, not shared across separate calls). Never start a second `Workflow` run while another is still active — wait for it to settle, then resume/restart with the full set of pending features in one `args.features` array.
 
 **Known gap:** only 9 of the 28 roles CLAUDE.md documents have actual `.claude/agents/dev-team/*.md` files (`bug-fixer`, `business-analyst`, `developer`, `enterprise-architect`, `orchestrator`, `process-organiser`, `solution-architect`, `test-script-writer`, `tester`). The other ~19 conceptual roles have no dev-team-specific agent — the workflow script maps them to the closest existing agent in the full roster instead (e.g. `system-engineer` → `system-architect`, `senior-engineer` → `code-analyzer`). If a future stage errors with "agent type not found," check this mapping first before assuming it's a new bug.
 
