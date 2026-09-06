@@ -38,7 +38,9 @@
 
 | FEAT_ID | Requirement (short) | Status | Branch | EA Decision | Notes |
 |---|---|---|---|---|---|
-| FEAT-118 | Chat window blocks screen (redesign) + app-wide mobile responsiveness | in_flight | dev-team/feat-118-* (TBD) | — | Code Explorer + BA stages seeded from pre-workflow manual run; full 28-30 stage pipeline running via Workflow `wf_14899418-22d`. |
+| FEAT-118 | Chat window blocks screen (redesign) + app-wide mobile responsiveness | in_flight | dev-team/feat-118-* (TBD) | — | First run errored at System Engineer stage — 6 role names in the script (`system-engineer`, `engineer`, `frontend-engineer`, `senior-engineer`, `software-architect`, `performance-optimisation-engineer`) don't exist in this harness's agent registry. Fixed (see `.claude/agents/dev-team/` note below) and resumed on the same run_id `wf_14899418-22d` — first 5 stages replayed from cache. |
+
+**Known gap:** only 9 of the 28 roles CLAUDE.md documents have actual `.claude/agents/dev-team/*.md` files (`bug-fixer`, `business-analyst`, `developer`, `enterprise-architect`, `orchestrator`, `process-organiser`, `solution-architect`, `test-script-writer`, `tester`). The other ~19 conceptual roles have no dev-team-specific agent — the workflow script maps them to the closest existing agent in the full roster instead (e.g. `system-engineer` → `system-architect`, `senior-engineer` → `code-analyzer`). If a future stage errors with "agent type not found," check this mapping first before assuming it's a new bug.
 
 ## Completed
 
