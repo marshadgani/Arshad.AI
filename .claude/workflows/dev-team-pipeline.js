@@ -157,19 +157,38 @@ async function runFeaturePipeline(f) {
   ))
 
   log_('Solution Architect')
-  const sa = await withRole('solution-architect', () => agent(
+  let sa = await withRole('solution-architect', () => agent(
     `${ctxHeader(f, 'Solution Architect')}\nBPDD: ${JSON.stringify(bpdd)}\nTech Lead plan: ${JSON.stringify(aiEng)}\nCodebase context: ${JSON.stringify(codebase_context)}\nProduce an SDD (components, data models, endpoints, technical approach) the Developer will follow strictly. Return JSON: {sdd: {...}}.`,
     { agentType: 'solution-architect', phase: 'Design', schema: { type: 'object', properties: { sdd: { type: 'object' } }, required: ['sdd'] } }
   ))
-  const sdd = sa && sa.sdd
+  let sdd = sa && sa.sdd
 
   log_('Architecture Critic')
-  const archCritic = await withRole('architecture-critic', () => agent(
+  let archCritic = await withRole('architecture-critic', () => agent(
     `${ctxHeader(f, 'Architecture Critic')}\nSDD: ${JSON.stringify(sdd)}\nCodebase context: ${JSON.stringify(codebase_context)}\nAdversarially review the SDD. Flag over-engineering, coupling risk, convention deviations. Return decision; set blocking:true only for genuinely blocking issues.`,
     { agentType: 'architecture-critic', model: OPUS, phase: 'Design', schema: DECISION_SCHEMA }
   ))
+
+  // Redesign loop: a blocking verdict here means real bugs the SDD would have
+  // shipped, not a reason to force through. Feed the findings back to Solution
+  // Architect for a corrected SDD and re-review, capped at 2 extra rounds — if
+  // it's still blocking after that, it needs human review, not more retries.
+  let archIter = 0
+  while (archCritic && archCritic.blocking && archIter < 2) {
+    archIter++
+    log_(`Architecture Critic blocked (redesign iteration ${archIter})`)
+    sa = await withRole('solution-architect', () => agent(
+      `${ctxHeader(f, `Solution Architect — redesign iteration ${archIter}`)}\nBPDD: ${JSON.stringify(bpdd)}\nTech Lead plan: ${JSON.stringify(aiEng)}\nCodebase context: ${JSON.stringify(codebase_context)}\nYour previous SDD was rejected by the Architecture Critic with these BLOCKING findings — address every one explicitly in the revised SDD, citing how each is resolved:\n${JSON.stringify(archCritic.concerns)}\n${archCritic.notes || ''}\nProduce a corrected SDD. Return JSON: {sdd: {...}}.`,
+      { agentType: 'solution-architect', phase: 'Design', schema: { type: 'object', properties: { sdd: { type: 'object' } }, required: ['sdd'] } }
+    ))
+    sdd = sa && sa.sdd
+    archCritic = await withRole('architecture-critic', () => agent(
+      `${ctxHeader(f, `Architecture Critic — re-review iteration ${archIter}`)}\nSDD: ${JSON.stringify(sdd)}\nCodebase context: ${JSON.stringify(codebase_context)}\nThis SDD was revised specifically to address your prior blocking findings. Re-review adversarially — do not rubber-stamp; set blocking:true again if the revision doesn't genuinely fix the issues or introduces new ones.`,
+      { agentType: 'architecture-critic', model: OPUS, phase: 'Design', schema: DECISION_SCHEMA }
+    ))
+  }
   if (archCritic && archCritic.blocking) {
-    return { featId: f.featId, status: 'halted', reason: `Architecture Critic blocking: ${(archCritic.concerns || []).join('; ')}` }
+    return { featId: f.featId, status: 'halted', reason: `Architecture Critic still blocking after ${archIter} redesign iteration(s): ${(archCritic.concerns || []).join('; ')}` }
   }
 
   log_('System Engineer')
