@@ -99,8 +99,12 @@ async def _check_rate_limit(user_id: str) -> None:
         redis_client = await get_redis()
         key = f"rl:whoop:{user_id}"
         count = await redis_client.incr(key)
-        if count == 1:
-            await redis_client.expire(key, 60)
+        # Unconditional + nx=True (not `if count == 1`): self-healing if a
+        # transient error dropped the expire on a prior call. Without nx,
+        # an incr-succeeds/expire-fails split leaves the key permanently
+        # un-expiring — once count climbs past 30 the user is locked out
+        # forever instead of the outage failing open.
+        await redis_client.expire(key, 60, nx=True)
     except redis.exceptions.RedisError as exc:
         _log.warning("Whoop rate limiter degraded — Redis unreachable: %s", exc)
         return
