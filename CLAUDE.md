@@ -113,6 +113,41 @@ change are the only exception — answer those directly.
 script enforces this with a per-role mutex (`withRole()` in the script) shared across
 every feature in the run: a role queues behind itself, never races itself.
 
+### 🔁 Always-On Pipeline — runs non-stop, survives session limits (PERMANENT)
+
+> Per Arshad's explicit instruction (2026-09-06): the dev-team pipeline and bug-fix
+> pipeline are the SAME mechanism — every bug report goes through this pipeline too,
+> not a separate process — and it must keep running **continuously in the background
+> until the queue is empty**, without waiting for Arshad to re-prompt, and without
+> stalling out when a session hits its context/token limit mid-pipeline.
+
+**How continuity across session limits works:** a session cannot resurrect itself
+after it ends — so a Routine (scheduled trigger) does the resurrecting. A recurring
+hourly Routine is registered (`trig_018w2XJ9mHBfqUZ1uciMNqit`, "Dev-Team Pipeline
+Continuation", `create_new_session_on_fire: true`) that:
+1. Checks out `claude/ai-personal-assistant-CcA11`.
+2. Reads `tasks/pipeline-queue.md` for any `queued`/`in_flight`/`error` feature.
+3. Starts (or restarts) a `dev-team-pipeline` Workflow run for it and drives it to
+   completion, in that firing's own session.
+4. On a hard error (e.g. an invalid agent role — see the known gap noted in
+   `tasks/pipeline-queue.md`), diagnoses and fixes the script, commits, and retries.
+   Does NOT give up after one failure.
+5. On a genuine halt (EA rejection, blocking architecture-critic finding, security
+   escalation, exhausted bug-fix loop) — stops for that feature and records the halt
+   reason; halts need Arshad's review, they are not errors to retry through.
+6. Updates `tasks/pipeline-queue.md` and no-ops quietly if the queue is empty.
+
+**Rules for every session, scheduled or interactive:**
+- Never leave a `queued` or `in_flight` feature idle at end of turn if a Workflow can
+  be started for it — start it, or explicitly note in `tasks/pipeline-queue.md` why
+  not (e.g. waiting on a human decision flagged mid-pipeline).
+- Never treat "context is getting long" as a reason to stop the pipeline and wait for
+  Arshad — that's what the hourly Routine is for. Let it run in the background and
+  end the turn normally; do not artificially block on it.
+- If you discover the Routine is missing, disabled, or misconfigured (check
+  `list_triggers`), recreate it — this policy assumes it always exists.
+- This is a standing, permanent instruction. It does not need to be re-requested.
+
 **When in doubt → queue it into the pipeline. There is no "too small" carve-out
 anymore — a one-line change still gets a `FEAT_ID` and flows through all 28-30
 stages,** per Arshad's explicit instruction (2026-09-06). The only true exception is

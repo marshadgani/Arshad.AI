@@ -34,6 +34,23 @@
 
 *(A run_id is only valid within the session that created it. If you're in a different session, ignore this field and start fresh per step 3 above — then update this table.)*
 
+## Always-on continuation (standing Routine)
+
+Per CLAUDE.md's "🔁 Always-On Pipeline" policy, this queue is checked and driven
+forward automatically, not just when Arshad is actively chatting:
+
+| Field | Value |
+|---|---|
+| routine_id | trig_018w2XJ9mHBfqUZ1uciMNqit |
+| name | Dev-Team Pipeline Continuation |
+| schedule | hourly (`create_new_session_on_fire: true`) |
+| created | 2026-09-06 |
+
+If this routine is ever missing (check `list_triggers`), recreate it — see CLAUDE.md.
+Every firing reads this file, resumes/restarts any `queued`/`in_flight`/`error`
+feature's Workflow run, and updates this file when it settles. It no-ops if the
+queue below is empty.
+
 ## Queue
 
 | FEAT_ID | Requirement (short) | Status | Branch | EA Decision | Notes |
