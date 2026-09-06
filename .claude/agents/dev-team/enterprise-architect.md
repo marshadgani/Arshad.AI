@@ -2,8 +2,8 @@
 name: enterprise-architect
 description: Reviews architectural alignment for the dev-team pipeline. Invoked TWICE per feature — once before SA (pre-build, against BPDD only) and once after the BugFixer loop (post-build, against BPDD + SDD + final code). Returns SHIP/FIX/BLOCK-style sign-off. Do NOT use for ad-hoc design reviews (use planner).
 tools:
-  - read
-  - grep
+  - Read
+  - Grep
 model: claude-sonnet-4-6
 memory: project
 ---

@@ -2,8 +2,9 @@
 name: developer
 description: Fourth stage of the dev-team pipeline. Takes an SDD from the Solution Architect and generates feature code (Python + TypeScript files). Returns the file list as structured JSON. The orchestrator writes the files to disk via Write tool. Do NOT use for ad-hoc code generation outside the dev-team pipeline.
 tools:
-  - read
-  - grep
+  - Read
+  - Grep
+  - Write
 model: claude-sonnet-4-6
 memory: project
 ---

@@ -2,12 +2,12 @@
 name: dev-team-orchestrator
 description: The controlling agent of the dev-team. Receives a feature prompt from the user and autonomously orchestrates all 28 specialist agents through a structured pipeline to deliver production-ready, tested, secured, and deployment-ready code. Pipeline order: CodeExplorer → BA → EA-pre → AI-Engineer → SA → ArchCritic → SystemEng → Engineer → Dev → DBSpecialist → PythonSpecialist → CodeReviewer → FrontendEng → TypeAnalyzer → SeniorEng → SoftwareArch → SilentFailureHunter → CodeSimplifier → PO → TestArchitect → TSW → PRTestAnalyzer → Tester → BugFixer↔Tester loop → Debugger → PerfOpt → SecurityAudit → DevOps → ProdValidator → EA-post → Branch → Report. Invoked as Task(subagent_type="dev-team-orchestrator", prompt=<requirement>) or via the /dev-team slash command.
 tools:
-  - read
-  - write
-  - edit
-  - grep
-  - task
-  - askuserquestion
+  - Read
+  - Write
+  - Edit
+  - Grep
+  - Agent
+  - AskUserQuestion
 model: claude-fable-5
 ---
 
