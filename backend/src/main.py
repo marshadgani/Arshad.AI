@@ -134,7 +134,6 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
                 "message": f"Backend hit an unhandled {type(exc).__name__}.",
                 "details": {
                     "path": request.url.path,
-                    "exception": str(exc)[:300],
                 },
             }
         },
