@@ -23,9 +23,20 @@ const DENY_PREFIXES = [
   'tasks/lessons.md', 'tasks/.feature-counter',
 ]
 
+// Agents sometimes return absolute paths (e.g. "/home/user/Arshad.AI/frontend/...")
+// even when asked for repo-relative ones. Strip the project root before any
+// denylist/traversal check so a legitimate absolute path isn't mistaken for a
+// path-escape attempt — a real ".." or a genuine leading "/" outside the
+// project root still gets caught after normalization.
+const PROJECT_ROOT_PREFIX = '/home/user/Arshad.AI/'
+function normalizePath(p) {
+  if (typeof p !== 'string') return p
+  return p.startsWith(PROJECT_ROOT_PREFIX) ? p.slice(PROJECT_ROOT_PREFIX.length) : p
+}
+
 function denylistHits(files) {
   return (files || []).filter(f => {
-    const p = f.path || ''
+    const p = normalizePath(f.path || '')
     if (p.includes('..') || p.startsWith('/') || p.startsWith('~') || p.includes('$')) return true
     if (p === 'backend/src/main.py') return false
     return DENY_PREFIXES.some(pre => p === pre || p.startsWith(pre))
@@ -34,7 +45,10 @@ function denylistHits(files) {
 
 function mergeFiles(base, updates) {
   const map = new Map(base.map(f => [f.path, f]))
-  for (const f of (updates || [])) map.set(f.path, f)
+  for (const f of (updates || [])) {
+    const path = normalizePath(f.path)
+    map.set(path, { ...f, path })
+  }
   return Array.from(map.values())
 }
 
