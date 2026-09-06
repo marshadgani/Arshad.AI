@@ -9,7 +9,8 @@ from __future__ import annotations
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.auth.dependencies import get_current_user
@@ -81,6 +82,29 @@ _SPORT_NAMES: dict[int, str] = {
     73: "Pickleball",
     74: "Hyrox",
 }
+
+
+async def _check_rate_limit(user_id: str) -> None:
+    """Sliding-window 30 req/min per user across all Whoop endpoints."""
+    redis = await get_redis()
+    if redis is None:
+        return
+    key = f"rl:whoop:{user_id}"
+    count = await redis.incr(key)
+    if count == 1:
+        await redis.expire(key, 60)
+    if count > 30:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "error": {
+                    "code": "rate_limit_exceeded",
+                    "message": "Too many requests. Retry after 60 seconds.",
+                    "details": {"retry_after": 60},
+                }
+            },
+            headers={"Retry-After": "60"},
+        )
 
 
 async def _get_whoop_integration(user_id: str, db: AsyncSession) -> Integration | None:
@@ -163,6 +187,7 @@ async def get_dashboard(
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Return today's recovery, sleep, and strain snapshot."""
+    await _check_rate_limit(str(current_user.id))
     integration = await _get_whoop_integration(str(current_user.id), db)
     if not integration:
         return JSONResponse({"data": WhoopDashboard(connected=False).model_dump()})
@@ -232,6 +257,7 @@ async def get_hrv_trend(
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Return HRV data points for the last N days (max 30)."""
+    await _check_rate_limit(str(current_user.id))
     integration = await _get_whoop_integration(str(current_user.id), db)
     if not integration:
         raise HTTPException(
@@ -270,6 +296,7 @@ async def get_workouts(
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Return recent workouts."""
+    await _check_rate_limit(str(current_user.id))
     integration = await _get_whoop_integration(str(current_user.id), db)
     if not integration:
         raise HTTPException(
