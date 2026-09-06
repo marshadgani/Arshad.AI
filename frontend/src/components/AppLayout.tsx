@@ -1,7 +1,9 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
+import { useLocation } from 'react-router-dom';
+
+import ChatLauncher from './ChatLauncher';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
-import ChatBar from './ChatBar';
 import styles from './AppLayout.module.css';
 
 export interface AppLayoutProps {
@@ -9,14 +11,21 @@ export interface AppLayoutProps {
 }
 
 export default function AppLayout({ children }: AppLayoutProps) {
+  const [isNavOpen, setNavOpen] = useState(false);
+  const { pathname } = useLocation();
+  const isChatRoute = pathname.startsWith('/chat');
+  const showLauncher = !isChatRoute && !isNavOpen;
+
   return (
     <div className={styles.app}>
-      <Sidebar />
-      <TopBar />
+      <Sidebar isOpen={isNavOpen} onClose={() => setNavOpen(false)} />
+      <TopBar onMenuClick={() => setNavOpen((v) => !v)} isNavOpen={isNavOpen} />
       <main className={styles.main}>
-        <div className={styles.content}>{children}</div>
+        <div className={showLauncher ? `${styles.content} ${styles.contentFabPad}` : styles.content}>
+          {children}
+        </div>
       </main>
-      <ChatBar />
+      <ChatLauncher isNavOpen={isNavOpen} />
     </div>
   );
 }

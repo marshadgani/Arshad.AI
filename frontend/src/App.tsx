@@ -16,6 +16,7 @@ import PersonalFinance from './pages/PersonalFinance';
 import ShopifyStore from './pages/ShopifyStore';
 import StockMarket from './pages/StockMarket';
 import Travel from './pages/Travel';
+import styles from './App.module.css';
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
@@ -40,7 +41,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
   render(): React.ReactNode {
     if (this.state.error) {
       return (
-        <div style={{ padding: '2rem' }}>
+        <div className={styles.errorBoundary}>
           <h1>Something went wrong</h1>
           <p>{this.state.error.message}</p>
           <button type="button" onClick={() => this.setState({ error: null })}>Reload</button>
@@ -59,7 +60,7 @@ function ProtectedRoutes() {
   // Token present but /auth/me hasn't resolved yet — render a thin shell so
   // the user doesn't see the dashboard flicker before the user record loads.
   if (isLoading && !user) {
-    return <div style={{ padding: '2rem', color: '#8b949e' }}>Loading…</div>;
+    return <div className={styles.statusMessage}>Loading…</div>;
   }
 
   return (

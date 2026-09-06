@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 
 import { ChatPanel } from '../chat/ChatPanel';
 import { getToken } from '../auth/tokenStorage';
+import styles from './Chat.module.css';
 
 export default function Chat() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -24,7 +25,7 @@ export default function Chat() {
   }, [sessionId, navigate]);
 
   if (!sessionId) {
-    return <div style={{ padding: '2rem', color: '#8b949e' }}>Creating chat…</div>;
+    return <div className={styles.statusMessage}>Creating chat…</div>;
   }
   return <ChatPanel sessionId={sessionId} />;
 }

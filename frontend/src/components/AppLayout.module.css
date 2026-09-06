@@ -1,14 +1,38 @@
 .app {
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .main {
   margin-left: var(--sidebar-w);
-  padding: calc(var(--topbar-h) + var(--s-6)) var(--s-8) calc(var(--chatbar-h) + var(--s-8));
+  padding: calc(var(--topbar-h) + var(--s-6)) var(--s-8) var(--s-8);
   min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
 }
 
 .content {
   max-width: 1400px;
+  width: 100%;
   margin: 0 auto;
+  /* min-height:0 lets this flex child shrink so nested scrollers (e.g.
+     ChatPanel's .scroller) own the scroll instead of the document. */
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Reserves room for the fixed ChatLauncher FAB. Applied conditionally by
+   AppLayout so /chat (where the FAB is hidden) never carries phantom
+   bottom padding. */
+.contentFabPad {
+  padding-bottom: calc(56px + var(--s-6) + env(safe-area-inset-bottom));
+}
+
+/* breakpoints: mobile below 768px */
+@media (max-width: 767.98px) {
+  .main {
+    margin-left: 0;
+    padding: calc(var(--topbar-h) + var(--s-4)) var(--s-4) var(--s-4);
+  }
 }

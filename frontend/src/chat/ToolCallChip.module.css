@@ -1,19 +1,19 @@
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.25rem 0.65rem;
+  gap: var(--s-2);
+  padding: 0.25rem var(--s-3);
   border-radius: 999px;
-  border: 1px solid var(--border-subtle, #30363d);
-  background: var(--surface-2, #21262d);
+  border: 1px solid var(--border-faint);
+  background: var(--bg-elevated);
   font-size: 0.78rem;
-  color: var(--text-secondary, #8b949e);
+  color: var(--text-secondary);
 }
 
 .label code {
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 0.78rem;
-  color: var(--text-primary, #e6edf3);
+  color: var(--text-primary);
 }
 
 .dot {
@@ -24,16 +24,16 @@
 }
 
 .running .dot {
-  background: #f0b840;
+  background: var(--status-warn);
   animation: pulse 1s infinite;
 }
 
 .completed .dot {
-  background: #3fb950;
+  background: var(--status-ok);
 }
 
 .error .dot {
-  background: #f85149;
+  background: var(--status-danger);
 }
 
 @keyframes pulse {

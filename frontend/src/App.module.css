@@ -1,0 +1,8 @@
+.statusMessage {
+  padding: var(--s-8);
+  color: var(--text-secondary);
+}
+
+.errorBoundary {
+  padding: var(--s-8);
+}

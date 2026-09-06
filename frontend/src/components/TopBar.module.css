@@ -11,7 +11,43 @@
   align-items: center;
   gap: var(--s-4);
   padding: 0 var(--s-6);
-  z-index: 9;
+  z-index: 10;
+}
+
+.menuBtn {
+  display: none;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  font-size: 16px;
+  flex-shrink: 0;
+  transition: background 120ms, color 120ms;
+}
+.menuBtn:hover { background: var(--accent-bg); color: var(--accent); }
+
+/* breakpoints: mobile below 768px */
+@media (max-width: 767.98px) {
+  .topbar {
+    left: 0;
+    padding: 0 var(--s-4);
+    gap: var(--s-2);
+  }
+  .menuBtn {
+    display: grid;
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .capture,
+  .kbd {
+    display: none;
+  }
+  .iconBtn {
+    min-width: 44px;
+    min-height: 44px;
+  }
 }
 
 .capture {

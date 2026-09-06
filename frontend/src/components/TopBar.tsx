@@ -1,14 +1,28 @@
 import { useAuth } from '../auth/AuthContext';
 import styles from './TopBar.module.css';
 
-export interface TopBarProps {}
+export interface TopBarProps {
+  onMenuClick: () => void;
+  isNavOpen: boolean;
+}
 
-export default function TopBar(_: TopBarProps) {
+export default function TopBar({ onMenuClick, isNavOpen }: TopBarProps) {
   const { user, logout } = useAuth();
   const initial = (user?.name?.[0] ?? user?.email?.[0] ?? 'A').toUpperCase();
 
   return (
     <header className={styles.topbar}>
+      <button
+        type="button"
+        className={styles.menuBtn}
+        onClick={onMenuClick}
+        aria-label="Open navigation"
+        aria-expanded={isNavOpen}
+        aria-controls="app-sidebar"
+      >
+        ☰
+      </button>
+
       <div className={styles.capture}>
         <span className={styles.captureIcon}>⌘</span>
         <input
