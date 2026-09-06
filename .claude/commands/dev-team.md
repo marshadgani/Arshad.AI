@@ -14,9 +14,9 @@ Or auto-triggered per CLAUDE.md §21 when a user prompt classifies as a feature 
 
 1. Spawns the orchestrator subagent:
    ```
-   Task(subagent_type="dev-team-orchestrator",
-        description="Run dev-team pipeline",
-        prompt=<requirement>)
+   Agent(subagent_type="dev-team-orchestrator",
+         description="Run dev-team pipeline",
+         prompt=<requirement>)
    ```
 2. The orchestrator runs all 11 steps autonomously (Step 0 through Step 11) — confirms the feature, issues a FEAT-NNN, dispatches BA → EA-pre → SA → Dev → PO → TSW → Tester → BugFixer↔Tester loop → EA-post, validates the denylist, atomically updates `tasks/process-hierarchy.md`, creates the `dev-team/<feat-id>-<slug>` branch, commits, and writes the `tasks/pipeline-runs.md` row.
 3. Returns the orchestrator's final report block (Feature ID, Branch, Status, EA decision, artifact paths) to the user.

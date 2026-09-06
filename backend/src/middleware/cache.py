@@ -23,6 +23,13 @@ async def get_redis() -> Redis:
                 REDIS_URL,
                 encoding="utf-8",
                 decode_responses=True,
+                # Without these, an unreachable host (dead DNS, dropped
+                # network path) stalls on the OS-level TCP timeout — minutes,
+                # not seconds — before any fail-open logic in a caller can
+                # kick in. Redis is a cache dependency; callers should never
+                # wait long for it.
+                socket_connect_timeout=2,
+                socket_timeout=2,
             )
     return _redis
 

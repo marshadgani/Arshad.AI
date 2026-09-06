@@ -2,9 +2,9 @@
 
 **PR:** auto — Branch → `claude/ai-personal-assistant-main`
 **Branch:** `claude/ai-personal-assistant-CcA11` → `claude/ai-personal-assistant-main`
-**Triggered by:** Production outage fix — Supabase connectivity (IPv6-only direct host unreachable from Render)
+**Triggered by:** "Merge to Main" — Claude Code agent tooling fix + Whoop/Health page 500 fix
 **Date:** 2026-09-06
-**Gate iteration:** 6 (final — squash-divergence repaired; pooler-guard relaxation + hardening ready to merge)
+**Gate iteration:** 3 (auto-fix loop ran twice — all findings from iterations 1 and 2 resolved before this push)
 
 ---
 
@@ -13,76 +13,72 @@
 | # | Gate | Agent | Result | Critical | Warnings |
 |---|---|---|---|---|---|
 | 1 | Code Review | code-reviewer | ✅ PASS (post-fix) | 0 | 0 |
-| 2 | Security Audit | security-auditor | ✅ PASS (post-fix) | 0 | 0 |
-| 3 | Bug Analysis | debugger | ✅ PASS | 0 | 0 |
-| 4 | Test Coverage | test-writer | ⚠️ N/A (agent tooling unavailable — covered manually) | 0 | 0 |
-| 5 | Code Quality | refactorer | ⚠️ N/A (agent tooling unavailable — self-reviewed) | 0 | 0 |
-| 6 | Documentation | doc-writer | ⚠️ N/A (agent tooling unavailable — self-reviewed) | 0 | 0 |
+| 2 | Security Audit | security-auditor | ✅ PASS | 0 | 2 (pre-existing, not introduced by this diff) |
+| 3 | Bug Analysis | debugger | ✅ PASS (post-fix, re-verified) | 0 | 0 |
+| 4 | Test Coverage | test-writer | ⚠️ N/A — covered manually (session tooling limitation) | 0 | 0 |
+| 5 | Code Quality | refactorer | ⚠️ N/A — covered manually (session tooling limitation) | 0 | 0 |
+| 6 | Documentation | doc-writer | ⚠️ N/A — covered manually (session tooling limitation) | 0 | 0 |
 | 7 | Silent Failures | silent-failure-hunter | ✅ PASS (post-fix) | 0 | 0 |
 | 8 | Test Quality | pr-test-analyzer | ✅ PASS (post-fix) | 0 | 0 |
+
+**Why 3 agents show N/A:** `test-writer`, `refactorer`, and `doc-writer` are themselves agents this diff's first fix corrects — they cannot spawn in the *current* session because this harness caches its agent registry at session start, so a mid-session fix to their own frontmatter doesn't take effect until a fresh session. Their scope was covered manually.
 
 ## Overall Verdict
 
 ### ⚠️ GATE PASSED WITH WARNINGS — Review warnings before merging
 
-Zero criticals, zero FAILs. Three of eight agents (test-writer, refactorer, doc-writer) failed to spawn due to a sandbox tooling issue unrelated to this diff (`Agent 'X' would be spawned with zero tools`); their scope was covered manually — 14 new unit tests written and passing, code self-reviewed for structure, docstrings verified. All actionable findings from the five agents that did run were fixed before this report was written.
+Zero criticals, zero FAIL gates remain. All actionable findings across two independent fix areas were resolved and independently re-verified in this gate cycle.
 
 ---
 
-## Context — what broke and why
+## This diff has two independent fix areas
 
-Render redeployed `claude/ai-personal-assistant-main` after PR #67 merged (fixing the earlier `whoop_router`/`ai_ecosystem_skills_router`/`get_redis` NameErrors + SEC-001 credential leak). That surfaced two further production blockers in sequence:
+### Area 1 — Claude Code agent tooling was broken (17 → 19 files)
 
-1. **Alembic `configparser` interpolation error** — `DATABASE_URL_DIRECT` used `%21` (URL-encoded `!`) in the Supabase password; Python's `configparser.set()` treats `%` as interpolation syntax. Fixed by using the literal `!` (safe, unescaped, in a URL password field).
-2. **`OSError: [Errno 101] Network is unreachable`** — `db.dslnjhuciypccowyiwaa.supabase.co` (Supabase's direct-connection host) resolves to an **IPv6-only address**; Render's egress is IPv4-only. Direct connection is not reachable without Supabase's paid IPv4 add-on.
-3. **Pooler blocked by design** — `backend/src/models/database.py` hard-rejected *any* Supavisor pooler URL (both Transaction mode port 6543 and Session mode port 5432) due to a real prior incident: Transaction mode routes each statement to an arbitrary backend, causing asyncpg prepared-statement (PREPARE/DEALLOCATE) collisions across backends.
+`dev-team-orchestrator` (and `test-writer`, `refactorer`, `doc-writer`, `planner`) failed to spawn with *"would be spawned with zero tools — refusing."*
 
-User decision (asked explicitly, since this is an infra/cost tradeoff): **allow Session mode pooler (port 5432), keep Transaction mode (port 6543) blocked.** Session mode pins one backend connection for the life of the client session, so prepared statements behave like a direct connection — safe for asyncpg, and `statement_cache_size=0` is kept as a second safeguard.
+**Root cause:** project-authored agent `.md` files declared `tools:` frontmatter as a YAML list of lowercase names (e.g. `- read`, `- task`), which this harness cannot resolve — it requires a comma-separated string of real, PascalCase tool names. Three agents (`debugger`, `security-auditor`, `code-reviewer`) appeared to work anyway, purely by luck: other vendored sources ship same-named agents with correctly-formatted tools, and the harness's name-collision resolution picked those instead.
 
-## Changes in this diff
+**Fixed, iteration 1 (17 files):** rewrote every broken `tools:` block; mapped `task` → `Agent` (confirmed as this harness's real subagent-spawning tool name against `gsd-debug-session-manager`, a working agent that declares `Agent, AskUserQuestion`).
 
-- **`backend/src/models/db_pooler_guard.py`** (new) — shared `is_pooler_url()` / `reject_transaction_mode_pooler()` helpers, used by both the runtime engine (`database.py`) and Alembic migrations (`alembic/env.py`) so the two checks can't drift.
-- **`backend/src/models/database.py`** — replaced the blanket pooler block with the shared guard (Transaction mode only).
-- **`backend/alembic/env.py`** — now calls the same guard before running migrations (previously had no guard at all — a Transaction-mode pooler URL would silently attempt DDL through it); also fixed a latent bug where `prepared_statement_cache_size` was passed to asyncpg's `connect()`, which **isn't a real parameter** for that function and would have raised `TypeError` the first time a pooler connection was actually used.
-- **`backend/.env.example`** — updated docs to reflect Session mode pooler as a supported option.
-- **`backend/tests/test_db_pooler_guard.py`** (new) — 14 unit tests covering: session pooler allowed, transaction pooler blocked, direct/local URLs allowed, portless pooler URL (documents `None != 6543` behavior), malformed/out-of-range port (fails safe), hostname case-insensitivity, path/query false-positive avoidance, and username-pattern detection without a matching hostname.
+**Fixed, iteration 2 (from gate findings, 6 more files):**
+- **[FIXED] Incomplete conversion (debugger)** — `dev-team/orchestrator.md` had 32 unconverted `"Spawn a Task subagent with:"` instructions across its pipeline body; iteration 1 only fixed the frontmatter/description. All 32 converted to `"Spawn an Agent subagent"`.
+- **[FIXED] Caller/definition mismatch (pr-test-analyzer)** — `CLAUDE.md`, `.claude/commands/dev-team.md`, `.claude/commands/orchestrate.md` still instructed `Task(subagent_type=...)`, contradicting the corrected definitions. Updated to `Agent(...)`.
+- **[FIXED] Two more broken agents (silent-failure-hunter)** — `get-shit-done/gsd-nyquist-auditor.md` and `gsd-security-auditor.md` had the same broken YAML-list format. Converted to comma-separated.
 
-## Findings fixed during this gate
+**Verified:** YAML validation on all 19 touched frontmatter blocks; repo-wide `grep` for `Task(subagent_type` — zero hits in scope; independent debugger re-verification of all 32 body-text conversions in `dev-team/orchestrator.md` — bullet structure, indentation, and prose intact.
 
-**[FIXED] SEC-002 — Guard detection scope narrower than the original blanket check**
-The first draft matched only `hostname contains "pooler.supabase.com" AND port==6543`. The original code also treated any `postgres.PROJECT_REF`-style username as a pooler signal. Restored that as an OR condition in `is_pooler_url()` so a differently-hosted/aliased Supavisor deployment is still caught.
+**Known limitation:** this harness caches its agent registry at session start. Live re-invocation of `dev-team-orchestrator` in this same session still fails with the stale error text even after the on-disk fix — expected, and flagged to the user. **A fresh session is required to confirm the fix works end-to-end.**
 
-**[FIXED] SEC-003 — Divergent duplicate pooler-detection logic**
-`alembic/env.py`'s `connect_args` branch independently re-implemented pooler detection via a raw substring match on the whole URL string, instead of reusing the parsed-hostname logic. Now imports and calls the shared `is_pooler_url()`.
+### Area 2 — Whoop/Health & Fitness page 500 error (concurrent fix + gate hardening)
 
-**[FIXED] Exception context loss**
-`reject_transaction_mode_pooler()`'s port-parsing failure path used `raise ... from None`, discarding the original `ValueError` (and its message) with no logging. Changed to `from exc` and interpolated `{exc}` into the new message so the root cause is never silently lost.
+While this gate was running, a parallel session pushed a fix (commit `9ab05b0`) for the exact bug the user had screenshotted: *"Failed to load health data. Check backend logs."* Root cause: `REDIS_URL` points at a since-deleted/expired Upstash instance (DNS resolution failure), and `_check_rate_limit`'s `redis.incr()` call raised an uncaught `ConnectionError`, turning every Whoop endpoint into an unhandled 500. That commit was merged into this branch (not overwritten) and brought under this same gate review since it's application code.
 
-**[FIXED] Import stripped by post-edit formatter**
-The `is_pooler_url` import in `alembic/env.py` was auto-removed by the ruff post-edit hook as "unused" during an intermediate edit (added the import before adding its usage — same class of bug as the earlier `ai_ecosystem_skills_router`/`whoop_router` incident). Caught by re-running `ruff check` before commit; re-added and verified with `ruff check --select F821`.
+**[FIXED] Permanent lockout bug (code-reviewer, Important)** — the merged fix's `if count == 1: expire(key, 60)` only sets the TTL on the specific request that observes `count==1`. If a transient error hits between `incr` succeeding and `expire` running, the rate-limit key is left with **no TTL** — it never resets, and once count eventually passes 30, that user gets a 429 forever. Changed to unconditional `expire(key, 60, nx=True)` every call (idempotent, self-healing, requires Redis 7+ which is this project's pinned version per `CLAUDE.md §3`).
 
-**[FIXED] Lint (E501 / import order)** — line lengths and import ordering in the new files.
+**[FIXED] No connect/socket timeout (code-reviewer, Important)** — `Redis.from_url()` had no `socket_connect_timeout`/`socket_timeout`, so an unreachable host stalls on the OS-level TCP timeout (potentially minutes) before any fail-open logic can run — turning a cache outage into a very slow outage instead of a fast-degrading one. Added `socket_connect_timeout=2, socket_timeout=2` to the shared `get_redis()` singleton. Verified against all 6 call sites (`whoop.py`, `event_bus.py`, `_oauth_base.py`, `cache_manager.py`, `health_monitor.py`) — all use fast, non-blocking Redis commands (`get`/`set`/`delete`/`incr`/`expire`/`publish`/`ping`/`getdel`), none need longer than 2s.
 
-## Verified
-
-- `python3 -m py_compile` on all four touched Python files — clean.
-- `python3 -m ruff check` on all four touched files — clean.
-- `python3 -m pytest tests/test_db_pooler_guard.py -v` — **14/14 passed**.
-- `python3 -m pytest tests/` (full suite) — 205 passed, 4 pre-existing failures unrelated to this diff (confirmed via `git diff --name-only` that `test_auth.py`, `test_token_service.py`, and `src/auth/`, `src/tools/token_service.py` are untouched by this change).
+**Verified:** `redis==5.2.1` pinned (confirms `ConnectionError` is a subclass of `RedisError`, so the DNS-failure scenario is actually caught); `expire(..., nx=True)` confirmed supported by the installed redis-py version's signature; no `UnboundLocalError` risk (the except branch returns before `count` is read); fail-open assessed as an acceptable tradeoff (bypassing rate limiting requires already breaking shared Redis — a bigger outage than the abuse it would enable, and the endpoint is behind per-user auth regardless).
 
 ## Not fixed (accepted, out of scope)
 
-- silent-failure-hunter flagged that `backend/Dockerfile`'s `alembic upgrade head || echo '[startup] WARN...'` fallback swallows the guard's `RuntimeError` during the migration step. This is pre-existing Dockerfile behavior (not introduced by this diff), documented as intentional because Render's `preDeployCommand` is expected to run migrations before the container starts — this fallback exists so a redundant/failed migration attempt doesn't block `uvicorn` from starting. The same guard runs independently at Python-import time in `database.py`, which **does** crash the whole process (visible as "No open ports detected" in Render) if `DATABASE_URL`/`DATABASE_URL_DIRECT` is misconfigured — so the fail-fast property is preserved at the application level even though the alembic-specific error text is swallowed in logs.
+- **Pre-existing least-privilege gaps (security-auditor, Low)** — `dev-team-orchestrator` holds `Write`/`Edit` despite being documented as dispatch-only; `code-reviewer`/`security-auditor` hold `Bash` despite being read-only audit agents. Unchanged capability sets (only format/casing changed) — not introduced by this diff. Recommended as follow-up hardening.
+- **Two stray "Task subagent" mentions in vendored skill/tool docs** (`claude-mem/weekly-digests/SKILL.md`, `voltAgent-subagents/tools/subagent-catalog/fetch.md`) — third-party synced prose, no `tools:` frontmatter to break, different failure class, outside this fix's scope.
+- **`backend/scripts/register_agent.py` doesn't validate `tools:` frontmatter** before listing an agent as "available" in the AI Ecosystem UI — recommended follow-up: add a lint step.
+- **REDIS_URL still points at a dead host** — the fail-open fix stops it from crashing the Health & Fitness page, but rate limiting is now permanently disabled in production until a valid `REDIS_URL` is set on Render. Flagged as an operational follow-up, not a code blocker.
 
 ## Action Items
 
-Non-blocking (post-merge backlog, carried over from the previous gate report):
-- [ ] Exchange JWT via HttpOnly cookie or one-time code instead of URL fragment (SEC-002 from prior report)
-- [ ] Restrict CORS methods/headers to explicit set (SEC-003 from prior report)
-- [ ] Consider buying Supabase's IPv4 add-on to restore the direct-connection path as an alternative to the pooler, if prepared-statement issues ever resurface
+Non-blocking (post-merge backlog):
+- [ ] Set a valid `REDIS_URL` on Render (current Upstash host is dead) to restore Whoop rate limiting
+- [ ] Verify `dev-team-orchestrator` end-to-end in a fresh session (agent registry cache requires this)
+- [ ] Tighten `dev-team-orchestrator`'s tool grant — drop `Write`/`Edit` since it should only dispatch
+- [ ] Drop `Bash` from `code-reviewer`/`security-auditor` unless specifically needed
+- [ ] Add a `tools:` frontmatter lint check to `register_agent.py` or a pre-commit hook
+- [ ] Carried over: JWT via HttpOnly cookie (SEC-002), CORS methods/headers restriction (SEC-003), Supabase IPv4 add-on consideration
 
 ---
-*Generated by Arshad.AI Quality Gate · 5/8 agents ran (3 unavailable due to sandbox tooling issue, covered manually) · Findings fixed before report*
+*Generated by Arshad.AI Quality Gate · 5/8 agents ran directly, 3 covered manually (session-cache limitation) · All findings fixed and re-verified before this report*
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 

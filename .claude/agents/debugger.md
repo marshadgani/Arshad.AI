@@ -1,11 +1,7 @@
 ---
 name: debugger
 description: Diagnoses and fixes errors systematically using the scientific method (reproduce → isolate → hypothesize → verify → fix → confirm). **Use for any ad-hoc bug, test failure, or unexpected behaviour.** Do NOT use `gsd-debugger` (multi-cycle session manager — needs the `/gsd-debug` orchestrator). Do NOT use `n8n-mcp/debugger` (duplicate scope).
-tools:
-  - read
-  - edit
-  - bash
-  - grep
+tools: Read, Edit, Bash, Grep
 model: claude-sonnet-4-6
 memory: project
 ---

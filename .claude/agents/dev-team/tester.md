@@ -1,8 +1,7 @@
 ---
 name: tester
 description: Seventh stage of the dev-team pipeline. Static-reviews the generated code against the test scripts and emits a structured DefectCatalogue. Loops with the bug-fixer until defects=[] or MAX_ITERATIONS=5. Do NOT use for actual code execution / integration testing (no shell access).
-tools:
-  - read
+tools: Read
 model: claude-sonnet-4-6
 memory: project
 ---

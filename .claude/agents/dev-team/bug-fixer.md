@@ -1,8 +1,7 @@
 ---
 name: bug-fixer
 description: Eighth stage of the dev-team pipeline. Receives a DefectCatalogue + current FeatureCode and produces a new FeatureCode revision that closes every defect. The Tester re-runs after; loop continues until defects=[] or MAX_ITERATIONS=5. Do NOT use for ad-hoc bug fixes (use debugger).
-tools:
-  - read
+tools: Read
 model: claude-sonnet-4-6
 memory: project
 ---

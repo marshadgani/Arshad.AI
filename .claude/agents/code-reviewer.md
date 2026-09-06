@@ -1,10 +1,7 @@
 ---
 name: code-reviewer
 description: Reviews diffs and PRs for bugs, security vulnerabilities, and performance issues. Outputs SHIP/FIX/BLOCK verdict. **Use this for any ad-hoc review.** Do NOT use for retroactive whole-codebase audit (use security-auditor for security-only audit, or `/gate` for the full 6-agent run). Do NOT use `gsd-code-reviewer` (writes REVIEW.md, requires the GSD orchestrator).
-tools:
-  - read
-  - bash
-  - grep
+tools: Read, Bash, Grep
 model: claude-sonnet-4-6
 memory: project
 ---

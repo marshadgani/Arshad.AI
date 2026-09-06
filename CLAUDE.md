@@ -60,7 +60,7 @@
 If yes → immediately invoke the dev-team orchestrator with his prompt. Do NOT ask for confirmation. Do NOT write code yourself. Just dispatch.
 
 ```
-Task(subagent_type="dev-team-orchestrator", prompt=<arshad's exact prompt>)
+Agent(subagent_type="dev-team-orchestrator", prompt=<arshad's exact prompt>)
 ```
 
 ### Trigger Detection — Read the intent, not the words
