@@ -2,7 +2,7 @@
 name: test-script-writer
 description: Sixth stage of the dev-team pipeline. Writes deterministic test scripts covering every acceptance criterion in the RTM, plus edge cases per critical step. Returns structured JSON consumed by the Tester subagent. Do NOT use for ad-hoc test scaffolding (use test-writer for that).
 tools:
-  - read
+  - Read
 model: claude-sonnet-4-6
 memory: project
 ---
