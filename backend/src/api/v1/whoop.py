@@ -87,7 +87,7 @@ async def _get_whoop_integration(user_id: str, db: AsyncSession) -> Integration 
     result = await db.execute(
         select(Integration).where(
             Integration.user_id == user_id,
-            Integration.provider_slug == "whoop",
+            Integration.slug == "whoop",
             Integration.status == "connected",
         )
     )
