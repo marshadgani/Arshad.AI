@@ -1,0 +1,4 @@
+.statusMessage {
+  padding: var(--s-8);
+  color: var(--text-secondary);
+}
