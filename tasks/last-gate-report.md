@@ -4,7 +4,7 @@
 **Branch:** `claude/ai-personal-assistant-CcA11` → `claude/ai-personal-assistant-main`
 **Triggered by:** Production outage fix — Supabase connectivity (IPv6-only direct host unreachable from Render)
 **Date:** 2026-09-06
-**Gate iteration:** 6 (Supabase pooler-guard relaxation + hardening)
+**Gate iteration:** 6 (final — squash-divergence repaired; pooler-guard relaxation + hardening ready to merge)
 
 ---
 
