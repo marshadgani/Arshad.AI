@@ -1,0 +1,8 @@
+{
+  "feat_id": "FEAT-118",
+  "feature_name": "Non-Blocking Chat Redesign & App-Wide Mobile Responsiveness",
+  "domain": "infrastructure",
+  "sub_section": "ui-layout-shell",
+  "decision_adopted": "BA flagged a product decision (keep vs remove global ChatLauncher outside /chat). Orchestrator adopts BA's default recommendation: remove ChatBar's unconditional rendering now (fixes the blocking bug immediately) and add a lightweight collapsed ChatLauncher (FAB) as part of this same feature per Code Explorer's recommendation, rather than deferring to a separate follow-up — this satisfies REQ-118-03 (should-have) without a second round-trip.",
+  "note": "Full RTM (9 requirements) and BPDD captured from Business Analyst agent output; see conversation history for complete structured document. Key requirements: REQ-118-01 (remove global fixed ChatBar), REQ-118-02 (dedupe /chat composer), REQ-118-03 (non-blocking launcher, backend-wired), REQ-118-04 (collapsible Sidebar <768px), REQ-118-05 (responsive TopBar), REQ-118-06 (shared breakpoint scale), REQ-118-07 (auto-fill/minmax grids on Dashboard/DomainPage), REQ-118-08 (no horizontal scroll at 320-1440px), REQ-118-09 (use existing design tokens, no new hardcoded colors)."
+}

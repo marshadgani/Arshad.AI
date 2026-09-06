@@ -1,0 +1,89 @@
+{
+  "feature_id": "FEAT-118",
+  "requirement": "The chat window in Arshad.AI blocks the screen — redesign it so it doesn't. Also the overall UI is not mobile-friendly — fix responsiveness across the app.",
+  "chat_ui_current_state": {
+    "summary": "Two entirely separate, non-integrated chat implementations coexist. ChatBar is a decorative fixed-footer mock rendered globally on EVERY route; ChatPanel is the real, functional streaming chat but only mounted on the dedicated /chat route.",
+    "components": [
+      {
+        "file": "frontend/src/components/ChatBar.tsx",
+        "role": "Legacy/mock chat input. Not wired to backend — onClick just does console.log(value) (line 26) with a comment '// mock — wired to Anthropic SDK in a future session' (line 25). Has no ChatBarProps fields (empty interface, line 4).",
+        "rendered_from": "frontend/src/components/AppLayout.tsx:19 — unconditionally, inside every protected route (App.tsx wraps ALL routes in <AppLayout>, App.tsx:65-84)."
+      },
+      {
+        "file": "frontend/src/components/ChatBar.module.css",
+        "screen_blocking_issues": [
+          "Line 1-11: .chatbar { position: fixed; bottom: 0; left: var(--sidebar-w); right: 0; z-index: 9; } — pinned across the full viewport width (minus sidebar) at the bottom of literally every page, all the time.",
+          "No collapse/dismiss affordance.",
+          "No responsive behaviour: left: var(--sidebar-w) (240px) fixed offset with no mobile fallback.",
+          "AppLayout.module.css:7 reserves calc(var(--chatbar-h) + var(--s-8)) (~104px) of bottom padding on .main on EVERY page."
+        ]
+      },
+      {
+        "file": "frontend/src/chat/ChatPanel.tsx",
+        "role": "The actual functional chat surface (SSE streaming via useChatStream.ts, message history, tool-call chips). height: 100% flex column — well-behaved in-flow layout.",
+        "mounted_from": "frontend/src/pages/Chat.tsx:29, only for /chat and /chat/:sessionId (App.tsx:69-70)."
+      },
+      {
+        "conflict": "When a user visits /chat, AppLayout still renders the mock ChatBar as a fixed footer ON TOP of the real ChatPanel's own composer. Two composer bars stack/overlap at the bottom of the /chat screen — this is the literal root cause of 'blocks the screen' in FEAT-118."
+      }
+    ]
+  },
+  "layout_structure": {
+    "AppLayout": "frontend/src/components/AppLayout.tsx renders Sidebar + TopBar + <main> + ChatBar unconditionally, no responsive/collapse logic.",
+    "AppLayout.module.css_issues": [
+      "Line 6: margin-left: var(--sidebar-w) (240px) static, zero media query.",
+      "Line 7: padding reserves both --topbar-h and --chatbar-h on every screen size."
+    ],
+    "Sidebar_issues": "width: var(--sidebar-w) fixed 240px, position: fixed, z-index:10 — always visible, no collapse/off-canvas, no hamburger anywhere.",
+    "TopBar_issues": "position: fixed; left: var(--sidebar-w); right:0 assumes sidebar always full-width; quick-capture input (max-width:720px) has no wrap/stack strategy for narrow viewports.",
+    "grids": "Dashboard.module.css:36,182,244 and DomainPage.module.css:37,60,93 use hardcoded repeat(N,1fr) with no @media override.",
+    "media_query_coverage": "Exactly ONE @media rule in the whole app: Obsidian.module.css:94-98 (max-width:900px). No responsive breakpoint anywhere in AppLayout/Sidebar/TopBar/ChatBar."
+  },
+  "css_conventions": {
+    "tokens_file": "frontend/src/styles/tokens.css",
+    "key_tokens": {
+      "--sidebar-w": "240px",
+      "--topbar-h": "56px",
+      "--chatbar-h": "72px",
+      "spacing_scale": "--s-1..--s-12, 4px base",
+      "no_breakpoint_tokens": true
+    },
+    "module_pattern": "<Name>.module.css co-located with .tsx, camelCase classes per .claude/rules/frontend.md.",
+    "token_drift": "Newer files (ChatPanel.module.css, Login.module.css, ToolCallChip.module.css) use fallback vars like var(--accent, #58a6ff) instead of tokens.css's real names — a pre-existing drift, flagged but out of scope to fully fix."
+  },
+  "existing_responsive_patterns": {
+    "reusable_now": "grid-template-columns: repeat(auto-fill, minmax(Npx, 1fr)) already used in Integrations.module.css:71, AiEcosystem.module.css:146, HealthFitness.module.css:82 — extend to Dashboard/DomainPage grids.",
+    "breakpoint_precedent": "900px in Obsidian.module.css — only existing breakpoint value in the app.",
+    "not_present": ["sidebar collapse/hamburger drawer", "mobile bottom-nav", "responsive typography (clamp/rem)", "container queries", "compact TopBar/composer variant"]
+  },
+  "naming_idioms": {
+    "components": "PascalCase file = component name, functional only, one per file.",
+    "css_modules": "<ComponentName>.module.css co-located, camelCase classes.",
+    "props": "Named <ComponentName>Props, exported, even when empty.",
+    "co_location_with_barrel": "pages/AiEcosystem/, pages/Obsidian/, components/FundFlowMap/ use Component.tsx + .module.css + index.ts — follow for any new component.",
+    "hooks": "use-prefixed, {data,isLoading,error} shape except useChatStream.ts (streaming/imperative, documented exception).",
+    "chat_dir_precedent": "frontend/src/chat/ is an established non-standard top-level dir for chat-domain code — fine to add ChatDrawer/ there or under components/."
+  },
+  "recommendations": [
+    "Eliminate/absorb the legacy ChatBar.tsx global fixed footer. Convert it into a collapsed launcher (small floating action button) that expands into the real ChatPanel on demand, rather than reserving permanent screen real estate on every route.",
+    "AppLayout.tsx should not unconditionally render a full-width chat surface on every page. Use a slide-over/drawer pattern: closed = small FAB (~56px, bottom-right), open = bounded-width overlay (~380-420px) hosting ChatPanel/useChatStream.",
+    "Deduplicate /chat route: consolidate ChatBar (mock) and ChatPanel (real, SSE-wired) into one implementation using ChatPanel/useChatStream as the source of truth.",
+    "Introduce shared breakpoint values (600px mobile, 900px tablet per Obsidian precedent, 1200px desktop) since none exist — decide once, not per-component.",
+    "Sidebar needs collapsible/off-canvas mode below tablet breakpoint: hidden by default on narrow viewports, toggled via hamburger in TopBar; AppLayout margin-left becomes conditional.",
+    "TopBar quick-capture input needs a responsive fallback (collapse to icon-only trigger below ~600px).",
+    "Apply existing repeat(auto-fill, minmax(Npx,1fr)) idiom to Dashboard.module.css and DomainPage.module.css instead of hardcoded repeat(N,1fr).",
+    "Reconcile chat UI's ad-hoc fallback color vars with tokens.css's real variable names so the new chat drawer matches the rest of the app.",
+    "Any new component (ChatDrawer, MobileNav) follows the co-location pattern: own directory, Component.tsx + .module.css + index.ts, exported <Component>Props."
+  ],
+  "essential_files": [
+    "frontend/src/components/AppLayout.tsx", "frontend/src/components/AppLayout.module.css",
+    "frontend/src/components/ChatBar.tsx", "frontend/src/components/ChatBar.module.css",
+    "frontend/src/chat/ChatPanel.tsx", "frontend/src/chat/ChatPanel.module.css",
+    "frontend/src/chat/useChatStream.ts", "frontend/src/pages/Chat.tsx",
+    "frontend/src/components/Sidebar.tsx", "frontend/src/components/Sidebar.module.css",
+    "frontend/src/components/TopBar.tsx", "frontend/src/components/TopBar.module.css",
+    "frontend/src/styles/tokens.css", "frontend/src/pages/Obsidian/Obsidian.module.css",
+    "frontend/src/components/DomainPage.module.css", "frontend/src/pages/Dashboard.module.css",
+    "frontend/src/App.tsx"
+  ]
+}
