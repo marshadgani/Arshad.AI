@@ -27,7 +27,10 @@ from src.models import (  # noqa: F401, E402  — register all models with Base.
     user,
 )
 from src.models.base import Base  # noqa: E402 — guard-free; no engine created here
-from src.models.db_pooler_guard import reject_transaction_mode_pooler  # noqa: E402
+from src.models.db_pooler_guard import (  # noqa: E402
+    is_pooler_url,
+    reject_transaction_mode_pooler,
+)
 
 config = context.config
 
@@ -72,7 +75,7 @@ async def run_async_migrations() -> None:
     # `prepared_statement_cache_size` parameter (passing one raises
     # TypeError at connection time).
     connect_args: dict = {}
-    if "pooler.supabase.com" in database_url or "pgbouncer" in database_url:
+    if is_pooler_url(database_url) or "pgbouncer" in database_url:
         connect_args = {"statement_cache_size": 0}
     connectable = async_engine_from_config(
         section,
