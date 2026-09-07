@@ -45,6 +45,7 @@ class WhoopStrain(BaseModel):
 
 class WhoopDashboard(BaseModel):
     connected: bool
+    needs_reauth: bool = False
     recovery: Optional[WhoopRecovery] = None
     sleep: Optional[WhoopSleep] = None
     strain: Optional[WhoopStrain] = None

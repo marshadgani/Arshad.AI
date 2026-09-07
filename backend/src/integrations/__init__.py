@@ -8,6 +8,9 @@ Importing this package triggers @register decorators across every provider
 from . import coming_soon as _coming_soon  # noqa: F401
 from . import registry  # noqa: F401
 
+# Personal push (no OAuth — the user's device POSTs data to us)
+from .personal import apple_health as _p_apple_health  # noqa: F401
+
 # Personal OAuth (wraps existing Phase C OAuth flows + Google sub-services)
 from .personal import github as _p_github  # noqa: F401
 from .personal import gmail as _p_gmail  # noqa: F401

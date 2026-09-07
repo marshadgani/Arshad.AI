@@ -1,7 +1,7 @@
-import { readFileSync, readdirSync, statSync } from 'fs';
-import { resolve } from 'path';
+import { readFileSync } from 'fs';
 
 import { BREAKPOINTS } from './breakpoints';
+import { findCssFiles, relPath } from './sourceFiles.test-helpers';
 
 // Guards against JS/CSS desync: a new @media rule added without deriving
 // its pixel value from BREAKPOINTS silently reintroduces bugs like the
@@ -19,30 +19,10 @@ const ALLOWED_VALUES = new Set<number>([
 
 const EXEMPT_MARKER = /breakpoint-exempt:\s*(.+)/;
 
-function findCssFiles(dir: string): string[] {
-  const entries = readdirSync(dir);
-  const files: string[] = [];
-
-  for (const entry of entries) {
-    const fullPath = resolve(dir, entry);
-    const stat = statSync(fullPath);
-    if (stat.isDirectory()) {
-      files.push(...findCssFiles(fullPath));
-    } else if (entry.endsWith('.module.css')) {
-      files.push(fullPath);
-    }
-  }
-
-  return files;
-}
-
 function findViolations(): string[] {
-  const srcDir = resolve(__dirname, '..');
-  const files = findCssFiles(srcDir);
   const violations: string[] = [];
 
-  for (const fullPath of files) {
-    const relPath = fullPath.slice(srcDir.length + 1);
+  for (const fullPath of findCssFiles()) {
     const css = readFileSync(fullPath, 'utf-8');
     const regex = /@media[^{]*\((?:max|min)-width:\s*([\d.]+)px\)[^{]*\{/g;
     let match: RegExpExecArray | null;
@@ -59,7 +39,7 @@ function findViolations(): string[] {
       if (EXEMPT_MARKER.test(context)) continue;
 
       const line = precedingText.split('\n').length;
-      violations.push(`${relPath}:${line} — @media width ${value}px is not derived from BREAKPOINTS`);
+      violations.push(`${relPath(fullPath)}:${line} — @media width ${value}px is not derived from BREAKPOINTS`);
     }
   }
 

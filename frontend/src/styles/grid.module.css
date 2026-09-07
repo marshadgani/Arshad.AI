@@ -1,0 +1,44 @@
+/* Shared responsive column ladder — the single source of truth for how a
+   grid of cards degrades from desktop to tablet to mobile. Dashboard and
+   DomainPage each carried their own copy and had already drifted: identical
+   four-up grids collapsed to different counts on mobile.
+
+   Consumers compose a ladder and own only their gap:
+
+     .myGrid {
+       composes: cols3 from '../styles/grid.module.css';
+       gap: var(--s-4);
+     }
+
+   Two families, because two intents:
+     cols2/cols3/cols4 — content cards; collapse to one column so text is
+       never squeezed below a readable measure.
+     tiles4/tiles5     — compact metric/action tiles; stay multi-column at
+       every width because a lone tile per row wastes a phone screen.
+
+   These classes set grid-template-columns and nothing else; anything that
+   varies per consumer (gap, grid-column, margins) stays at the call site. */
+
+.cols2 { display: grid; grid-template-columns: repeat(2, 1fr); }
+.cols3 { display: grid; grid-template-columns: repeat(3, 1fr); }
+.cols4 { display: grid; grid-template-columns: repeat(4, 1fr); }
+
+.tiles4 { display: grid; grid-template-columns: repeat(4, 1fr); }
+.tiles5 { display: grid; grid-template-columns: repeat(5, 1fr); }
+
+/* breakpoints.ts: tablet */
+@media (max-width: 1023.98px) {
+  .cols3,
+  .cols4,
+  .tiles4 { grid-template-columns: repeat(2, 1fr); }
+  .tiles5 { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* breakpoints.ts: mobile */
+@media (max-width: 767.98px) {
+  .cols2,
+  .cols3,
+  .cols4 { grid-template-columns: 1fr; }
+  .tiles4,
+  .tiles5 { grid-template-columns: repeat(2, 1fr); }
+}

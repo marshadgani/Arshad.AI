@@ -9,11 +9,8 @@ export interface MessageRowProps {
 // Maps a persisted row onto the presentational primitive that renders it.
 // It owns no styling of its own — that is the primitives' job.
 export function MessageRow({ message }: MessageRowProps) {
-  if (message.role === 'user') {
-    return <MessageBubble role="user">{message.content.text}</MessageBubble>;
-  }
-  if (message.role === 'assistant') {
-    return <MessageBubble role="assistant">{message.content.text}</MessageBubble>;
+  if (message.role === 'user' || message.role === 'assistant') {
+    return <MessageBubble role={message.role}>{message.content.text}</MessageBubble>;
   }
   if (message.role === 'tool_use') {
     return <ToolUseLine toolName={message.content.tool} />;

@@ -23,13 +23,14 @@ import logging
 import os
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import (
     RedirectResponse,  # noqa: F401 — used by oauth_callback below
 )
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..api.errors import http_error
 from ..auth.dependencies import get_current_user
 from ..models.database import get_db
 from ..models.integration import Integration
@@ -61,10 +62,35 @@ def _provider_descriptor(p: IntegrationProvider) -> dict[str, Any]:
     }
 
 
-def _envelope(code: int, error_code: str, message: str) -> HTTPException:
-    return HTTPException(
-        status_code=code,
-        detail={"error": {"code": error_code, "message": message, "details": {}}},
+def _require_provider(slug: str) -> IntegrationProvider:
+    """Resolve a registered provider or 404.
+
+    Every /{slug}/* route began with this same lookup-or-404; hoisting it
+    keeps the "unknown integration" contract defined once.
+    """
+    provider = get_provider(slug)
+    if provider is None:
+        raise http_error(
+            status.HTTP_404_NOT_FOUND,
+            "unknown_integration",
+            f"No integration '{slug}'.",
+        )
+    return provider
+
+
+async def _find_user_integration(
+    slug: str, user: User, db: AsyncSession
+) -> Integration | None:
+    """The integration row for this slug visible to this user.
+
+    user_id IS NULL matches project-scoped (non-personal) integrations,
+    which are shared rather than owned by one user.
+    """
+    return await db.scalar(
+        select(Integration).where(
+            Integration.slug == slug,
+            (Integration.user_id == user.id) | (Integration.user_id.is_(None)),
+        )
     )
 
 
@@ -93,7 +119,11 @@ async def list_integrations(
                 meta["last_synced_at"] = report.last_synced_at
                 meta["last_error"] = report.last_error
                 meta["extra"] = report.extra
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:  # noqa: BLE001 — one bad provider must not blank the list
+                _log.exception(
+                    "provider.status() raised for %s during list_integrations",
+                    provider.slug,
+                )
                 meta["status"] = "error"
                 meta["last_error"] = f"{type(exc).__name__}: {exc}"
                 meta["extra"] = {}
@@ -115,21 +145,16 @@ async def connect_integration(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    provider = get_provider(slug)
-    if provider is None:
-        raise _envelope(
-            status.HTTP_404_NOT_FOUND,
-            "unknown_integration",
-            f"No integration '{slug}'.",
-        )
+    provider = _require_provider(slug)
     try:
         result = await provider.connect(user=user, db=db, payload=payload or {})
     except IntegrationError as exc:
-        raise _envelope(status.HTTP_400_BAD_REQUEST, exc.code, exc.message)
+        raise http_error(status.HTTP_400_BAD_REQUEST, exc.code, exc.message) from exc
     return {
         "data": {
             "integration_id": result.integration_id,
             "redirect_url": result.redirect_url,
+            "ingest_token": result.ingest_token,
         }
     }
 
@@ -140,21 +165,10 @@ async def sync_integration(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    provider = get_provider(slug)
-    if provider is None:
-        raise _envelope(
-            status.HTTP_404_NOT_FOUND,
-            "unknown_integration",
-            f"No integration '{slug}'.",
-        )
-    integration = await db.scalar(
-        select(Integration).where(
-            Integration.slug == slug,
-            (Integration.user_id == user.id) | (Integration.user_id.is_(None)),
-        )
-    )
+    provider = _require_provider(slug)
+    integration = await _find_user_integration(slug, user, db)
     if integration is None:
-        raise _envelope(
+        raise http_error(
             status.HTTP_400_BAD_REQUEST,
             "not_connected",
             f"Integration '{slug}' is not connected. Connect it first.",
@@ -162,7 +176,7 @@ async def sync_integration(
     try:
         result = await provider.sync(integration=integration, db=db)
     except IntegrationError as exc:
-        raise _envelope(status.HTTP_400_BAD_REQUEST, exc.code, exc.message)
+        raise http_error(status.HTTP_400_BAD_REQUEST, exc.code, exc.message) from exc
     return {
         "data": {
             "rows_written": result.rows_written,
@@ -178,19 +192,8 @@ async def disconnect_integration(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    provider = get_provider(slug)
-    if provider is None:
-        raise _envelope(
-            status.HTTP_404_NOT_FOUND,
-            "unknown_integration",
-            f"No integration '{slug}'.",
-        )
-    integration = await db.scalar(
-        select(Integration).where(
-            Integration.slug == slug,
-            (Integration.user_id == user.id) | (Integration.user_id.is_(None)),
-        )
-    )
+    provider = _require_provider(slug)
+    integration = await _find_user_integration(slug, user, db)
     if integration is None:
         return {"data": {"status": "already_disconnected"}}
     await provider.disconnect(integration=integration, db=db)
@@ -203,19 +206,8 @@ async def integration_status(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    provider = get_provider(slug)
-    if provider is None:
-        raise _envelope(
-            status.HTTP_404_NOT_FOUND,
-            "unknown_integration",
-            f"No integration '{slug}'.",
-        )
-    integration = await db.scalar(
-        select(Integration).where(
-            Integration.slug == slug,
-            (Integration.user_id == user.id) | (Integration.user_id.is_(None)),
-        )
-    )
+    provider = _require_provider(slug)
+    integration = await _find_user_integration(slug, user, db)
     if integration is None:
         return {
             "data": {

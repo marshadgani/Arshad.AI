@@ -16,7 +16,7 @@ registers via @register. Two kinds of providers:
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, ClassVar, Literal
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,7 +25,7 @@ from ..models.integration import Integration
 from ..models.user import User
 
 IntegrationKind = Literal[
-    "personal_oauth", "personal_apikey", "project_apikey", "static"
+    "personal_oauth", "personal_apikey", "project_apikey", "static", "personal_push"
 ]
 IntegrationStatus = Literal[
     "connected", "disconnected", "error", "expired", "coming_soon"
@@ -46,10 +46,18 @@ class ConnectResult:
     """Returned by connect(). For OAuth providers, redirect_url is the
     URL the frontend must navigate the browser to. For API-key providers,
     the integration is already connected — redirect_url is None.
+
+    ingest_token: one-time-display bearer secret for webhook/push-style
+    providers (e.g. Apple Health via an iOS Shortcut) that need to hand
+    the user a token to paste into an external tool. None for every other
+    provider kind. MUST NOT be logged — repr is suppressed on this field
+    specifically so it can never leak via a log line, an exception
+    message, or an error-tracking breadcrumb that dumps the dataclass.
     """
 
     integration_id: str
     redirect_url: str | None = None
+    ingest_token: str | None = field(default=None, repr=False)
 
 
 @dataclass

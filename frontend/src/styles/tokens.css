@@ -26,6 +26,16 @@
   --status-info:   #4facfe;
   --status-neutral: #8b9cba;
 
+  /* Health domain accent — distinct from the cyan system accent so the
+     two live-biometric sources (Whoop vs. Apple Health) read as visually
+     separate lanes on the same dashboard rather than competing for the
+     same colour. Rose/red plays against the HUD cyan without clashing
+     with --status-danger's semantic meaning (danger vs. brand accent). */
+  --accent-health:      #ff375f;
+  --accent-health-soft: rgba(255, 55, 95, 0.65);
+  --accent-health-faint: rgba(255, 55, 95, 0.16);
+  --accent-health-bg:   rgba(255, 55, 95, 0.07);
+
   /* Text */
   --text-primary:   #d8e6ff;
   --text-secondary: #8b9cba;

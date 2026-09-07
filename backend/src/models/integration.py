@@ -70,6 +70,49 @@ class IntegrationOAuthToken(Base, TimestampedMixin):
     extra: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
 
 
+class IntegrationIngestToken(Base, TimestampedMixin):
+    """Bearer credential for push-style providers (Apple Health via an iOS
+    Shortcut) that POST data to us instead of us pulling from them.
+
+    Only the SHA-256 hash of the token is ever stored — the cleartext value
+    is shown to the user exactly once, in the connect() response
+    (ConnectResult.ingest_token), and is never recoverable afterwards. This
+    mirrors encrypted_access_token / encrypted_key in spirit but goes one
+    step further: those are reversible (decrypt() exists for token refresh),
+    this is not, because nothing server-side ever needs the cleartext back —
+    only equality-by-hash at request time.
+
+    One active token per integration (uq_ingest_token_one_per_integration).
+    Rotation (re-running connect()) replaces the row rather than appending,
+    so a leaked-and-rotated token stops working immediately instead of
+    lingering as a second valid credential.
+    """
+
+    __tablename__ = "integration_ingest_tokens"
+    __table_args__ = (
+        UniqueConstraint("integration_id", name="uq_ingest_token_one_per_integration"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    integration_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("integrations.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    # Looked up by hash on every webhook POST (no JWT on that request path),
+    # so this needs its own unique index distinct from the FK index above —
+    # a JSONB-buried token inside Integration.config would force a full
+    # table scan (or an expression index) on every ingest call instead of
+    # an O(log n) unique-btree lookup.
+    token_hash: Mapped[str] = mapped_column(
+        String(64), nullable=False, unique=True, index=True
+    )
+    last_used_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(nullable=True)
+
+
 class ApiKeyCredential(Base, TimestampedMixin):
     __tablename__ = "api_key_credentials"
     __table_args__ = (

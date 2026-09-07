@@ -166,19 +166,9 @@ class _IndMoneyStub(
     pass
 
 
-@register
-class _AppleHealthStub(
-    _make_coming_soon(
-        slug="apple_health",
-        display_name="Apple Health",
-        category="Health",
-        description="HealthKit is iOS-only. Web integration requires a native iOS companion app.",
-        docs_url="https://developer.apple.com/documentation/healthkit",
-        icon="apple-health",
-        reason="No web API. Workaround: iOS Shortcuts → POST to Arshad.AI webhook (Phase J+).",
-    )
-):
-    pass
+# apple_health is now a real provider — see personal/apple_health.py.
+# (Registering both here and there would collide on the slug and crash
+# app startup via registry.register()'s duplicate-slug guard.)
 
 
 @register

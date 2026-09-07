@@ -1,347 +1,259 @@
 """Whoop health data endpoints.
 
-Fetches live data from the Whoop Developer API using the stored OAuth token.
-All endpoints require the user to have connected their Whoop account first.
+Fetches live data from the Whoop Developer API using the stored OAuth
+token. All endpoints require the user to have connected their Whoop
+account first.
+
+Biometric values are read per request and returned straight to the caller;
+nothing here writes recovery, sleep, strain, HRV or workout data to
+Postgres. See the standing decision in
+integrations/personal/oauth_providers.py.
+
+This module is routing and wire shape only. The work it coordinates lives
+in src/services/whoop/: transport in client.py, wire parsing in parsers.py,
+integration-state rules in state.py, the OAuth-provider seam in tokens.py.
+
+The thin module-level `_`-prefixed wrappers below are an intentional seam,
+not indirection for its own sake: routes call them as module globals, which
+keeps every collaborator substitutable from a test via monkeypatch without
+the router taking a constructor or a DI container.
 """
 
 from __future__ import annotations
 
-import logging
+from datetime import date, timedelta
 from typing import Any
 
 import httpx
-import redis.exceptions
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from src.api.errors import error_body, http_error
 from src.auth.dependencies import get_current_user
-from src.middleware.cache import get_redis
+from src.integrations.base import IntegrationError
+from src.middleware.rate_limit import enforce_rate_limit
 from src.models.database import get_db
 from src.models.integration import Integration
-from src.schemas.whoop import (
-    WhoopDashboard,
-    WhoopHRVPoint,
-    WhoopRecovery,
-    WhoopSleep,
-    WhoopStrain,
-    WhoopWorkout,
-)
+from src.models.user import User
+from src.schemas.whoop import WhoopDashboard
+from src.services.whoop import client, parsers, state, tokens
 
 router = APIRouter(prefix="/api/v1/whoop", tags=["whoop"])
 
-_log = logging.getLogger(__name__)
+# 30 requests/minute per user across every Whoop endpoint.
+_RATE_LIMIT = 30
+_RATE_WINDOW_SECONDS = 60
 
-_BASE = "https://api.prod.whoop.com/developer/v1"
+_UPSTREAM_ERROR_MESSAGE = (
+    "Upstream health service is unavailable. Please try again later."
+)
 
-_SPORT_NAMES: dict[int, str] = {
-    -1: "Activity",
-    0: "Running",
-    1: "Cycling",
-    16: "Baseball",
-    17: "Basketball",
-    18: "Rowing",
-    19: "Fencing",
-    20: "Field Hockey",
-    21: "Football",
-    22: "Golf",
-    24: "Ice Hockey",
-    25: "Lacrosse",
-    27: "Rugby",
-    28: "Sailing",
-    29: "Skiing",
-    30: "Soccer",
-    31: "Softball",
-    32: "Squash",
-    33: "Swimming",
-    34: "Tennis",
-    35: "Track & Field",
-    36: "Volleyball",
-    37: "Water Polo",
-    38: "Wrestling",
-    39: "Boxing",
-    42: "Dance",
-    43: "Pilates",
-    44: "Yoga",
-    45: "Weightlifting",
-    47: "Cross Country Skiing",
-    48: "Functional Fitness",
-    49: "Duathlon",
-    51: "Gymnastics",
-    52: "Hiking/Rucking",
-    53: "Horseback Riding",
-    55: "Kayaking",
-    56: "Martial Arts",
-    57: "Mountain Biking",
-    58: "Powerlifting",
-    59: "Rock Climbing",
-    60: "Paddleboarding",
-    61: "Triathlon",
-    62: "Walking",
-    63: "Surfing",
-    64: "Elliptical",
-    65: "Stairmaster",
-    67: "Meditation",
-    68: "Other",
-    71: "Duathlon",
-    73: "Pickleball",
-    74: "Hyrox",
-}
+_WHOOP_REAUTH_ERROR = error_body(
+    "whoop_reauth_required", "Whoop session expired. Please re-authenticate."
+)
+_WHOOP_NOT_CONNECTED_ERROR = error_body(
+    "whoop_not_connected", "Whoop account not connected."
+)
+
+
+# ── Collaborator seams (monkeypatchable module globals) ──────────────────
 
 
 async def _check_rate_limit(user_id: str) -> None:
-    """Sliding-window 30 req/min per user across all Whoop endpoints.
-
-    Fails open on a Redis outage: losing rate limiting is acceptable,
-    losing the entire Health & Fitness page over a cache dependency is not.
-    """
-    try:
-        redis_client = await get_redis()
-        key = f"rl:whoop:{user_id}"
-        count = await redis_client.incr(key)
-        # Unconditional + nx=True (not `if count == 1`): self-healing if a
-        # transient error dropped the expire on a prior call. Without nx,
-        # an incr-succeeds/expire-fails split leaves the key permanently
-        # un-expiring — once count climbs past 30 the user is locked out
-        # forever instead of the outage failing open.
-        await redis_client.expire(key, 60, nx=True)
-    except redis.exceptions.RedisError as exc:
-        _log.warning("Whoop rate limiter degraded — Redis unreachable: %s", exc)
-        return
-
-    if count > 30:
-        raise HTTPException(
-            status_code=429,
-            detail={
-                "error": {
-                    "code": "rate_limit_exceeded",
-                    "message": "Too many requests. Retry after 60 seconds.",
-                    "details": {"retry_after": 60},
-                }
-            },
-            headers={"Retry-After": "60"},
-        )
-
-
-async def _get_whoop_integration(user_id: str, db: AsyncSession) -> Integration | None:
-    result = await db.execute(
-        select(Integration).where(
-            Integration.user_id == user_id,
-            Integration.slug == "whoop",
-            Integration.status == "connected",
-        )
+    await enforce_rate_limit(
+        bucket="whoop",
+        identity=user_id,
+        limit=_RATE_LIMIT,
+        window_seconds=_RATE_WINDOW_SECONDS,
+        message=f"Too many requests. Retry after {_RATE_WINDOW_SECONDS} seconds.",
     )
-    return result.scalar_one_or_none()
 
 
-async def _whoop_get(path: str, access_token: str, params: dict | None = None) -> Any:
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        resp = await client.get(
-            f"{_BASE}{path}",
-            headers={"Authorization": f"Bearer {access_token}"},
-            params=params or {},
-        )
-        resp.raise_for_status()
-        return resp.json()
+async def _find_whoop_integration(user_id: str, db: AsyncSession) -> Integration | None:
+    return await state.find_integration(user_id, db)
 
 
 async def _get_token(integration: Integration, db: AsyncSession) -> str:
-    from src.integrations.personal.oauth_providers import WhoopIntegration
-
-    return await WhoopIntegration().get_access_token(integration=integration, db=db)
+    return await tokens.get_access_token(integration, db)
 
 
-def _parse_recovery(record: dict) -> WhoopRecovery:
-    score = record.get("score") or {}
-    return WhoopRecovery(
-        recovery_score=score.get("recovery_score"),
-        hrv_rmssd_milli=score.get("hrv_rmssd_milli"),
-        resting_heart_rate=score.get("resting_heart_rate"),
-        skin_temp_celsius=score.get("skin_temp_celsius"),
-        spo2_percentage=score.get("spo2_percentage"),
-        cycle_id=record.get("cycle_id"),
-        created_at=record.get("created_at"),
+async def _whoop_get(
+    path: str, access_token: str, params: dict[str, Any] | None = None
+) -> Any:
+    return await client.get(path, access_token, params)
+
+
+async def _fetch_dashboard_data(token: str) -> tuple[Any, Any, Any]:
+    return await client.fetch_dashboard_bodies(token)
+
+
+def _classify_whoop_error(exc: Exception) -> tuple[bool, int]:
+    return state.classify_error(exc)
+
+
+async def _apply_whoop_error_status(
+    integration: Integration, exc: Exception, needs_reauth: bool, db: AsyncSession
+) -> None:
+    await state.apply_error_status(integration, exc, needs_reauth, db)
+
+
+async def _mark_whoop_healthy(integration: Integration, db: AsyncSession) -> None:
+    await state.mark_healthy(integration, db)
+
+
+# ── Shared request-flow helpers ──────────────────────────────────────────
+
+
+async def _resolve_active_integration(user_id: str, db: AsyncSession) -> Integration:
+    """Rate-limit, then resolve the integration for the two list endpoints.
+
+    Returns 404 whoop_not_connected when there is no Whoop integration at
+    all. Returns 409 whoop_reauth_required — a deliberate, documented
+    deviation from the standard status table in .claude/rules/api.md — when
+    the integration exists but the token is expired/revoked. 401 is avoided
+    on purpose: frontend/src/hooks/useFetch.ts calls clearToken() on ANY
+    401, which would log the user out of Arshad.AI itself over an unrelated
+    third-party token expiring. 409 (conflict with current resource state)
+    is returned instead, for both this pre-fetch gate and the mid-fetch
+    exception path, so the two produce one consistent shape.
+    """
+    await _check_rate_limit(user_id)
+    integration = await _find_whoop_integration(user_id, db)
+    if not integration:
+        raise HTTPException(status_code=404, detail=_WHOOP_NOT_CONNECTED_ERROR)
+    if integration.status == "expired":
+        raise HTTPException(status_code=409, detail=_WHOOP_REAUTH_ERROR)
+    return integration
+
+
+async def _persist_failure_needs_reauth(
+    integration: Integration, exc: Exception, db: AsyncSession
+) -> bool:
+    """Classify a fetch failure, persist the implied status, and either
+    return True (caller renders its own re-auth shape) or raise the 502.
+
+    Collapses a block that was previously copy-pasted into all three
+    routes, where the three copies had to be kept in step by hand.
+    """
+    needs_reauth, fallback_status = _classify_whoop_error(exc)
+    await _apply_whoop_error_status(integration, exc, needs_reauth, db)
+    if needs_reauth:
+        return True
+    raise http_error(
+        fallback_status, "whoop_api_error", _UPSTREAM_ERROR_MESSAGE
+    ) from exc
+
+
+def _reauth_dashboard(integration: Integration) -> JSONResponse:
+    return JSONResponse(
+        {
+            "data": WhoopDashboard(
+                connected=True,
+                needs_reauth=True,
+                user_first_name=state.profile_first_name(integration),
+            ).model_dump()
+        }
     )
 
 
-def _parse_sleep(record: dict) -> WhoopSleep:
-    score = record.get("score") or {}
-    stage = (score or {}).get("stage_summary") or {}
-    return WhoopSleep(
-        id=record.get("id"),
-        start=record.get("start"),
-        end=record.get("end"),
-        total_in_bed_time_milli=stage.get("total_in_bed_time_milli"),
-        total_awake_time_milli=stage.get("total_awake_time_milli"),
-        total_no_data_time_milli=stage.get("total_no_data_time_milli"),
-        total_light_sleep_time_milli=stage.get("total_light_sleep_time_milli"),
-        total_slow_wave_sleep_time_milli=stage.get("total_slow_wave_sleep_time_milli"),
-        total_rem_sleep_time_milli=stage.get("total_rem_sleep_time_milli"),
-        sleep_performance_percentage=score.get("sleep_performance_percentage"),
-        sleep_consistency_percentage=score.get("sleep_consistency_percentage"),
-        sleep_efficiency_percentage=score.get("sleep_efficiency_percentage"),
-        respiratory_rate=score.get("respiratory_rate"),
-    )
-
-
-def _parse_strain(record: dict) -> WhoopStrain:
-    score = record.get("score") or {}
-    return WhoopStrain(
-        id=record.get("id"),
-        start=record.get("start"),
-        end=record.get("end"),
-        score=score.get("strain"),
-        kilojoule=score.get("kilojoule"),
-        average_heart_rate=score.get("average_heart_rate"),
-        max_heart_rate=score.get("max_heart_rate"),
-    )
+# ── Routes ───────────────────────────────────────────────────────────────
 
 
 @router.get("/dashboard")
 async def get_dashboard(
-    current_user=Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """Return today's recovery, sleep, and strain snapshot."""
+    """Return today's recovery, sleep, and strain snapshot.
+
+    Always returns HTTP 200. When the Whoop token is expired/revoked, the
+    response carries needs_reauth: true with null biometric fields instead
+    of an error status — this endpoint backs the always-visible dashboard
+    tile and a 4xx/5xx here would blank the whole Health & Fitness page for
+    a condition the frontend can render gracefully.
+    """
     await _check_rate_limit(str(current_user.id))
-    integration = await _get_whoop_integration(str(current_user.id), db)
+    integration = await _find_whoop_integration(str(current_user.id), db)
     if not integration:
         return JSONResponse({"data": WhoopDashboard(connected=False).model_dump()})
+
+    if integration.status == "expired":
+        return _reauth_dashboard(integration)
 
     try:
         token = await _get_token(integration, db)
         recovery_body, sleep_body, strain_body = await _fetch_dashboard_data(token)
-    except httpx.HTTPStatusError:
-        raise HTTPException(
-            status_code=502,
-            detail={
-                "error": {
-                    "code": "whoop_api_error",
-                    "message": "Upstream health service is unavailable. Please try again later.",
-                    "details": {},
-                }
-            },
-        )
+    except (httpx.HTTPError, IntegrationError) as exc:
+        await _persist_failure_needs_reauth(integration, exc, db)
+        return _reauth_dashboard(integration)
 
-    recovery_records = recovery_body.get("records") or []
-    sleep_records = sleep_body.get("records") or []
-    strain_records = strain_body.get("records") or []
+    await _mark_whoop_healthy(integration, db)
 
-    config = integration.config or {}
+    recovery_records = parsers.records_of(recovery_body)
+    sleep_records = parsers.records_of(sleep_body)
+    strain_records = parsers.records_of(strain_body)
+
     dashboard = WhoopDashboard(
         connected=True,
-        recovery=_parse_recovery(recovery_records[0]) if recovery_records else None,
-        sleep=_parse_sleep(sleep_records[0]) if sleep_records else None,
-        strain=_parse_strain(strain_records[0]) if strain_records else None,
-        user_first_name=config.get("first_name"),
+        needs_reauth=False,
+        recovery=(
+            parsers.parse_recovery(recovery_records[0]) if recovery_records else None
+        ),
+        sleep=parsers.parse_sleep(sleep_records[0]) if sleep_records else None,
+        strain=parsers.parse_strain(strain_records[0]) if strain_records else None,
+        user_first_name=state.profile_first_name(integration),
     )
     return JSONResponse({"data": dashboard.model_dump()})
-
-
-async def _fetch_dashboard_data(token: str) -> tuple[Any, Any, Any]:
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        headers = {"Authorization": f"Bearer {token}"}
-        recovery_resp, sleep_resp, strain_resp = await _parallel_get(
-            client,
-            headers,
-            ["/recovery", "/sleep", "/cycle"],
-            [{"limit": 1}, {"limit": 1}, {"limit": 1}],
-        )
-    return recovery_resp, sleep_resp, strain_resp
-
-
-async def _parallel_get(
-    client: httpx.AsyncClient,
-    headers: dict,
-    paths: list[str],
-    params_list: list[dict],
-) -> list[Any]:
-    import asyncio
-
-    async def fetch(path: str, params: dict) -> Any:
-        resp = await client.get(f"{_BASE}{path}", headers=headers, params=params)
-        resp.raise_for_status()
-        return resp.json()
-
-    return await asyncio.gather(*[fetch(p, q) for p, q in zip(paths, params_list)])
 
 
 @router.get("/hrv-trend")
 async def get_hrv_trend(
     days: int = Query(default=14, ge=1, le=30),
-    current_user=Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """Return HRV data points for the last N days (max 30)."""
-    await _check_rate_limit(str(current_user.id))
-    integration = await _get_whoop_integration(str(current_user.id), db)
-    if not integration:
-        raise HTTPException(
-            status_code=404,
-            detail={
-                "error": {
-                    "code": "whoop_not_connected",
-                    "message": "Whoop account not connected.",
-                    "details": {},
-                }
-            },
+    """Return HRV data points for the last N days (max 30).
+
+    404/409 wire shape is explained in _resolve_active_integration.
+    """
+    integration = await _resolve_active_integration(str(current_user.id), db)
+
+    try:
+        token = await _get_token(integration, db)
+        start = (date.today() - timedelta(days=days)).isoformat()
+        body = await _whoop_get(
+            client.RECOVERY_PATH, token, {"limit": days, "start": start}
         )
+    except (httpx.HTTPError, IntegrationError) as exc:
+        await _persist_failure_needs_reauth(integration, exc, db)
+        raise HTTPException(status_code=409, detail=_WHOOP_REAUTH_ERROR) from exc
 
-    from datetime import date, timedelta
+    await _mark_whoop_healthy(integration, db)
 
-    token = await _get_token(integration, db)
-    start = (date.today() - timedelta(days=days)).isoformat()
-    body = await _whoop_get("/recovery", token, {"limit": days, "start": start})
-    records = body.get("records") or []
-
-    points = [
-        WhoopHRVPoint(
-            date=r.get("created_at", "")[:10],
-            hrv_rmssd_milli=(r.get("score") or {}).get("hrv_rmssd_milli"),
-        ).model_dump()
-        for r in reversed(records)
-        if r.get("created_at")
-    ]
+    points = [point.model_dump() for point in parsers.parse_hrv_trend(body)]
     return JSONResponse({"data": points, "total": len(points)})
 
 
 @router.get("/workouts")
 async def get_workouts(
     limit: int = Query(default=10, ge=1, le=25),
-    current_user=Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """Return recent workouts."""
-    await _check_rate_limit(str(current_user.id))
-    integration = await _get_whoop_integration(str(current_user.id), db)
-    if not integration:
-        raise HTTPException(
-            status_code=404,
-            detail={
-                "error": {
-                    "code": "whoop_not_connected",
-                    "message": "Whoop account not connected.",
-                    "details": {},
-                }
-            },
-        )
+    """Return recent workouts. Same 404/409 wire shape as /hrv-trend."""
+    integration = await _resolve_active_integration(str(current_user.id), db)
 
-    token = await _get_token(integration, db)
-    body = await _whoop_get("/workout", token, {"limit": limit})
-    records = body.get("records") or []
+    try:
+        token = await _get_token(integration, db)
+        body = await _whoop_get(client.WORKOUT_PATH, token, {"limit": limit})
+    except (httpx.HTTPError, IntegrationError) as exc:
+        await _persist_failure_needs_reauth(integration, exc, db)
+        raise HTTPException(status_code=409, detail=_WHOOP_REAUTH_ERROR) from exc
+
+    await _mark_whoop_healthy(integration, db)
 
     workouts = [
-        WhoopWorkout(
-            id=r.get("id"),
-            sport_id=r.get("sport_id"),
-            sport_name=_SPORT_NAMES.get(r.get("sport_id", -1), "Activity"),
-            start=r.get("start"),
-            end=r.get("end"),
-            strain=(r.get("score") or {}).get("strain"),
-            average_heart_rate=(r.get("score") or {}).get("average_heart_rate"),
-            max_heart_rate=(r.get("score") or {}).get("max_heart_rate"),
-            kilojoule=(r.get("score") or {}).get("kilojoule"),
-        ).model_dump()
-        for r in records
+        parsers.parse_workout(record).model_dump()
+        for record in parsers.records_of(body)
     ]
     return JSONResponse({"data": workouts, "total": len(workouts)})

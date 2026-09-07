@@ -6,7 +6,7 @@ import AuthCallback from './pages/AuthCallback';
 import AiEcosystem from './pages/AiEcosystem';
 import Chat from './pages/Chat';
 import Obsidian from './pages/Obsidian';
-import Dashboard from './pages/Dashboard';
+import Dashboard from './dashboard/Dashboard';
 import HealthFitness from './pages/HealthFitness';
 import HomeIoT from './pages/HomeIoT';
 import Integrations from './pages/Integrations';

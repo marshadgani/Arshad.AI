@@ -3,7 +3,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { getToken } from '../auth/tokenStorage';
 import styles from './Integrations.module.css';
 
-type IntegrationKind = 'personal_oauth' | 'personal_apikey' | 'project_apikey' | 'static';
+type IntegrationKind =
+  | 'personal_oauth'
+  | 'personal_apikey'
+  | 'personal_push'
+  | 'project_apikey'
+  | 'static';
 type IntegrationStatus = 'connected' | 'disconnected' | 'error' | 'expired' | 'coming_soon';
 
 interface IntegrationItem {
@@ -56,6 +61,16 @@ export default function Integrations() {
   const [apiKeyDraft, setApiKeyDraft] = useState('');
   const [apiKeyErr, setApiKeyErr] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  // personal_push providers (e.g. Apple Health) hand back a one-time
+  // ingest token on connect. Without this, the generic connect flow
+  // below silently dropped it after showing a "connected" toast — the
+  // user would have no way to configure the Shortcut/webhook that
+  // actually needs it.
+  const [ingestTokenModal, setIngestTokenModal] = useState<{
+    item: IntegrationItem;
+    token: string;
+  } | null>(null);
+  const [tokenCopied, setTokenCopied] = useState(false);
 
   const fetchAll = async () => {
     const token = getToken();
@@ -119,12 +134,30 @@ export default function Integrations() {
         window.location.href = url;
         return;
       }
+      const ingestToken = body?.data?.ingest_token as string | null;
+      if (ingestToken) {
+        setIngestTokenModal({ item, token: ingestToken });
+        setTokenCopied(false);
+        await fetchAll();
+        return;
+      }
       flashToast(`${item.display_name} connected`);
       await fetchAll();
     } catch (e: unknown) {
       flashToast(`Connect failed: ${(e as Error).message}`);
     } finally {
       setActioning(null);
+    }
+  };
+
+  const copyIngestToken = async () => {
+    if (!ingestTokenModal) return;
+    try {
+      await navigator.clipboard.writeText(ingestTokenModal.token);
+      setTokenCopied(true);
+      setTimeout(() => setTokenCopied(false), 2000);
+    } catch {
+      // Clipboard API can be blocked — token remains visible/selectable.
     }
   };
 
@@ -238,7 +271,11 @@ export default function Integrations() {
                     </div>
                   </div>
                   <span className={styles.kind}>
-                    {it.kind === 'personal_oauth' ? 'OAuth' : 'API key'}
+                    {it.kind === 'personal_oauth'
+                      ? 'OAuth'
+                      : it.kind === 'personal_push'
+                        ? 'Push sync'
+                        : 'API key'}
                   </span>
                 </div>
 
@@ -275,13 +312,24 @@ export default function Integrations() {
                     </button>
                   ) : it.status === 'connected' ? (
                     <>
-                      <button
-                        type="button"
-                        onClick={() => onSync(it)}
-                        disabled={actioning === it.slug}
-                      >
-                        {actioning === it.slug ? '…' : 'Sync now'}
-                      </button>
+                      {it.kind === 'personal_push' ? (
+                        <button
+                          type="button"
+                          onClick={() => onConnect(it)}
+                          disabled={actioning === it.slug}
+                          title="Revokes the current token and issues a new one"
+                        >
+                          {actioning === it.slug ? '…' : 'Reissue token'}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => onSync(it)}
+                          disabled={actioning === it.slug}
+                        >
+                          {actioning === it.slug ? '…' : 'Sync now'}
+                        </button>
+                      )}
                       <button
                         type="button"
                         className={styles.secondary}
@@ -356,6 +404,36 @@ export default function Integrations() {
                 disabled={actioning === apiKeyModal.slug}
               >
                 {actioning === apiKeyModal.slug ? 'Validating…' : 'Connect'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {ingestTokenModal && (
+        <div
+          className={styles.modalBackdrop}
+          onClick={() => setIngestTokenModal(null)}
+        >
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <h3>{ingestTokenModal.item.display_name} sync token</h3>
+            <p className={styles.modalDesc}>
+              This token is shown once. Save it now — it's required to configure the
+              push (e.g. an iOS Shortcut) that sends data to Arshad.AI.
+            </p>
+            <div className={styles.modalInput} style={{ userSelect: 'all' }}>
+              {ingestTokenModal.token}
+            </div>
+            <div className={styles.modalActions}>
+              <button type="button" className={styles.secondary} onClick={copyIngestToken}>
+                {tokenCopied ? 'Copied' : 'Copy'}
+              </button>
+              <button
+                type="button"
+                className={styles.primary}
+                onClick={() => setIngestTokenModal(null)}
+              >
+                Done — I've saved it
               </button>
             </div>
           </div>

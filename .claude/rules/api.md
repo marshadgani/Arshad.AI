@@ -54,6 +54,21 @@ POST   /sessions/{id}/messages       → send a message
 
 Never return 200 with `{ "error": "..." }` in the body. Use the correct HTTP status code.
 
+### Documented deviation — third-party re-auth uses 409, not 401
+
+`GET /api/v1/whoop/hrv-trend` and `GET /api/v1/whoop/workouts` return **409** with
+`error.code: "whoop_reauth_required"` when the user's Whoop OAuth token is
+expired/revoked, instead of the "textbook" 401. This is deliberate:
+`frontend/src/hooks/useFetch.ts` treats ANY 401 response as an
+Arshad.AI session expiry and calls `clearToken()`, logging the user out of
+the whole app. A third-party integration's token expiring must never do
+that. 409 (the current state of the Whoop integration resource conflicts
+with the request) is used instead. Do not "fix" this back to 401 — it
+would silently reintroduce an app-wide logout bug. `GET /api/v1/whoop/dashboard`
+uses a different, also-deliberate shape: always HTTP 200 with
+`needs_reauth: bool` in the body, because that endpoint backs an
+always-visible dashboard tile.
+
 ## Error Responses
 
 All error responses follow this shape:
