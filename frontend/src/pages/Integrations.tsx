@@ -25,6 +25,7 @@ interface IntegrationItem {
   extra: Record<string, unknown>;
   coming_soon: boolean;
   coming_soon_reason: string | null;
+  connect_prompt?: { label: string; placeholder: string } | null;
 }
 
 const STATUS_DOT: Record<IntegrationStatus, string> = {
@@ -60,6 +61,12 @@ export default function Integrations() {
   const [apiKeyModal, setApiKeyModal] = useState<IntegrationItem | null>(null);
   const [apiKeyDraft, setApiKeyDraft] = useState('');
   const [apiKeyErr, setApiKeyErr] = useState<string | null>(null);
+  // Generic domain/account-input modal for any provider that declares
+  // connect_prompt (e.g. Shopify's *.myshopify.com domain). No slug
+  // special-casing: any future provider gets this modal automatically.
+  const [shopConnectModal, setShopConnectModal] = useState<IntegrationItem | null>(null);
+  const [shopDomainDraft, setShopDomainDraft] = useState('');
+  const [shopDomainErr, setShopDomainErr] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   // personal_push providers (e.g. Apple Health) hand back a one-time
   // ingest token on connect. Without this, the generic connect flow
@@ -113,6 +120,12 @@ export default function Integrations() {
       setApiKeyModal(item);
       setApiKeyDraft('');
       setApiKeyErr(null);
+      return;
+    }
+    if (item.kind === 'personal_oauth' && item.connect_prompt) {
+      setShopConnectModal(item);
+      setShopDomainDraft('');
+      setShopDomainErr(null);
       return;
     }
     // personal_oauth — POST connect; if it returns a redirect_url, navigate there
@@ -186,6 +199,47 @@ export default function Integrations() {
       await fetchAll();
     } catch (e: unknown) {
       setApiKeyErr((e as Error).message);
+    } finally {
+      setActioning(null);
+    }
+  };
+
+  const submitShopConnect = async () => {
+    if (!shopConnectModal) return;
+    if (!shopDomainDraft.trim()) {
+      setShopDomainErr('Store domain required');
+      return;
+    }
+    setActioning(shopConnectModal.slug);
+    try {
+      const token = getToken();
+      const res = await fetch(`/api/v1/integrations/${shopConnectModal.slug}/connect`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ shop: shopDomainDraft.trim() }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        const code = body?.error?.code as string | undefined;
+        if (code === 'invalid_hmac' || code === 'timestamp_skew') {
+          throw new Error('Authentication failed. Please click Connect again.');
+        }
+        throw new Error(body?.error?.message ?? `HTTP ${res.status}`);
+      }
+      const url = body?.data?.redirect_url as string | null;
+      if (url) {
+        window.location.href = url;
+        return;
+      }
+      flashToast(`${shopConnectModal.display_name} connected`);
+      setShopConnectModal(null);
+      setShopDomainDraft('');
+      await fetchAll();
+    } catch (e: unknown) {
+      setShopDomainErr((e as Error).message);
     } finally {
       setActioning(null);
     }
@@ -404,6 +458,44 @@ export default function Integrations() {
                 disabled={actioning === apiKeyModal.slug}
               >
                 {actioning === apiKeyModal.slug ? 'Validating…' : 'Connect'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {shopConnectModal && (
+        <div className={styles.modalBackdrop} onClick={() => setShopConnectModal(null)}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <h3>Connect {shopConnectModal.display_name}</h3>
+            <p className={styles.modalDesc}>
+              Enter your {shopConnectModal.connect_prompt?.label ?? 'store domain'}. You'll
+              be redirected to Shopify to approve access.
+            </p>
+            <input
+              type="text"
+              className={styles.modalInput}
+              placeholder={shopConnectModal.connect_prompt?.placeholder ?? ''}
+              value={shopDomainDraft}
+              onChange={(e) => setShopDomainDraft(e.target.value)}
+              autoFocus
+            />
+            {shopDomainErr && <div className={styles.modalErr}>{shopDomainErr}</div>}
+            <div className={styles.modalActions}>
+              <button
+                type="button"
+                className={styles.secondary}
+                onClick={() => setShopConnectModal(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={styles.primary}
+                onClick={submitShopConnect}
+                disabled={actioning === shopConnectModal.slug}
+              >
+                {actioning === shopConnectModal.slug ? 'Connecting…' : 'Connect'}
               </button>
             </div>
           </div>

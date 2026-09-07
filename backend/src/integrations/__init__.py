@@ -26,6 +26,9 @@ from .personal import openweathermap as _p_owm  # noqa: F401
 
 # Wave 4 — Stack Overflow, Plaid, Upstox, Zerodha
 from .personal import plaid as _p_plaid  # noqa: F401
+
+# Commerce — Shopify Admin API (per-shop OAuth, see personal/shopify.py)
+from .personal import shopify as _p_shopify  # noqa: F401
 from .personal import stack_overflow as _p_so  # noqa: F401
 
 # Static (no-credentials): Hacker News, Open-Meteo

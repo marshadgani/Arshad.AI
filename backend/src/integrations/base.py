@@ -85,6 +85,12 @@ class IntegrationProvider(ABC):
     icon: ClassVar[str] = ""  # short identifier the frontend maps to a glyph
     coming_soon: ClassVar[bool] = False
     coming_soon_reason: ClassVar[str | None] = None
+    # When set, the frontend shows a domain/account-input modal before
+    # kicking off connect() instead of POSTing an empty payload straight
+    # away. None (default) for every provider that needs no extra input —
+    # emitted unconditionally by _provider_descriptor() so it reaches the
+    # frontend even for a provider the user has never connected.
+    connect_prompt: ClassVar[dict[str, str] | None] = None
 
     @abstractmethod
     async def connect(

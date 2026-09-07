@@ -69,6 +69,13 @@ uses a different, also-deliberate shape: always HTTP 200 with
 `needs_reauth: bool` in the body, because that endpoint backs an
 always-visible dashboard tile.
 
+`GET /api/v1/shopify/dashboard` follows the same always-200 pattern as
+`GET /api/v1/whoop/dashboard` for the same reason: it backs the
+always-visible `/shopify` page tile, and a 401 there would trigger
+`frontend/src/hooks/useFetch.ts`'s app-wide `clearToken()` over an
+unrelated Shopify token expiring. `connected` / `needs_reauth` /
+`partial_failures` carry integration state in the body instead.
+
 ## Error Responses
 
 All error responses follow this shape:

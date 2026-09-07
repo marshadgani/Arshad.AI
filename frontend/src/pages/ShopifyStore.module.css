@@ -1,0 +1,26 @@
+/*
+ * Page shell only: the outer frame and the one element the page itself
+ * renders (the staleness line). Header, grid, cards and panels each own
+ * their appearance in components/shopify/*, so nothing here can drift out
+ * of step with a component that was restyled.
+ *
+ * Bold direction (implemented across those components): a commerce-accent
+ * (emerald/gold) lane distinct from the cyan HUD chrome and the
+ * health-domain rose, a monospace numeric face on every KPI, and light
+ * motion (rise-in tiles, pulsing "Live" indicator, shimmering skeletons)
+ * so the page reads as a live trading-desk ticker rather than a static
+ * report.
+ */
+
+.page {
+  padding: var(--s-8);
+  max-width: 1100px;
+  margin: 0 auto;
+  color: var(--text-primary);
+}
+
+.stale {
+  font-size: 0.8rem;
+  color: var(--text-faint);
+  margin: 0 0 var(--s-6);
+}

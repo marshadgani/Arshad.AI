@@ -1,28 +1,18 @@
 """Whoop integration-record lifecycle: lookup, error classification, and
 the status transitions that follow a fetch attempt.
 
-Separated from the router because this is where the subtle rules live —
-which statuses still count as "connected", when a failure means re-auth
-versus a transient upstream fault, and when to write back to Postgres. The
-router should read as routing, not as a state machine.
-
-Note the deliberate split between the pure classifier and the impure
-persister: `classify_error` takes only the exception and returns a verdict,
-so it is table-testable with no fixtures at all.
+Thin binding over src/services/integrations/state.py — the shared,
+slug-parameterised implementation. This module supplies WHOOP_SLUG and
+REAUTH_CODES and re-exports the four functions bound to them, so every
+existing call site (src/api/v1/whoop.py) keeps working unmodified and with
+identical behaviour. See services/integrations/state.py for the rules
+themselves; this file is deliberately thin.
 """
 
 from __future__ import annotations
 
-import logging
-
-import httpx
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from ...integrations.base import IntegrationError
 from ...models.integration import Integration
-
-_log = logging.getLogger(__name__)
+from ..integrations import state as _shared
 
 WHOOP_SLUG = "whoop"
 
@@ -37,92 +27,21 @@ REAUTH_CODES = frozenset(
     }
 )
 
-# Statuses that still represent "the user has connected Whoop".
-#   connected — the normal path.
-#   expired   — the account IS connected but the token needs a refresh the
-#               user must re-approve. Included so the pre-fetch gate can
-#               emit needs_reauth instead of a 404 "not connected", which
-#               would be a lie.
-#   error     — included for self-healing. A transient Whoop 5xx sets this
-#               via apply_error_status; without it here, one bad request
-#               would permanently blank the dashboard. mark_healthy resets
-#               it on the next successful fetch.
-# 'disconnected' and 'coming_soon' are excluded.
-ACTIVE_STATUSES = ("connected", "expired", "error")
-
-UPSTREAM_FALLBACK_STATUS = 502
-
-_LAST_ERROR_MAX_CHARS = 500
+ACTIVE_STATUSES = _shared.ACTIVE_STATUSES
+UPSTREAM_FALLBACK_STATUS = _shared.UPSTREAM_FALLBACK_STATUS
 
 
-async def find_integration(user_id: str, db: AsyncSession) -> Integration | None:
+async def find_integration(user_id: str, db) -> Integration | None:  # type: ignore[no-untyped-def]
     """The user's Whoop integration, if it is in any active status."""
-    result = await db.execute(
-        select(Integration).where(
-            Integration.user_id == user_id,
-            Integration.slug == WHOOP_SLUG,
-            Integration.status.in_(ACTIVE_STATUSES),
-        )
-    )
-    return result.scalar_one_or_none()
+    return await _shared.find_integration(user_id, WHOOP_SLUG, db)
 
 
 def classify_error(exc: Exception) -> tuple[bool, int]:
-    """Decide whether re-authentication is required, and the HTTP status to
-    fall back to when it is not. Returns (needs_reauth, fallback_status).
-
-    Pure: no I/O, no mutation, no Integration or session argument.
-
-    Ordering is load-bearing. `.response` is only ever accessed inside the
-    `isinstance(exc, httpx.HTTPStatusError)` branch. `httpx.RequestError`
-    (ConnectTimeout, ReadTimeout, ConnectError, ...) is a sibling of
-    HTTPStatusError under httpx.HTTPError and has NO `.response` attribute —
-    touching it there would raise AttributeError while handling the
-    original exception.
-    """
-    if isinstance(exc, IntegrationError):
-        if exc.code in REAUTH_CODES:
-            return True, 0
-        return False, UPSTREAM_FALLBACK_STATUS
-
-    if isinstance(exc, httpx.HTTPStatusError):
-        if exc.response.status_code in (401, 403):
-            return True, 0
-        return False, UPSTREAM_FALLBACK_STATUS
-
-    if isinstance(exc, httpx.RequestError):
-        return False, UPSTREAM_FALLBACK_STATUS
-
-    return False, UPSTREAM_FALLBACK_STATUS
+    return _shared.classify_error(exc, REAUTH_CODES)
 
 
-async def apply_error_status(
-    integration: Integration, exc: Exception, needs_reauth: bool, db: AsyncSession
-) -> None:
-    """Impure counterpart to classify_error — persist the implied status.
-
-    Never raises: a failure to record status must not turn a 502/409 into
-    an unrelated 500.
-    """
-    try:
-        integration.status = "expired" if needs_reauth else "error"
-        integration.last_error = f"{type(exc).__name__}: {exc}"[:_LAST_ERROR_MAX_CHARS]
-        await db.commit()
-    except Exception:  # noqa: BLE001
-        _log.exception("Failed to persist Whoop integration error status")
-
-
-async def mark_healthy(integration: Integration, db: AsyncSession) -> None:
-    """Reset a prior error/expired status to connected after a successful
-    fetch (self-healing).
-
-    Guarded so the dashboard's steady 120s poll on an already-healthy
-    integration does not issue a DB write on every single request.
-    """
-    if integration.status != "connected" or integration.last_error is not None:
-        integration.status = "connected"
-        integration.last_error = None
-        await db.commit()
+apply_error_status = _shared.apply_error_status
+mark_healthy = _shared.mark_healthy
 
 
 def profile_first_name(integration: Integration) -> str | None:

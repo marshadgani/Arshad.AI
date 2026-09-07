@@ -36,6 +36,16 @@
   --accent-health-faint: rgba(255, 55, 95, 0.16);
   --accent-health-bg:   rgba(255, 55, 95, 0.07);
 
+  /* Commerce domain accent — a third lane, distinct from the HUD cyan and
+     the health rose, so live-money data (Shopify) reads as its own visual
+     territory. Warm emerald/gold pairing evokes "cash register", not the
+     literal Shopify brand green, to stay inside the HUD palette family. */
+  --accent-commerce:       #2bffb0;
+  --accent-commerce-soft:  rgba(43, 255, 176, 0.65);
+  --accent-commerce-faint: rgba(43, 255, 176, 0.18);
+  --accent-commerce-bg:    rgba(43, 255, 176, 0.07);
+  --accent-commerce-gold:  #ffc857;
+
   /* Text */
   --text-primary:   #d8e6ff;
   --text-secondary: #8b9cba;
