@@ -54,7 +54,10 @@ export default function HealthFitness() {
     );
   }
 
-  if (error) {
+  // Gated on `!dashboard` (mirrors ShopifyStore.tsx) so a transient failure
+  // of the background poll doesn't blank an already-rendered dashboard —
+  // only a failed *first* load shows the full-page error.
+  if (error && !dashboard) {
     return (
       <div className={styles.page}>
         <p className={styles.error}>Failed to load health data. Check backend logs.</p>
