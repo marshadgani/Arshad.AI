@@ -22,6 +22,7 @@ from src.auth.routers import router as auth_router
 from src.middleware.cache import close_redis
 from src.models.database import AsyncSessionLocal
 from src.services import queue_worker
+from src.services.whoop.client import aclose_client as close_whoop_client
 from src.tools.routers import router as tools_router
 
 # `import src.integrations` (line 6) triggers @register side-effects.
