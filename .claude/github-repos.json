@@ -6,7 +6,7 @@
     "claude-code": {
       "url": "https://github.com/anthropics/claude-code.git",
       "name": "claude-code",
-      "last_fetched": "2026-09-03 21:18 UTC",
+      "last_fetched": "2026-09-11 09:29 UTC",
       "components": {
         "skills": [
           "writing-rules",
@@ -1178,7 +1178,7 @@
     "skills": {
       "url": "https://github.com/anthropics/skills.git",
       "name": "skills",
-      "last_fetched": "2026-09-03 21:20 UTC",
+      "last_fetched": "2026-09-11 09:29 UTC",
       "components": {
         "skills": [
           "canvas-design",
