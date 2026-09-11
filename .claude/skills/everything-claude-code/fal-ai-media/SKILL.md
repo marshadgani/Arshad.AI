@@ -1,15 +1,9 @@
 ---
 name: fal-ai-media
 description: Unified media generation via fal.ai MCP — image, video, and audio. Covers text-to-image (Nano Banana), text/image-to-video (Seedance, Kling, Veo 3), text-to-speech (CSM-1B), and video-to-audio (ThinkSound). Use when the user wants to generate images, videos, or audio with AI.
-metadata:
-  origin: ECC
 ---
 
 # fal.ai Media Generation
-
-> **Drift-prone skill.** fal.ai model IDs, pricing, inputs, and MCP tool names
-> change quickly. Search or fetch the current model metadata before promising a
-> specific model, parameter, output format, or cost.
 
 Generate images, videos, and audio using fal.ai models via MCP.
 
@@ -57,8 +51,8 @@ Best for: quick iterations, drafts, text-to-image, image editing.
 
 ```
 generate(
-  app_id: "fal-ai/nano-banana-2",
-  input_data: {
+  model_name: "fal-ai/nano-banana-2",
+  input: {
     "prompt": "a futuristic cityscape at sunset, cyberpunk style",
     "image_size": "landscape_16_9",
     "num_images": 1,
@@ -72,8 +66,8 @@ Best for: production images, realism, typography, detailed prompts.
 
 ```
 generate(
-  app_id: "fal-ai/nano-banana-pro",
-  input_data: {
+  model_name: "fal-ai/nano-banana-pro",
+  input: {
     "prompt": "professional product photo of wireless headphones on marble surface, studio lighting",
     "image_size": "square",
     "num_images": 1,
@@ -101,8 +95,8 @@ upload(file_path: "/path/to/image.png")
 
 # Then generate with image input
 generate(
-  app_id: "fal-ai/nano-banana-2",
-  input_data: {
+  model_name: "fal-ai/nano-banana-2",
+  input: {
     "prompt": "same scene but in watercolor style",
     "image_url": "<uploaded_url>",
     "image_size": "landscape_16_9"
@@ -119,8 +113,8 @@ Best for: text-to-video, image-to-video with high motion quality.
 
 ```
 generate(
-  app_id: "fal-ai/seedance-1-0-pro",
-  input_data: {
+  model_name: "fal-ai/seedance-1-0-pro",
+  input: {
     "prompt": "a drone flyover of a mountain lake at golden hour, cinematic",
     "duration": "5s",
     "aspect_ratio": "16:9",
@@ -134,8 +128,8 @@ Best for: text/image-to-video with native audio generation.
 
 ```
 generate(
-  app_id: "fal-ai/kling-video/v3/pro",
-  input_data: {
+  model_name: "fal-ai/kling-video/v3/pro",
+  input: {
     "prompt": "ocean waves crashing on a rocky coast, dramatic clouds",
     "duration": "5s",
     "aspect_ratio": "16:9"
@@ -148,8 +142,8 @@ Best for: video with generated sound, high visual quality.
 
 ```
 generate(
-  app_id: "fal-ai/veo-3",
-  input_data: {
+  model_name: "fal-ai/veo-3",
+  input: {
     "prompt": "a bustling Tokyo street market at night, neon signs, crowd noise",
     "aspect_ratio": "16:9"
   }
@@ -161,8 +155,8 @@ Start from an existing image:
 
 ```
 generate(
-  app_id: "fal-ai/seedance-1-0-pro",
-  input_data: {
+  model_name: "fal-ai/seedance-1-0-pro",
+  input: {
     "prompt": "camera slowly zooms out, gentle wind moves the trees",
     "image_url": "<uploaded_image_url>",
     "duration": "5s"
@@ -189,8 +183,8 @@ Text-to-speech with natural, conversational quality.
 
 ```
 generate(
-  app_id: "fal-ai/csm-1b",
-  input_data: {
+  model_name: "fal-ai/csm-1b",
+  input: {
     "text": "Hello, welcome to the demo. Let me show you how this works.",
     "speaker_id": 0
   }
@@ -202,8 +196,8 @@ Generate matching audio from video content.
 
 ```
 generate(
-  app_id: "fal-ai/thinksound",
-  input_data: {
+  model_name: "fal-ai/thinksound",
+  input: {
     "video_url": "<video_url>",
     "prompt": "ambient forest sounds with birds chirping"
   }
@@ -254,14 +248,7 @@ sfx = coll.generate_sound_effect(prompt="thunder crack followed by rain")
 Before generating, check estimated cost:
 
 ```
-estimate_cost(
-  estimate_type: "unit_price",
-  endpoints: {
-    "fal-ai/nano-banana-pro": {
-      "unit_quantity": 1
-    }
-  }
-)
+estimate_cost(model_name: "fal-ai/nano-banana-pro", input: {...})
 ```
 
 ## Model Discovery
@@ -270,7 +257,7 @@ Find models for specific tasks:
 
 ```
 search(query: "text to video")
-find(endpoint_ids: ["fal-ai/seedance-1-0-pro"])
+find(model_name: "fal-ai/seedance-1-0-pro")
 models()
 ```
 
