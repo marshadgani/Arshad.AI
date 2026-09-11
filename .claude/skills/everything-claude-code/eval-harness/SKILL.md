@@ -1,7 +1,9 @@
 ---
 name: eval-harness
 description: Formal evaluation framework for Claude Code sessions implementing eval-driven development (EDD) principles. Use when a Claude Code workflow needs a formal eval before it is trusted or changed.
-allowed-tools: Read, Write, Edit, Bash, Grep, Glob
+metadata:
+  origin: ECC
+tools: Read, Write, Edit, Bash, Grep, Glob
 ---
 
 # Eval Harness Skill
@@ -233,3 +235,63 @@ Capability: 5/5 passed (pass@3: 100%)
 Regression: 3/3 passed (pass^3: 100%)
 Status: SHIP IT
 ```
+
+## Local Framework Utilities
+
+The mechanical utilities ship in `scripts/lib/eval-harness/`:
+
+```sh
+node scripts/eval-harness.js example
+```
+
+- Capsule: hash-linked journal with five lineages and local integrity checks.
+- Inspection: source digests, validated variant paths, and syntactic warnings.
+- Replay: declared tools and content-addressed fixtures. Missing fixtures fail
+  closed; SE3 and above are refused in replay. Record mode invokes the registered
+  implementation, so only register trusted functions.
+- Receipt: offline verification of capsule and artifact bytes, with named checks.
+
+Candidate execution is disabled on every OS because no verified OS containment
+backend is implemented. `gate run`, `runGate`, `runVariant`, direct child launch,
+and the retired effect preload refuse with `gate.isolation_required`. No trust
+flag or caller-supplied executor can bypass the refusal. The example records
+that refusal and inspects source without executing or scoring it.
+
+Do not present static warnings, a capsule receipt, or successful utility tests
+as candidate containment or promotion evidence. A future gate requires an
+independently reviewed OS boundary, protected checker and audit channels, and
+fatal baseline rejection. See `docs/architecture/eval-harness-frameworks.md`.
+
+## Product Evals (v1.8)
+
+Use product evals when behavior quality cannot be captured by unit tests alone.
+
+### Grader Types
+
+1. Code grader (deterministic assertions)
+2. Rule grader (regex/schema constraints)
+3. Model grader (LLM-as-judge rubric)
+4. Human grader (manual adjudication for ambiguous outputs)
+
+### pass@k Guidance
+
+- `pass@1`: direct reliability
+- `pass@3`: practical reliability under controlled retries
+- `pass^3`: stability test (all 3 runs must pass)
+
+Recommended thresholds:
+- Capability evals: pass@3 >= 0.90
+- Regression evals: pass^3 = 1.00 for release-critical paths
+
+### Eval Anti-Patterns
+
+- Overfitting prompts to known eval examples
+- Measuring only happy-path outputs
+- Ignoring cost and latency drift while chasing pass rates
+- Allowing flaky graders in release gates
+
+### Minimal Eval Artifact Layout
+
+- `.claude/evals/<feature>.md` definition
+- `.claude/evals/<feature>.log` run history
+- `docs/releases/<version>/eval-summary.md` release snapshot

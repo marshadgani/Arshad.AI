@@ -247,11 +247,12 @@
     "obsidian-skills": {
       "url": "https://github.com/kepano/obsidian-skills.git",
       "name": "obsidian-skills",
-      "last_fetched": "2026-09-03 21:18 UTC",
+      "last_fetched": "2026-09-11 09:29 UTC",
       "components": {
         "skills": [
           "obsidian-cli",
           "obsidian-bases",
+          "knap",
           "json-canvas",
           "defuddle",
           "obsidian-markdown"
@@ -265,7 +266,7 @@
     "n8n-mcp": {
       "url": "https://github.com/czlonkowski/n8n-mcp.git",
       "name": "n8n-mcp",
-      "last_fetched": "2026-09-03 21:18 UTC",
+      "last_fetched": "2026-09-11 09:29 UTC",
       "components": {
         "skills": [
           "n8n-code-python",
@@ -305,7 +306,7 @@
     "get-shit-done": {
       "url": "https://github.com/gsd-build/get-shit-done.git",
       "name": "get-shit-done",
-      "last_fetched": "2026-09-03 21:19 UTC",
+      "last_fetched": "2026-09-11 09:29 UTC",
       "components": {
         "skills": [],
         "agents": [
@@ -433,7 +434,7 @@
     "awesome-claude-code": {
       "url": "https://github.com/hesreallyhim/awesome-claude-code.git",
       "name": "awesome-claude-code",
-      "last_fetched": "2026-09-03 21:19 UTC",
+      "last_fetched": "2026-09-11 09:29 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -447,7 +448,7 @@
     "context7": {
       "url": "https://github.com/upstash/context7.git",
       "name": "context7",
-      "last_fetched": "2026-09-03 21:19 UTC",
+      "last_fetched": "2026-09-11 09:29 UTC",
       "components": {
         "skills": [
           "context7-mcp",
@@ -524,7 +525,7 @@
     "claude-plugins-official": {
       "url": "https://github.com/anthropics/claude-plugins-official.git",
       "name": "claude-plugins-official",
-      "last_fetched": "2026-09-03 21:19 UTC",
+      "last_fetched": "2026-09-11 09:30 UTC",
       "components": {
         "skills": [
           "access",
@@ -882,7 +883,7 @@
     "agent-skills": {
       "url": "https://github.com/addyosmani/agent-skills.git",
       "name": "agent-skills",
-      "last_fetched": "2026-09-03 21:19 UTC",
+      "last_fetched": "2026-09-11 09:30 UTC",
       "components": {
         "skills": [
           "interview-me",
