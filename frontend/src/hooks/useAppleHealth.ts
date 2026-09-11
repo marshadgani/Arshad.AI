@@ -1,19 +1,22 @@
-import { useCallback, useEffect, useState } from 'react';
+/**
+ * Apple Health snapshot for the Health page.
+ *
+ * This hook used to re-implement useFetch in full — auth header, 401 →
+ * clearToken, AbortController, `{ data }` envelope unwrap, loading/error
+ * state — solely because it also needed a `refetch` the generic hook did
+ * not expose. That is ~50 lines of transport policy maintained in two
+ * places: useFetch later grew a `skip` option and a documented 401 →
+ * app-wide-logout contract that this copy never received.
+ *
+ * useFetch now exposes `refetch`, so this is composition over duplication:
+ * one transport, one 401 policy, and this module left owning only what is
+ * actually Apple-Health-specific — the URL and the poll interval.
+ */
 
-import { clearToken, getToken } from '../auth/tokenStorage';
+import { useFetch } from './useFetch';
+import type { AppleHealthSnapshot } from '../types/appleHealth';
 
-export interface AppleHealthSnapshot {
-  connected: boolean;
-  stale: boolean;
-  resting_heart_rate: number | null;
-  heart_rate_variability_ms: number | null;
-  sleep_hours: number | null;
-  active_energy_kcal: number | null;
-  steps: number | null;
-  vo2_max: number | null;
-  recorded_at: string | null;
-  received_at: string | null;
-}
+export type { AppleHealthSnapshot } from '../types/appleHealth';
 
 export interface UseAppleHealthResult {
   data: AppleHealthSnapshot | null;
@@ -23,59 +26,12 @@ export interface UseAppleHealthResult {
 }
 
 const URL = '/api/v1/apple-health/dashboard';
+
+// Pushes arrive at whatever cadence the user's Shortcut runs (typically
+// hourly), so polling faster buys nothing; 90s is fast enough that a push
+// landing mid-session shows up without the user reloading.
 const POLL_MS = 90_000;
 
-// Same envelope-unwrapping contract as useFetch, but exposes `refetch` —
-// the generic hook has no way to trigger a fetch from outside its own
-// interval, and this page needs to re-poll immediately after the user
-// finishes the Apple Health connect flow instead of waiting up to 90s.
 export function useAppleHealth(): UseAppleHealthResult {
-  const [data, setData] = useState<AppleHealthSnapshot | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  const [tick, setTick] = useState(0);
-
-  const refetch = useCallback(() => setTick((t) => t + 1), []);
-
-  useEffect(() => {
-    const id = setInterval(refetch, POLL_MS);
-    return () => clearInterval(id);
-  }, [refetch]);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    setIsLoading(true);
-    setError(null);
-
-    const token = getToken();
-    const headers: Record<string, string> = {};
-    if (token) headers.Authorization = `Bearer ${token}`;
-
-    fetch(URL, { signal: controller.signal, headers })
-      .then(async (res) => {
-        if (res.status === 401) {
-          clearToken();
-          throw new Error('401 Unauthorized');
-        }
-        if (!res.ok) {
-          const body = await res.text();
-          throw new Error(`${res.status} ${res.statusText}: ${body.slice(0, 200)}`);
-        }
-        return res.json() as Promise<{ data: AppleHealthSnapshot }>;
-      })
-      .then((body) => {
-        if (!controller.signal.aborted) setData(body.data);
-      })
-      .catch((err: Error) => {
-        if (err.name === 'AbortError') return;
-        if (!controller.signal.aborted) setError(err);
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setIsLoading(false);
-      });
-
-    return () => controller.abort();
-  }, [tick]);
-
-  return { data, isLoading, error, refetch };
+  return useFetch<AppleHealthSnapshot>(URL, { refreshInterval: POLL_MS });
 }

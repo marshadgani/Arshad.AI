@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 
+import { ConnectError, connectIntegration } from '../api/integrations';
 import { getToken } from '../auth/tokenStorage';
 import styles from './Integrations.module.css';
 
@@ -131,23 +132,13 @@ export default function Integrations() {
     // personal_oauth — POST connect; if it returns a redirect_url, navigate there
     setActioning(item.slug);
     try {
-      const token = getToken();
-      const res = await fetch(`/api/v1/integrations/${item.slug}/connect`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({}),
-      });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body?.error?.message ?? `HTTP ${res.status}`);
-      const url = body?.data?.redirect_url as string | null;
+      const { redirect_url: url, ingest_token: ingestToken } = await connectIntegration(
+        item.slug,
+      );
       if (url) {
         window.location.href = url;
         return;
       }
-      const ingestToken = body?.data?.ingest_token as string | null;
       if (ingestToken) {
         setIngestTokenModal({ item, token: ingestToken });
         setTokenCopied(false);
@@ -182,17 +173,7 @@ export default function Integrations() {
     }
     setActioning(apiKeyModal.slug);
     try {
-      const token = getToken();
-      const res = await fetch(`/api/v1/integrations/${apiKeyModal.slug}/connect`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ api_key: apiKeyDraft.trim() }),
-      });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body?.error?.message ?? `HTTP ${res.status}`);
+      await connectIntegration(apiKeyModal.slug, { api_key: apiKeyDraft.trim() });
       flashToast(`${apiKeyModal.display_name} connected`);
       setApiKeyModal(null);
       setApiKeyDraft('');
@@ -212,24 +193,18 @@ export default function Integrations() {
     }
     setActioning(shopConnectModal.slug);
     try {
-      const token = getToken();
-      const res = await fetch(`/api/v1/integrations/${shopConnectModal.slug}/connect`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ shop: shopDomainDraft.trim() }),
-      });
-      const body = await res.json();
-      if (!res.ok) {
-        const code = body?.error?.code as string | undefined;
+      const { redirect_url: url } = await connectIntegration(shopConnectModal.slug, {
+        shop: shopDomainDraft.trim(),
+      }).catch((e: unknown) => {
+        // A failed HMAC or a skewed timestamp means the nonce this modal
+        // was opened with is no longer usable — the user's fix is to start
+        // the flow again, which the raw upstream message does not say.
+        const code = e instanceof ConnectError ? e.code : null;
         if (code === 'invalid_hmac' || code === 'timestamp_skew') {
           throw new Error('Authentication failed. Please click Connect again.');
         }
-        throw new Error(body?.error?.message ?? `HTTP ${res.status}`);
-      }
-      const url = body?.data?.redirect_url as string | null;
+        throw e;
+      });
       if (url) {
         window.location.href = url;
         return;

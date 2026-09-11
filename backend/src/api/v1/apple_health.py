@@ -4,21 +4,33 @@ POST /api/v1/apple-health/ingest
     Called by the user's iOS Shortcut, not the frontend. Auth is the
     ingest bearer token minted by AppleHealthIntegration.connect() — NOT
     the app's JWT, since a Shortcut can't hold a session that expires
-    every JWT_EXPIRY_HOURS. Looked up by SHA-256 hash against
-    integration_ingest_tokens; the cleartext token is never stored or
-    logged anywhere past this comparison.
+    every JWT_EXPIRY_HOURS. The rule itself lives in
+    services/apple_health/ingest_auth.py.
 
 GET /api/v1/apple-health/dashboard
-    Called by the frontend with the normal JWT. Reads the Redis-cached
-    snapshot the most recent ingest wrote — see snapshot_cache_key() in
-    integrations/personal/apple_health.py. Never reads Postgres for
-    biometric values because none are ever written there.
+    Called by the frontend with the normal JWT. Reads the snapshot the
+    most recent ingest wrote, via services/apple_health/snapshot_store.py.
+    Never reads Postgres for biometric values because none are ever
+    written there.
+
+This module is routing and wire shape only. The work it coordinates lives
+in src/services/apple_health/: token verification in ingest_auth.py,
+storage in snapshot_store.py, encryption in envelope.py. It keeps
+`get_redis` as a module-level name on purpose — the router owns client
+acquisition so the store stays a pure function of its arguments and the
+seam remains substitutable from a test.
+
+Both endpoints are fail-open toward Redis: a Redis outage never turns
+into a 500 on the always-visible dashboard endpoint, and never marks an
+ingest as "synced" when nothing was actually stored.
 """
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 
+import redis.exceptions
 from fastapi import APIRouter, Depends, Header
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
@@ -28,17 +40,12 @@ from src.auth.dependencies import get_current_user
 from src.middleware.cache import get_redis
 from src.middleware.rate_limit import enforce_rate_limit
 from src.models.database import get_db
-from src.models.integration import Integration, IntegrationIngestToken
+from src.models.integration import Integration
 from src.models.user import User
-from src.schemas.apple_health import (
-    AppleHealthIngestPayload,
-    AppleHealthSnapshot,
-)
-from src.services.apple_health import (
-    CACHE_TTL_SECONDS,
-    hash_ingest_token,
-    snapshot_cache_key,
-)
+from src.schemas.apple_health import AppleHealthIngestPayload, AppleHealthSnapshot
+from src.services.apple_health import ingest_auth, snapshot_store
+
+_log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/apple-health", tags=["apple-health"])
 
@@ -61,44 +68,8 @@ async def _check_ingest_rate_limit(integration_id: str) -> None:
     )
 
 
-async def _authenticate_ingest_token(
-    authorization: str | None, db: AsyncSession
-) -> tuple[Integration, IntegrationIngestToken]:
-    """Resolve the Integration an inbound push belongs to, from its bearer
-    token, or raise 401.
-
-    The presented token is re-hashed and matched against the stored digest;
-    the cleartext value is never stored or logged anywhere past this
-    comparison. Every failure returns the same generic 401 code so the
-    response cannot be used to distinguish "no such token" from "revoked"
-    from "integration disconnected".
-    """
-    if not authorization or not authorization.lower().startswith("bearer "):
-        raise http_error(
-            401, "missing_ingest_token", "Authorization: Bearer <token> is required."
-        )
-    token = authorization.split(" ", 1)[1].strip()
-    if not token:
-        raise http_error(401, "missing_ingest_token", "Ingest token was empty.")
-
-    token_row = await db.scalar(
-        select(IntegrationIngestToken).where(
-            IntegrationIngestToken.token_hash == hash_ingest_token(token),
-            IntegrationIngestToken.revoked_at.is_(None),
-        )
-    )
-    if token_row is None:
-        raise http_error(
-            401, "invalid_ingest_token", "Ingest token is invalid or revoked."
-        )
-
-    integration = await db.scalar(
-        select(Integration).where(Integration.id == token_row.integration_id)
-    )
-    if integration is None or integration.status == "disconnected":
-        raise http_error(401, "invalid_ingest_token", "Integration is disconnected.")
-
-    return integration, token_row
+def _snapshot_response(snapshot: AppleHealthSnapshot) -> JSONResponse:
+    return JSONResponse({"data": snapshot.model_dump(mode="json")})
 
 
 @router.post("/ingest", summary="Receive a push from the Apple Health Shortcut")
@@ -107,31 +78,41 @@ async def ingest(
     authorization: str | None = Header(default=None),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    integration, token_row = await _authenticate_ingest_token(authorization, db)
+    integration, token_row = await ingest_auth.authenticate(authorization, db)
     await _check_ingest_rate_limit(str(integration.id))
 
     now = datetime.now(timezone.utc)
-    snapshot = AppleHealthSnapshot(
-        connected=True,
-        resting_heart_rate=payload.resting_heart_rate,
-        heart_rate_variability_ms=payload.heart_rate_variability_ms,
-        sleep_hours=payload.sleep_hours,
-        active_energy_kcal=payload.active_energy_kcal,
-        steps=payload.steps,
-        vo2_max=payload.vo2_max,
-        recorded_at=payload.recorded_at,
-        received_at=now.isoformat(),
-    )
+    snapshot = AppleHealthSnapshot.from_ingest(payload, received_at=now)
 
-    # This is the ONLY write path for biometric values in this feature,
-    # and it deliberately targets Redis with a TTL, never Postgres — see
-    # the HUMAN REVIEW FLAG in integrations/personal/apple_health.py.
+    # This is the ONLY write path for biometric values in this feature. It
+    # targets Redis with a TTL, never Postgres — see the HUMAN REVIEW FLAG
+    # in integrations/personal/apple_health.py — and the value written is
+    # AES-GCM ciphertext, never cleartext, so the "never persisted at rest
+    # in cleartext" constraint holds regardless of Redis RDB/AOF config.
     redis_client = await get_redis()
-    await redis_client.set(
-        snapshot_cache_key(str(integration.id)),
-        snapshot.model_dump_json(),
-        ex=CACHE_TTL_SECONDS,
-    )
+    try:
+        await snapshot_store.write(redis_client, str(integration.id), snapshot)
+    except RuntimeError:
+        _log.critical(
+            "apple_health.ingest: encryption unavailable — "
+            "OAUTH_ENCRYPTION_KEY missing or malformed"
+        )
+        raise http_error(
+            500,
+            "encryption_unavailable",
+            "Health data encryption is not configured. Contact the app administrator.",
+        ) from None
+    except redis.exceptions.RedisError:
+        _log.warning("apple_health.ingest: Redis unavailable — snapshot not stored")
+        # Nothing was actually persisted, so don't mark the integration as
+        # freshly synced — that would tell the dashboard a push landed when
+        # it didn't.
+        raise http_error(
+            503,
+            "cache_unavailable",
+            "Health data store is temporarily unavailable. "
+            "Your Shortcut will retry on its next run.",
+        ) from None
 
     token_row.last_used_at = now
     integration.last_synced_at = now
@@ -139,7 +120,9 @@ async def ingest(
     integration.status = "connected"
     await db.commit()
 
-    return JSONResponse({"data": {"received": True}})
+    return JSONResponse(
+        {"data": {"received": True, "dropped_fields": payload.dropped_fields}}
+    )
 
 
 @router.get("/dashboard", summary="Latest cached Apple Health snapshot")
@@ -155,16 +138,14 @@ async def get_dashboard(
         )
     )
     if integration is None:
-        return JSONResponse({"data": AppleHealthSnapshot(connected=False).model_dump()})
+        return _snapshot_response(AppleHealthSnapshot(connected=False))
 
     redis_client = await get_redis()
-    cached = await redis_client.get(snapshot_cache_key(str(integration.id)))
-    if not cached:
-        return JSONResponse(
-            {"data": AppleHealthSnapshot(connected=True, stale=True).model_dump()}
-        )
+    snapshot = await snapshot_store.load(redis_client, str(integration.id))
+    if snapshot is None:
+        # No push yet, TTL elapsed, Redis down, or a corrupt/foreign/
+        # key-rotated value — one branch, never a 500. See
+        # services/apple_health/snapshot_store.py::load.
+        return _snapshot_response(AppleHealthSnapshot(connected=True, stale=True))
 
-    if isinstance(cached, bytes):
-        cached = cached.decode("utf-8")
-    snapshot = AppleHealthSnapshot.model_validate_json(cached)
-    return JSONResponse({"data": snapshot.model_dump()})
+    return _snapshot_response(snapshot)

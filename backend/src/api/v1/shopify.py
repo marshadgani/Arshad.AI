@@ -116,7 +116,7 @@ async def _failure_response(
 
     Collapses the classify/persist/branch block so error policy lives in one
     named place instead of inline in the happy path — mirrors
-    whoop.py::_persist_failure_needs_reauth, which serves the same role for
+    whoop.py::_persist_fetch_failure, which serves the same role for
     the 409-raising Whoop routes.
     """
     needs_reauth, fallback_status = _classify_error(exc)

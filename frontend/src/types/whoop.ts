@@ -48,6 +48,9 @@ export interface WhoopStrain {
 export interface WhoopDashboard {
   connected: boolean;
   needs_reauth: boolean;
+  /** True when a transient upstream failure forced null biometric fields,
+   * as distinct from a genuine no-data-recorded-today response. */
+  degraded: boolean;
   recovery: WhoopRecovery | null;
   sleep: WhoopSleep | null;
   strain: WhoopStrain | null;

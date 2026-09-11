@@ -103,6 +103,51 @@ def test_dashboard_prefetch_gate_returns_needs_reauth_without_upstream_call(
     get_token.assert_not_awaited()
 
 
+def test_dashboard_mid_fetch_transient_upstream_error_returns_200_degraded(
+    client, monkeypatch
+):
+    """Regression guard for the always-200 contract bug: a transient
+    upstream failure (network timeout, Whoop 5xx) must never 502 on
+    /dashboard — it previously did, because the old except block called
+    _persist_fetch_failure, which raises whenever needs_reauth is False.
+    """
+    integration = _FakeIntegration(status="connected")
+    _mock_find_integration(monkeypatch, integration)
+    monkeypatch.setattr(whoop_module, "_get_token", AsyncMock(return_value="tok"))
+    monkeypatch.setattr(
+        whoop_module,
+        "_fetch_dashboard_data",
+        AsyncMock(side_effect=httpx.ConnectTimeout("timed out")),
+    )
+
+    resp = client.get("/api/v1/whoop/dashboard")
+    assert resp.status_code == 200
+    body = resp.json()["data"]
+    assert body["connected"] is True
+    assert body["needs_reauth"] is False
+    assert body["degraded"] is True
+    assert body["recovery"] is None
+
+
+def test_dashboard_mid_fetch_401_returns_needs_reauth_not_degraded(client, monkeypatch):
+    integration = _FakeIntegration(status="connected")
+    _mock_find_integration(monkeypatch, integration)
+    monkeypatch.setattr(whoop_module, "_get_token", AsyncMock(return_value="tok"))
+
+    response = MagicMock()
+    response.status_code = 401
+    exc = httpx.HTTPStatusError("unauthorized", request=MagicMock(), response=response)
+    monkeypatch.setattr(
+        whoop_module, "_fetch_dashboard_data", AsyncMock(side_effect=exc)
+    )
+
+    resp = client.get("/api/v1/whoop/dashboard")
+    assert resp.status_code == 200
+    body = resp.json()["data"]
+    assert body["needs_reauth"] is True
+    assert body["degraded"] is False
+
+
 def test_hrv_trend_prefetch_gate_returns_409(client, monkeypatch):
     integration = _FakeIntegration(status="expired")
     _mock_find_integration(monkeypatch, integration)

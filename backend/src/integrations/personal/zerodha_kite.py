@@ -59,7 +59,7 @@ class ZerodhaKiteIntegration(OAuthIntegrationProvider):
             "redirect_params": f"state={state}",
         }
         url = f"{self.auth_url}?{urlencode(params)}"
-        return ConnectResult(integration_id="", redirect_url=url)
+        return ConnectResult(integration_id=None, redirect_url=url)
 
     async def exchange_code(self, code: str) -> dict[str, Any]:
         """Kite uses request_token + checksum, not the standard OAuth2 grant.

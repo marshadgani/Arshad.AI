@@ -36,7 +36,15 @@ function PageHeader({ subtitle }: { subtitle?: string | null }) {
 }
 
 export default function HealthFitness() {
-  const { dashboard, hrvPoints, workouts, isLoading, error } = useWhoopDashboard();
+  const {
+    dashboard,
+    hrvPoints,
+    workouts,
+    isLoading,
+    error,
+    hrvError,
+    workoutsError,
+  } = useWhoopDashboard();
 
   if (isLoading) {
     return (
@@ -101,13 +109,20 @@ export default function HealthFitness() {
         subtitle={user_first_name ? `${user_first_name}'s Whoop & Apple Health data` : null}
       />
 
+      {dashboard.degraded && (
+        <p className={styles.degradedStrip}>
+          Whoop data temporarily unavailable — recovery, sleep and strain will
+          refresh automatically once Whoop responds again.
+        </p>
+      )}
+
       <div className={styles.grid}>
         <RecoveryCard recovery={recovery} />
         <SleepCard sleep={sleep} />
         <StrainCard strain={strain} />
-        <HRVTrendCard points={hrvPoints} days={HRV_TREND_DAYS} />
+        <HRVTrendCard points={hrvPoints} days={HRV_TREND_DAYS} error={hrvError} />
         <AppleHealthCard />
-        <WorkoutsCard workouts={workouts} />
+        <WorkoutsCard workouts={workouts} error={workoutsError} />
       </div>
     </div>
   );

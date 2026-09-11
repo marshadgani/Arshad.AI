@@ -21,7 +21,7 @@ const DASHBOARD_POLL_MS = 120_000;
 export function useShopifyDashboard(): UseShopifyDashboardResult {
   const { data, isLoading, error } = useFetch<ShopifyDashboard>(
     '/api/v1/shopify/dashboard',
-    DASHBOARD_POLL_MS,
+    { refreshInterval: DASHBOARD_POLL_MS },
   );
 
   return { dashboard: data, isLoading, error };

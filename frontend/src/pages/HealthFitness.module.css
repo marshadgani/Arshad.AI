@@ -57,3 +57,17 @@
   padding: 2rem;
   font-size: 0.9rem;
 }
+
+/* Muted, not red — Whoop had a transient hiccup, the connection is fine
+ * and the user has no action to take. Distinct from .error above, which
+ * signals the page itself failed to load. */
+.degradedStrip {
+  color: var(--text-secondary);
+  background: var(--bg-panel);
+  border: 1px solid var(--border-faint);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 0.6rem 0.9rem;
+  margin-bottom: 1.25rem;
+}

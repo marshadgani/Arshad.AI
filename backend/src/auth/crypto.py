@@ -23,8 +23,21 @@ class TokenDecryptError(Exception):
 
 _NONCE_LEN = 12
 
+# OAUTH_ENCRYPTION_KEY is process-lifetime — Render only changes it via a
+# redeploy, which starts a fresh process. Re-reading the env var and
+# re-running base64 decode + length validation on every single encrypt()/
+# decrypt() call (every Apple Health ingest push, every dashboard read,
+# every Whoop token refresh) repeated work whose result never changes
+# within a process. Cached the first time it's needed; a real
+# misconfiguration still raises RuntimeError on that first call, same as
+# before.
+_cached_key: bytes | None = None
+
 
 def _load_key() -> bytes:
+    global _cached_key
+    if _cached_key is not None:
+        return _cached_key
     raw = os.getenv("OAUTH_ENCRYPTION_KEY")
     if not raw:
         raise RuntimeError(
@@ -40,6 +53,7 @@ def _load_key() -> bytes:
         raise RuntimeError(
             f"OAUTH_ENCRYPTION_KEY must decode to 32 bytes (got {len(key)})"
         )
+    _cached_key = key
     return key
 
 

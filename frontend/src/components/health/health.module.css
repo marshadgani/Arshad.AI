@@ -273,3 +273,16 @@
   background: rgba(255, 77, 109, 0.12);
   color: var(--status-danger);
 }
+
+/* ── Error banner (distinct from .empty — this is a failure, not a fact) ── */
+
+.errorBanner {
+  color: var(--status-danger);
+  background: rgba(255, 77, 109, 0.08);
+  border: 1px solid var(--status-danger);
+  border-radius: 8px;
+  font-size: 0.8rem;
+  text-align: center;
+  padding: 0.6rem 0.75rem;
+  margin-top: 0.5rem;
+}

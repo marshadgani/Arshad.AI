@@ -46,7 +46,9 @@ export default function Obsidian() {
   const [syncError, setSyncError] = useState<string | null>(null);
   const [noteError, setNoteError] = useState<string | null>(null);
 
-  const { data: stats } = useFetch<NoteStats>('/api/v1/obsidian/stats', 30_000);
+  const { data: stats } = useFetch<NoteStats>('/api/v1/obsidian/stats', {
+    refreshInterval: 30_000,
+  });
 
   const notesUrl = query.trim()
     ? `/api/v1/obsidian/notes?q=${encodeURIComponent(query)}&limit=50`

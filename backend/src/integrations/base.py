@@ -47,17 +47,42 @@ class ConnectResult:
     URL the frontend must navigate the browser to. For API-key providers,
     the integration is already connected — redirect_url is None.
 
+    integration_id: None when connect() hands control to an OAuth
+    redirect before any Integration row exists yet (the row is created
+    later, in the callback). Previously this was modelled as "" (empty
+    string) rather than None — a classic weak-type sentinel that let a
+    real (if degenerate) empty string collide with "no id yet" and gave
+    every caller one more falsy-string case to reason about instead of a
+    single None check. str | None makes "no id yet" and "an id" the only
+    two representable states.
+
     ingest_token: one-time-display bearer secret for webhook/push-style
     providers (e.g. Apple Health via an iOS Shortcut) that need to hand
     the user a token to paste into an external tool. None for every other
     provider kind. MUST NOT be logged — repr is suppressed on this field
     specifically so it can never leak via a log line, an exception
     message, or an error-tracking breadcrumb that dumps the dataclass.
+
+    Invariant: redirect_url and ingest_token are mutually exclusive — a
+    provider is either handing the browser off to an external OAuth flow
+    or handing the user a token to paste elsewhere, never both. This was
+    previously unenforced (any provider could set both, or a new provider
+    kind could get it wrong with no error until a confused frontend
+    branch); __post_init__ makes the illegal combination unconstructible
+    instead of a possibility every consumer has to defend against.
     """
 
-    integration_id: str
+    integration_id: str | None = None
     redirect_url: str | None = None
     ingest_token: str | None = field(default=None, repr=False)
+
+    def __post_init__(self) -> None:
+        if self.redirect_url is not None and self.ingest_token is not None:
+            raise ValueError(
+                "ConnectResult cannot carry both redirect_url and ingest_token "
+                "— a provider hands the user off to OAuth or hands them a "
+                "token to paste elsewhere, never both."
+            )
 
 
 @dataclass

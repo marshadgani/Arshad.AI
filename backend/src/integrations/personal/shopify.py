@@ -129,7 +129,7 @@ class ShopifyIntegration(OAuthIntegrationProvider):
             "state": state,
         }
         url = f"https://{shop}/admin/oauth/authorize?{urlencode(params)}"
-        return ConnectResult(integration_id="", redirect_url=url)
+        return ConnectResult(integration_id=None, redirect_url=url)
 
     async def complete_callback(
         self, *, context: OAuthCallbackContext

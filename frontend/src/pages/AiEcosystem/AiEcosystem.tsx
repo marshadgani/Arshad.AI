@@ -60,10 +60,14 @@ export default function AiEcosystem() {
     new Set(['development', 'security', 'data', 'other'])
   );
 
-  const { data: agentsData } = useFetch<AgentData[]>('/api/v1/ai-ecosystem/agents', 30_000);
+  const { data: agentsData } = useFetch<AgentData[]>('/api/v1/ai-ecosystem/agents', {
+    refreshInterval: 30_000,
+  });
   const { data: metricsData } = useFetch<MetricsInner>(`/api/v1/ai-ecosystem/metrics?period=${period}`);
   const { data: summaryData } = useFetch<SummaryInner>(`/api/v1/ai-ecosystem/summary?period=${period}`);
-  const { data: skillsData, isLoading: skillsLoading, error: skillsError } = useFetch<SkillData[]>('/api/v1/ai-ecosystem/skills', 30_000);
+  const { data: skillsData, isLoading: skillsLoading, error: skillsError } = useFetch<SkillData[]>('/api/v1/ai-ecosystem/skills', {
+    refreshInterval: 30_000,
+  });
 
   const agents = agentsData ?? [];
   const skills = skillsData ?? [];

@@ -196,7 +196,7 @@ class OAuthIntegrationProvider(IntegrationProvider):
             **self.additional_auth_params,
         }
         url = f"{self.auth_url}?{urlencode(params)}"
-        return ConnectResult(integration_id="", redirect_url=url)
+        return ConnectResult(integration_id=None, redirect_url=url)
 
     async def _post_token_request(self, data: dict[str, str]) -> httpx.Response:
         """POST a grant to token_url with this provider's client credentials

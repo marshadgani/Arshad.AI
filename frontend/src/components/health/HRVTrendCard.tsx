@@ -5,6 +5,10 @@ import { fmtDate } from '../../utils/healthFormat';
 export interface HRVTrendCardProps {
   points: WhoopHRVPoint[];
   days: number;
+  /** Non-null when the secondary /hrv-trend fetch failed. Rendered as a
+   * distinct red banner rather than folded into the "no data" empty state
+   * — the two are different facts for the user. */
+  error?: Error | null;
 }
 
 /**
@@ -14,10 +18,11 @@ export interface HRVTrendCardProps {
  * scale: healthy HRV varies by an order of magnitude between people, so a
  * fixed axis would flatten the trend for most users. Bars carry a minimum
  * height so a near-zero reading stays visible and hoverable.
+ *
+ * Only rendered with at least one point — the card owns the empty state,
+ * the same way WorkoutsCard does.
  */
 function HRVSparkline({ points }: { points: WhoopHRVPoint[] }) {
-  if (!points.length) return <p className={styles.empty}>No HRV data</p>;
-
   const values = points.map((p) => p.hrv_rmssd_milli ?? 0);
   const maxVal = Math.max(...values, 1);
 
@@ -41,11 +46,20 @@ function HRVSparkline({ points }: { points: WhoopHRVPoint[] }) {
   );
 }
 
-export default function HRVTrendCard({ points, days }: HRVTrendCardProps) {
+export default function HRVTrendCard({ points, days, error = null }: HRVTrendCardProps) {
+  const hasData = points.length > 0;
+
   return (
     <div className={styles.card}>
       <p className={styles.cardTitle}>HRV Trend ({days} days)</p>
-      <HRVSparkline points={points} />
+      {hasData && <HRVSparkline points={points} />}
+      {error ? (
+        <p role="alert" className={styles.errorBanner}>
+          Could not load HRV data — retry later
+        </p>
+      ) : (
+        !hasData && <p className={styles.empty}>No HRV data</p>
+      )}
     </div>
   );
 }

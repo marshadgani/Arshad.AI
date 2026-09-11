@@ -46,8 +46,16 @@ async def enforce_rate_limit(
     try:
         redis_client = await get_redis()
         key = f"rl:{bucket}:{identity}"
-        count = await redis_client.incr(key)
-        await redis_client.expire(key, window_seconds, nx=True)
+        # incr + expire(nx=True) as one pipelined round trip instead of two
+        # sequential awaits — halves the Redis latency this check adds to
+        # every Whoop and Apple Health request (each Health page load fires
+        # it 2-3 times). Pipeline preserves the fail-open contract: any
+        # error in either command still raises RedisError from execute()
+        # and is caught below exactly as it was for two separate calls.
+        pipe = redis_client.pipeline()
+        pipe.incr(key)
+        pipe.expire(key, window_seconds, nx=True)
+        count, _ = await pipe.execute()
     except redis.exceptions.RedisError as exc:
         _log.warning(
             "Rate limiter degraded for bucket %s — Redis unreachable: %s", bucket, exc

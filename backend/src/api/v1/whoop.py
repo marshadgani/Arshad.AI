@@ -126,33 +126,87 @@ async def _resolve_active_integration(user_id: str, db: AsyncSession) -> Integra
     return integration
 
 
-async def _persist_failure_needs_reauth(
+async def _persist_fetch_failure(
     integration: Integration, exc: Exception, db: AsyncSession
-) -> bool:
-    """Classify a fetch failure, persist the implied status, and either
-    return True (caller renders its own re-auth shape) or raise the 502.
+) -> None:
+    """Persist the integration status a failed fetch implies, then raise
+    unless the failure is a re-auth condition.
+
+    Returning normally means "this is a re-auth failure, render your own
+    shape for it" — the list endpoints answer 409 (see
+    _resolve_active_integration). Anything else, a timeout or a Whoop 5xx,
+    becomes the upstream error status here because no caller has a better
+    answer for it.
 
     Collapses a block that was previously copy-pasted into all three
     routes, where the three copies had to be kept in step by hand.
     """
     needs_reauth, fallback_status = _classify_whoop_error(exc)
     await _apply_whoop_error_status(integration, exc, needs_reauth, db)
-    if needs_reauth:
-        return True
-    raise http_error(
-        fallback_status, "whoop_api_error", _UPSTREAM_ERROR_MESSAGE
-    ) from exc
+    if not needs_reauth:
+        raise http_error(
+            fallback_status, "whoop_api_error", _UPSTREAM_ERROR_MESSAGE
+        ) from exc
+
+
+async def _fetch_list_body(
+    user_id: str, db: AsyncSession, path: str, params: dict[str, Any]
+) -> Any:
+    """The whole request flow the two list endpoints share, minus parsing.
+
+    Resolve → token → fetch → persist-status, with the failure branch that
+    turns any fetch error into 409 whoop_reauth_required. Both endpoints
+    ran this same seven-line sequence verbatim; the only thing that ever
+    differed between them is the path, the query params, and how the body
+    is parsed. Keeping one copy means a change to the 404/409 wire contract
+    (documented in _resolve_active_integration) is made once rather than
+    made twice and hopefully kept in step.
+
+    Returns the raw upstream body — parsing stays in the route, because
+    that is the one part that is genuinely per-endpoint.
+    """
+    integration = await _resolve_active_integration(user_id, db)
+
+    try:
+        token = await _get_token(integration, db)
+        body = await _whoop_get(path, token, params)
+    except (httpx.HTTPError, IntegrationError) as exc:
+        await _persist_fetch_failure(integration, exc, db)
+        raise HTTPException(status_code=409, detail=_WHOOP_REAUTH_ERROR) from exc
+
+    await _mark_whoop_healthy(integration, db)
+    return body
+
+
+def _list_response(items: list[dict[str, Any]]) -> JSONResponse:
+    """The `{data, total}` collection envelope from .claude/rules/api.md."""
+    return JSONResponse({"data": items, "total": len(items)})
+
+
+def _dashboard_response(dashboard: WhoopDashboard) -> JSONResponse:
+    """The `{data: ...}` single-resource envelope from .claude/rules/api.md."""
+    return JSONResponse({"data": dashboard.model_dump()})
 
 
 def _reauth_dashboard(integration: Integration) -> JSONResponse:
-    return JSONResponse(
-        {
-            "data": WhoopDashboard(
-                connected=True,
-                needs_reauth=True,
-                user_first_name=state.profile_first_name(integration),
-            ).model_dump()
-        }
+    """Token expired/revoked: connected, but carrying no readings."""
+    return _dashboard_response(
+        WhoopDashboard(
+            connected=True,
+            needs_reauth=True,
+            user_first_name=state.profile_first_name(integration),
+        )
+    )
+
+
+def _degraded_dashboard(integration: Integration) -> JSONResponse:
+    """Transient upstream failure: the connection is fine, the fetch wasn't."""
+    return _dashboard_response(
+        WhoopDashboard(
+            connected=True,
+            degraded=True,
+            user_first_name=state.profile_first_name(integration),
+        )
     )
 
 
@@ -170,12 +224,15 @@ async def get_dashboard(
     response carries needs_reauth: true with null biometric fields instead
     of an error status — this endpoint backs the always-visible dashboard
     tile and a 4xx/5xx here would blank the whole Health & Fitness page for
-    a condition the frontend can render gracefully.
+    a condition the frontend can render gracefully. When a transient
+    upstream failure occurs (network timeout, Whoop 5xx) the response
+    carries degraded: true with null biometric fields, distinguishable from
+    a genuine no-data-recorded-today response.
     """
     await _check_rate_limit(str(current_user.id))
     integration = await _find_whoop_integration(str(current_user.id), db)
     if not integration:
-        return JSONResponse({"data": WhoopDashboard(connected=False).model_dump()})
+        return _dashboard_response(WhoopDashboard(connected=False))
 
     if integration.status == "expired":
         return _reauth_dashboard(integration)
@@ -184,8 +241,16 @@ async def get_dashboard(
         token = await _get_token(integration, db)
         recovery_body, sleep_body, strain_body = await _fetch_dashboard_data(token)
     except (httpx.HTTPError, IntegrationError) as exc:
-        await _persist_failure_needs_reauth(integration, exc, db)
-        return _reauth_dashboard(integration)
+        # Deliberately not _persist_fetch_failure: that raises for any
+        # non-reauth failure, which would turn every timeout or Whoop 5xx
+        # into a 502 on an endpoint documented and relied on as always-200.
+        # Its two steps are called directly here and the fallback status
+        # discarded — it must never reach the wire from /dashboard.
+        needs_reauth, _fallback_status = _classify_whoop_error(exc)
+        await _apply_whoop_error_status(integration, exc, needs_reauth, db)
+        if needs_reauth:
+            return _reauth_dashboard(integration)
+        return _degraded_dashboard(integration)
 
     await _mark_whoop_healthy(integration, db)
 
@@ -193,17 +258,19 @@ async def get_dashboard(
     sleep_records = parsers.records_of(sleep_body)
     strain_records = parsers.records_of(strain_body)
 
-    dashboard = WhoopDashboard(
-        connected=True,
-        needs_reauth=False,
-        recovery=(
-            parsers.parse_recovery(recovery_records[0]) if recovery_records else None
-        ),
-        sleep=parsers.parse_sleep(sleep_records[0]) if sleep_records else None,
-        strain=parsers.parse_strain(strain_records[0]) if strain_records else None,
-        user_first_name=state.profile_first_name(integration),
+    return _dashboard_response(
+        WhoopDashboard(
+            connected=True,
+            recovery=(
+                parsers.parse_recovery(recovery_records[0])
+                if recovery_records
+                else None
+            ),
+            sleep=parsers.parse_sleep(sleep_records[0]) if sleep_records else None,
+            strain=parsers.parse_strain(strain_records[0]) if strain_records else None,
+            user_first_name=state.profile_first_name(integration),
+        )
     )
-    return JSONResponse({"data": dashboard.model_dump()})
 
 
 @router.get("/hrv-trend")
@@ -216,22 +283,13 @@ async def get_hrv_trend(
 
     404/409 wire shape is explained in _resolve_active_integration.
     """
-    integration = await _resolve_active_integration(str(current_user.id), db)
-
-    try:
-        token = await _get_token(integration, db)
-        start = (date.today() - timedelta(days=days)).isoformat()
-        body = await _whoop_get(
-            client.RECOVERY_PATH, token, {"limit": days, "start": start}
-        )
-    except (httpx.HTTPError, IntegrationError) as exc:
-        await _persist_failure_needs_reauth(integration, exc, db)
-        raise HTTPException(status_code=409, detail=_WHOOP_REAUTH_ERROR) from exc
-
-    await _mark_whoop_healthy(integration, db)
-
-    points = [point.model_dump() for point in parsers.parse_hrv_trend(body)]
-    return JSONResponse({"data": points, "total": len(points)})
+    start = (date.today() - timedelta(days=days)).isoformat()
+    body = await _fetch_list_body(
+        str(current_user.id), db, client.RECOVERY_PATH, {"limit": days, "start": start}
+    )
+    return _list_response(
+        [point.model_dump() for point in parsers.parse_hrv_trend(body)]
+    )
 
 
 @router.get("/workouts")
@@ -241,19 +299,12 @@ async def get_workouts(
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
     """Return recent workouts. Same 404/409 wire shape as /hrv-trend."""
-    integration = await _resolve_active_integration(str(current_user.id), db)
-
-    try:
-        token = await _get_token(integration, db)
-        body = await _whoop_get(client.WORKOUT_PATH, token, {"limit": limit})
-    except (httpx.HTTPError, IntegrationError) as exc:
-        await _persist_failure_needs_reauth(integration, exc, db)
-        raise HTTPException(status_code=409, detail=_WHOOP_REAUTH_ERROR) from exc
-
-    await _mark_whoop_healthy(integration, db)
-
-    workouts = [
-        parsers.parse_workout(record).model_dump()
-        for record in parsers.records_of(body)
-    ]
-    return JSONResponse({"data": workouts, "total": len(workouts)})
+    body = await _fetch_list_body(
+        str(current_user.id), db, client.WORKOUT_PATH, {"limit": limit}
+    )
+    return _list_response(
+        [
+            parsers.parse_workout(record).model_dump()
+            for record in parsers.records_of(body)
+        ]
+    )

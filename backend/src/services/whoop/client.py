@@ -24,6 +24,39 @@ SLEEP_PATH = "/sleep"
 CYCLE_PATH = "/cycle"
 WORKOUT_PATH = "/workout"
 
+# Every call used to open `async with httpx.AsyncClient(...)`, pay a fresh
+# TCP+TLS handshake to api.prod.whoop.com, and tear the connection back
+# down — on /hrv-trend and /workouts that handshake is the entire request's
+# transport cost, since each only issues one upstream GET. A shared,
+# lazily-built client with keep-alive pooling (same lazy-singleton shape as
+# middleware/cache.py's get_redis) lets consecutive Whoop calls reuse a warm
+# connection instead of re-negotiating TLS every time.
+_client: httpx.AsyncClient | None = None
+_client_lock = asyncio.Lock()
+
+
+async def _get_client() -> httpx.AsyncClient:
+    global _client
+    if _client is not None:
+        return _client
+    async with _client_lock:
+        if _client is None:
+            _client = httpx.AsyncClient(
+                timeout=REQUEST_TIMEOUT_SECONDS,
+                limits=httpx.Limits(max_keepalive_connections=10, max_connections=20),
+            )
+    return _client
+
+
+async def aclose_client() -> None:
+    """Close the shared client. Called from the app's shutdown hook so the
+    pooled connection doesn't outlive the process' event loop."""
+    global _client
+    async with _client_lock:
+        if _client is not None:
+            await _client.aclose()
+            _client = None
+
 
 def auth_headers(access_token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {access_token}"}
@@ -33,14 +66,14 @@ async def get(
     path: str, access_token: str, params: dict[str, Any] | None = None
 ) -> Any:
     """Single authenticated GET against the Whoop API, raising for status."""
-    async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT_SECONDS) as client:
-        resp = await client.get(
-            f"{BASE_URL}{path}",
-            headers=auth_headers(access_token),
-            params=params or {},
-        )
-        resp.raise_for_status()
-        return resp.json()
+    client = await _get_client()
+    resp = await client.get(
+        f"{BASE_URL}{path}",
+        headers=auth_headers(access_token),
+        params=params or {},
+    )
+    resp.raise_for_status()
+    return resp.json()
 
 
 async def gather_get(
@@ -80,14 +113,15 @@ async def gather_get(
 async def fetch_dashboard_bodies(access_token: str) -> tuple[Any, Any, Any]:
     """Concurrently fetch the latest recovery, sleep and cycle records.
 
-    One client for all three so the dashboard costs a single connection
-    setup rather than three sequential round trips.
+    Uses the shared pooled client so the three concurrent GETs fan out over
+    already-warm connections instead of paying three TLS handshakes (or,
+    previously, a fresh one per dashboard poll) against the same host.
     """
-    async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT_SECONDS) as client:
-        recovery, sleep, strain = await gather_get(
-            client,
-            auth_headers(access_token),
-            [RECOVERY_PATH, SLEEP_PATH, CYCLE_PATH],
-            [{"limit": 1}, {"limit": 1}, {"limit": 1}],
-        )
+    client = await _get_client()
+    recovery, sleep, strain = await gather_get(
+        client,
+        auth_headers(access_token),
+        [RECOVERY_PATH, SLEEP_PATH, CYCLE_PATH],
+        [{"limit": 1}, {"limit": 1}, {"limit": 1}],
+    )
     return recovery, sleep, strain

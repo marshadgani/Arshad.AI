@@ -92,6 +92,7 @@ async def lifespan(app: FastAPI):
                 except asyncio.CancelledError:
                     pass
         await close_redis()
+        await close_whoop_client()
 
 
 app = FastAPI(title="Arshad.AI Backend", version="0.1.0", lifespan=lifespan)

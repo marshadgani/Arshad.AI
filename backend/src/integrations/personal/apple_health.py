@@ -18,35 +18,49 @@ exports out, so this provider is a "personal_push" kind (see base.py):
      oauth_providers.py). The ingest endpoint caches the latest snapshot
      in Redis with a short TTL and nothing else persists it.
 
-HUMAN REVIEW FLAG: unlike Whoop (server pulls fresh data on every
-dashboard request, so "live" and "never at rest" are the same thing),
-Apple Health is push-only — there is no pull to retry between Shortcut
-runs. A short-TTL Redis cache is the closest analogue to "live" available
-here, but Redis is not inherently non-persistent (RDB/AOF snapshotting
-can still write it to disk depending on the Redis deployment's config).
-If the letter of "never persisted at rest" must extend to the Redis layer
-too, the TTL and/or Redis persistence settings need an explicit decision
-from Arshad before this ships — flagged rather than assumed.
+HUMAN REVIEW FLAG — MITIGATED, NOT CLOSED: unlike Whoop (server pulls
+fresh data on every dashboard request, so "live" and "never at rest" are
+the same thing), Apple Health is push-only — there is no pull to retry
+between Shortcut runs. A short-TTL Redis cache is the closest analogue to
+"live" available here.
+
+  1. Snapshots are AES-GCM encrypted (src/auth/crypto.py) and
+     base64-encoded before the Redis write (see
+     services/apple_health/envelope.py). Redis RDB/AOF
+     snapshotting to disk therefore stores only ciphertext, never
+     cleartext biometric values.
+  2. This narrows the residual exposure, it does not close it: the
+     encryption key (OAUTH_ENCRYPTION_KEY) lives in the same process
+     environment as the Redis client, so an attacker with both
+     environment access AND disk access is unprotected. What encryption
+     genuinely buys is protection against managed-Redis snapshot
+     exfiltration WITHOUT environment access.
+  3. Whether to additionally disable Redis persistence for defence in
+     depth remains Arshad's decision — now a hardening choice rather than
+     a correctness gate, but still open.
+  4. Rotating OAUTH_ENCRYPTION_KEY renders every cached snapshot
+     undecryptable. This is treated as a cache miss (stale=True), never
+     an error, and self-heals within one TTL (6 hours) as the user's next
+     Shortcut push writes a fresh snapshot under the new key.
 """
 
 from __future__ import annotations
 
+import logging
 import secrets
 import time
 from datetime import datetime, timezone
 from typing import Any
 
+import redis.exceptions
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...middleware.cache import get_redis
 from ...models.integration import Integration, IntegrationIngestToken
 from ...models.user import User
-from ...services.apple_health import (
-    CACHE_TTL_SECONDS,
-    hash_ingest_token,
-    snapshot_cache_key,
-)
+from ...services.apple_health import snapshot_store
+from ...services.apple_health.ingest_auth import hash_ingest_token
 from ..base import (
     ConnectResult,
     IntegrationError,
@@ -56,15 +70,7 @@ from ..base import (
 )
 from ..registry import register
 
-# Re-exported: these moved to services/apple_health.py so the API layer no
-# longer has to import upward into this provider module. Kept importable
-# from here because existing call sites and tests refer to them by this path.
-__all__ = [
-    "AppleHealthIntegration",
-    "CACHE_TTL_SECONDS",
-    "hash_ingest_token",
-    "snapshot_cache_key",
-]
+_log = logging.getLogger(__name__)
 
 
 @register
@@ -145,9 +151,7 @@ class AppleHealthIntegration(IntegrationProvider):
         """
 
         started = time.perf_counter()
-        redis_client = await get_redis()
-        cached = await redis_client.get(snapshot_cache_key(str(integration.id)))
-        if cached:
+        if await self._has_recent_push(integration):
             integration.last_error = None
             summary = (
                 "Apple Health: last Shortcut push is still within the cache window."
@@ -165,14 +169,31 @@ class AppleHealthIntegration(IntegrationProvider):
             duration_ms=int((time.perf_counter() - started) * 1000),
         )
 
+    @staticmethod
+    async def _has_recent_push(integration: Integration) -> bool:
+        """True when a snapshot is still in the cache window.
+
+        Fails open, matching the rest of this feature (api/v1/apple_health.py,
+        middleware/rate_limit.py): a Redis outage must degrade to "no recent
+        push" rather than 500 the manual Sync button or flip the integration
+        to `error` in the integrations list, which is what an escaping
+        RedisError did here.
+        """
+        try:
+            redis_client = await get_redis()
+            return await snapshot_store.has_snapshot(redis_client, str(integration.id))
+        except redis.exceptions.RedisError:
+            _log.warning(
+                "apple_health: Redis unavailable — reporting no recent push "
+                "for integration %s",
+                integration.id,
+            )
+            return False
+
     async def status(
         self, *, integration: Integration, db: AsyncSession
     ) -> StatusReport:
-
-        redis_client = await get_redis()
-        has_cached_snapshot = bool(
-            await redis_client.get(snapshot_cache_key(str(integration.id)))
-        )
+        has_cached_snapshot = await self._has_recent_push(integration)
         return StatusReport(
             status=integration.status,  # type: ignore[arg-type]
             last_synced_at=(
