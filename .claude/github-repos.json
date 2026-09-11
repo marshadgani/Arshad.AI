@@ -1040,17 +1040,19 @@
     "system-prompts-leaks": {
       "url": "https://github.com/asgeirtj/system_prompts_leaks.git",
       "name": "system_prompts_leaks",
-      "last_fetched": "2026-09-03 21:20 UTC",
+      "last_fetched": "2026-09-11 09:30 UTC",
       "components": {
         "skills": [
           "simplify",
           "doctor",
           "debug",
+          "init-new",
           "artifact-design",
           "workflow-authoring",
           "deep-research",
           "design",
           "update-config",
+          "plugin-authoring",
           "claude-in-chrome",
           "init",
           "claude-api",
@@ -1110,6 +1112,7 @@
         "hooks": [],
         "token_optimization": [
           "claude-code-opus-4.6.md",
+          "claude-code.d.ts",
           "prompt-audit.md",
           "platform-availability.md",
           "prompt-caching.md",
@@ -1117,8 +1120,7 @@
           "managed-agents-multiagent.md",
           "models.md",
           "cost-hillclimb.md",
-          "live-sources.md",
-          "model-migration.md"
+          "live-sources.md"
         ]
       }
     },
