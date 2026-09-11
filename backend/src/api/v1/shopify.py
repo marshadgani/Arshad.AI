@@ -160,11 +160,13 @@ async def get_dashboard(
 
         token = await _get_token(integration, db)
         raw = await _execute_query(ctx.shop, token, day_start, day_end)
+        # Parsing/validation runs inside the same guard as the fetch: a
+        # malformed wire payload must degrade to the always-200 contract
+        # this endpoint promises, not surface as an uncaught 500.
+        payload = dashboards.build_dashboard(raw, ctx, as_of=day_end).model_dump()
     except _FETCH_ERRORS as exc:
         return await _failure_response(integration, exc, db)
 
     await _mark_healthy(integration, db)
-
-    payload = dashboards.build_dashboard(raw, ctx, as_of=day_end).model_dump()
     await _set_cached(str(integration.id), {**payload, "cached_at": now.isoformat()})
     return JSONResponse({"data": payload})

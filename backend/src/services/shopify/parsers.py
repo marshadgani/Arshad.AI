@@ -50,7 +50,12 @@ def day_window(tz: str, now: datetime) -> tuple[str, str]:
     local_midnight = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
     day_start_utc = local_midnight.astimezone(timezone.utc)
     day_end_utc = local_now.astimezone(timezone.utc)
-    return day_start_utc.isoformat(), day_end_utc.isoformat()
+    # Shopify's search grammar wants a bare "Z" suffix, not the "+00:00"
+    # offset datetime.isoformat() produces — an unquoted "+00:00" risks the
+    # ":00" being mis-parsed as a second field delimiter in `created_at:>=…`,
+    # silently shifting or emptying the day's revenue/order KPIs.
+    fmt = "%Y-%m-%dT%H:%M:%SZ"
+    return day_start_utc.strftime(fmt), day_end_utc.strftime(fmt)
 
 
 def _to_decimal(amount: str | None) -> Decimal | None:

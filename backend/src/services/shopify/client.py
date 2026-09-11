@@ -149,7 +149,7 @@ async def execute_dashboard_query(
     VARIANTS_PAGE_LIMIT-sized page and reports variants_has_next_page so a
     consumer can tell a complete count from a partial one.
     """
-    orders_query = f"created_at:>={day_start} created_at:<={day_end} test:false"
+    orders_query = f"created_at:>='{day_start}' created_at:<='{day_end}' test:false"
     variables = {
         "ordersQuery": orders_query,
         "ordersFirst": ORDERS_PAGE_LIMIT,
