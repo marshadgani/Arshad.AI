@@ -120,7 +120,9 @@ export function useChatStream(sessionId: string | null) {
             let parsed: ChatSseEvent;
             try {
               parsed = JSON.parse(body) as ChatSseEvent;
-            } catch {
+            } catch (err) {
+              // eslint-disable-next-line no-console
+              console.error('[useChatStream] malformed SSE chunk, skipping', { body, err });
               continue;
             }
             applyEvent(setState, parsed);

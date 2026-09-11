@@ -26,7 +26,7 @@ afterEach(() => {
 
 describe('useShopifyDashboard', () => {
   it('calls the shopify dashboard endpoint', () => {
-    mockUseFetch.mockReturnValue({ data: null, isLoading: true, error: null });
+    mockUseFetch.mockReturnValue({ data: null, isLoading: true, error: null, refetch: vi.fn() });
 
     renderHook(() => useShopifyDashboard());
 
@@ -37,7 +37,7 @@ describe('useShopifyDashboard', () => {
   });
 
   it('passes a 120-second poll interval matching the backend cache TTL', () => {
-    mockUseFetch.mockReturnValue({ data: null, isLoading: true, error: null });
+    mockUseFetch.mockReturnValue({ data: null, isLoading: true, error: null, refetch: vi.fn() });
 
     renderHook(() => useShopifyDashboard());
 
@@ -54,7 +54,7 @@ describe('useShopifyDashboard', () => {
       recent_orders: [],
       partial_failures: [],
     };
-    mockUseFetch.mockReturnValue({ data: fakeDashboard, isLoading: false, error: null });
+    mockUseFetch.mockReturnValue({ data: fakeDashboard, isLoading: false, error: null, refetch: vi.fn() });
 
     const { result } = renderHook(() => useShopifyDashboard());
 
@@ -62,7 +62,7 @@ describe('useShopifyDashboard', () => {
   });
 
   it('reports null for dashboard before the first fetch resolves', () => {
-    mockUseFetch.mockReturnValue({ data: null, isLoading: true, error: null });
+    mockUseFetch.mockReturnValue({ data: null, isLoading: true, error: null, refetch: vi.fn() });
 
     const { result } = renderHook(() => useShopifyDashboard());
 
@@ -72,7 +72,7 @@ describe('useShopifyDashboard', () => {
 
   it('propagates a fetch error', () => {
     const err = new Error('network failure');
-    mockUseFetch.mockReturnValue({ data: null, isLoading: false, error: err });
+    mockUseFetch.mockReturnValue({ data: null, isLoading: false, error: err, refetch: vi.fn() });
 
     const { result } = renderHook(() => useShopifyDashboard());
 
