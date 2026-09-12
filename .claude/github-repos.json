@@ -3123,6 +3123,32 @@
         "hooks": [],
         "token_optimization": []
       }
+    },
+    "taste-skill": {
+      "url": "https://github.com/Leonxlnx/taste-skill.git",
+      "name": "taste-skill",
+      "last_fetched": "2026-09-12 23:54 UTC",
+      "components": {
+        "skills": [
+          "brandkit",
+          "redesign-skill",
+          "imagegen-frontend-web",
+          "soft-skill",
+          "brutalist-skill",
+          "taste-skill",
+          "taste-skill-v1",
+          "stitch-skill",
+          "output-skill",
+          "image-to-code-skill",
+          "gpt-tasteskill",
+          "imagegen-frontend-mobile",
+          "minimalist-skill"
+        ],
+        "agents": [],
+        "commands": [],
+        "hooks": [],
+        "token_optimization": []
+      }
     }
   }
 }
