@@ -805,6 +805,8 @@ This registry is the source of truth for weekly auto-updates.
 | `agent-reach` | https://github.com/Panniantong/Agent-Reach | skills | 1 skill (agent-reach — career/dev/finance/search/social/video/web reference lookup) | 2026-09-12 |
 | `openmontage` | https://github.com/calesthio/OpenMontage | skills+agents+commands | 142 skills, 8 agents, 3 commands (video/media generation and editing toolchain) | 2026-09-12 |
 | `orca` | https://github.com/stablyai/orca | skills | 8 skills (computer-use, orchestration, orca-cli, orca-emulator/-android, orca-linear, linear-tickets, orca-per-workspace-env) | 2026-09-12 |
+| `learn-claude-code` | https://github.com/shareAI-lab/learn-claude-code | skills | 4 skills (agent-builder, code-review, mcp-builder, pdf) | 2026-09-12 |
+| `claude-code-router` | https://github.com/musistudio/claude-code-router | agents | 10 provider-router agent configs (claude-code, claude-design, codex, grok, kilo, kimi, opencode, pi, workbuddy, zcode) | 2026-09-12 |
 
 > This table is updated automatically by `scripts/fetch-github-repo.sh` when a new repo is integrated.
 
