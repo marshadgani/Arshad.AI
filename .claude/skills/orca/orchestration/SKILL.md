@@ -17,6 +17,9 @@ description: >-
 
 # Orca Orchestration
 
+> **Provenance note:** this skill resolves the `orca` executable from `PATH`/env at run time and then fetches its real operating instructions live via `ORCA skills get ...` — the guidance actually followed is not fixed content in this repo. Only trust an `orca` binary whose install source you can verify (see `orca-per-workspace-env` for sandboxing guidance); a hijacked `PATH` or a compromised `stablyai/orca` release could otherwise serve injected instructions with no diff or code review ever showing it.
+
+
 This file is a discovery stub, not the usage guide. The full, version-matched Orca
 orchestration reference is served by the `orca` binary itself — kept out of this file on
 purpose so it can never drift from the binary that will actually run your commands.
