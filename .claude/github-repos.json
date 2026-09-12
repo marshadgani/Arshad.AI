@@ -250,7 +250,7 @@
     "obsidian-skills": {
       "url": "https://github.com/kepano/obsidian-skills.git",
       "name": "obsidian-skills",
-      "last_fetched": "2026-09-11 09:29 UTC",
+      "last_fetched": "2026-09-12 23:40 UTC",
       "components": {
         "skills": [
           "obsidian-cli",
@@ -3026,6 +3026,30 @@
           "influencer-marketing",
           "ads"
         ],
+        "agents": [],
+        "commands": [],
+        "hooks": [],
+        "token_optimization": []
+      }
+    },
+    "obsidian-releases": {
+      "url": "https://github.com/obsidianmd/obsidian-releases.git",
+      "name": "obsidian-releases",
+      "last_fetched": "2026-09-12 23:40 UTC",
+      "components": {
+        "skills": [],
+        "agents": [],
+        "commands": [],
+        "hooks": [],
+        "token_optimization": []
+      }
+    },
+    "obsidian-git": {
+      "url": "https://github.com/Vinzent03/obsidian-git.git",
+      "name": "obsidian-git",
+      "last_fetched": "2026-09-12 23:40 UTC",
+      "components": {
+        "skills": [],
         "agents": [],
         "commands": [],
         "hooks": [],
