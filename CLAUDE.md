@@ -800,6 +800,16 @@ This registry is the source of truth for weekly auto-updates.
 | `awesome-ai-agents` | https://github.com/e2b-dev/awesome-ai-agents | reference | curated AI agents directory (no extractables) | 2026-07-12 |
 | `awesome-agent-skills` | https://github.com/VoltAgent/awesome-agent-skills | reference | curated agent skills list (no extractables) | 2026-07-12 |
 | `awesome-claude-code-subagents` | https://github.com/VoltAgent/awesome-claude-code-subagents | agents | 154 Claude Code subagents across 10 categories | 2026-07-12 |
+| `anydoc` | https://github.com/firecrawl/anydoc | skills | 1 skill (convert-documents-to-markdown) | 2026-09-12 |
+| `archify` | https://github.com/tt-a1i/archify | skills | 1 skill (archify — architecture/dataflow/sequence/lifecycle/workflow diagram renderers) | 2026-09-12 |
+| `agent-reach` | https://github.com/Panniantong/Agent-Reach | skills | 1 skill (agent-reach — career/dev/finance/search/social/video/web reference lookup) | 2026-09-12 |
+| `openmontage` | https://github.com/calesthio/OpenMontage | skills+agents+commands | 142 skills, 8 agents, 3 commands (video/media generation and editing toolchain) | 2026-09-12 |
+| `orca` | https://github.com/stablyai/orca | skills | 8 skills (computer-use, orchestration, orca-cli, orca-emulator/-android, orca-linear, linear-tickets, orca-per-workspace-env) | 2026-09-12 |
+| `learn-claude-code` | https://github.com/shareAI-lab/learn-claude-code | skills | 4 skills (agent-builder, code-review, mcp-builder, pdf) | 2026-09-12 |
+| `claude-code-router` | https://github.com/musistudio/claude-code-router | agents | 10 provider-router agent configs (claude-code, claude-design, codex, grok, kilo, kimi, opencode, pi, workbuddy, zcode) | 2026-09-12 |
+| `claude-skills` | https://github.com/alirezarezvani/claude-skills | skills+agents+commands+hooks | Large mixed pack — hundreds of skills/agents/commands spanning C-level advisors, marketing, product, engineering, compliance, and ops roles, plus 5 hooks (karpathy-gate, on-session-end, error-capture, detect-playwright, validate-test) | 2026-09-12 |
+| `codegraph` | https://github.com/colbymchenry/codegraph | skills | 2 skills (agent-eval, add-lang) | 2026-09-12 |
+| `marketingskills` | https://github.com/coreyhaines31/marketingskills | skills | ~55 marketing skills (SEO, ads, copywriting, CRO, email, social, pricing, retention) | 2026-09-12 |
 
 > This table is updated automatically by `scripts/fetch-github-repo.sh` when a new repo is integrated.
 
