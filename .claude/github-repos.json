@@ -1257,6 +1257,20 @@
           "README_EN.md"
         ]
       }
+    },
+    "-gent--each": {
+      "url": "https://github.com/Panniantong/Agent-Reach.git",
+      "name": "Agent-Reach",
+      "last_fetched": "2026-09-12 23:26 UTC",
+      "components": {
+        "skills": [
+          "skill"
+        ],
+        "agents": [],
+        "commands": [],
+        "hooks": [],
+        "token_optimization": []
+      }
     }
   }
 }
