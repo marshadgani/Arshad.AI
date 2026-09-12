@@ -2951,6 +2951,23 @@
           "CHANGELOG.md"
         ]
       }
+    },
+    "codegraph": {
+      "url": "https://github.com/colbymchenry/codegraph.git",
+      "name": "codegraph",
+      "last_fetched": "2026-09-12 23:40 UTC",
+      "components": {
+        "skills": [
+          "agent-eval",
+          "add-lang"
+        ],
+        "agents": [],
+        "commands": [],
+        "hooks": [],
+        "token_optimization": [
+          "SKILL.md"
+        ]
+      }
     }
   }
 }
