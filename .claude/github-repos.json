@@ -1461,6 +1461,38 @@
         "hooks": [],
         "token_optimization": []
       }
+    },
+    "orca": {
+      "url": "https://github.com/stablyai/orca.git",
+      "name": "orca",
+      "last_fetched": "2026-09-12 23:31 UTC",
+      "components": {
+        "skills": [
+          "computer-use",
+          "orchestration",
+          "linear-tickets",
+          "orca-cli",
+          "orca-per-workspace-env",
+          "orca-emulator-android",
+          "orca-linear",
+          "orca-emulator"
+        ],
+        "agents": [],
+        "commands": [],
+        "hooks": [],
+        "token_optimization": [
+          "pane-agent-identity-resolver.ts",
+          "agent-title-identity.ts",
+          "global-settings-types.ts",
+          "claude-events.ts",
+          "claude-lifecycle-events.ts",
+          "claude-status-build.ts",
+          "provider-event-routing.ts",
+          "terminal-title-agent-type.ts",
+          "agent-task-complete-notify.ts",
+          "pty-exit-hibernate.ts"
+        ]
+      }
     }
   }
 }
