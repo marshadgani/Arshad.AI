@@ -1517,6 +1517,42 @@
           "s07-task-system.md"
         ]
       }
+    },
+    "claude-code-router": {
+      "url": "https://github.com/musistudio/claude-code-router.git",
+      "name": "claude-code-router",
+      "last_fetched": "2026-09-12 23:33 UTC",
+      "components": {
+        "skills": [],
+        "agents": [
+          "opencode",
+          "zcode",
+          "claude-code",
+          "kilo",
+          "claude-design",
+          "kimi",
+          "grok",
+          "pi",
+          "workbuddy",
+          "codex",
+          "opencode",
+          "zcode",
+          "claude-code",
+          "kilo",
+          "claude-design",
+          "kimi",
+          "grok",
+          "pi",
+          "workbuddy",
+          "codex"
+        ],
+        "commands": [],
+        "hooks": [],
+        "token_optimization": [
+          "responses-session-affinity.ts",
+          "openrouter-discount-provider-router.ts"
+        ]
+      }
     }
   }
 }
