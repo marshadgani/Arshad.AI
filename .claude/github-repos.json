@@ -1226,6 +1226,20 @@
           "tool-use-concepts.md"
         ]
       }
+    },
+    "anydoc": {
+      "url": "https://github.com/firecrawl/anydoc.git",
+      "name": "anydoc",
+      "last_fetched": "2026-09-12 23:25 UTC",
+      "components": {
+        "skills": [
+          "convert-documents-to-markdown"
+        ],
+        "agents": [],
+        "commands": [],
+        "hooks": [],
+        "token_optimization": []
+      }
     }
   }
 }
