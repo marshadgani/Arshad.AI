@@ -1179,6 +1179,27 @@
         ]
       }
     },
+    "orca": {
+      "url": "https://github.com/stablyai/orca",
+      "name": "orca",
+      "last_fetched": "2026-09-12",
+      "components": {
+        "skills": [
+          "computer-use",
+          "orchestration",
+          "linear-tickets",
+          "orca-cli",
+          "orca-per-workspace-env",
+          "orca-emulator-android",
+          "orca-linear",
+          "orca-emulator"
+        ],
+        "agents": [],
+        "commands": [],
+        "hooks": [],
+        "token_optimization": []
+      }
+    },
     "skills": {
       "url": "https://github.com/anthropics/skills.git",
       "name": "skills",

@@ -800,6 +800,7 @@ This registry is the source of truth for weekly auto-updates.
 | `awesome-ai-agents` | https://github.com/e2b-dev/awesome-ai-agents | reference | curated AI agents directory (no extractables) | 2026-07-12 |
 | `awesome-agent-skills` | https://github.com/VoltAgent/awesome-agent-skills | reference | curated agent skills list (no extractables) | 2026-07-12 |
 | `awesome-claude-code-subagents` | https://github.com/VoltAgent/awesome-claude-code-subagents | agents | 154 Claude Code subagents across 10 categories | 2026-07-12 |
+| `orca` | https://github.com/stablyai/orca | skills | 8 skills (computer-use, orchestration, linear-tickets, orca-cli, orca-per-workspace-env, orca-emulator-android, orca-linear, orca-emulator) | 2026-09-12 |
 
 > This table is updated automatically by `scripts/fetch-github-repo.sh` when a new repo is integrated.
 
