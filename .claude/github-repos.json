@@ -3055,6 +3055,74 @@
         "hooks": [],
         "token_optimization": []
       }
+    },
+    "impeccable": {
+      "url": "https://github.com/pbakaus/impeccable.git",
+      "name": "impeccable",
+      "last_fetched": "2026-09-12 23:54 UTC",
+      "components": {
+        "skills": [
+          "impeccable",
+          "impeccable",
+          "impeccable",
+          "impeccable",
+          "impeccable",
+          "impeccable",
+          "impeccable",
+          "impeccable",
+          "impeccable",
+          "impeccable",
+          "impeccable",
+          "impeccable",
+          "impeccable",
+          "impeccable",
+          "audit",
+          "impeccable",
+          "impeccable",
+          "impeccable",
+          "impeccable",
+          "impeccable",
+          "impeccable",
+          "impeccable",
+          "impeccable",
+          "impeccable"
+        ],
+        "agents": [
+          "impeccable-finish-reviewer",
+          "impeccable-documenter",
+          "impeccable-manual-edit-applier",
+          "impeccable-asset-producer",
+          "impeccable-finish-reviewer",
+          "impeccable-documenter",
+          "impeccable-manual-edit-applier",
+          "impeccable-asset-producer",
+          "impeccable-asset-producer.agent",
+          "impeccable-documenter.agent",
+          "impeccable-manual-edit-applier.agent",
+          "impeccable-finish-reviewer.agent",
+          "impeccable-finish-reviewer",
+          "impeccable-documenter",
+          "impeccable-manual-edit-applier",
+          "impeccable-asset-producer",
+          "impeccable-finish-reviewer",
+          "impeccable-documenter",
+          "impeccable-manual-edit-applier",
+          "impeccable-asset-producer",
+          "impeccable-finish-reviewer",
+          "impeccable-documenter",
+          "impeccable-manual-edit-applier",
+          "impeccable-asset-producer",
+          "impeccable-finish-reviewer",
+          "impeccable-documenter",
+          "impeccable-manual-edit-applier",
+          "impeccable-asset-producer"
+        ],
+        "commands": [
+          "impeccable"
+        ],
+        "hooks": [],
+        "token_optimization": []
+      }
     }
   }
 }
