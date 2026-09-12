@@ -802,6 +802,8 @@ This registry is the source of truth for weekly auto-updates.
 | `awesome-claude-code-subagents` | https://github.com/VoltAgent/awesome-claude-code-subagents | agents | 154 Claude Code subagents across 10 categories | 2026-07-12 |
 | `anydoc` | https://github.com/firecrawl/anydoc | skills | 1 skill (convert-documents-to-markdown) | 2026-09-12 |
 | `archify` | https://github.com/tt-a1i/archify | skills | 1 skill (archify — architecture/dataflow/sequence/lifecycle/workflow diagram renderers) | 2026-09-12 |
+| `agent-reach` | https://github.com/Panniantong/Agent-Reach | skills | 1 skill (agent-reach — career/dev/finance/search/social/video/web reference lookup) | 2026-09-12 |
+| `openmontage` | https://github.com/calesthio/OpenMontage | skills+agents+commands | 142 skills, 8 agents, 3 commands (video/media generation and editing toolchain) | 2026-09-12 |
 
 > This table is updated automatically by `scripts/fetch-github-repo.sh` when a new repo is integrated.
 
