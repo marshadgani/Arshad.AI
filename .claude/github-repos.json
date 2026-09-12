@@ -1179,6 +1179,32 @@
         ]
       }
     },
+    "openmontage": {
+      "url": "https://github.com/calesthio/OpenMontage",
+      "name": "OpenMontage",
+      "last_fetched": "2026-09-12",
+      "components": {
+        "skills": [
+          "acestep", "agents", "ai-video-gen", "avatar-video", "azure-speech-to-text",
+          "azure-text-to-speech", "beautiful-mermaid", "bfl-api", "create-video", "d3-viz",
+          "elevenlabs", "faceswap", "ffmpeg", "flux-best-practices", "framer-motion", "heygen",
+          "lottie-bodymovin", "ltx2", "manim-composer", "manimce-best-practices",
+          "manimgl-best-practices", "music", "playwright-recording", "remotion",
+          "remotion-best-practices", "setup-api-key", "sound-effects", "speech-to-text",
+          "tailwind-design-system", "text-to-speech", "threejs-animation",
+          "threejs-fundamentals", "threejs-geometry", "threejs-interaction", "threejs-lighting",
+          "threejs-loaders", "threejs-materials", "threejs-postprocessing", "threejs-shaders",
+          "threejs-textures", "vercel-composition-patterns", "vercel-react-best-practices",
+          "video-download", "video-edit", "video-translate", "video-understand",
+          "video_toolkit", "visual-style", "web-design-guidelines"
+        ],
+        "agents": [],
+        "commands": ["ink-art", "animated-drawing", "backlot"],
+        "hooks": [],
+        "token_optimization": [],
+        "note": "Repo also ships a near-duplicate, larger .agents/skills/ mirror (55M, includes vendor-agnostic variants + hyperframes-*/gsap-* families and binary SFX assets) for non-Claude agent runtimes (Cursor/Codex). Skipped as redundant with .claude/skills/ for this integration."
+      }
+    },
     "orca": {
       "url": "https://github.com/stablyai/orca",
       "name": "orca",
