@@ -39,7 +39,7 @@ fi
 # Normalise URL — ensure .git suffix
 [[ "$REPO_URL" == *.git ]] || REPO_URL="${REPO_URL}.git"
 REPO_NAME="$(basename "$REPO_URL" .git)"
-REPO_SLUG="$(echo "$REPO_NAME" | tr '[:upper:]' '-' | sed 's/[^a-z0-9-]/-/g')"
+REPO_SLUG="$(echo "$REPO_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g')"
 
 log "=== fetch-github-repo: $REPO_URL ==="
 [ "$DRY_RUN" = "--dry-run" ] && log "DRY RUN — no files will be written"
@@ -75,15 +75,21 @@ done < <(find "$CLONE_DIR" -not -path '*/.git/*' -name "SKILL.md" 2>/dev/null ||
   done
 }
 
-# Agents: agent markdown files or agents/ directory
+# Agents: agent markdown files or agents/ directory.
+# SKILL.md is excluded — an "agents/" *directory* can itself be a skill (its
+# own manifest matches the */agents/*.md path glob), which would otherwise
+# catalog a fake agent literally named "SKILL" and later make the `find
+# ... -name SKILL.md` lookup below match every skill's manifest in the repo.
 while IFS= read -r f; do
   name="$(basename "$f" .md)"
+  [ "$name" = "SKILL" ] && continue
   FOUND_AGENTS+=("$name")
 done < <(find "$CLONE_DIR" -not -path '*/.git/*' \( -path '*/agents/*.md' -o -path '*/.claude/agents/*.md' \) 2>/dev/null || true)
 
-# Commands: command markdown files
+# Commands: command markdown files (same SKILL.md exclusion as agents above).
 while IFS= read -r f; do
   name="$(basename "$f" .md)"
+  [ "$name" = "SKILL" ] && continue
   FOUND_COMMANDS+=("$name")
 done < <(find "$CLONE_DIR" -not -path '*/.git/*' \( -path '*/commands/*.md' -o -path '*/.claude/commands/*.md' \) 2>/dev/null || true)
 
@@ -196,7 +202,7 @@ if [ "$DRY_RUN" != "--dry-run" ]; then
 
   # Copy agent .md files → backend/src/agents/ (reference copies)
   for f in "${FOUND_AGENTS[@]+"${FOUND_AGENTS[@]}"}"; do
-    src_file="$(find "$CLONE_DIR" -not -path '*/.git/*' -name "${f}.md" | head -1)"
+    src_file="$(find "$CLONE_DIR" -not -path '*/.git/*' -name "${f}.md" -print -quit)"
     [ -f "$src_file" ] || continue
     dest_file="$REPO_ROOT/backend/src/agents/${REPO_SLUG}_${f}.md"
     if ! diff -q "$src_file" "$dest_file" >/dev/null 2>&1; then
@@ -208,7 +214,7 @@ if [ "$DRY_RUN" != "--dry-run" ]; then
 
   # Copy command .md files → backend/src/commands/
   for f in "${FOUND_COMMANDS[@]+"${FOUND_COMMANDS[@]}"}"; do
-    src_file="$(find "$CLONE_DIR" -not -path '*/.git/*' -name "${f}.md" | head -1)"
+    src_file="$(find "$CLONE_DIR" -not -path '*/.git/*' -name "${f}.md" -print -quit)"
     [ -f "$src_file" ] || continue
     dest_file="$REPO_ROOT/backend/src/commands/${REPO_SLUG}_${f}.md"
     if ! diff -q "$src_file" "$dest_file" >/dev/null 2>&1; then
@@ -222,7 +228,7 @@ if [ "$DRY_RUN" != "--dry-run" ]; then
   # Files are NOT marked executable: a human review + explicit chmod is required
   # before any external hook can run, mitigating supply-chain RCE risk.
   for f in "${FOUND_HOOKS[@]+"${FOUND_HOOKS[@]}"}"; do
-    src_file="$(find "$CLONE_DIR" -not -path '*/.git/*' -name "$f" | head -1)"
+    src_file="$(find "$CLONE_DIR" -not -path '*/.git/*' -name "$f" -print -quit)"
     [ -f "$src_file" ] || continue
     dest_file="$REPO_ROOT/backend/src/hooks/${REPO_SLUG}_${f}"
     if ! diff -q "$src_file" "$dest_file" >/dev/null 2>&1; then
