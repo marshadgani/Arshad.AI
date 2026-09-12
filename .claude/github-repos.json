@@ -1179,6 +1179,30 @@
         ]
       }
     },
+    "anydoc": {
+      "url": "https://github.com/firecrawl/anydoc",
+      "name": "anydoc",
+      "last_fetched": "2026-09-12",
+      "components": {
+        "skills": ["convert-documents-to-markdown"],
+        "agents": [],
+        "commands": [],
+        "hooks": [],
+        "token_optimization": []
+      }
+    },
+    "archify": {
+      "url": "https://github.com/tt-a1i/archify",
+      "name": "archify",
+      "last_fetched": "2026-09-12",
+      "components": {
+        "skills": ["archify"],
+        "agents": [],
+        "commands": [],
+        "hooks": [],
+        "token_optimization": []
+      }
+    },
     "openmontage": {
       "url": "https://github.com/calesthio/OpenMontage",
       "name": "OpenMontage",
