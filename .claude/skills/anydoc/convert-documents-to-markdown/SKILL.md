@@ -11,10 +11,12 @@ metadata:
 Run the anydoc CLI. It needs Node 20+ and no install:
 
 ```bash
-npx -y @firecrawl/anydoc <file>              # Markdown to stdout
-npx -y @firecrawl/anydoc <file> -o out.md    # write to a file
-npx -y @firecrawl/anydoc - --format csv < f  # read stdin
+npx -y @firecrawl/anydoc@0.2.4 <file>              # Markdown to stdout
+npx -y @firecrawl/anydoc@0.2.4 <file> -o out.md    # write to a file
+npx -y @firecrawl/anydoc@0.2.4 - --format csv < f  # read stdin
 ```
+
+Pin the version explicitly (as above) rather than using an unpinned `npx -y @firecrawl/anydoc` — an unpinned invocation always installs whatever is latest on the npm registry at call time, with no integrity check. Bump the pinned version deliberately when upgrading, not implicitly on every invocation.
 
 Rules:
 
