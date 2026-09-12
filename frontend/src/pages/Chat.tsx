@@ -1,30 +1,53 @@
 import { useNavigate, useParams } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { ChatPanel } from '../chat/ChatPanel';
-import { getToken } from '../auth/tokenStorage';
+import { CHAT_PATH } from '../routes/paths';
+import { MissingTokenError, createChatSession } from '../chat/chatApi';
+import styles from './Chat.module.css';
 
 export default function Chat() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
+  const [error, setError] = useState<string | null>(null);
+
+  const startSession = useCallback(() => {
+    setError(null);
+    createChatSession()
+      .then((session) => navigate(`${CHAT_PATH}/${session.id}`, { replace: true }))
+      .catch((err) =>
+        setError(
+          err instanceof MissingTokenError
+            ? 'You need to sign in again before starting a chat.'
+            : 'Could not start a new chat session.',
+        ),
+      );
+  }, [navigate]);
 
   // If no sessionId in URL, auto-create one and redirect.
   useEffect(() => {
     if (sessionId) return;
-    const token = getToken();
-    if (!token) return;
-    fetch('/api/v1/chat/sessions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({}),
-    })
-      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`${res.status}`))))
-      .then((body) => navigate(`/chat/${body.data.id}`, { replace: true }))
-      .catch(() => undefined);
-  }, [sessionId, navigate]);
+    startSession();
+  }, [sessionId, startSession]);
 
-  if (!sessionId) {
-    return <div style={{ padding: '2rem', color: '#8b949e' }}>Creating chat…</div>;
-  }
-  return <ChatPanel sessionId={sessionId} />;
+  if (sessionId) return <ChatPanel sessionId={sessionId} />;
+
+  return (
+    <div className={styles.statusPane}>
+      {error ? (
+        <>
+          <p className={styles.statusMessage} role="alert">
+            {error}
+          </p>
+          <button type="button" className={styles.retryButton} onClick={startSession}>
+            Try again
+          </button>
+        </>
+      ) : (
+        <p className={styles.statusMessage} role="status">
+          Creating chat…
+        </p>
+      )}
+    </div>
+  );
 }

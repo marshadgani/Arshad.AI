@@ -394,12 +394,9 @@ DOMAINS: list[dict[str, Any]] = [
         "title": "Shopify Store",
         "emoji": "🛒",
         "tagline": "Orders · inventory · customer ops",
-        "kpis": [
-            {"label": "Today's orders", "value": "12", "delta": "+25% vs avg day"},
-            {"label": "GMV (today)", "value": "₹84,200", "delta": "+18%"},
-            {"label": "Low-stock SKUs", "value": "4", "delta": "needs reorder"},
-            {"label": "Open tickets", "value": "2", "delta": "avg response 3 h"},
-        ],
+        # KPIs removed (FEAT-119): the /shopify page now sources live
+        # revenue/order/conversion/low-stock KPIs from GET
+        # /api/v1/shopify/dashboard instead of these seeded mock rows.
         "applications": [
             {
                 "id": "sa1",

@@ -15,9 +15,14 @@ Required env vars (per provider):
 
 from __future__ import annotations
 
+import json
+import logging
 import os
 import secrets
 import time
+import uuid
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, ClassVar
 from urllib.parse import urlencode
@@ -40,6 +45,11 @@ from ..base import (
 
 _STATE_TTL_SECONDS = 600  # 10 min — generous for slow consent flows
 
+# Every outbound provider call from this module (token grants, sync reads).
+_HTTP_TIMEOUT_SECONDS = 15.0
+
+_log = logging.getLogger(__name__)
+
 
 def _backend_url() -> str:
     return os.environ["BACKEND_URL"].rstrip("/")
@@ -53,26 +63,76 @@ def _state_key(state: str) -> str:
     return f"int_oauth_state:{state}"
 
 
-async def store_oauth_state(*, user_id: str, slug: str) -> str:
-    """Generate a CSRF-protection state token, store user_id+slug in Redis."""
+async def store_oauth_state(
+    *, user_id: str, slug: str, ctx: dict[str, Any] | None = None
+) -> str:
+    """Generate a CSRF-protection state token, store user_id+slug in Redis.
+
+    ctx carries provider-specific data (e.g. Shopify's shop domain) that must
+    survive the round trip to the OAuth consent screen and back. When absent
+    (every provider before Shopify), the stored value is the original plain
+    "user_id::slug" string — no extra Redis round trip, fully backward
+    compatible with consume_oauth_state's legacy fallback below.
+    """
     state = secrets.token_urlsafe(32)
+    pair = f"{user_id}::{slug}"
+    value = json.dumps({"v": pair, "ctx": ctx}) if ctx else pair
     redis = await get_redis()
-    await redis.set(_state_key(state), f"{user_id}::{slug}", ex=_STATE_TTL_SECONDS)
+    await redis.set(_state_key(state), value, ex=_STATE_TTL_SECONDS)
     return state
 
 
-async def consume_oauth_state(state: str) -> tuple[str, str] | None:
-    """Atomically read+delete state. Returns (user_id, slug) or None."""
+def _unwrap_state_value(raw: str) -> tuple[str, dict[str, Any]]:
+    """Split a stored state value into its "user_id::slug" pair and its ctx.
+
+    Handles both shapes store_oauth_state writes: the JSON envelope (a
+    provider passed ctx=...) and the legacy plain string, which has no ctx.
+    """
+    try:
+        envelope = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return raw, {}
+    if isinstance(envelope, dict) and "v" in envelope:
+        return str(envelope["v"]), dict(envelope.get("ctx") or {})
+    return raw, {}
+
+
+async def consume_oauth_state(state: str) -> tuple[str, str, dict[str, Any]] | None:
+    """Atomically read+delete state. Returns (user_id, slug, ctx) or None.
+
+    Tries the JSON envelope first (providers that called store_oauth_state
+    with ctx=...), falling back to the legacy plain "user_id::slug" string
+    with ctx={} for every other provider's state key.
+    """
     redis = await get_redis()
     raw = await redis.getdel(_state_key(state))
     if not raw:
         return None
     if isinstance(raw, bytes):
         raw = raw.decode("utf-8")
-    if "::" not in raw:
+    pair, ctx = _unwrap_state_value(raw)
+    if "::" not in pair:
         return None
-    user_id, slug = raw.split("::", 1)
-    return user_id, slug
+    user_id, slug = pair.split("::", 1)
+    return user_id, slug, ctx
+
+
+@dataclass(frozen=True)
+class OAuthCallbackContext:
+    """Everything complete_callback() needs beyond the provider instance."""
+
+    code: str
+    state: str
+    user_id: str
+    query_params: Mapping[str, str]
+    stored: Mapping[str, Any]
+
+
+@dataclass(frozen=True)
+class CallbackOutcome:
+    token_response: dict[str, Any]
+    profile: dict[str, Any] = field(default_factory=dict)
+    config_extra: dict[str, Any] = field(default_factory=dict)
 
 
 class OAuthIntegrationProvider(IntegrationProvider):
@@ -136,30 +196,44 @@ class OAuthIntegrationProvider(IntegrationProvider):
             **self.additional_auth_params,
         }
         url = f"{self.auth_url}?{urlencode(params)}"
-        return ConnectResult(integration_id="", redirect_url=url)
+        return ConnectResult(integration_id=None, redirect_url=url)
 
-    async def exchange_code(self, code: str) -> dict[str, Any]:
-        """POST to token_url with code → returns the JSON token response."""
-        data = {
-            "grant_type": "authorization_code",
-            "code": code,
-            "redirect_uri": self._redirect_uri(),
-        }
+    async def _post_token_request(self, data: dict[str, str]) -> httpx.Response:
+        """POST a grant to token_url with this provider's client credentials
+        attached the way it expects — HTTP Basic, or in the form body.
+
+        Shared by the initial code exchange and the refresh grant, which
+        differ only in their form fields and in what they report on failure,
+        so the caller owns the error message for a non-2xx response.
+        """
         if self.use_basic_auth_for_token:
-            auth = (self._client_id(), self._client_secret())
-            kwargs: dict[str, Any] = {"auth": auth}
+            kwargs: dict[str, Any] = {
+                "auth": (self._client_id(), self._client_secret())
+            }
         else:
-            data["client_id"] = self._client_id()
-            data["client_secret"] = self._client_secret()
+            data = {
+                **data,
+                "client_id": self._client_id(),
+                "client_secret": self._client_secret(),
+            }
             kwargs = {}
-
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.post(
+        async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT_SECONDS) as client:
+            return await client.post(
                 self.token_url,
                 data=data,
                 headers={"Accept": "application/json"},
                 **kwargs,
             )
+
+    async def exchange_code(self, code: str) -> dict[str, Any]:
+        """POST to token_url with code → returns the JSON token response."""
+        resp = await self._post_token_request(
+            {
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": self._redirect_uri(),
+            }
+        )
         if resp.status_code >= 400:
             raise IntegrationError(
                 "token_exchange_failed",
@@ -170,6 +244,34 @@ class OAuthIntegrationProvider(IntegrationProvider):
     async def fetch_profile(self, access_token: str) -> dict[str, Any]:
         """Subclasses override. Default returns an empty dict."""
         return {}
+
+    async def complete_callback(
+        self, *, context: OAuthCallbackContext
+    ) -> CallbackOutcome:
+        """Handle the OAuth callback for this provider.
+
+        Default implementation is a lift-and-shift of the standard
+        Authorization Code flow: exchange the code, best-effort fetch the
+        profile (a failure here must not fail the whole callback), and
+        return with no extra config. Providers with a non-standard callback
+        (per-shop token URLs, signature verification, etc. — see
+        ShopifyIntegration) override this instead of hand-rolling their own
+        router wiring.
+        """
+        token_response = await self.exchange_code(context.code)
+        access_token = token_response.get("access_token")
+        if not access_token:
+            raise IntegrationError(
+                "no_access_token", "Provider returned no access_token."
+            )
+        try:
+            profile = await self.fetch_profile(access_token)
+        except Exception as exc:  # noqa: BLE001 — fetch_profile is best-effort
+            _log.warning(
+                "fetch_profile failed for %s: %s", self.slug, type(exc).__name__
+            )
+            profile = {}
+        return CallbackOutcome(token_response=token_response, profile=profile)
 
     async def status(
         self, *, integration: Integration, db: AsyncSession
@@ -229,25 +331,9 @@ class OAuthIntegrationProvider(IntegrationProvider):
                 "no_refresh_token",
                 f"{self.display_name} access token expired and no refresh token is stored.",
             )
-        data: dict[str, Any] = {
-            "grant_type": "refresh_token",
-            "refresh_token": rt,
-        }
-        if self.use_basic_auth_for_token:
-            kwargs: dict[str, Any] = {
-                "auth": (self._client_id(), self._client_secret())
-            }
-        else:
-            data["client_id"] = self._client_id()
-            data["client_secret"] = self._client_secret()
-            kwargs = {}
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.post(
-                self.token_url,
-                data=data,
-                headers={"Accept": "application/json"},
-                **kwargs,
-            )
+        resp = await self._post_token_request(
+            {"grant_type": "refresh_token", "refresh_token": rt}
+        )
         if resp.status_code >= 400:
             raise IntegrationError(
                 "refresh_failed",
@@ -272,13 +358,18 @@ async def upsert_oauth_integration(
     token_response: dict[str, Any],
     profile: dict[str, Any],
     scopes: list[str],
+    config_extra: dict[str, Any] | None = None,
 ) -> Integration:
     """Create or update the integration + IntegrationOAuthToken rows
     after a successful code exchange.
-    """
-    import uuid
 
+    config_extra is merged into integration.config alongside 'profile' —
+    e.g. Shopify's shop_domain/shop_timezone/currency_code, which no other
+    provider needs, so this stays an opt-in kwarg with no effect on the
+    15 existing providers, which never pass it.
+    """
     user_uuid = uuid.UUID(user_id)
+    extra = config_extra or {}
     integration = await db.scalar(
         select(Integration).where(
             Integration.user_id == user_uuid, Integration.slug == slug
@@ -290,14 +381,18 @@ async def upsert_oauth_integration(
             slug=slug,
             kind="personal_oauth",
             status="connected",
-            config={"profile": profile},
+            config={"profile": profile, **extra},
         )
         db.add(integration)
         await db.flush()
     else:
         integration.status = "connected"
         integration.last_error = None
-        integration.config = {**(integration.config or {}), "profile": profile}
+        integration.config = {
+            **(integration.config or {}),
+            "profile": profile,
+            **extra,
+        }
 
     token_row = await db.scalar(
         select(IntegrationOAuthToken).where(
@@ -354,7 +449,7 @@ def make_oauth_sync_via_api(
         started = time.perf_counter()
         access_token = await self.get_access_token(integration=integration, db=db)
         try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
+            async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT_SECONDS) as client:
                 resp = await client.get(
                     sync_url,
                     headers={"Authorization": f"Bearer {access_token}"},

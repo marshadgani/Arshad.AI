@@ -1,5 +1,20 @@
 # Lessons Learned
 
+## dev-team-orchestrator (as a subagent) cannot spawn subagents — architecture rebuilt around Workflow
+
+**Date**: 2026-09-06
+**Context**: `dev-team-orchestrator`'s `tools:` frontmatter had a bug (lowercase YAML-list format the harness couldn't parse) that made it spawn with zero tools and get refused outright. Fixed the frontmatter format (comma-separated, PascalCase tool names — confirmed correct by a parallel session's independent fix landing on `claude/ai-personal-assistant-CcA11`), re-tested, and it now spawns successfully.
+
+**What happened**: Once it actually spawned, direct testing (having it try to invoke its own Task/Agent tool and report the verbatim error) surfaced a much deeper, non-fixable problem:
+```
+Error: No such tool available: Task. Task is disabled for this session, in subagents as well as here.
+```
+Subagents in this harness cannot spawn further subagents, regardless of what their frontmatter grants. `dev-team-orchestrator`'s entire design is a subagent whose job is to spawn 28 further subagents — that's structurally impossible one level down. No amount of frontmatter correction fixes this; it's a platform-level nesting restriction, not a syntax bug. This was verified empirically per `.claude/rules/subagent-verification.md` (had the agent itself attempt the call and report the literal error), not taken on the agent's word.
+
+**Rule**: Never invoke `dev-team-orchestrator` (or any agent whose job is to spawn further agents) via `Agent(subagent_type=..., ...)`. The 28-30 stage dev-team pipeline now runs via the `Workflow` tool instead — `.claude/workflows/dev-team-pipeline.js`, invoked from the top level (never from inside another agent), which is exactly what `Workflow` is designed for and doesn't hit the nesting restriction. See CLAUDE.md's "🚨 DEVELOPMENT STRATEGY" section for the full protocol, including the `tasks/pipeline-queue.md` cross-session bookkeeping (since `resumeFromRunId` only works within the session that created the run) and the per-role mutex that lets multiple features interleave without the same specialist ever running twice at once.
+
+---
+
 <!-- Format:
 ## <Short description of the mistake or pattern>
 **Date**: YYYY-MM-DD

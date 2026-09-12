@@ -1,0 +1,158 @@
+.card {
+  position: relative;
+  background: linear-gradient(160deg, var(--bg-elevated) 0%, var(--bg-panel) 100%);
+  border: 1px solid var(--border-faint);
+  border-radius: var(--radius-lg);
+  padding: var(--s-4) var(--s-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  overflow: hidden;
+  animation: kpiRise 360ms ease-out both;
+  transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent-commerce), transparent 80%);
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+
+.card:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.card:hover::before,
+.card.ok::before {
+  opacity: 1;
+}
+
+.card.unavailable::before {
+  background: linear-gradient(90deg, var(--text-faint), transparent 80%);
+}
+
+@keyframes kpiRise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+}
+
+.label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.iconChip {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-md);
+  background: var(--accent-commerce-bg);
+  color: var(--accent-commerce);
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.value {
+  font-family: var(--font-mono);
+  font-size: 1.9rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+}
+
+.card.ok .value {
+  color: var(--accent-commerce);
+  text-shadow: 0 0 18px var(--accent-commerce-faint);
+}
+
+.hint {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.unavailable {
+  font-size: 0.92rem;
+  color: var(--text-muted);
+  font-style: italic;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+
+.lockIcon {
+  color: var(--text-faint);
+}
+
+.docsLink {
+  color: var(--accent);
+  font-style: normal;
+}
+
+/* Skeleton loading — shimmering bar in place of a numeric value, so the
+   card's footprint never jumps once real data lands. */
+.skeleton {
+  height: 1.9rem;
+  display: flex;
+  align-items: center;
+}
+
+.skeletonBar {
+  width: 60%;
+  height: 1.1rem;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(
+    90deg,
+    var(--bg-panel) 25%,
+    var(--border-strong) 50%,
+    var(--bg-panel) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    animation: none;
+  }
+  .card:hover {
+    transform: none;
+  }
+  .skeletonBar {
+    animation: none;
+    background: var(--border-strong);
+  }
+}

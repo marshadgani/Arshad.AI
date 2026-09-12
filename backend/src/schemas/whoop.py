@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, model_validator
 
 
 class WhoopRecovery(BaseModel):
@@ -45,10 +45,55 @@ class WhoopStrain(BaseModel):
 
 class WhoopDashboard(BaseModel):
     connected: bool
+    needs_reauth: bool = False
+    degraded: bool = Field(
+        default=False,
+        description="True when a transient upstream failure (network "
+        "timeout, Whoop 5xx) forced null biometric fields, as distinct "
+        "from a genuine no-data-recorded-today response. The connection "
+        "itself is fine; retry later.",
+    )
     recovery: Optional[WhoopRecovery] = None
     sleep: Optional[WhoopSleep] = None
     strain: Optional[WhoopStrain] = None
     user_first_name: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _check_state_combination(self) -> "WhoopDashboard":
+        """connected/needs_reauth/degraded were three independent bools —
+        8 representable combinations for a state machine with 4 legal
+        ones (see api/v1/whoop.py's four WhoopDashboard(...) call sites:
+        disconnected; connected+needs_reauth; connected+degraded;
+        connected+healthy). Nothing stopped a future edit from
+        constructing e.g. connected=False, needs_reauth=True — a
+        dashboard the frontend has no rendering branch for. This closes
+        the gap without changing the wire shape any existing consumer
+        depends on.
+        """
+        if not self.connected and (self.needs_reauth or self.degraded):
+            raise ValueError(
+                "needs_reauth/degraded require connected=True — a "
+                "disconnected dashboard has no Whoop session to be "
+                "degraded or expired."
+            )
+        if self.needs_reauth and self.degraded:
+            raise ValueError(
+                "needs_reauth and degraded are mutually exclusive — "
+                "re-auth is required before another fetch can even be "
+                "attempted, so a transient-failure state is undefined."
+            )
+        if (self.needs_reauth or self.degraded or not self.connected) and (
+            self.recovery is not None
+            or self.sleep is not None
+            or self.strain is not None
+        ):
+            raise ValueError(
+                "recovery/sleep/strain must be null whenever the "
+                "dashboard is disconnected, needs re-auth, or degraded — "
+                "those are the states with no fresh Whoop data behind "
+                "them."
+            )
+        return self
 
 
 class WhoopHRVPoint(BaseModel):

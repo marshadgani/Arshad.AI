@@ -49,48 +49,110 @@
 ## 🚨 DEVELOPMENT STRATEGY — READ THIS FIRST, EVERY SESSION
 
 > **This is the non-negotiable rule for ALL feature development on this project.**
-> Every new feature, every non-trivial change, goes through the dev-team pipeline.
+> Every change, every new feature, every bug — goes through the dev-team pipeline.
 > No exceptions. No shortcuts. No writing code directly.
+
+### ⚠️ Execution mechanism — Workflow tool, NOT a subagent orchestrator
+
+**`dev-team-orchestrator` as a Task/Agent subagent is CONFIRMED NON-FUNCTIONAL in this
+environment** (verified 2026-09-06 by direct test — see `tasks/lessons.md`). Subagents
+in this harness cannot spawn further subagents, no matter what their `tools:`
+frontmatter grants:
+
+```
+Error: No such tool available: Task. Task is disabled for this session, in subagents as well as here.
+```
+
+`dev-team-orchestrator`'s entire job is spawning 28 further specialist subagents —
+that's structurally impossible one level down. **Never invoke it via
+`Agent(subagent_type="dev-team-orchestrator", ...)` — it will either error or silently
+have zero effect.** The file is kept for reference/documentation only.
+
+**The real mechanism is the `Workflow` tool**, running the pipeline as a script from
+the top level (not from inside another agent) — this is exactly what `Workflow` is
+for, and it doesn't hit the nesting restriction. The canonical script lives at
+`.claude/workflows/dev-team-pipeline.js` and is invocable by name.
 
 ### Auto-Trigger — No command needed
 
-**Arshad will NEVER type `/dev-team`. He gives prompts directly.**
+**Arshad will NEVER type `/dev-team`. He gives prompts directly, in this same chat
+window, as he analyses and discusses features over time.**
 
-**You must analyse every prompt and decide: is this a development request?**
-If yes → immediately invoke the dev-team orchestrator with his prompt. Do NOT ask for confirmation. Do NOT write code yourself. Just dispatch.
+**You must analyse every prompt and decide: is this a change, feature, or bug?**
+If yes → immediately queue it into the pipeline. Do NOT ask for confirmation. Do NOT
+write code yourself. Just dispatch. Pure questions/explanations that request no code
+change are the only exception — answer those directly.
 
-```
-Agent(subagent_type="dev-team-orchestrator", prompt=<arshad's exact prompt>)
-```
+**Protocol, every time:**
+1. Read `tasks/.feature-counter`, increment it, assign `FEAT-{N}`.
+2. Append a row to `tasks/pipeline-queue.md` (status: `queued`) with the requirement text.
+3. If a Workflow run is already active **this session** (check `tasks/pipeline-queue.md`
+   → Active run → `active_run_id`), resume it with the new feature appended:
+   ```
+   Workflow({
+     scriptPath: ".claude/workflows/dev-team-pipeline.js",
+     resumeFromRunId: "<active_run_id>",
+     args: { features: [...every queued/in_flight feature, old ones unchanged...] }
+   })
+   ```
+   Unchanged features return instantly from cache (same prompt+opts); only the new
+   one's agent calls actually run — and it interleaves with whatever's still in
+   flight, respecting the per-role lock (below).
+4. If this is a **new session** (no active run_id, or the prior session ended),
+   start a fresh run with only the still-`queued`/`in_flight` features — completed
+   features are already committed, nothing to resume for them:
+   ```
+   Workflow({ name: "dev-team-pipeline", args: { features: [...] } })
+   ```
+5. After the run settles (completed/halted/error), update `tasks/pipeline-queue.md`:
+   move the row out of Queue into Completed, record branch + EA decision.
 
-### Trigger Detection — Read the intent, not the words
+**Concurrency rule (per Arshad's explicit instruction):** features run *interleaved*
+— Feature A can be in Code Review while Feature B is in Business Analysis — but the
+**same specialist role never runs concurrently for two different features**. The
+script enforces this with a per-role mutex (`withRole()` in the script) shared across
+every feature in the run: a role queues behind itself, never races itself.
 
-Route to dev-team orchestrator when the prompt contains ANY of these intents:
+### 🔁 Always-On Pipeline — runs non-stop, survives session limits (PERMANENT)
 
-| Intent | Example prompts |
-|---|---|
-| Build something new | "Add a dark mode", "Create a settings page", "I want users to be able to…" |
-| Implement a feature | "Implement real-time notifications", "Build the chat interface" |
-| Add functionality | "Add search to the sidebar", "Let me filter by date" |
-| Create an endpoint | "I need an API for…", "Expose a route that…" |
-| New UI / component | "Design a dashboard widget", "Build a modal for…" |
-| Schema / data change | "Store user preferences", "Track conversation history" |
-| Integration | "Connect to Google Calendar", "Add GitHub webhook support" |
-| Refactor (multi-file) | "Clean up the auth flow", "Restructure the agent system" |
+> Per Arshad's explicit instruction (2026-09-06): the dev-team pipeline and bug-fix
+> pipeline are the SAME mechanism — every bug report goes through this pipeline too,
+> not a separate process — and it must keep running **continuously in the background
+> until the queue is empty**, without waiting for Arshad to re-prompt, and without
+> stalling out when a session hits its context/token limit mid-pipeline.
 
-### Do NOT route to dev-team — handle directly
+**How continuity across session limits works:** a session cannot resurrect itself
+after it ends — so a Routine (scheduled trigger) does the resurrecting. A recurring
+hourly Routine is registered (`trig_018w2XJ9mHBfqUZ1uciMNqit`, "Dev-Team Pipeline
+Continuation", `create_new_session_on_fire: true`) that:
+1. Checks out `claude/ai-personal-assistant-CcA11`.
+2. Reads `tasks/pipeline-queue.md` for any `queued`/`in_flight`/`error` feature.
+3. Starts (or restarts) a `dev-team-pipeline` Workflow run for it and drives it to
+   completion, in that firing's own session.
+4. On a hard error (e.g. an invalid agent role — see the known gap noted in
+   `tasks/pipeline-queue.md`), diagnoses and fixes the script, commits, and retries.
+   Does NOT give up after one failure.
+5. On a genuine halt (EA rejection, blocking architecture-critic finding, security
+   escalation, exhausted bug-fix loop) — stops for that feature and records the halt
+   reason; halts need Arshad's review, they are not errors to retry through.
+6. Updates `tasks/pipeline-queue.md` and no-ops quietly if the queue is empty.
 
-| Situation | Handle as |
-|---|---|
-| Single-line bug fix | Direct edit |
-| Config / env var change | Direct edit |
-| Rename / move file | Direct edit |
-| Typo / comment fix | Direct edit |
-| Explanation / question | Answer directly |
-| Fixing a broken test | Direct debugger agent |
-| Deployment issue | Direct fix |
+**Rules for every session, scheduled or interactive:**
+- Never leave a `queued` or `in_flight` feature idle at end of turn if a Workflow can
+  be started for it — start it, or explicitly note in `tasks/pipeline-queue.md` why
+  not (e.g. waiting on a human decision flagged mid-pipeline).
+- Never treat "context is getting long" as a reason to stop the pipeline and wait for
+  Arshad — that's what the hourly Routine is for. Let it run in the background and
+  end the turn normally; do not artificially block on it.
+- If you discover the Routine is missing, disabled, or misconfigured (check
+  `list_triggers`), recreate it — this policy assumes it always exists.
+- This is a standing, permanent instruction. It does not need to be re-requested.
 
-**When in doubt → route to dev-team.**
+**When in doubt → queue it into the pipeline. There is no "too small" carve-out
+anymore — a one-line change still gets a `FEAT_ID` and flows through all 28-30
+stages,** per Arshad's explicit instruction (2026-09-06). The only true exception is
+a request that produces no code change at all (a question, an explanation, "what
+does X do").
 
 ### The 28-Agent Pipeline (30 Steps)
 
@@ -129,7 +191,9 @@ The orchestrator runs these agents in strict sequence. Every agent output feeds 
 | 8.9 | `production-validator` | Sonnet | Final production-readiness check — no stubs, no TODOs, all endpoints functional, no debug code |
 | 9 | `enterprise-architect` *(post)* | Sonnet | Final architectural verdict — always runs |
 
-**Orchestrator model: `claude-fable-5`** — it controls all 28 agents.
+**Orchestration: `.claude/workflows/dev-team-pipeline.js` (Workflow tool)** — runs
+all 28 agents from the top level via `agentType: '<role>'` calls, not through a
+subagent orchestrator (see the ⚠️ note above for why).
 
 ### Model Tiers
 
@@ -147,9 +211,21 @@ The orchestrator runs these agents in strict sequence. Every agent output feeds 
 
 ### Agent files location
 
-All agent definitions live in `.claude/agents/dev-team/`:
-- `orchestrator.md` — the controlling agent
-- One `.md` file per specialist agent listed above
+All specialist agent definitions live in `.claude/agents/dev-team/` — one `.md` file
+per agent listed above. Their `tools:`/model frontmatter still matters when they're
+invoked ad-hoc via the `Agent` tool directly, but the pipeline itself invokes them
+through `Workflow`'s `agentType` option, which resolves from the same registry.
+`.claude/agents/dev-team/orchestrator.md` is kept for historical reference only —
+**do not invoke it as a subagent** (see the ⚠️ note above).
+
+### Pipeline execution files
+
+| File | Purpose |
+|---|---|
+| `.claude/workflows/dev-team-pipeline.js` | The canonical 28-30 stage Workflow script. Invoke by `name: "dev-team-pipeline"` (fresh session) or `scriptPath` + `resumeFromRunId` (same session, to add a feature to an active run). |
+| `tasks/pipeline-queue.md` | Living queue of features — queued/in_flight/completed/halted/error — plus the current session's `active_run_id`. Read this FIRST every time before deciding whether to resume or start fresh. |
+| `tasks/pipeline-runs.md` | Append-only run history (one row per completed feature), written by the pipeline's own final "Ship" stage. |
+| `tasks/agent-outputs/<role>/<FEAT_ID>.json` | Per-stage outputs, written when a stage is run manually outside the Workflow (e.g. to seed a run) — not written by the Workflow itself, which keeps state in-memory across the script's single execution. |
 
 ---
 
@@ -235,6 +311,14 @@ All services start with `docker compose up --build`.
 | Airflow UI  | 8080 | http://localhost:8080 (admin / admin) |
 | PostgreSQL  | 5432 | — |
 | Redis       | 6379 | — |
+
+### Production URLs
+
+| Service | URL |
+|---|---|
+| Frontend (Vercel) | https://arshad-ai-seven.vercel.app |
+| Frontend health check | https://arshad-ai-seven.vercel.app/health |
+| Backend (Render) | https://arshad-ai.onrender.com |
 
 ---
 

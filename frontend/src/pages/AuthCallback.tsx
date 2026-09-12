@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../auth/AuthContext';
+import styles from './AuthCallback.module.css';
 
 // Backend redirects to /auth/callback#token=<jwt>. Reading from the URL
 // FRAGMENT (not the query string) keeps the JWT out of server logs and
@@ -23,5 +24,5 @@ export default function AuthCallback() {
     }
   }, [navigate, setTokenFromCallback]);
 
-  return <div style={{ padding: '2rem', color: '#8b949e' }}>Signing you in…</div>;
+  return <div className={styles.statusMessage}>Signing you in…</div>;
 }

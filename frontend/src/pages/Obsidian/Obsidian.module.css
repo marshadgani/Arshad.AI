@@ -91,7 +91,10 @@
   align-items: start;
 }
 
-@media (max-width: 900px) {
+/* breakpoints.ts: mobile */
+@media (max-width: 767.98px) {
+  /* grid-exempt: a fixed-width list beside a fluid viewer, not a card
+     ladder — the 340px track has no equal-fraction equivalent to compose. */
   .layout {
     grid-template-columns: 1fr;
   }
@@ -104,6 +107,7 @@
   flex-direction: column;
   gap: 8px;
   max-height: calc(100vh - 220px);
+  max-height: calc(100dvh - 220px);
   overflow-y: auto;
 }
 
@@ -200,6 +204,7 @@
   background: var(--surface, #161b22);
   padding: 20px 24px;
   max-height: calc(100vh - 220px);
+  max-height: calc(100dvh - 220px);
   overflow-y: auto;
   position: sticky;
   top: 16px;

@@ -51,7 +51,7 @@ async def upsert_personal_integration(
     )
     if existing_account is None:
         login_url = f"{_frontend_url()}/login?reason=missing_{oauth_provider}_scope"
-        return ConnectResult(integration_id="", redirect_url=login_url)
+        return ConnectResult(integration_id=None, redirect_url=login_url)
 
     integration = await db.scalar(
         select(Integration).where(

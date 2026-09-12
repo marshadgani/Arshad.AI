@@ -1,0 +1,81 @@
+.panel {
+  position: relative;
+  background: linear-gradient(160deg, var(--bg-elevated) 0%, var(--bg-panel) 100%);
+  border: 1px solid var(--border-faint);
+  border-radius: var(--radius-xl);
+  padding: var(--s-12) var(--s-6);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-3);
+  overflow: hidden;
+  animation: panelRise 400ms ease-out both;
+}
+
+.panel::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--accent-commerce),
+    var(--accent-commerce-gold),
+    transparent
+  );
+}
+
+@keyframes panelRise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.icon {
+  font-size: 2.6rem;
+  filter: drop-shadow(0 0 14px var(--accent-commerce-faint));
+}
+
+.title {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.description {
+  margin: 0;
+  max-width: 480px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.action {
+  margin-top: var(--s-3);
+  background: var(--accent-commerce);
+  color: var(--bg-deep);
+  padding: var(--s-3) var(--s-6);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  transition: transform 140ms ease, box-shadow 140ms ease;
+}
+
+.action:hover {
+  color: var(--bg-deep);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px var(--accent-commerce-faint);
+}
+
+.action:focus-visible {
+  outline: 2px solid var(--accent-commerce);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    animation: none;
+  }
+}

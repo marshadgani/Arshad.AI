@@ -66,6 +66,7 @@
 
 .canvasWrap {
   overflow-x: auto;
+  max-width: 100%;
   border-radius: var(--radius-md);
   background: #0f1117;
   border: 1px solid #1e2433;

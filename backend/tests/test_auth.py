@@ -3,11 +3,16 @@
 import hashlib as _hashlib
 import hmac as _hmac
 import time
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
-from src.auth.routers import _make_signed_state, _verify_signed_state
+from src.auth.routers import (
+    _handle_callback,
+    _login_nonce_key,
+    _make_signed_state,
+    _verify_signed_state,
+)
 from src.main import app
 
 client = TestClient(app)
@@ -139,6 +144,59 @@ def test_google_callback_rejects_expired_state(mock_db, monkeypatch):
     response = client.get(f"/api/v1/auth/google/callback?code=fakecode&state={signed}")
     assert response.status_code == 400
     assert response.json()["error"]["code"] == "invalid_state"
+
+
+# ── Unit tests: SEC-002 login-CSRF / session-fixation fix ─────────────────────
+# _handle_callback's nonce-cookie binding and single-use Redis check, tested
+# directly (not via HTTP) so they don't need a live Postgres/Redis — these
+# cover exactly the rejection paths that close the finding: a stolen/replayed
+# state with no matching cookie, or reused after its Redis entry is consumed.
+
+
+@pytest.mark.asyncio
+async def test_handle_callback_rejects_missing_cookie_nonce():
+    """An attacker-supplied state with no corresponding browser cookie is rejected
+    before any Redis lookup or provider call — this is the core CSRF fix."""
+    signed = _make_signed_state("victim-nonce")
+    with pytest.raises(Exception) as exc_info:
+        await _handle_callback("google", "code", signed, None, MagicMock())
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail["error"]["code"] == "invalid_state"
+
+
+@pytest.mark.asyncio
+async def test_handle_callback_rejects_mismatched_cookie_nonce():
+    """A state signed for one nonce presented with a different browser cookie
+    (e.g. the attacker's own prior login flow) is rejected."""
+    signed = _make_signed_state("real-nonce")
+    with pytest.raises(Exception) as exc_info:
+        await _handle_callback("google", "code", signed, "different-nonce", MagicMock())
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail["error"]["code"] == "invalid_state"
+
+
+@pytest.mark.asyncio
+async def test_handle_callback_rejects_already_consumed_state(monkeypatch):
+    """A matching cookie+state pair is still rejected if the Redis entry was
+    already GETDEL'd by a prior callback — kills replay of a valid state."""
+    nonce = "one-shot-nonce"
+    signed = _make_signed_state(nonce)
+
+    mock_redis = MagicMock()
+    mock_redis.getdel = AsyncMock(return_value=None)  # already consumed / expired
+
+    async def _fake_get_redis():
+        return mock_redis
+
+    import src.auth.routers as routers_mod
+
+    monkeypatch.setattr(routers_mod, "get_redis", _fake_get_redis)
+
+    with pytest.raises(Exception) as exc_info:
+        await _handle_callback("google", "code", signed, nonce, MagicMock())
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail["error"]["code"] == "invalid_state"
+    mock_redis.getdel.assert_awaited_once_with(_login_nonce_key(nonce))
 
 
 # ── Integration tests: /me endpoint ───────────────────────────────────────────

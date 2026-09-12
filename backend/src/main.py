@@ -11,15 +11,18 @@ from sqlalchemy import text
 from src.agents.routers import router as agents_router
 from src.api.v1.ai_ecosystem import router as ai_ecosystem_router
 from src.api.v1.ai_ecosystem_skills import router as ai_ecosystem_skills_router
+from src.api.v1.apple_health import router as apple_health_router
 from src.api.v1.chat import router as chat_router
 from src.api.v1.dashboard import router as dashboard_router
 from src.api.v1.domains import router as domains_router
 from src.api.v1.obsidian import router as obsidian_router
+from src.api.v1.shopify import router as shopify_router
 from src.api.v1.whoop import router as whoop_router
 from src.auth.routers import router as auth_router
 from src.middleware.cache import close_redis
 from src.models.database import AsyncSessionLocal
 from src.services import queue_worker
+from src.services.whoop.client import aclose_client as close_whoop_client
 from src.tools.routers import router as tools_router
 
 # `import src.integrations` (line 6) triggers @register side-effects.
@@ -90,6 +93,7 @@ async def lifespan(app: FastAPI):
                 except asyncio.CancelledError:
                     pass
         await close_redis()
+        await close_whoop_client()
 
 
 app = FastAPI(title="Arshad.AI Backend", version="0.1.0", lifespan=lifespan)
@@ -179,4 +183,6 @@ app.include_router(ai_ecosystem_router)
 app.include_router(ai_ecosystem_skills_router)
 app.include_router(obsidian_router)
 app.include_router(whoop_router)
+app.include_router(shopify_router)
+app.include_router(apple_health_router)
 app.include_router(integrations_router)

@@ -1,0 +1,54 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-commerce);
+  background: var(--accent-commerce-bg);
+  border: 1px solid var(--accent-commerce-faint);
+  border-radius: 999px;
+}
+
+.sm {
+  font-size: 0.7rem;
+  padding: 4px 10px;
+}
+
+.md {
+  font-size: 0.72rem;
+  padding: 5px 12px;
+  /* Aligns the pill with the title's cap height in the page header's
+     baseline-agnostic flex row, and stops it collapsing next to a long
+     shop name. */
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-commerce);
+  box-shadow: 0 0 8px var(--accent-commerce);
+  animation: pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.7);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot {
+    animation: none;
+  }
+}

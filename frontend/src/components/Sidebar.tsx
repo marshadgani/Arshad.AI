@@ -1,62 +1,109 @@
+import { useRef } from 'react';
 import { NavLink } from 'react-router-dom';
 
+import Scrim from './Scrim';
 import type { NavItem } from '../data/mockData';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 import { useFetch } from '../hooks/useFetch';
+import { useFocusReturn } from '../hooks/useFocusReturn';
+import { useOnRouteChange } from '../hooks/useOnRouteChange';
 import styles from './Sidebar.module.css';
 
-export interface SidebarProps {}
+export interface SidebarProps {
+  isOpen: boolean;
+  onClose: () => void;
+  overlayMode: boolean;
+}
 
-export default function Sidebar(_: SidebarProps) {
-  const { data: navItems } = useFetch<NavItem[]>('/api/v1/nav');
+function navItemClass({ isActive }: { isActive: boolean }): string {
+  return isActive ? `${styles.item} ${styles.itemActive}` : styles.item;
+}
+
+export default function Sidebar({ isOpen, onClose, overlayMode }: SidebarProps) {
+  const { data: navItems, error: navError } = useFetch<NavItem[]>('/api/v1/nav');
+  // Below the mobile breakpoint the sidebar is an off-canvas modal drawer;
+  // above it, a persistent landmark. Every modal-only behaviour hangs off
+  // this one predicate, supplied by useAppShell — the sole breakpoint
+  // subscriber in the tree — so Sidebar itself never reads the viewport.
+  const asideRef = useRef<HTMLElement>(null);
+  const isModal = isOpen && overlayMode;
+
+  useOnRouteChange(() => {
+    if (isOpen) onClose();
+  });
+  useEscapeKey(isModal, onClose);
+  useBodyScrollLock(isModal);
+  useFocusReturn(overlayMode, isOpen, asideRef);
+
+  // Dialog semantics apply only while the sidebar is an OPEN mobile modal
+  // overlay. Gating on overlayMode alone (instead of isModal) would leave
+  // aria-modal="true" on the closed, off-canvas drawer, which tells
+  // assistive tech the rest of the page is inert even though nothing is
+  // visually blocking it.
+  const dialogProps = isModal
+    ? {
+        role: 'dialog' as const,
+        'aria-modal': true as const,
+        'aria-label': 'Main navigation',
+        tabIndex: -1,
+      }
+    : {};
 
   return (
-    <aside className={styles.sidebar}>
-      <div className={styles.brand}>
-        <span className={styles.brandMark}>A</span>
-        <div className={styles.brandText}>
-          <strong>Arshad.AI</strong>
-          <span>Personal OS</span>
+    <>
+      {isModal && <Scrim label="Close navigation" onDismiss={onClose} />}
+      <aside
+        id="app-sidebar"
+        ref={asideRef}
+        className={isOpen ? `${styles.sidebar} ${styles.sidebarOpen}` : styles.sidebar}
+        {...dialogProps}
+      >
+        <div className={styles.brand}>
+          <span className={styles.brandMark}>A</span>
+          <div className={styles.brandText}>
+            <strong>Arshad.AI</strong>
+            <span>Personal OS</span>
+          </div>
         </div>
-      </div>
 
-      <div className={styles.section}>
-        <div className={styles.label}>Workspace</div>
-        {(navItems ?? []).map((n) => (
-          <NavLink
-            key={n.to}
-            to={n.to}
-            end={n.to === '/'}
-            className={({ isActive }) =>
-              isActive ? `${styles.item} ${styles.itemActive}` : styles.item
-            }
-          >
-            <span className={styles.icon}>{n.icon}</span>
-            <span>{n.label}</span>
+        <div className={styles.section}>
+          <div className={styles.label}>Workspace</div>
+          {navError ? (
+            // A dropped fetch here used to render an empty Workspace section
+            // with no signal that navigation had failed to load — the user
+            // would just see a sidebar missing all its links. Surface it
+            // instead of hiding it behind `navItems ?? []`.
+            <div className={styles.navError} role="alert">
+              Navigation failed to load.
+            </div>
+          ) : (
+            (navItems ?? []).map((n) => (
+              <NavLink key={n.to} to={n.to} end={n.to === '/'} className={navItemClass}>
+                <span className={styles.icon}>{n.icon}</span>
+                <span>{n.label}</span>
+              </NavLink>
+            ))
+          )}
+        </div>
+
+        <div className={styles.section}>
+          <div className={styles.label}>Account</div>
+          <a className={styles.item} href="#"><span className={styles.icon}>⚙</span>Settings</a>
+          <NavLink to="/integrations" className={navItemClass}>
+            <span className={styles.icon}>⌗</span>Integrations
           </NavLink>
-        ))}
-      </div>
-
-      <div className={styles.section}>
-        <div className={styles.label}>Account</div>
-        <a className={styles.item} href="#"><span className={styles.icon}>⚙</span>Settings</a>
-        <NavLink
-          to="/integrations"
-          className={({ isActive }) =>
-            isActive ? `${styles.item} ${styles.itemActive}` : styles.item
-          }
-        >
-          <span className={styles.icon}>⌗</span>Integrations
-        </NavLink>
-        <a className={styles.item} href="#"><span className={styles.icon}>📜</span>Activity log</a>
-      </div>
-
-      <div className={styles.footer}>
-        <div className={styles.avatar}>A</div>
-        <div className={styles.user}>
-          <span className={styles.userName}>Arshad</span>
-          <span className={styles.userStatus}>online</span>
+          <a className={styles.item} href="#"><span className={styles.icon}>📜</span>Activity log</a>
         </div>
-      </div>
-    </aside>
+
+        <div className={styles.footer}>
+          <div className={styles.avatar}>A</div>
+          <div className={styles.user}>
+            <span className={styles.userName}>Arshad</span>
+            <span className={styles.userStatus}>online</span>
+          </div>
+        </div>
+      </aside>
+    </>
   );
 }

@@ -6,7 +6,7 @@
     "claude-code": {
       "url": "https://github.com/anthropics/claude-code.git",
       "name": "claude-code",
-      "last_fetched": "2026-09-03 21:18 UTC",
+      "last_fetched": "2026-09-11 09:29 UTC",
       "components": {
         "skills": [
           "writing-rules",
@@ -99,7 +99,7 @@
     "repomix": {
       "url": "https://github.com/yamadashy/repomix.git",
       "name": "repomix",
-      "last_fetched": "2026-09-03 21:18 UTC",
+      "last_fetched": "2026-09-11 09:29 UTC",
       "components": {
         "skills": [
           "repomix-explorer",
@@ -149,7 +149,7 @@
     "superpowers": {
       "url": "https://github.com/obra/superpowers.git",
       "name": "superpowers",
-      "last_fetched": "2026-09-03 21:18 UTC",
+      "last_fetched": "2026-09-11 09:29 UTC",
       "components": {
         "skills": [
           "using-superpowers",
@@ -198,7 +198,7 @@
     "claude-mem": {
       "url": "https://github.com/thedotmack/claude-mem.git",
       "name": "claude-mem",
-      "last_fetched": "2026-09-03 21:18 UTC",
+      "last_fetched": "2026-09-11 09:29 UTC",
       "components": {
         "skills": [
           "mem-setup",
@@ -216,6 +216,7 @@
           "design-is",
           "wowerpoint",
           "make-plan",
+          "ccs-align",
           "version-bump",
           "how-it-works",
           "do",
@@ -246,11 +247,12 @@
     "obsidian-skills": {
       "url": "https://github.com/kepano/obsidian-skills.git",
       "name": "obsidian-skills",
-      "last_fetched": "2026-09-03 21:18 UTC",
+      "last_fetched": "2026-09-11 09:29 UTC",
       "components": {
         "skills": [
           "obsidian-cli",
           "obsidian-bases",
+          "knap",
           "json-canvas",
           "defuddle",
           "obsidian-markdown"
@@ -264,7 +266,7 @@
     "n8n-mcp": {
       "url": "https://github.com/czlonkowski/n8n-mcp.git",
       "name": "n8n-mcp",
-      "last_fetched": "2026-09-03 21:18 UTC",
+      "last_fetched": "2026-09-11 09:29 UTC",
       "components": {
         "skills": [
           "n8n-code-python",
@@ -304,7 +306,7 @@
     "get-shit-done": {
       "url": "https://github.com/gsd-build/get-shit-done.git",
       "name": "get-shit-done",
-      "last_fetched": "2026-09-03 21:19 UTC",
+      "last_fetched": "2026-09-11 09:29 UTC",
       "components": {
         "skills": [],
         "agents": [
@@ -432,7 +434,7 @@
     "awesome-claude-code": {
       "url": "https://github.com/hesreallyhim/awesome-claude-code.git",
       "name": "awesome-claude-code",
-      "last_fetched": "2026-09-03 21:19 UTC",
+      "last_fetched": "2026-09-11 09:29 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -446,7 +448,7 @@
     "context7": {
       "url": "https://github.com/upstash/context7.git",
       "name": "context7",
-      "last_fetched": "2026-09-03 21:19 UTC",
+      "last_fetched": "2026-09-11 09:29 UTC",
       "components": {
         "skills": [
           "context7-mcp",
@@ -523,7 +525,7 @@
     "claude-plugins-official": {
       "url": "https://github.com/anthropics/claude-plugins-official.git",
       "name": "claude-plugins-official",
-      "last_fetched": "2026-09-03 21:19 UTC",
+      "last_fetched": "2026-09-11 09:30 UTC",
       "components": {
         "skills": [
           "access",
@@ -881,7 +883,7 @@
     "agent-skills": {
       "url": "https://github.com/addyosmani/agent-skills.git",
       "name": "agent-skills",
-      "last_fetched": "2026-09-03 21:19 UTC",
+      "last_fetched": "2026-09-11 09:30 UTC",
       "components": {
         "skills": [
           "interview-me",
@@ -941,7 +943,7 @@
     "headroom": {
       "url": "https://github.com/headroomlabs-ai/headroom.git",
       "name": "headroom",
-      "last_fetched": "2026-09-03 21:19 UTC",
+      "last_fetched": "2026-09-11 09:30 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -956,15 +958,15 @@
           "ARCHITECTURE.md",
           "index.md",
           "README.md",
-          "test_ccr.py",
-          "context_compression_demo.py"
+          "benchmark.py",
+          "scenarios.py"
         ]
       }
     },
     "agent-browser": {
       "url": "https://github.com/vercel-labs/agent-browser.git",
       "name": "agent-browser",
-      "last_fetched": "2026-09-03 21:19 UTC",
+      "last_fetched": "2026-09-11 09:30 UTC",
       "components": {
         "skills": [
           "agent-browser",
@@ -987,7 +989,7 @@
     "andrej-karpathy-skills": {
       "url": "https://github.com/multica-ai/andrej-karpathy-skills.git",
       "name": "andrej-karpathy-skills",
-      "last_fetched": "2026-09-03 21:19 UTC",
+      "last_fetched": "2026-09-11 09:30 UTC",
       "components": {
         "skills": [
           "karpathy-guidelines"
@@ -1001,7 +1003,7 @@
     "ui-ux-pro-max-skill": {
       "url": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git",
       "name": "ui-ux-pro-max-skill",
-      "last_fetched": "2026-09-03 21:19 UTC",
+      "last_fetched": "2026-09-11 09:30 UTC",
       "components": {
         "skills": [
           "banner-design",
@@ -1038,17 +1040,19 @@
     "system-prompts-leaks": {
       "url": "https://github.com/asgeirtj/system_prompts_leaks.git",
       "name": "system_prompts_leaks",
-      "last_fetched": "2026-09-03 21:20 UTC",
+      "last_fetched": "2026-09-11 09:30 UTC",
       "components": {
         "skills": [
           "simplify",
           "doctor",
           "debug",
+          "init-new",
           "artifact-design",
           "workflow-authoring",
           "deep-research",
           "design",
           "update-config",
+          "plugin-authoring",
           "claude-in-chrome",
           "init",
           "claude-api",
@@ -1108,6 +1112,7 @@
         "hooks": [],
         "token_optimization": [
           "claude-code-opus-4.6.md",
+          "claude-code.d.ts",
           "prompt-audit.md",
           "platform-availability.md",
           "prompt-caching.md",
@@ -1115,15 +1120,14 @@
           "managed-agents-multiagent.md",
           "models.md",
           "cost-hillclimb.md",
-          "live-sources.md",
-          "model-migration.md"
+          "live-sources.md"
         ]
       }
     },
     "awesome-openclaw-skills": {
       "url": "https://github.com/VoltAgent/awesome-openclaw-skills.git",
       "name": "awesome-openclaw-skills",
-      "last_fetched": "2026-09-03 21:20 UTC",
+      "last_fetched": "2026-09-11 09:30 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -1138,7 +1142,7 @@
     "awesome-ai-agents": {
       "url": "https://github.com/e2b-dev/awesome-ai-agents.git",
       "name": "awesome-ai-agents",
-      "last_fetched": "2026-09-03 21:20 UTC",
+      "last_fetched": "2026-09-11 09:30 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -1150,7 +1154,7 @@
     "awesome-agent-skills": {
       "url": "https://github.com/VoltAgent/awesome-agent-skills.git",
       "name": "awesome-agent-skills",
-      "last_fetched": "2026-09-03 21:20 UTC",
+      "last_fetched": "2026-09-11 09:30 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -1164,7 +1168,7 @@
     "awesome-claude-code-subagents": {
       "url": "https://github.com/VoltAgent/awesome-claude-code-subagents.git",
       "name": "awesome-claude-code-subagents",
-      "last_fetched": "2026-09-03 21:20 UTC",
+      "last_fetched": "2026-09-11 09:30 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -1178,7 +1182,7 @@
     "skills": {
       "url": "https://github.com/anthropics/skills.git",
       "name": "skills",
-      "last_fetched": "2026-09-03 21:20 UTC",
+      "last_fetched": "2026-09-11 09:30 UTC",
       "components": {
         "skills": [
           "canvas-design",

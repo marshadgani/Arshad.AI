@@ -10,8 +10,41 @@
   top: 0;
   left: 0;
   bottom: 0;
-  z-index: 10;
+  z-index: var(--z-drawer);
 }
+
+/* breakpoints.ts: mobile — off-canvas drawer */
+@media (max-width: 767.98px) {
+  .sidebar {
+    width: min(var(--sidebar-w), 84vw);
+    transform: translateX(-100%);
+    /* transform alone moves the drawer off-screen but leaves its links in
+       the tab order and in the accessibility tree. `visibility: hidden`
+       removes both; the 200ms delay holds it visible for the length of the
+       close animation so the drawer does not blink out mid-slide. */
+    visibility: hidden;
+    transition: transform 200ms ease, visibility 0s linear 200ms;
+    will-change: transform;
+    outline: none;
+    /* Prevents scrolling to the end of the drawer's nav list from chaining
+       into (and scrolling) the body locked underneath it. */
+    overscroll-behavior: contain;
+  }
+  .sidebarOpen {
+    transform: translateX(0);
+    visibility: visible;
+    transition: transform 200ms ease, visibility 0s linear 0s;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar,
+  .sidebarOpen {
+    transition: none;
+  }
+}
+
+/* The dimmed backdrop is not a sidebar concern — see components/Scrim. */
 
 .brand {
   display: flex;
@@ -43,6 +76,13 @@
 .brandText span { font-size: 10px; color: var(--text-muted); font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.08em; }
 
 .section { display: flex; flex-direction: column; gap: 2px; }
+
+.navError {
+  padding: var(--s-2) var(--s-3);
+  font-size: 12px;
+  color: var(--status-danger);
+}
+
 .label {
   font-size: 10px;
   font-weight: 600;

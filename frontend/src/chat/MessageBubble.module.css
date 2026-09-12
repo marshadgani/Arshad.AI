@@ -1,0 +1,50 @@
+.bubble {
+  max-width: 70ch;
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--radius-lg);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.user {
+  align-self: flex-end;
+  background: var(--accent);
+  color: var(--bg-deep);
+}
+
+.assistant {
+  align-self: flex-start;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-faint);
+}
+
+.caret {
+  display: inline-block;
+  width: 0.5em;
+  height: 1em;
+  margin-left: 0.15em;
+  background: currentColor;
+  vertical-align: text-bottom;
+  animation: blink 1s steps(2) infinite;
+}
+
+@keyframes blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caret {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+/* breakpoints.ts: mobile */
+@media (max-width: 767.98px) {
+  .bubble {
+    max-width: 88%;
+  }
+}

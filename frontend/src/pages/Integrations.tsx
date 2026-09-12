@@ -1,9 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 
+import { ConnectError, connectIntegration } from '../api/integrations';
 import { getToken } from '../auth/tokenStorage';
 import styles from './Integrations.module.css';
 
-type IntegrationKind = 'personal_oauth' | 'personal_apikey' | 'project_apikey' | 'static';
+type IntegrationKind =
+  | 'personal_oauth'
+  | 'personal_apikey'
+  | 'personal_push'
+  | 'project_apikey'
+  | 'static';
 type IntegrationStatus = 'connected' | 'disconnected' | 'error' | 'expired' | 'coming_soon';
 
 interface IntegrationItem {
@@ -20,6 +26,7 @@ interface IntegrationItem {
   extra: Record<string, unknown>;
   coming_soon: boolean;
   coming_soon_reason: string | null;
+  connect_prompt?: { label: string; placeholder: string } | null;
 }
 
 const STATUS_DOT: Record<IntegrationStatus, string> = {
@@ -55,7 +62,23 @@ export default function Integrations() {
   const [apiKeyModal, setApiKeyModal] = useState<IntegrationItem | null>(null);
   const [apiKeyDraft, setApiKeyDraft] = useState('');
   const [apiKeyErr, setApiKeyErr] = useState<string | null>(null);
+  // Generic domain/account-input modal for any provider that declares
+  // connect_prompt (e.g. Shopify's *.myshopify.com domain). No slug
+  // special-casing: any future provider gets this modal automatically.
+  const [shopConnectModal, setShopConnectModal] = useState<IntegrationItem | null>(null);
+  const [shopDomainDraft, setShopDomainDraft] = useState('');
+  const [shopDomainErr, setShopDomainErr] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  // personal_push providers (e.g. Apple Health) hand back a one-time
+  // ingest token on connect. Without this, the generic connect flow
+  // below silently dropped it after showing a "connected" toast — the
+  // user would have no way to configure the Shortcut/webhook that
+  // actually needs it.
+  const [ingestTokenModal, setIngestTokenModal] = useState<{
+    item: IntegrationItem;
+    token: string;
+  } | null>(null);
+  const [tokenCopied, setTokenCopied] = useState(false);
 
   const fetchAll = async () => {
     const token = getToken();
@@ -100,23 +123,26 @@ export default function Integrations() {
       setApiKeyErr(null);
       return;
     }
+    if (item.kind === 'personal_oauth' && item.connect_prompt) {
+      setShopConnectModal(item);
+      setShopDomainDraft('');
+      setShopDomainErr(null);
+      return;
+    }
     // personal_oauth — POST connect; if it returns a redirect_url, navigate there
     setActioning(item.slug);
     try {
-      const token = getToken();
-      const res = await fetch(`/api/v1/integrations/${item.slug}/connect`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({}),
-      });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body?.error?.message ?? `HTTP ${res.status}`);
-      const url = body?.data?.redirect_url as string | null;
+      const { redirect_url: url, ingest_token: ingestToken } = await connectIntegration(
+        item.slug,
+      );
       if (url) {
         window.location.href = url;
+        return;
+      }
+      if (ingestToken) {
+        setIngestTokenModal({ item, token: ingestToken });
+        setTokenCopied(false);
+        await fetchAll();
         return;
       }
       flashToast(`${item.display_name} connected`);
@@ -128,6 +154,17 @@ export default function Integrations() {
     }
   };
 
+  const copyIngestToken = async () => {
+    if (!ingestTokenModal) return;
+    try {
+      await navigator.clipboard.writeText(ingestTokenModal.token);
+      setTokenCopied(true);
+      setTimeout(() => setTokenCopied(false), 2000);
+    } catch {
+      // Clipboard API can be blocked — token remains visible/selectable.
+    }
+  };
+
   const submitApiKey = async () => {
     if (!apiKeyModal) return;
     if (!apiKeyDraft.trim()) {
@@ -136,23 +173,48 @@ export default function Integrations() {
     }
     setActioning(apiKeyModal.slug);
     try {
-      const token = getToken();
-      const res = await fetch(`/api/v1/integrations/${apiKeyModal.slug}/connect`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ api_key: apiKeyDraft.trim() }),
-      });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body?.error?.message ?? `HTTP ${res.status}`);
+      await connectIntegration(apiKeyModal.slug, { api_key: apiKeyDraft.trim() });
       flashToast(`${apiKeyModal.display_name} connected`);
       setApiKeyModal(null);
       setApiKeyDraft('');
       await fetchAll();
     } catch (e: unknown) {
       setApiKeyErr((e as Error).message);
+    } finally {
+      setActioning(null);
+    }
+  };
+
+  const submitShopConnect = async () => {
+    if (!shopConnectModal) return;
+    if (!shopDomainDraft.trim()) {
+      setShopDomainErr('Store domain required');
+      return;
+    }
+    setActioning(shopConnectModal.slug);
+    try {
+      const { redirect_url: url } = await connectIntegration(shopConnectModal.slug, {
+        shop: shopDomainDraft.trim(),
+      }).catch((e: unknown) => {
+        // A failed HMAC or a skewed timestamp means the nonce this modal
+        // was opened with is no longer usable — the user's fix is to start
+        // the flow again, which the raw upstream message does not say.
+        const code = e instanceof ConnectError ? e.code : null;
+        if (code === 'invalid_hmac' || code === 'timestamp_skew') {
+          throw new Error('Authentication failed. Please click Connect again.');
+        }
+        throw e;
+      });
+      if (url) {
+        window.location.href = url;
+        return;
+      }
+      flashToast(`${shopConnectModal.display_name} connected`);
+      setShopConnectModal(null);
+      setShopDomainDraft('');
+      await fetchAll();
+    } catch (e: unknown) {
+      setShopDomainErr((e as Error).message);
     } finally {
       setActioning(null);
     }
@@ -238,7 +300,11 @@ export default function Integrations() {
                     </div>
                   </div>
                   <span className={styles.kind}>
-                    {it.kind === 'personal_oauth' ? 'OAuth' : 'API key'}
+                    {it.kind === 'personal_oauth'
+                      ? 'OAuth'
+                      : it.kind === 'personal_push'
+                        ? 'Push sync'
+                        : 'API key'}
                   </span>
                 </div>
 
@@ -275,13 +341,24 @@ export default function Integrations() {
                     </button>
                   ) : it.status === 'connected' ? (
                     <>
-                      <button
-                        type="button"
-                        onClick={() => onSync(it)}
-                        disabled={actioning === it.slug}
-                      >
-                        {actioning === it.slug ? '…' : 'Sync now'}
-                      </button>
+                      {it.kind === 'personal_push' ? (
+                        <button
+                          type="button"
+                          onClick={() => onConnect(it)}
+                          disabled={actioning === it.slug}
+                          title="Revokes the current token and issues a new one"
+                        >
+                          {actioning === it.slug ? '…' : 'Reissue token'}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => onSync(it)}
+                          disabled={actioning === it.slug}
+                        >
+                          {actioning === it.slug ? '…' : 'Sync now'}
+                        </button>
+                      )}
                       <button
                         type="button"
                         className={styles.secondary}
@@ -356,6 +433,74 @@ export default function Integrations() {
                 disabled={actioning === apiKeyModal.slug}
               >
                 {actioning === apiKeyModal.slug ? 'Validating…' : 'Connect'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {shopConnectModal && (
+        <div className={styles.modalBackdrop} onClick={() => setShopConnectModal(null)}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <h3>Connect {shopConnectModal.display_name}</h3>
+            <p className={styles.modalDesc}>
+              Enter your {shopConnectModal.connect_prompt?.label ?? 'store domain'}. You'll
+              be redirected to Shopify to approve access.
+            </p>
+            <input
+              type="text"
+              className={styles.modalInput}
+              placeholder={shopConnectModal.connect_prompt?.placeholder ?? ''}
+              value={shopDomainDraft}
+              onChange={(e) => setShopDomainDraft(e.target.value)}
+              autoFocus
+            />
+            {shopDomainErr && <div className={styles.modalErr}>{shopDomainErr}</div>}
+            <div className={styles.modalActions}>
+              <button
+                type="button"
+                className={styles.secondary}
+                onClick={() => setShopConnectModal(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={styles.primary}
+                onClick={submitShopConnect}
+                disabled={actioning === shopConnectModal.slug}
+              >
+                {actioning === shopConnectModal.slug ? 'Connecting…' : 'Connect'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {ingestTokenModal && (
+        <div
+          className={styles.modalBackdrop}
+          onClick={() => setIngestTokenModal(null)}
+        >
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <h3>{ingestTokenModal.item.display_name} sync token</h3>
+            <p className={styles.modalDesc}>
+              This token is shown once. Save it now — it's required to configure the
+              push (e.g. an iOS Shortcut) that sends data to Arshad.AI.
+            </p>
+            <div className={styles.modalInput} style={{ userSelect: 'all' }}>
+              {ingestTokenModal.token}
+            </div>
+            <div className={styles.modalActions}>
+              <button type="button" className={styles.secondary} onClick={copyIngestToken}>
+                {tokenCopied ? 'Copied' : 'Copy'}
+              </button>
+              <button
+                type="button"
+                className={styles.primary}
+                onClick={() => setIngestTokenModal(null)}
+              >
+                Done — I've saved it
               </button>
             </div>
           </div>

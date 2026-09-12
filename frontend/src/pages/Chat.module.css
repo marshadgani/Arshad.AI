@@ -1,0 +1,42 @@
+/* Status pane shown while a new session is being created, or when
+   session creation fails. */
+.statusPane {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-4);
+  padding: var(--s-8);
+}
+
+.statusMessage {
+  margin: 0;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+}
+
+.retryButton {
+  appearance: none;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  padding: var(--s-2) var(--s-5);
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 120ms, box-shadow 120ms;
+}
+
+.retryButton:hover,
+.retryButton:focus-visible {
+  border-color: var(--accent);
+  box-shadow: var(--glow-cyan-soft);
+}
+
+/* breakpoints.ts: mobile */
+@media (max-width: 767.98px) {
+  .statusPane {
+    padding: var(--s-4);
+  }
+}

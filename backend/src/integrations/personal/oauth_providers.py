@@ -13,12 +13,18 @@ Setup per provider (one-time):
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
 from ..registry import register
 from ._oauth_base import OAuthIntegrationProvider, make_oauth_sync_via_api
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    from ...models.integration import Integration
+    from ..base import SyncResult
 
 # ── Spotify ──────────────────────────────────────────────────────────────
 
@@ -469,7 +475,7 @@ class WhoopIntegration(OAuthIntegrationProvider):
             "first_name": body.get("first_name"),
         }
 
-    async def sync(self, *, integration, db) -> "SyncResult":
+    async def sync(self, *, integration: Integration, db: AsyncSession) -> SyncResult:
         import time as _time
         from datetime import date, datetime, timedelta, timezone
 
@@ -491,15 +497,25 @@ class WhoopIntegration(OAuthIntegrationProvider):
             integration.status = "error"
             integration.last_error = f"{type(exc).__name__}: {exc}"[:500]
             await db.commit()
-            raise IntegrationError("sync_failed", f"{type(exc).__name__}: {exc}")
+            raise IntegrationError(
+                "sync_failed", f"{type(exc).__name__}: {exc}"
+            ) from exc
         # Biometric fields are fetched live per request — do not cache in cleartext config.
         # Config stores only non-sensitive profile metadata (first_name) set during OAuth connect.
+        records = body.get("records") or []
         integration.last_synced_at = datetime.now(timezone.utc)
         integration.last_error = None
         integration.status = "connected"
         await db.commit()
+        # rows_written is deliberately 0, not len(records): this sync() never
+        # persists biometric values (see comment above). Reporting len(records)
+        # here would be a monitoring lie — it implies rows were written that
+        # never were. LinearIntegration.sync() returns 0 for the same reason.
         return SyncResult(
-            rows_written=len(records),
-            summary="Whoop: recovery score refreshed.",
+            rows_written=0,
+            summary=(
+                f"Whoop: liveness check OK "
+                f"({len(records)} recovery record(s) available; nothing persisted)."
+            ),
             duration_ms=int((_time.perf_counter() - started) * 1000),
         )

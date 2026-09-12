@@ -32,9 +32,8 @@
 .headerTagline { color: var(--text-secondary); font-size: 13px; }
 
 .kpis {
+  composes: tiles4 from '../styles/grid.module.css';
   grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
   gap: var(--s-3);
   margin-top: var(--s-4);
 }
@@ -57,7 +56,7 @@
 .sectionMeta { font-size: 10px; color: var(--text-muted); font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.08em; }
 
 /* Applications grid */
-.appGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s-4); }
+.appGrid { composes: cols4 from '../styles/grid.module.css'; gap: var(--s-4); }
 .app {
   background: var(--bg-elevated);
   border: 1px solid var(--border-faint);
@@ -69,8 +68,8 @@
   transition: border-color 120ms, box-shadow 120ms;
 }
 .app:hover { border-color: var(--accent); box-shadow: var(--glow-cyan-soft); }
-.appName { font-size: 14px; font-weight: 600; }
-.appDesc { font-size: 12px; color: var(--text-secondary); flex: 1; }
+.appName { font-size: 14px; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.appDesc { font-size: 12px; color: var(--text-secondary); flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .appFoot { display: flex; align-items: center; justify-content: space-between; margin-top: var(--s-2); }
 .appOpen {
   background: var(--accent);
@@ -90,7 +89,7 @@
 .planned { color: var(--text-muted); background: var(--bg-deep); border: 1px solid var(--border-faint); }
 
 /* Agents */
-.agents { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-4); }
+.agents { composes: cols3 from '../styles/grid.module.css'; gap: var(--s-4); }
 .agent {
   background: var(--bg-elevated);
   border: 1px solid var(--border-faint);
@@ -107,7 +106,7 @@
 .healthDegraded { background: var(--status-warn);  box-shadow: 0 0 6px var(--status-warn); }
 .healthOffline  { background: var(--status-danger); box-shadow: 0 0 6px var(--status-danger); }
 .healthTraining { background: var(--accent);       box-shadow: 0 0 6px var(--accent); }
-.agentName { font-family: var(--font-mono); font-size: 13px; }
+.agentName { font-family: var(--font-mono); font-size: 13px; min-width: 0; overflow-wrap: anywhere; }
 .agentDesc { font-size: 12px; color: var(--text-secondary); }
 
 .agentMetrics {
@@ -126,6 +125,15 @@
 .agentRun { color: var(--text-muted); }
 .agentConfig { color: var(--accent); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
 
+/* Only the header's own two-track layout collapses here. The grids' column
+   counts come from styles/grid.module.css. */
+/* breakpoints.ts: mobile */
+@media (max-width: 767.98px) {
+  /* grid-exempt: the header's emoji/text two-track layout, not a card
+     ladder — it has no tablet step and no multi-column mobile form. */
+  .header { grid-template-columns: 1fr; }
+}
+
 /* Activity feed */
 .feed { display: flex; flex-direction: column; }
 .feedRow {
@@ -138,4 +146,4 @@
 }
 .feedRow:last-child { border-bottom: 0; }
 .feedTime { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); white-space: nowrap; }
-.feedMsg { color: var(--text-secondary); }
+.feedMsg { color: var(--text-secondary); min-width: 0; overflow-wrap: anywhere; }
