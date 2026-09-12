@@ -810,6 +810,8 @@ This registry is the source of truth for weekly auto-updates.
 | `claude-skills` | https://github.com/alirezarezvani/claude-skills | skills+agents+commands+hooks | Large mixed pack — hundreds of skills/agents/commands spanning C-level advisors, marketing, product, engineering, compliance, and ops roles, plus 5 hooks (karpathy-gate, on-session-end, error-capture, detect-playwright, validate-test) | 2026-09-12 |
 | `codegraph` | https://github.com/colbymchenry/codegraph | skills | 2 skills (agent-eval, add-lang) | 2026-09-12 |
 | `marketingskills` | https://github.com/coreyhaines31/marketingskills | skills | ~55 marketing skills (SEO, ads, copywriting, CRO, email, social, pricing, retention) | 2026-09-12 |
+| `impeccable` | https://github.com/pbakaus/impeccable | skills+agents+commands | 1 skill (impeccable — visual polish/design-critique toolchain: audit, craft, harden, polish, typeset, live-preview), 4 agents (asset-producer, documenter, finish-reviewer, manual-edit-applier), 1 command | 2026-09-12 |
+| `taste-skill` | https://github.com/Leonxlnx/taste-skill | skills | 13 design-taste skills (brandkit, redesign, minimalist, brutalist, soft, stitch, image-to-code, imagegen-frontend web/mobile, output, gpt-tasteskill) | 2026-09-12 |
 
 > This table is updated automatically by `scripts/fetch-github-repo.sh` when a new repo is integrated.
 
