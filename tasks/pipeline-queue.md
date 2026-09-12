@@ -39,7 +39,7 @@
 | started | 2026-09-06 |
 | 15-feature batch | Settled 2026-09-07 — ALL halted. See Queue table for per-feature reasons. |
 | convergence-test batch | Task `wm5xz1tv5` (FEAT-119 + FEAT-121, redesign-loop prompt fix) settled 2026-09-07 — **mixed result**: FEAT-119 got past Architecture Critic entirely (redesign fix worked). FEAT-121 is still Architecture-Critic-blocked with fresh findings even after the fix — this one needs a human decision, not another auto-iteration (see FEAT-121 row + notes below). |
-| resume batch | Task `w9kn2psyx` (FEAT-119 + FEAT-120) completed 2026-09-11. Both went through code-reviewer/security-auditor/test-writer/etc., accumulated as commits on `claude/ai-personal-assistant-CcA11`, gated via the full 8-agent "Merge to Main" panel, and **merged to `claude/ai-personal-assistant-main` via PR #71 on 2026-09-12** (squash commit `b348e79`). Deployed to Render — confirmed healthy (Application startup complete, `/health` 200s). FEAT-121 remains excluded, still awaiting a human decision on scope/approach. |
+| resume batch | Task `w9kn2psyx` (FEAT-119 + FEAT-120) completed 2026-09-11. Both, plus FEAT-118 (fixed directly earlier, riding along on the same branch), went through code-reviewer/security-auditor/test-writer/etc., accumulated as commits on `claude/ai-personal-assistant-CcA11`, gated via the full 8-agent "Merge to Main" panel, and **merged to `claude/ai-personal-assistant-main` via PR #71 on 2026-09-12** (squash commit `b348e79`). Deployed to Render — confirmed healthy (Application startup complete, `/health` 200s). FEAT-121 remains excluded, still awaiting a human decision on scope/approach. |
 
 *(A run_id is only valid within the session that created it. If you're in a different session, ignore this field and start fresh per step 3 above — then update this table.)*
 
@@ -96,7 +96,7 @@ pre-build with resubmission checklists.
 **Cross-feature dependencies — the script has no ordering between features in one batch, so this must be managed by NOT batching dependents with their prerequisites:**
 - FEAT-125 (Shopify intelligence layer) needs FEAT-119 (base Shopify integration) to be `completed` first — its Solution Architect stage would otherwise design against Shopify code that doesn't exist yet. **Do not include FEAT-125 in the same `args.features` batch as FEAT-119.**
 - FEAT-129 (Booking.com trip-feasibility) needs FEAT-125's runway data — same rule, one batch later again.
-- Everything else in this queue (121-124, 126-128, 130-134) has no dependency on another queued feature and can go in the very next batch alongside FEAT-118/119/120's retry.
+- Everything else in this queue (121-124, 126-128, 130-134) has no dependency on another queued feature and can go in the very next batch.
 
 **Launch plan for the next batch (FEAT-118/119/120 are done and merged — no need to include them):** FEAT-125 is now unblocked (FEAT-119 completed) and can go in the same batch as the still-halted Architecture-Critic features (122, 123, 124, 127, 128, 131, 132, 133, 134), all relaunched with the fixed redesign-loop prompt. FEAT-126 and FEAT-130 need their BPDD revised first (see their notes), not a redesign-loop retry — a different fix path, don't include them in a redesign-loop batch. FEAT-121 stays excluded pending Arshad's decision (see its row). FEAT-129 stays queued behind FEAT-125 — do not batch them together. Hold FEAT-135 (Coursera) out of every batch until Arshad confirms reconnect.
 
@@ -114,4 +114,9 @@ Everything else that was ever a real proposal is now queued somewhere above — 
 
 ## Completed
 
-*(none yet — move rows here from Queue once a run finishes, with final branch + EA decision)*
+FEAT-118, FEAT-119, and FEAT-120 are completed (see their rows in the Queue
+table above for branch/EA-decision detail — kept in place rather than moved
+here, since other rows' notes cross-reference them by FEAT_ID, e.g. FEAT-125
+and FEAT-129's dependency notes). All three merged to
+`claude/ai-personal-assistant-main` via PR #71 (squash `b348e79`,
+2026-09-12) and are confirmed deployed and healthy.
