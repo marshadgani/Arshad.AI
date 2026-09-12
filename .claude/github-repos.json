@@ -199,7 +199,7 @@
     "claude-mem": {
       "url": "https://github.com/thedotmack/claude-mem.git",
       "name": "claude-mem",
-      "last_fetched": "2026-09-11 09:29 UTC",
+      "last_fetched": "2026-09-12 23:39 UTC",
       "components": {
         "skills": [
           "mem-setup",
@@ -239,6 +239,8 @@
         ],
         "hooks": [],
         "token_optimization": [
+          "12-provider-and-extensibility-roadmap.md",
+          "20-project-identity-and-injection-scope.md",
           "npx-distribution.md",
           "CHANGELOG.md",
           "worker-configuration.d.ts"
