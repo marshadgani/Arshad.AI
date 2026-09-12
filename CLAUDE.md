@@ -807,6 +807,9 @@ This registry is the source of truth for weekly auto-updates.
 | `orca` | https://github.com/stablyai/orca | skills | 8 skills (computer-use, orchestration, orca-cli, orca-emulator/-android, orca-linear, linear-tickets, orca-per-workspace-env) | 2026-09-12 |
 | `learn-claude-code` | https://github.com/shareAI-lab/learn-claude-code | skills | 4 skills (agent-builder, code-review, mcp-builder, pdf) | 2026-09-12 |
 | `claude-code-router` | https://github.com/musistudio/claude-code-router | agents | 10 provider-router agent configs (claude-code, claude-design, codex, grok, kilo, kimi, opencode, pi, workbuddy, zcode) | 2026-09-12 |
+| `claude-skills` | https://github.com/alirezarezvani/claude-skills | skills+agents+commands+hooks | Large mixed pack — hundreds of skills/agents/commands spanning C-level advisors, marketing, product, engineering, compliance, and ops roles, plus 5 hooks (karpathy-gate, on-session-end, error-capture, detect-playwright, validate-test) | 2026-09-12 |
+| `codegraph` | https://github.com/colbymchenry/codegraph | skills | 2 skills (agent-eval, add-lang) | 2026-09-12 |
+| `marketingskills` | https://github.com/coreyhaines31/marketingskills | skills | ~55 marketing skills (SEO, ads, copywriting, CRO, email, social, pricing, retention) | 2026-09-12 |
 
 > This table is updated automatically by `scripts/fetch-github-repo.sh` when a new repo is integrated.
 
