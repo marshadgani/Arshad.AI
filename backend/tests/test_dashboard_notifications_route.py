@@ -1,0 +1,308 @@
+"""Route-level tests for GET /api/v1/dashboard/notifications (FEAT-136).
+
+Monkeypatches ``queries.fetch_github_activity_by_kind`` (kind='issue') and
+``dashboard_module._fetch_all`` rather than standing up a real database.
+
+``test_dashboard_derivation.py`` already characterises
+``derive_notifications_from_github`` in isolation; this file exercises
+what only shows up once rows flow through the actual route: the live/seed
+mode switch (including the all-filtered case), derivation-raises fallback,
+personalization call-through, and the auth gate.
+"""
+
+from __future__ import annotations
+
+import logging
+import uuid
+from datetime import datetime, timezone
+from types import SimpleNamespace
+
+import pytest
+import src.api.v1.dashboard as dashboard_module
+from httpx import ASGITransport, AsyncClient
+from src.main import app
+
+
+def _issue_row(
+    *,
+    number=42,
+    title="Something broke",
+    labels=None,
+    provider_id="owner/repo#42",
+    occurred_at=None,
+):
+    raw = {"number": number, "title": title, "labels": labels or []}
+    return SimpleNamespace(
+        id=uuid.uuid4(),
+        raw=raw,
+        occurred_at=occurred_at or datetime(2026, 9, 12, tzinfo=timezone.utc),
+        provider_id=provider_id,
+        kind="issue",
+    )
+
+
+def _seed_notification():
+    return SimpleNamespace(
+        id="seed-notif-1",
+        severity="warn",
+        title="Seed notification",
+        detail="Some detail",
+        time="3 h ago",
+    )
+
+
+@pytest.fixture(autouse=True)
+def _fake_user():
+    fake_user = SimpleNamespace(id=uuid.uuid4())
+
+    async def _get_current_user():
+        return fake_user
+
+    from src.auth.dependencies import get_current_user
+
+    app.dependency_overrides[get_current_user] = _get_current_user
+    yield fake_user
+    app.dependency_overrides.pop(get_current_user, None)
+
+
+@pytest.fixture(autouse=True)
+def _fake_seed_fetch(monkeypatch):
+    """Patch _fetch_all so seed-table reads return a predictable row."""
+
+    async def _fake_fetch_all(db, stmt):
+        return [_seed_notification()]
+
+    monkeypatch.setattr(dashboard_module, "_fetch_all", _fake_fetch_all)
+
+
+async def _client():
+    return AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
+
+
+# ---------------------------------------------------------------------------
+# Live path
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_live_path_returns_derived_rows(monkeypatch):
+    """Live GitHub issues with critical/warn labels are returned with mode='live'."""
+    row = _issue_row(labels=[{"name": "bug"}], provider_id="acme/core#5")
+
+    async def _fake_issues(db, user_id, kind, **kwargs):
+        return [row]
+
+    monkeypatch.setattr(
+        dashboard_module.queries, "fetch_github_activity_by_kind", _fake_issues
+    )
+
+    async with await _client() as client:
+        resp = await client.get("/api/v1/dashboard/notifications")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["mode"] == "live"
+    assert body["total"] == 1
+    assert body["data"][0]["severity"] == "warn"
+
+
+# ---------------------------------------------------------------------------
+# Response envelope shape
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_live_response_envelope_has_data_total_mode(monkeypatch):
+    """Live mode response always includes data (list), total (int), mode='live'."""
+    row = _issue_row(labels=[{"name": "security"}], provider_id="acme/core#6")
+
+    async def _fake_issues(db, user_id, kind, **kwargs):
+        return [row]
+
+    monkeypatch.setattr(
+        dashboard_module.queries, "fetch_github_activity_by_kind", _fake_issues
+    )
+
+    async with await _client() as client:
+        resp = await client.get("/api/v1/dashboard/notifications")
+
+    body = resp.json()
+    assert "data" in body
+    assert "total" in body
+    assert "mode" in body
+    assert isinstance(body["data"], list)
+    assert isinstance(body["total"], int)
+    assert body["total"] == len(body["data"])
+    assert body["mode"] == "live"
+
+
+@pytest.mark.asyncio
+async def test_seed_response_envelope_has_data_total_mode(monkeypatch):
+    """Seed mode response always includes data, total, mode; total == len(data)."""
+
+    async def _fake_issues(db, user_id, kind, **kwargs):
+        return []
+
+    monkeypatch.setattr(
+        dashboard_module.queries, "fetch_github_activity_by_kind", _fake_issues
+    )
+
+    async with await _client() as client:
+        resp = await client.get("/api/v1/dashboard/notifications")
+
+    body = resp.json()
+    assert "data" in body
+    assert "total" in body
+    assert "mode" in body
+    assert isinstance(body["data"], list)
+    assert isinstance(body["total"], int)
+    assert body["total"] == len(body["data"])
+    assert body["mode"] == "seed"
+
+
+# ---------------------------------------------------------------------------
+# Seed fallback: no ingested issues
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_no_ingested_issues_falls_back_to_seed(monkeypatch):
+    """Empty live_rows triggers seed fallback with mode='seed'."""
+
+    async def _fake_issues(db, user_id, kind, **kwargs):
+        return []
+
+    monkeypatch.setattr(
+        dashboard_module.queries, "fetch_github_activity_by_kind", _fake_issues
+    )
+
+    async with await _client() as client:
+        resp = await client.get("/api/v1/dashboard/notifications")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["mode"] == "seed"
+    assert body["total"] == 1
+    assert body["data"][0]["id"] == "seed-notif-1"
+
+
+# ---------------------------------------------------------------------------
+# Seed fallback: rows present but all filtered out (no critical/warn labels)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_all_issues_filtered_falls_back_to_seed(monkeypatch):
+    """derive_notifications_from_github filters every row out (no critical/warn
+    labels) -> seed fallback."""
+    benign1 = _issue_row(labels=[{"name": "question"}], provider_id="acme/core#10")
+    benign2 = _issue_row(labels=[{"name": "help wanted"}], provider_id="acme/core#11")
+
+    async def _fake_issues(db, user_id, kind, **kwargs):
+        return [benign1, benign2]
+
+    monkeypatch.setattr(
+        dashboard_module.queries, "fetch_github_activity_by_kind", _fake_issues
+    )
+
+    async with await _client() as client:
+        resp = await client.get("/api/v1/dashboard/notifications")
+
+    assert resp.status_code == 200
+    assert resp.json()["mode"] == "seed"
+
+
+# ---------------------------------------------------------------------------
+# Seed fallback: derivation raises
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_derivation_raises_falls_back_to_seed(monkeypatch, caplog):
+    """Derivation exception triggers seed fallback with warning log;
+    response is still HTTP 200 and well-formed."""
+    row = _issue_row(labels=[{"name": "security"}])
+
+    async def _fake_issues(db, user_id, kind, **kwargs):
+        return [row]
+
+    def _boom(rows):
+        raise RuntimeError("derivation blew up")
+
+    monkeypatch.setattr(
+        dashboard_module.queries, "fetch_github_activity_by_kind", _fake_issues
+    )
+    monkeypatch.setattr(
+        dashboard_module.derive, "derive_notifications_from_github", _boom
+    )
+
+    with caplog.at_level(logging.WARNING, logger="src.api.v1.dashboard"):
+        async with await _client() as client:
+            resp = await client.get("/api/v1/dashboard/notifications")
+
+    assert resp.status_code == 200
+    assert resp.json()["mode"] == "seed"
+    assert "derivation failed" in " ".join(caplog.messages)
+
+
+# ---------------------------------------------------------------------------
+# Personalization
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_personalization_user_id_passed_to_query(monkeypatch, _fake_user):
+    """The route must pass current_user.id to fetch_github_activity_by_kind
+    so each user only sees their own ingested rows."""
+    captured_user_ids: list[uuid.UUID] = []
+
+    async def _fake_issues(db, user_id, kind, **kwargs):
+        captured_user_ids.append(user_id)
+        return []
+
+    monkeypatch.setattr(
+        dashboard_module.queries, "fetch_github_activity_by_kind", _fake_issues
+    )
+
+    async with await _client() as client:
+        await client.get("/api/v1/dashboard/notifications")
+
+    assert len(captured_user_ids) == 1
+    assert captured_user_ids[0] == _fake_user.id
+
+
+@pytest.mark.asyncio
+async def test_query_called_with_issue_kind(monkeypatch):
+    """The notifications route must query kind='issue', not 'pr'."""
+    captured_kinds: list[str] = []
+
+    async def _fake_issues(db, user_id, kind, **kwargs):
+        captured_kinds.append(kind)
+        return []
+
+    monkeypatch.setattr(
+        dashboard_module.queries, "fetch_github_activity_by_kind", _fake_issues
+    )
+
+    async with await _client() as client:
+        await client.get("/api/v1/dashboard/notifications")
+
+    assert captured_kinds == ["issue"]
+
+
+# ---------------------------------------------------------------------------
+# Unauthenticated
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_route_requires_auth():
+    """Unauthenticated request must return 401."""
+    from src.auth.dependencies import get_current_user
+
+    app.dependency_overrides.pop(get_current_user, None)
+
+    async with await _client() as client:
+        resp = await client.get("/api/v1/dashboard/notifications")
+
+    assert resp.status_code == 401
