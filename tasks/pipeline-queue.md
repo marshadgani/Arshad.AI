@@ -34,7 +34,7 @@
 
 | Field | Value |
 |---|---|
-| active_run_id | (set below once launched) |
+| active_run_id | wf_43aa76ac-55d (task `wbiez7rpi`) |
 | session | session_01S3fJzZzJykfHRA9jhMycuk |
 | started | 2026-09-13 (this run) |
 | FEAT-142 (OAuth invalid_state bug) | Arshad approved the fix 2026-09-13. Re-launched as a fresh, tightly-scoped run (frontend-only, explicit no-touch on `backend/src/auth/**`) after the first pass (`wf_ea9200d9-e33`) confirmed the root cause but halted on the denylist. |
