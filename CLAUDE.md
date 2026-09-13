@@ -815,6 +815,8 @@ This registry is the source of truth for weekly auto-updates.
 | `awesome-claude-design` | https://github.com/VoltAgent/awesome-claude-design | reference | curated Claude design-resource list (no SKILL.md extractables) | 2026-09-13 |
 | `design-md-chrome` | https://github.com/bergside/design-md-chrome | reference | Chrome extension project (no SKILL.md extractables) | 2026-09-13 |
 | `design-motion-principles` | https://github.com/kylezantos/design-motion-principles | skills | 1 skill (design-motion-principles — UI motion/animation audit + creation workflow, references named designers' principles, accessibility & performance guidance) | 2026-09-13 |
+| `omniroute` | https://github.com/diegosouzapw/OmniRoute | skills+commands | ~34 skills (multi-provider LLM routing/proxy CLI toolchain — auth, budget, cache, resilience, tunnels, MCP, webhooks, usage logs, version manager), 1 command (bridge-check) | 2026-09-13 |
+| `one-skill-to-rule-them-all` | https://github.com/rebelytics/one-skill-to-rule-them-all | skills | 1 skill (one-skill-to-rule-them-all) | 2026-09-13 |
 
 > This table is updated automatically by `scripts/fetch-github-repo.sh` when a new repo is integrated.
 
