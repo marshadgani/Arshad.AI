@@ -128,8 +128,10 @@ export const notifications: Notification[] = [
   { id: 'n4', severity: 'ok',       title: 'Backup complete',           detail: 'Postgres → Supabase',     time: '03:00' },
 ];
 
-// ── Weather + Commute + News ───────────────────────────────────────
-export const weather = { temp: '28 °C', condition: 'Partly cloudy', city: 'Bengaluru' };
+// ── Commute + News ─────────────────────────────────────────────────
+// No `weather` export: WeatherCard reads live OpenWeatherMap conditions
+// through useDashboardData, so a mock shape here is unreferenced and
+// contradicts the tile it appears to describe.
 export const commute = { eta: '24 min', mode: 'Drive', dest: 'Office (MG Rd)' };
 export const news = [
   { id: 'nw1', title: 'India\'s GDP grew 7.4% in Q4',           source: 'Reuters' },
@@ -187,6 +189,9 @@ export interface DomainConfig {
   feed: { id: string; message: string; time: string }[];
 }
 
+// learning / home / travel deliberately have no entry: those pages render
+// DomainComingSoon (see frontend/src/data/comingSoonDomains.ts) because no
+// real integration backs them. Do not re-add fabricated KPIs for them.
 export const domains: Record<string, DomainConfig> = {
   finance: {
     slug: 'finance',
@@ -301,93 +306,6 @@ export const domains: Record<string, DomainConfig> = {
       { id: 'hf1', message: 'Sleep score 84 (good). Deep sleep +12 min vs avg',                 time: '07:00' },
       { id: 'hf2', message: 'Tennis booked 5:30 pm — 1 hr cardio',                              time: '11:00' },
       { id: 'hf3', message: 'Water intake 0.6 L behind goal — drink 2 glasses by 3 pm',         time: '13:00' },
-    ],
-  },
-
-  learning: {
-    slug: 'learning',
-    title: 'Learning · Second Brain',
-    emoji: '📚',
-    tagline: 'Notes · papers · highlights · knowledge graph',
-    kpis: [
-      { label: 'Notes total',     value: '4,218',    delta: '+12 this week' },
-      { label: 'Reading queue',   value: '14 items', delta: '~18 hr to clear' },
-      { label: 'Papers read MTD', value: '7',        delta: 'goal: 12' },
-      { label: 'Streak',          value: '23 days',  delta: 'daily review' },
-    ],
-    applications: [
-      { id: 'la1', name: 'Notion Vault',          description: 'Indexed search + RAG',           status: 'live' },
-      { id: 'la2', name: 'Reading Queue',         description: 'Pocket / ArXiv / RSS unified',   status: 'live' },
-      { id: 'la3', name: 'Flashcard Generator',   description: 'Anki-style cards from highlights', status: 'beta' },
-      { id: 'la4', name: 'Knowledge Graph',       description: 'Concept-link explorer',           status: 'planned' },
-    ],
-    agents: [
-      { name: 'note-indexer',   description: 'Embeds + semantically tags new notes',           health: 'healthy', uptime: '99.6%', accuracy: 95, lastAction: 'Indexed 12 new notes',        lastRun: '20 min ago' },
-      { name: 'paper-summariser', description: 'TL;DR + claims for ArXiv papers',                health: 'healthy', uptime: '98.3%', accuracy: 89, lastAction: 'Summarised "RAG Survey 2026"', lastRun: '4 hr ago' },
-      { name: 'recall-trainer', description: 'Spaced-repetition prompts at the right time',     health: 'healthy', uptime: '99.0%', accuracy: 91, lastAction: 'Sent 8 recall prompts',         lastRun: '6 hr ago' },
-    ],
-    feed: [
-      { id: 'lf1', message: 'Indexed 12 new notes (Notion)',                                     time: '14:20' },
-      { id: 'lf2', message: 'Paper summary ready: "Retrieval-Augmented Generation Survey 2026"', time: '10:00' },
-      { id: 'lf3', message: 'Flashcards generated: 6 from highlights last night',                time: '07:30' },
-    ],
-  },
-
-  home: {
-    slug: 'home',
-    title: 'Home & IoT',
-    emoji: '🏠',
-    tagline: 'Devices · automations · energy',
-    kpis: [
-      { label: 'Devices online', value: '14 / 16',  delta: '2 offline' },
-      { label: 'Energy today',   value: '6.4 kWh',  delta: '−12% vs avg' },
-      { label: 'Active scenes',  value: '3',        delta: 'Evening, Away, Sleep' },
-      { label: 'Alerts open',    value: '1',        delta: 'fridge door left open' },
-    ],
-    applications: [
-      { id: 'hoa1', name: 'Device Map',         description: 'All sensors + actuators by room', status: 'live' },
-      { id: 'hoa2', name: 'Automation Rules',   description: 'If-this-then-that builder',        status: 'live' },
-      { id: 'hoa3', name: 'Energy Monitor',     description: 'Per-circuit consumption + cost',   status: 'beta' },
-      { id: 'hoa4', name: 'Security Dashboard', description: 'Cameras, locks, motion',           status: 'planned' },
-    ],
-    agents: [
-      { name: 'scene-runner',    description: 'Triggers scenes by time/presence',                health: 'healthy', uptime: '99.95%', accuracy: 99, lastAction: 'Ran "Evening" scene',         lastRun: '2 hr ago' },
-      { name: 'energy-coach',    description: 'Suggests load shifts to off-peak',                health: 'healthy', uptime: '98.2%', accuracy: 87, lastAction: 'Recommended shift to 22:00',   lastRun: '4 hr ago' },
-      { name: 'anomaly-watcher', description: 'Detects unusual device behaviour',                 health: 'degraded', uptime: '95.0%', accuracy: 82, lastAction: 'Flagged fridge alert',        lastRun: '12 min ago' },
-    ],
-    feed: [
-      { id: 'hof1', message: 'Fridge door left open > 5 min',                                    time: '14:30' },
-      { id: 'hof2', message: 'Evening scene ran — lights 40%, AC 24°C',                          time: '12:00' },
-      { id: 'hof3', message: 'AC unit (bedroom) drawing 18% more than baseline',                  time: '10:00' },
-    ],
-  },
-
-  travel: {
-    slug: 'travel',
-    title: 'Travel',
-    emoji: '✈️',
-    tagline: 'Trips · bookings · expenses · packing',
-    kpis: [
-      { label: 'Upcoming trips', value: '2',         delta: 'next: 12 May' },
-      { label: 'Miles balance',  value: '142,300',   delta: '+12k MTD' },
-      { label: 'Open bookings',  value: '5',         delta: 'flights + hotels' },
-      { label: 'Travel spend YTD', value: '₹4.8 L',   delta: 'budget 50%' },
-    ],
-    applications: [
-      { id: 'ta1', name: 'Trip Planner',     description: 'Itinerary + reservations in one view', status: 'live' },
-      { id: 'ta2', name: 'Booking Tracker',  description: 'PNRs, hotel bookings, refunds',         status: 'live' },
-      { id: 'ta3', name: 'Packing Lists',    description: 'Auto-generated by trip type/weather',   status: 'beta' },
-      { id: 'ta4', name: 'Expense Splitter', description: 'Family/friends trip cost split',         status: 'planned' },
-    ],
-    agents: [
-      { name: 'fare-watcher',    description: 'Alerts on price drops for routes',                 health: 'healthy', uptime: '99.4%', accuracy: 93, lastAction: 'Found ₹2,400 cheaper BLR→GOA',  lastRun: '1 hr ago' },
-      { name: 'itinerary-builder', description: 'Drafts full itineraries from prompts',            health: 'healthy', uptime: '98.7%', accuracy: 88, lastAction: 'Drafted 3-day Goa plan',         lastRun: '3 d ago' },
-      { name: 'visa-tracker',    description: 'Watches visa requirements + expiry',                health: 'healthy', uptime: '99.0%', accuracy: 96, lastAction: 'Checked Schengen rules',         lastRun: '5 d ago' },
-    ],
-    feed: [
-      { id: 'tf1', message: 'BLR → GOA fare dropped: ₹4,200 (was ₹6,600)',                        time: '13:00' },
-      { id: 'tf2', message: 'Hotel booking confirmed: Park Hyatt Goa, 12–15 May',                  time: '10:00' },
-      { id: 'tf3', message: 'Itinerary v2 ready for "Goa weekend"',                                 time: '09:00' },
     ],
   },
 };

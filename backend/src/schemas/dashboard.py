@@ -7,7 +7,7 @@ type imports continue to work after the rewire.
 
 from typing import Literal
 
-from pydantic import Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from . import ORMBase as _ORM
 
@@ -104,13 +104,69 @@ class FocusBlockResponse(_ORM):
     action: str
 
 
-class WeatherResponse(_ORM):
-    temp: str
-    condition: str
-    city: str
+class WeatherResponse(BaseModel):
+    """Not an ``_ORM`` subclass — the OpenWeatherMap-connected states carry
+    no backing row, so this schema is always constructed field-by-field by
+    ``services/weather/service.py`` rather than via
+    ``model_validate(orm_obj)``.
+
+    Four legal ``connected``/``needs_reauth``/``degraded`` combinations,
+    mirroring ``WhoopDashboard`` (``schemas/whoop.py``):
+
+    1. disconnected — ``connected=False``, both flags ``False``, and
+       ``temp``/``condition``/``city`` must all be ``None``.
+    2. connected + needs_reauth — payload fields must be ``None``.
+    3. connected + degraded — payload fields must be ``None``.
+    4. connected + healthy — both flags ``False``, payload may be populated.
+
+    ``frozen=True`` because the state-machine validator below runs only on
+    construction: on a mutable model a field could be reassigned after
+    validation into an illegal combination nothing re-checks.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    temp: str | None = None
+    condition: str | None = None
+    city: str | None = None
+    connected: bool = False
+    needs_reauth: bool = False
+    degraded: bool = False
+
+    @model_validator(mode="after")
+    def _check_state_combination(self) -> "WeatherResponse":
+        if not self.connected and (self.needs_reauth or self.degraded):
+            raise ValueError("needs_reauth/degraded require connected=True.")
+        if self.needs_reauth and self.degraded:
+            raise ValueError("needs_reauth and degraded are mutually exclusive.")
+        healthy = self.connected and not (self.needs_reauth or self.degraded)
+        if not healthy and (self.temp, self.condition, self.city) != (None, None, None):
+            raise ValueError(
+                "temp/condition/city are populated only in the connected, "
+                "healthy state."
+            )
+        return self
 
 
 class CommuteResponse(_ORM):
     eta: str
     mode: str
     dest: str
+
+
+# ── GitHub activity feed ───────────────────────────────────────────
+class GitHubActivityResponse(BaseModel):
+    """Not an ``_ORM`` subclass — validated from the plain dict produced by
+    ``project_github_activity`` (JSONB extraction), never from the ORM row
+    directly, so ``from_attributes`` support is unneeded here."""
+
+    id: str
+    title: str
+    url: str | None
+    number: int | None
+    repository: str
+    kind: Literal["issue", "pr"]
+    state: Literal["open", "closed", "merged"]
+    is_draft: bool = Field(serialization_alias="isDraft")
+    author: str | None
+    updated_at: str = Field(serialization_alias="updatedAt")

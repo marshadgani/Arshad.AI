@@ -277,7 +277,11 @@ NOTIFICATIONS: list[dict[str, Any]] = [
     },
 ]
 
-WEATHER = {"id": 1, "temp": "28 °C", "condition": "Partly cloudy", "city": "Bengaluru"}
+# No WEATHER constant: /api/v1/dashboard/weather serves live OpenWeatherMap
+# conditions and never reads the `weather` table (see
+# services/weather/service.py). Seeding a row here would put mock Bengaluru
+# conditions in a table nothing reads, where the next person to grep for the
+# widget's data source finds them first and believes the tile is still mocked.
 COMMUTE = {"id": 1, "eta": "24 min", "mode": "Drive", "dest": "Office (MG Rd)"}
 
 NEWS: list[dict[str, Any]] = [
@@ -634,250 +638,11 @@ DOMAINS: list[dict[str, Any]] = [
             },
         ],
     },
-    {
-        "slug": "learning",
-        "title": "Learning · Second Brain",
-        "emoji": "📚",
-        "tagline": "Notes · papers · highlights · knowledge graph",
-        "kpis": [
-            {"label": "Notes total", "value": "4,218", "delta": "+12 this week"},
-            {"label": "Reading queue", "value": "14 items", "delta": "~18 hr to clear"},
-            {"label": "Papers read MTD", "value": "7", "delta": "goal: 12"},
-            {"label": "Streak", "value": "23 days", "delta": "daily review"},
-        ],
-        "applications": [
-            {
-                "id": "la1",
-                "name": "Notion Vault",
-                "description": "Indexed search + RAG",
-                "status": "live",
-            },
-            {
-                "id": "la2",
-                "name": "Reading Queue",
-                "description": "Pocket / ArXiv / RSS unified",
-                "status": "live",
-            },
-            {
-                "id": "la3",
-                "name": "Flashcard Generator",
-                "description": "Anki-style cards from highlights",
-                "status": "beta",
-            },
-            {
-                "id": "la4",
-                "name": "Knowledge Graph",
-                "description": "Concept-link explorer",
-                "status": "planned",
-            },
-        ],
-        "agents": [
-            {
-                "name": "note-indexer",
-                "description": "Embeds + semantically tags new notes",
-                "health": "healthy",
-                "uptime": "99.6%",
-                "accuracy": 95,
-                "last_action": "Indexed 12 new notes",
-                "last_run": "20 min ago",
-            },
-            {
-                "name": "paper-summariser",
-                "description": "TL;DR + claims for ArXiv papers",
-                "health": "healthy",
-                "uptime": "98.3%",
-                "accuracy": 89,
-                "last_action": 'Summarised "RAG Survey 2026"',
-                "last_run": "4 hr ago",
-            },
-            {
-                "name": "recall-trainer",
-                "description": "Spaced-repetition prompts at the right time",
-                "health": "healthy",
-                "uptime": "99.0%",
-                "accuracy": 91,
-                "last_action": "Sent 8 recall prompts",
-                "last_run": "6 hr ago",
-            },
-        ],
-        "feed": [
-            {"id": "lf1", "message": "Indexed 12 new notes (Notion)", "time": "14:20"},
-            {
-                "id": "lf2",
-                "message": 'Paper summary ready: "Retrieval-Augmented Generation Survey 2026"',
-                "time": "10:00",
-            },
-            {
-                "id": "lf3",
-                "message": "Flashcards generated: 6 from highlights last night",
-                "time": "07:30",
-            },
-        ],
-    },
-    {
-        "slug": "home",
-        "title": "Home & IoT",
-        "emoji": "🏠",
-        "tagline": "Devices · automations · energy",
-        "kpis": [
-            {"label": "Devices online", "value": "14 / 16", "delta": "2 offline"},
-            {"label": "Energy today", "value": "6.4 kWh", "delta": "−12% vs avg"},
-            {"label": "Active scenes", "value": "3", "delta": "Evening, Away, Sleep"},
-            {"label": "Alerts open", "value": "1", "delta": "fridge door left open"},
-        ],
-        "applications": [
-            {
-                "id": "hoa1",
-                "name": "Device Map",
-                "description": "All sensors + actuators by room",
-                "status": "live",
-            },
-            {
-                "id": "hoa2",
-                "name": "Automation Rules",
-                "description": "If-this-then-that builder",
-                "status": "live",
-            },
-            {
-                "id": "hoa3",
-                "name": "Energy Monitor",
-                "description": "Per-circuit consumption + cost",
-                "status": "beta",
-            },
-            {
-                "id": "hoa4",
-                "name": "Security Dashboard",
-                "description": "Cameras, locks, motion",
-                "status": "planned",
-            },
-        ],
-        "agents": [
-            {
-                "name": "scene-runner",
-                "description": "Triggers scenes by time/presence",
-                "health": "healthy",
-                "uptime": "99.95%",
-                "accuracy": 99,
-                "last_action": 'Ran "Evening" scene',
-                "last_run": "2 hr ago",
-            },
-            {
-                "name": "energy-coach",
-                "description": "Suggests load shifts to off-peak",
-                "health": "healthy",
-                "uptime": "98.2%",
-                "accuracy": 87,
-                "last_action": "Recommended shift to 22:00",
-                "last_run": "4 hr ago",
-            },
-            {
-                "name": "anomaly-watcher",
-                "description": "Detects unusual device behaviour",
-                "health": "degraded",
-                "uptime": "95.0%",
-                "accuracy": 82,
-                "last_action": "Flagged fridge alert",
-                "last_run": "12 min ago",
-            },
-        ],
-        "feed": [
-            {"id": "hof1", "message": "Fridge door left open > 5 min", "time": "14:30"},
-            {
-                "id": "hof2",
-                "message": "Evening scene ran — lights 40%, AC 24°C",
-                "time": "12:00",
-            },
-            {
-                "id": "hof3",
-                "message": "AC unit (bedroom) drawing 18% more than baseline",
-                "time": "10:00",
-            },
-        ],
-    },
-    {
-        "slug": "travel",
-        "title": "Travel",
-        "emoji": "✈️",
-        "tagline": "Trips · bookings · expenses · packing",
-        "kpis": [
-            {"label": "Upcoming trips", "value": "2", "delta": "next: 12 May"},
-            {"label": "Miles balance", "value": "142,300", "delta": "+12k MTD"},
-            {"label": "Open bookings", "value": "5", "delta": "flights + hotels"},
-            {"label": "Travel spend YTD", "value": "₹4.8 L", "delta": "budget 50%"},
-        ],
-        "applications": [
-            {
-                "id": "ta1",
-                "name": "Trip Planner",
-                "description": "Itinerary + reservations in one view",
-                "status": "live",
-            },
-            {
-                "id": "ta2",
-                "name": "Booking Tracker",
-                "description": "PNRs, hotel bookings, refunds",
-                "status": "live",
-            },
-            {
-                "id": "ta3",
-                "name": "Packing Lists",
-                "description": "Auto-generated by trip type/weather",
-                "status": "beta",
-            },
-            {
-                "id": "ta4",
-                "name": "Expense Splitter",
-                "description": "Family/friends trip cost split",
-                "status": "planned",
-            },
-        ],
-        "agents": [
-            {
-                "name": "fare-watcher",
-                "description": "Alerts on price drops for routes",
-                "health": "healthy",
-                "uptime": "99.4%",
-                "accuracy": 93,
-                "last_action": "Found ₹2,400 cheaper BLR→GOA",
-                "last_run": "1 hr ago",
-            },
-            {
-                "name": "itinerary-builder",
-                "description": "Drafts full itineraries from prompts",
-                "health": "healthy",
-                "uptime": "98.7%",
-                "accuracy": 88,
-                "last_action": "Drafted 3-day Goa plan",
-                "last_run": "3 d ago",
-            },
-            {
-                "name": "visa-tracker",
-                "description": "Watches visa requirements + expiry",
-                "health": "healthy",
-                "uptime": "99.0%",
-                "accuracy": 96,
-                "last_action": "Checked Schengen rules",
-                "last_run": "5 d ago",
-            },
-        ],
-        "feed": [
-            {
-                "id": "tf1",
-                "message": "BLR → GOA fare dropped: ₹4,200 (was ₹6,600)",
-                "time": "13:00",
-            },
-            {
-                "id": "tf2",
-                "message": "Hotel booking confirmed: Park Hyatt Goa, 12–15 May",
-                "time": "10:00",
-            },
-            {
-                "id": "tf3",
-                "message": 'Itinerary v2 ready for "Goa weekend"',
-                "time": "09:00",
-            },
-        ],
-    },
+    # learning / home / travel deliberately have no entry: those domains have no
+    # real integration behind them, so the frontend renders DomainComingSoon
+    # (frontend/src/data/comingSoonDomains.ts) instead of a dashboard. Seeding
+    # fabricated KPIs/agents here would make GET /api/v1/domains/{slug} serve
+    # invented numbers to any caller. Do not re-add them without a real provider.
 ]
 
 NAV_ITEMS: list[dict[str, Any]] = [
@@ -919,6 +684,10 @@ NAV_ITEMS: list[dict[str, Any]] = [
     },
     {
         "path": "/home-iot",
+        # domain slug is "home" (not "home-iot") for historical reasons; the
+        # route is authoritative and matches frontend/src/App.tsx and
+        # comingSoonDomains.ts's 'home-iot' key. Do not "fix" this mismatch
+        # without updating both places in the same change.
         "label": "Home & IoT",
         "icon": "🏠",
         "domain": "home",
@@ -1116,6 +885,9 @@ async def seed() -> None:
             dm.HealthHabit,
             dm.DailyBriefing,
             dm.FocusBlock,
+            # Kept in the truncate list although nothing re-inserts it: this
+            # is what purges the mock row from databases seeded before the
+            # weather tile was wired to OpenWeatherMap.
             dm.Weather,
             dm.Commute,
         ):
@@ -1134,7 +906,6 @@ async def seed() -> None:
         s.add_all([dm.HealthHabit(**h) for h in HEALTH_HABITS])
         s.add(dm.DailyBriefing(**DAILY_BRIEFING))
         s.add(dm.FocusBlock(**FOCUS_NOW))
-        s.add(dm.Weather(**WEATHER))
         s.add(dm.Commute(**COMMUTE))
 
         # Domains + nav
