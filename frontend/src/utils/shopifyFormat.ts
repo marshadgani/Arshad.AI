@@ -1,26 +1,13 @@
-export function formatMoney(amount: string | null | undefined, currency: string | null | undefined): string {
-  if (amount == null) return '—';
-  const value = Number(amount);
-  if (Number.isNaN(value)) return '—';
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: 'currency',
-      currency: currency || 'USD',
-    }).format(value);
-  } catch {
-    return `${amount} ${currency ?? ''}`.trim();
-  }
-}
+// Moved to utils/money.ts and utils/time.ts respectively so unrelated
+// domains (finance/brokerage, GitHub activity) don't need to import from a
+// "shopify"-named module. Re-exported here, unchanged, so existing Shopify
+// call sites and vi.mock('../utils/shopifyFormat') paths keep working
+// untouched. formatRelativeTime is imported (not just re-exported) because
+// staleLabel below still calls it in this module's scope.
+import { formatRelativeTime } from './time';
 
-export function formatRelativeTime(iso: string | null | undefined): string {
-  if (!iso) return '—';
-  const ms = Date.now() - new Date(iso).getTime();
-  if (Number.isNaN(ms)) return '—';
-  if (ms < 60_000) return 'Just now';
-  if (ms < 3_600_000) return `${Math.floor(ms / 60_000)}m ago`;
-  if (ms < 86_400_000) return `${Math.floor(ms / 3_600_000)}h ago`;
-  return `${Math.floor(ms / 86_400_000)}d ago`;
-}
+export { formatMoney } from './money';
+export { formatRelativeTime };
 
 export function staleLabel(cachedAt: string | null | undefined): string | null {
   if (!cachedAt) return null;

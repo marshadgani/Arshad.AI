@@ -23,6 +23,7 @@
   --status-ok:     #00ff9c;
   --status-warn:   #f5a623;
   --status-danger: #ff4d6d;
+  --status-danger-bg: rgba(255, 77, 109, 0.08);
   --status-info:   #4facfe;
   --status-neutral: #8b9cba;
 
@@ -45,6 +46,19 @@
   --accent-commerce-faint: rgba(43, 255, 176, 0.18);
   --accent-commerce-bg:    rgba(43, 255, 176, 0.07);
   --accent-commerce-gold:  #ffc857;
+  --accent-commerce-gold-faint: rgba(255, 200, 87, 0.18);
+  --accent-commerce-gold-bg:    rgba(255, 200, 87, 0.16);
+
+  /* Ontology domain accent (FEAT-141) — the vault's knowledge-graph layer
+     is a fourth live-data lane alongside health (rose) and commerce
+     (emerald/gold), so it gets its own colour rather than borrowing the
+     system cyan. Violet reads as "synthesised/derived knowledge" — neither
+     a literal brand colour nor a semantic status colour — so it never
+     collides with --status-* meaning. */
+  --accent-ontology:       #b18aff;
+  --accent-ontology-soft:  rgba(177, 138, 255, 0.65);
+  --accent-ontology-faint: rgba(177, 138, 255, 0.18);
+  --accent-ontology-bg:    rgba(177, 138, 255, 0.07);
 
   /* Text */
   --text-primary:   #d8e6ff;

@@ -1,0 +1,129 @@
+/* Bold "signal not yet online" aesthetic: a HUD panel with a slow-sweeping
+   scan line and a pulsing status kicker, communicating "monitoring, nothing
+   live yet" rather than a plain empty-state card. All motion is disabled
+   under prefers-reduced-motion (see bottom of file). */
+.panel {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-faint);
+  border-radius: var(--radius-xl);
+  padding: var(--s-12) var(--s-8);
+  max-width: 520px;
+  margin: var(--s-12) auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--s-3);
+  box-shadow: var(--glow-cyan-soft);
+}
+
+/* Slow diagonal sweep, purely decorative — sits behind the content (z-index
+   via stacking context from `isolation: isolate` on .panel). */
+.panel::before {
+  content: '';
+  position: absolute;
+  inset: -50%;
+  z-index: -1;
+  background: linear-gradient(
+    115deg,
+    transparent 40%,
+    var(--accent-faint) 50%,
+    transparent 60%
+  );
+  animation: sweep 6s ease-in-out infinite;
+}
+
+.emojiWrap {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--s-2);
+}
+
+.emojiRing {
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--accent-faint);
+  border-radius: 50%;
+  animation: pulse-ring 2.4s ease-out infinite;
+}
+
+.emoji {
+  position: relative;
+  font-size: 40px;
+  line-height: 1;
+  filter: drop-shadow(0 0 12px var(--accent-faint));
+}
+
+.kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent-soft);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.kicker::before {
+  content: '// ';
+  color: var(--text-muted);
+}
+
+.kickerDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: var(--glow-cyan);
+  animation: blink 1.6s ease-in-out infinite;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  background: linear-gradient(90deg, var(--text-primary), var(--accent-soft));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.reason {
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.6;
+  max-width: 40ch;
+}
+
+@keyframes sweep {
+  0%, 100% { transform: translateX(-15%) translateY(-10%); }
+  50% { transform: translateX(15%) translateY(10%); }
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(0.85); opacity: 0.9; }
+  100% { transform: scale(1.35); opacity: 0; }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel::before,
+  .emojiRing,
+  .kickerDot {
+    animation: none;
+  }
+}

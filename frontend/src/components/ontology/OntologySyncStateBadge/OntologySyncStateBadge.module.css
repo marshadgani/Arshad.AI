@@ -1,0 +1,66 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.pending {
+  color: var(--status-neutral, #8b9cba);
+  background: rgba(139, 156, 186, 0.12);
+}
+.pending .dot { background: var(--status-neutral, #8b9cba); }
+
+.synced {
+  color: var(--status-ok, #00ff9c);
+  background: rgba(0, 255, 156, 0.1);
+}
+.synced .dot { background: var(--status-ok, #00ff9c); }
+
+.deferred {
+  color: var(--status-warn, #f5a623);
+  background: rgba(245, 166, 35, 0.12);
+}
+.deferred .dot { background: var(--status-warn, #f5a623); }
+
+.conflict {
+  color: var(--status-danger, #ff4d6d);
+  background: var(--status-danger-bg, rgba(255, 77, 109, 0.08));
+}
+.conflict .dot {
+  background: var(--status-danger, #ff4d6d);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+.archived {
+  color: var(--text-faint, #3a4865);
+  background: rgba(58, 72, 101, 0.15);
+}
+.archived .dot { background: var(--text-faint, #3a4865); }
+
+.unknown {
+  color: var(--text-muted, #5a6c8a);
+  background: rgba(90, 108, 138, 0.12);
+}
+.unknown .dot { background: var(--text-muted, #5a6c8a); }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .conflict .dot { animation: none; }
+}

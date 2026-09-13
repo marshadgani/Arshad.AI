@@ -24,3 +24,12 @@ httpx==0.28.1
 authlib==1.6.12
 cryptography==49.0.0
 pyjwt==2.13.0
+
+# FEAT-136 — zoneinfo has no bundled tz database on python:3.12-slim;
+# dashboard_derivation.py's DASHBOARD_TZ normalisation needs it. Belt and
+# braces alongside the ZoneInfoNotFoundError -> UTC fallback in _tz().
+tzdata==2025.2
+
+# FEAT-141 — Obsidian ontology layer. safe_dump/safe_load only, for
+# deterministic, injection-safe YAML frontmatter (never string-formatted).
+pyyaml==6.0.2

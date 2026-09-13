@@ -23,13 +23,37 @@ from typing import Any
 from urllib.parse import urlencode
 
 import httpx
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from ...models.user import User
 from ..base import ConnectResult, IntegrationError
 from ..registry import register
+from ._holdings_snapshot import make_holdings_parser
 from ._oauth_base import (
     OAuthIntegrationProvider,
+    make_oauth_sync_via_api,
     store_oauth_state,
 )
+
+# Kite's names for the four snapshot fields -- the only way its portfolio
+# read differs from Upstox's in shape. See _holdings_snapshot.py.
+_parse_holdings = make_holdings_parser(
+    fields={
+        "symbol": "tradingsymbol",
+        "qty": "quantity",
+        "ltp": "last_price",
+        "pnl": "pnl",
+    }
+)
+
+
+def _holdings_summary(_display_name: str, config_update: dict[str, Any]) -> str:
+    """Kite's sync summary quotes the portfolio size, unlike every other
+    provider's fixed string -- hence a callable rather than a format str.
+    The display name is part of the Summarise signature but unused: "Kite"
+    reads better here than the full "Zerodha Kite (India)".
+    """
+    return f"Kite: {config_update['holding_count']} holdings refreshed"
 
 
 @register
@@ -46,15 +70,19 @@ class ZerodhaKiteIntegration(OAuthIntegrationProvider):
     client_id_env = "ZERODHA_KITE_CLIENT_ID"
     client_secret_env = "ZERODHA_KITE_CLIENT_SECRET"
 
-    async def connect(self, *, user, db, payload):  # type: ignore[override]
+    async def connect(
+        self, *, user: User | None, db: AsyncSession, payload: dict[str, Any]
+    ) -> ConnectResult:
         """Kite uses 'api_key' not 'client_id' in the auth URL."""
         if user is None:
             raise IntegrationError("auth_required", "User context required.")
-        self._client_id()
+        api_key = self._client_id()
+        # Not used until exchange_code(), but read here so a missing secret
+        # fails before the user is sent through Kite's consent screen.
         self._client_secret()
         state = await store_oauth_state(user_id=str(user.id), slug=self.slug)
         params = {
-            "api_key": self._client_id(),
+            "api_key": api_key,
             "v": "3",
             "redirect_params": f"state={state}",
         }
@@ -124,52 +152,28 @@ class ZerodhaKiteIntegration(OAuthIntegrationProvider):
             "broker": data.get("broker"),
         }
 
-    async def sync(self, *, integration, db):  # type: ignore[override]
-        import time
-        from datetime import datetime, timezone
+    def sync_headers(self, access_token: str) -> dict[str, str]:
+        """Kite authenticates portfolio reads with `token <api_key>:<token>`
+        rather than a bearer, and requires its API version header.
 
-        from ..base import IntegrationError as _IE
-        from ..base import SyncResult
-
-        started = time.perf_counter()
-        access_token = await self.get_access_token(integration=integration, db=db)
-        api_key = self._client_id()
-        try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                resp = await client.get(
-                    "https://api.kite.trade/portfolio/holdings",
-                    headers={
-                        "Authorization": f"token {api_key}:{access_token}",
-                        "X-Kite-Version": "3",
-                    },
-                )
-                resp.raise_for_status()
-                body = resp.json() or {}
-        except Exception as exc:  # noqa: BLE001
-            integration.status = "error"
-            integration.last_error = f"{type(exc).__name__}: {exc}"[:500]
-            await db.commit()
-            raise _IE("sync_failed", f"{type(exc).__name__}: {exc}")
-        holdings = body.get("data") or []
-        integration.config = {
-            **(integration.config or {}),
-            "holding_count": len(holdings),
-            "holdings": [
-                {
-                    "symbol": h.get("tradingsymbol"),
-                    "qty": h.get("quantity"),
-                    "ltp": h.get("last_price"),
-                    "pnl": h.get("pnl"),
-                }
-                for h in holdings[:10]
-            ],
+        make_oauth_sync_via_api calls this inside its guarded block, which
+        is what keeps _client_id() -- IntegrationError('missing_client_id')
+        when ZERODHA_KITE_CLIENT_ID is unset or rotated on Render -- inside
+        record_sync_failure's reach. Outside it, that error escaped
+        classification and left integration.status stuck on 'connected'
+        with a stale last_error, the exact defect class this feature closes.
+        """
+        return {
+            "Authorization": f"token {self._client_id()}:{access_token}",
+            "X-Kite-Version": "3",
         }
-        integration.last_synced_at = datetime.now(timezone.utc)
-        integration.last_error = None
-        integration.status = "connected"
-        await db.commit()
-        return SyncResult(
-            rows_written=0,
-            summary=f"Kite: {len(holdings)} holdings refreshed",
-            duration_ms=int((time.perf_counter() - started) * 1000),
-        )
+
+    # Kite issues no refresh token, so a dead daily token (06:00 IST)
+    # surfaces as IntegrationError('no_refresh_token') from the preflight
+    # get_access_token call inside make_oauth_sync_via_api -- classified
+    # there as 'expired' rather than leaving status stuck on 'connected'.
+    sync = make_oauth_sync_via_api(
+        sync_url="https://api.kite.trade/portfolio/holdings",
+        parse_sync=_parse_holdings,
+        summarise=_holdings_summary,
+    )

@@ -1,0 +1,132 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4, 16px);
+}
+
+.grid {
+  composes: tiles4 from '../../../styles/grid.module.css';
+  gap: var(--s-3, 12px);
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: var(--s-4, 16px);
+  border-radius: var(--radius-lg, 12px);
+  border: 1px solid var(--border-faint, #1a2440);
+  background: var(--bg-panel, #0a1020);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 150ms, box-shadow 150ms, background 150ms;
+}
+
+.tile:hover {
+  border-color: var(--accent-ontology-soft, rgba(177, 138, 255, 0.65));
+}
+
+.tile:focus-visible {
+  outline: 2px solid var(--accent-ontology, #b18aff);
+  outline-offset: 2px;
+}
+
+.tileActive {
+  border-color: var(--accent-ontology, #b18aff);
+  background: var(--accent-ontology-bg, rgba(177, 138, 255, 0.07));
+  box-shadow: var(--glow-cyan-soft, 0 0 12px rgba(177, 138, 255, 0.12));
+}
+
+.tileLabel {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted, #5a6c8a);
+}
+
+.tileValue {
+  font-family: var(--font-mono, monospace);
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--accent-ontology, #b18aff);
+}
+
+/* ── Skeleton ── */
+
+.tileSkeleton {
+  cursor: default;
+  pointer-events: none;
+}
+
+.skeletonLabel,
+.skeletonValue {
+  display: block;
+  border-radius: var(--radius-sm, 4px);
+  background: var(--border-faint, #1a2440);
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.skeletonLabel { width: 60%; height: 10px; }
+.skeletonValue { width: 40%; height: 24px; margin-top: 4px; }
+
+@keyframes shimmer {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonLabel, .skeletonValue { animation: none; }
+}
+
+/* ── Meta row ── */
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4, 16px);
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+  color: var(--text-secondary, #8b9cba);
+}
+
+.metaItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.metaLabel {
+  color: var(--text-muted, #5a6c8a);
+  text-transform: uppercase;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+}
+
+.commitSha {
+  font-family: var(--font-mono, monospace);
+  color: var(--accent-ontology, #b18aff);
+  background: var(--accent-ontology-bg, rgba(177, 138, 255, 0.07));
+  padding: 1px 6px;
+  border-radius: var(--radius-sm, 4px);
+}
+
+.runBadge {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  background: rgba(139, 156, 186, 0.12);
+  color: var(--status-neutral, #8b9cba);
+}
+
+.run_succeeded { background: rgba(0, 255, 156, 0.1); color: var(--status-ok, #00ff9c); }
+.run_running { background: var(--accent-ontology-bg, rgba(177, 138, 255, 0.07)); color: var(--accent-ontology, #b18aff); }
+.run_partial { background: rgba(245, 166, 35, 0.12); color: var(--status-warn, #f5a623); }
+.run_deferred { background: rgba(245, 166, 35, 0.12); color: var(--status-warn, #f5a623); }
+.run_failed { background: var(--status-danger-bg, rgba(255, 77, 109, 0.08)); color: var(--status-danger, #ff4d6d); }
+.run_dry_run { background: rgba(139, 156, 186, 0.12); color: var(--status-neutral, #8b9cba); }
+
+.warn { color: var(--status-warn, #f5a623); }
+.danger { color: var(--status-danger, #ff4d6d); }

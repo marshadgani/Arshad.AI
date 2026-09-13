@@ -26,7 +26,7 @@ interface IntegrationItem {
   extra: Record<string, unknown>;
   coming_soon: boolean;
   coming_soon_reason: string | null;
-  connect_prompt?: { label: string; placeholder: string } | null;
+  connect_prompt?: { field?: string; label: string; placeholder: string } | null;
 }
 
 const STATUS_DOT: Record<IntegrationStatus, string> = {
@@ -62,6 +62,9 @@ export default function Integrations() {
   const [apiKeyModal, setApiKeyModal] = useState<IntegrationItem | null>(null);
   const [apiKeyDraft, setApiKeyDraft] = useState('');
   const [apiKeyErr, setApiKeyErr] = useState<string | null>(null);
+  // connect_prompt field value collected alongside the API key (e.g.
+  // OpenWeatherMap's city) — empty is allowed, the backend defaults it.
+  const [apiKeyPromptDraft, setApiKeyPromptDraft] = useState('');
   // Generic domain/account-input modal for any provider that declares
   // connect_prompt (e.g. Shopify's *.myshopify.com domain). No slug
   // special-casing: any future provider gets this modal automatically.
@@ -117,9 +120,10 @@ export default function Integrations() {
   };
 
   const onConnect = async (item: IntegrationItem) => {
-    if (item.kind === 'project_apikey') {
+    if (item.kind === 'project_apikey' || item.kind === 'personal_apikey') {
       setApiKeyModal(item);
       setApiKeyDraft('');
+      setApiKeyPromptDraft('');
       setApiKeyErr(null);
       return;
     }
@@ -173,10 +177,17 @@ export default function Integrations() {
     }
     setActioning(apiKeyModal.slug);
     try {
-      await connectIntegration(apiKeyModal.slug, { api_key: apiKeyDraft.trim() });
+      const promptField = apiKeyModal.connect_prompt;
+      await connectIntegration(apiKeyModal.slug, {
+        api_key: apiKeyDraft.trim(),
+        ...(promptField && apiKeyPromptDraft.trim()
+          ? { [promptField.field ?? 'value']: apiKeyPromptDraft.trim() }
+          : {}),
+      });
       flashToast(`${apiKeyModal.display_name} connected`);
       setApiKeyModal(null);
       setApiKeyDraft('');
+      setApiKeyPromptDraft('');
       await fetchAll();
     } catch (e: unknown) {
       setApiKeyErr((e as Error).message);
@@ -417,6 +428,15 @@ export default function Integrations() {
               onChange={(e) => setApiKeyDraft(e.target.value)}
               autoFocus
             />
+            {apiKeyModal.connect_prompt && (
+              <input
+                type="text"
+                className={styles.modalInput}
+                placeholder={apiKeyModal.connect_prompt.placeholder}
+                value={apiKeyPromptDraft}
+                onChange={(e) => setApiKeyPromptDraft(e.target.value)}
+              />
+            )}
             {apiKeyErr && <div className={styles.modalErr}>{apiKeyErr}</div>}
             <div className={styles.modalActions}>
               <button

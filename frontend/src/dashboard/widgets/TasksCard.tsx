@@ -1,9 +1,14 @@
 import { type Task } from '../../data/mockData';
 import { CardHeader } from '../CardHeader';
+import { SourceBadge, WidgetStatus } from '../WidgetStatus';
 import styles from '../Dashboard.module.css';
 
 export interface TasksCardProps {
   tasks: Task[] | null;
+  isLoading?: boolean;
+  error?: Error | null;
+  /** `"live"` (from Gmail) | `"seed"` (Phase-A fallback) | undefined. */
+  mode?: string;
 }
 
 const VISIBLE_TASKS = 5;
@@ -18,23 +23,35 @@ function dueClass(due: string): string {
   return '';
 }
 
-export function TasksCard({ tasks }: TasksCardProps) {
+export function TasksCard({ tasks, isLoading = false, error = null, mode }: TasksCardProps) {
   const rows = tasks ?? [];
+  const visible = rows.slice(0, VISIBLE_TASKS);
 
   return (
     <section className={styles.card}>
-      <CardHeader title="My tasks" meta={`${rows.length} open`} />
-      <div className={styles.list}>
-        {rows.slice(0, VISIBLE_TASKS).map((t) => (
-          <div key={t.id} className={styles.row3}>
-            <span className={`${styles.priority} ${styles[t.priority]}`}>{t.priority.toUpperCase()}</span>
-            <span className={styles.rowText}>
-              {t.title}<span className={styles.tag}>{t.source}</span>
-            </span>
-            <span className={`${styles.due} ${dueClass(t.due)}`}>{t.due}</span>
-          </div>
-        ))}
-      </div>
+      <CardHeader
+        title="My tasks"
+        meta={`${rows.length} open`}
+        badge={<SourceBadge mode={mode} />}
+      />
+      <WidgetStatus
+        isLoading={isLoading}
+        error={error}
+        isEmpty={!isLoading && !error && rows.length === 0}
+        emptyMessage="No starred or important emails need action right now."
+      >
+        <div className={styles.list}>
+          {visible.map((t) => (
+            <div key={t.id} className={styles.row3}>
+              <span className={`${styles.priority} ${styles[t.priority]}`}>{t.priority.toUpperCase()}</span>
+              <span className={styles.rowText}>
+                {t.title}<span className={styles.tag}>{t.source}</span>
+              </span>
+              <span className={`${styles.due} ${dueClass(t.due)}`}>{t.due}</span>
+            </div>
+          ))}
+        </div>
+      </WidgetStatus>
     </section>
   );
 }

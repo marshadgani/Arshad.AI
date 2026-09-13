@@ -59,5 +59,9 @@ async def run(
         from . import obsidian as obsidian_runner
 
         return await obsidian_runner.ingest(user=user, db=db, payload=payload)
+    if dag_id == "obsidian_ontology_sync":
+        from .ontology.pipeline import sync as ontology_sync
+
+        return await ontology_sync(user=user, db=db, payload=payload)
 
     raise IngestionError(f"unknown_dag_id: {dag_id}")

@@ -1,0 +1,148 @@
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  margin-top: var(--s-6);
+  animation: sectionRise 400ms ease-out both;
+}
+
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+}
+
+.heading {
+  position: relative;
+  margin: 0;
+  padding-left: var(--s-3);
+  color: var(--text-primary);
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.heading::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 2px;
+  bottom: 2px;
+  width: 3px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--accent-commerce), var(--accent-commerce-gold));
+}
+
+.status {
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.errorBanner {
+  color: var(--status-danger);
+  margin: 0;
+}
+
+.retry {
+  background: none;
+  border: 1px solid var(--status-danger);
+  color: var(--status-danger);
+  border-radius: var(--radius-md);
+  padding: 2px 10px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 140ms ease, transform 140ms ease;
+}
+
+.retry:hover {
+  background: rgba(255, 77, 109, 0.1);
+  transform: translateY(-1px);
+}
+
+.syncButton {
+  background: var(--accent-commerce);
+  color: var(--bg-deep);
+  border: none;
+  border-radius: var(--radius-md);
+  padding: var(--s-2) var(--s-4);
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 140ms ease, box-shadow 140ms ease;
+}
+
+.syncButton:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px var(--accent-commerce-faint);
+}
+
+.syncButton:focus-visible {
+  outline: 2px solid var(--accent-commerce);
+  outline-offset: 2px;
+}
+
+.syncButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.syncWarning {
+  margin: 0;
+  color: var(--status-warn);
+  font-size: 0.85rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: var(--s-4);
+}
+
+.skeletonCard {
+  height: 180px;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border-faint);
+  background: linear-gradient(
+    90deg,
+    var(--bg-panel) 25%,
+    var(--border-strong) 50%,
+    var(--bg-panel) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes sectionRise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .section {
+    animation: none;
+  }
+  .syncButton:hover:not(:disabled),
+  .retry:hover {
+    transform: none;
+  }
+  .skeletonCard {
+    animation: none;
+    background: var(--border-strong);
+  }
+}

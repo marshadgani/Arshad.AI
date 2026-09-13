@@ -19,6 +19,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, ClassVar, Literal
 
+import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.integration import Integration
@@ -39,6 +40,36 @@ class IntegrationError(Exception):
         super().__init__(message)
         self.code = code
         self.message = message
+
+
+# The single, shared definition of "the user must reconnect" for every
+# OAuth-backed integration. refresh_failed / no_refresh_token / not_connected
+# / token_decryption_failed all mean the stored credential is unusable and no
+# retry will fix it without the user re-approving the consent screen.
+# Keep this in the integrations layer (not services/) — providers already
+# import IntegrationError from here, so `needs_reauth` travels with the
+# exception type it classifies instead of crossing a services -> integrations
+# -> services import cycle.
+REAUTH_CODES: frozenset[str] = frozenset(
+    {"refresh_failed", "no_refresh_token", "not_connected", "token_decryption_failed"}
+)
+
+
+def needs_reauth(exc: BaseException, extra_codes: frozenset[str] = frozenset()) -> bool:
+    """True if `exc` means the user must reconnect this integration.
+
+    Ordering is load-bearing: `.response` is only ever touched inside the
+    `isinstance(exc, httpx.HTTPStatusError)` branch. `httpx.RequestError`
+    (ConnectTimeout, ReadTimeout, ConnectError, ...) is a sibling of
+    HTTPStatusError under httpx.HTTPError with NO `.response` attribute —
+    touching it there would raise AttributeError while handling the
+    original exception.
+    """
+    if isinstance(exc, IntegrationError):
+        return exc.code in (REAUTH_CODES | extra_codes)
+    if isinstance(exc, httpx.HTTPStatusError):
+        return exc.response.status_code in (401, 403)
+    return False
 
 
 @dataclass

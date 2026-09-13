@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import cast as sa_cast
 from sqlalchemy import func, select, text
@@ -18,6 +18,7 @@ from ...auth.dependencies import get_current_user
 from ...models.dag_trigger import DagTriggerQueue
 from ...models.database import get_db
 from ...models.obsidian import IngestedObsidianNote
+from ...models.ontology import OntologyEntityNote, OntologySyncRun
 from ...models.user import User
 from ...tools.base import ToolError
 
@@ -120,14 +121,15 @@ async def stats(
 @router.get("/notes", summary="List or search vault notes")
 async def list_notes(
     q: str | None = None,
-    tags: str | None = None,
-    limit: int = 20,
-    offset: int = 0,
+    tags: str | None = Query(default=None, max_length=1000),
+    # Bounded at the boundary: a negative limit/offset reached Postgres
+    # as "LIMIT -1" and surfaced as a 500, and an unbounded limit is an
+    # easy full-table read. 422 is the documented validation code.
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    if limit > 100:
-        limit = 100
     if q and len(q) > 1000:
         raise _err(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -148,7 +150,8 @@ async def list_notes(
 
     if tags:
         for tag in (t.strip() for t in tags.split(",") if t.strip()):
-            # json.dumps handles escaping; sa_cast gives Postgres the correct JSONB type.
+            # json.dumps handles escaping; sa_cast gives Postgres the
+            # correct JSONB type.
             stmt = stmt.where(
                 IngestedObsidianNote.tags.op("@>")(sa_cast(json.dumps([tag]), JSONB))
             )
@@ -259,6 +262,160 @@ async def update_note(
         )
         raise _err(status_code, exc.code, exc.message)
     return {"data": result.model_dump()}
+
+
+# ── Ontology layer (FEAT-141) ─────────────────────────────────────
+
+
+class OntologySyncRequest(BaseModel):
+    lookback_days: int | None = Field(default=None, ge=1, le=3650)
+    max_entities: int | None = Field(default=None, ge=1, le=5000)
+    domains: list[str] | None = None
+    dry_run: bool = False
+
+
+@router.post(
+    "/ontology/sync",
+    status_code=status.HTTP_201_CREATED,
+    summary="Trigger ontology push-sync",
+)
+async def trigger_ontology_sync(
+    body: OntologySyncRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    existing = await db.scalar(
+        select(DagTriggerQueue)
+        .where(
+            DagTriggerQueue.user_id == user.id,
+            DagTriggerQueue.dag_id == "obsidian_ontology_sync",
+            DagTriggerQueue.status.in_(["pending", "picked"]),
+        )
+        .order_by(DagTriggerQueue.requested_at.desc())
+        .limit(1)
+    )
+    if existing is not None:
+        return {
+            "data": {
+                "job_id": str(existing.id),
+                "status": existing.status,
+                "deduplicated": True,
+            }
+        }
+
+    job = DagTriggerQueue(
+        id=uuid.uuid4(),
+        dag_id="obsidian_ontology_sync",
+        user_id=user.id,
+        payload=body.model_dump(exclude_none=True),
+        status="pending",
+        requested_at=datetime.now(timezone.utc),
+    )
+    db.add(job)
+    await db.commit()
+    return {"data": {"job_id": str(job.id), "status": "pending", "deduplicated": False}}
+
+
+@router.get("/ontology/entities", summary="List tracked ontology entities")
+async def list_ontology_entities(
+    domain: str | None = None,
+    entity_type: str | None = None,
+    sync_state: str | None = None,
+    # Bounded by FastAPI so an out-of-range value is a 422 with the
+    # standard error body, not a 500 from Postgres rejecting a negative
+    # LIMIT/OFFSET (.claude/rules/api.md — validate at the boundary,
+    # default 20, max 100).
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+
+    stmt = select(OntologyEntityNote).where(OntologyEntityNote.user_id == user.id)
+    if domain:
+        stmt = stmt.where(OntologyEntityNote.domain == domain)
+    if entity_type:
+        stmt = stmt.where(OntologyEntityNote.entity_type == entity_type)
+    if sync_state:
+        stmt = stmt.where(OntologyEntityNote.sync_state == sync_state)
+
+    total = await db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+
+    stmt = (
+        stmt.order_by(OntologyEntityNote.updated_at.desc()).limit(limit).offset(offset)
+    )
+    rows = (await db.execute(stmt)).scalars().all()
+
+    return {
+        "data": [
+            {
+                "id": str(row.id),
+                "domain": row.domain,
+                "entity_type": row.entity_type,
+                "stable_entity_id": row.stable_entity_id,
+                "display_name": row.display_name,
+                "vault_path": row.vault_path,
+                "sync_state": row.sync_state,
+                "conflict_reason": row.conflict_reason,
+                "tags": row.tags if isinstance(row.tags, list) else [],
+                "source_updated_at": row.source_updated_at.isoformat()
+                if row.source_updated_at
+                else None,
+                "last_synced_at": row.last_synced_at.isoformat()
+                if row.last_synced_at
+                else None,
+            }
+            for row in rows
+        ],
+        "total": total,
+    }
+
+
+@router.get("/ontology/status", summary="Ontology sync status summary")
+async def ontology_status(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    rows = await db.execute(
+        select(OntologyEntityNote.domain, OntologyEntityNote.sync_state, func.count())
+        .where(OntologyEntityNote.user_id == user.id)
+        .group_by(OntologyEntityNote.domain, OntologyEntityNote.sync_state)
+    )
+    entity_counts_by_domain: dict[str, int] = {}
+    total_entities = 0
+    deferred = 0
+    conflicts = 0
+    archived = 0
+    for domain, sync_state, count in rows:
+        entity_counts_by_domain[domain] = entity_counts_by_domain.get(domain, 0) + count
+        total_entities += count
+        if sync_state == "deferred":
+            deferred += count
+        elif sync_state == "conflict":
+            conflicts += count
+        elif sync_state == "archived":
+            archived += count
+
+    last_run = await db.scalar(
+        select(OntologySyncRun)
+        .where(OntologySyncRun.user_id == user.id)
+        .order_by(OntologySyncRun.started_at.desc())
+        .limit(1)
+    )
+
+    return {
+        "data": {
+            "last_run_at": last_run.started_at.isoformat() if last_run else None,
+            "last_run_status": last_run.status if last_run else None,
+            "last_commit_sha": last_run.commit_sha if last_run else None,
+            "branch": last_run.branch if last_run else None,
+            "entity_counts_by_domain": entity_counts_by_domain,
+            "total_entities": total_entities,
+            "deferred": deferred,
+            "conflicts": conflicts,
+            "archived": archived,
+        }
+    }
 
 
 # ── Serialisers ────────────────────────────────────────────────────

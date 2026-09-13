@@ -17,7 +17,20 @@ from typing import Any
 import httpx
 
 from ..registry import register
+from ._holdings_snapshot import make_holdings_parser
 from ._oauth_base import OAuthIntegrationProvider, make_oauth_sync_via_api
+
+# All this provider contributes to the holdings snapshot: Upstox's names
+# for the four fields. The snapshot shape, the row cap and the defensive
+# handling of a malformed `data` array live in _holdings_snapshot.py.
+_parse_holdings = make_holdings_parser(
+    fields={
+        "symbol": "trading_symbol",
+        "qty": "quantity",
+        "ltp": "last_price",
+        "pnl": "pnl",
+    }
+)
 
 
 @register
@@ -55,16 +68,6 @@ class UpstoxIntegration(OAuthIntegrationProvider):
 
     sync = make_oauth_sync_via_api(
         sync_url="https://api.upstox.com/v2/portfolio/long-term-holdings",
-        parse_sync=lambda body: {
-            "holding_count": len((body or {}).get("data", [])),
-            "holdings": [
-                {
-                    "symbol": h.get("trading_symbol"),
-                    "qty": h.get("quantity"),
-                    "ltp": h.get("last_price"),
-                }
-                for h in (body or {}).get("data", [])[:10]
-            ],
-        },
+        parse_sync=_parse_holdings,
         summary_fmt="Upstox: holdings refreshed",
     )

@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { clearToken, getToken } from '../../auth/tokenStorage';
 import { useFetch } from '../../hooks/useFetch';
+import { OntologyTab } from '../../components/ontology';
 import styles from './Obsidian.module.css';
+
+type ObsidianTabId = 'notes' | 'ontology';
 
 interface NoteStats {
   total_notes: number;
@@ -40,6 +43,7 @@ function formatWords(n: number): string {
 }
 
 export default function Obsidian() {
+  const [tab, setTab] = useState<ObsidianTabId>('notes');
   const [query, setQuery] = useState('');
   const [selectedNote, setSelectedNote] = useState<NoteFull | null>(null);
   const [syncing, setSyncing] = useState(false);
@@ -53,7 +57,11 @@ export default function Obsidian() {
   const notesUrl = query.trim()
     ? `/api/v1/obsidian/notes?q=${encodeURIComponent(query)}&limit=50`
     : '/api/v1/obsidian/notes?limit=50';
-  const { data: notesData } = useFetch<{ notes: NoteSummary[]; total: number }>(notesUrl);
+  // Skip the notes fetch entirely while on the Ontology tab — no point
+  // paying for a request whose result won't render.
+  const { data: notesData } = useFetch<{ notes: NoteSummary[]; total: number }>(notesUrl, {
+    skip: tab !== 'notes',
+  });
   const notes = notesData?.notes ?? [];
 
   function authHeaders(): Record<string, string> {
@@ -124,83 +132,121 @@ export default function Obsidian() {
         </div>
       </div>
 
-      {/* Search */}
-      <div className={styles.searchRow}>
-        <input
-          className={styles.searchInput}
-          type="search"
-          placeholder="Search notes…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        {notesData && (
-          <span className={styles.resultCount}>
-            {notesData.total.toLocaleString()} note{notesData.total !== 1 ? 's' : ''}
-          </span>
-        )}
+      {/* Tabs */}
+      <div className={styles.tabBar} role="tablist" aria-label="Obsidian views">
+        <button
+          type="button"
+          role="tab"
+          id="obsidian-tab-notes"
+          aria-selected={tab === 'notes'}
+          aria-controls="obsidian-panel-notes"
+          className={`${styles.tabBtn} ${tab === 'notes' ? styles.tabBtnActive : ''}`}
+          onClick={() => setTab('notes')}
+        >
+          Notes
+        </button>
+        <button
+          type="button"
+          role="tab"
+          id="obsidian-tab-ontology"
+          aria-selected={tab === 'ontology'}
+          aria-controls="obsidian-panel-ontology"
+          className={`${styles.tabBtn} ${tab === 'ontology' ? styles.tabBtnActive : ''}`}
+          onClick={() => setTab('ontology')}
+        >
+          Ontology
+        </button>
       </div>
 
-      {noteError && <p className={styles.noteError}>{noteError}</p>}
-
-      <div className={styles.layout}>
-        {/* Note list */}
-        <div className={styles.list}>
-          {notes.length === 0 ? (
-            <div className={styles.empty}>
-              {query ? 'No notes match your search.' : 'No notes yet — click Sync Vault to import your vault.'}
-            </div>
-          ) : (
-            notes.map((note) => (
-              <button
-                key={note.id}
-                type="button"
-                className={`${styles.noteCard} ${selectedNote?.id === note.id ? styles.noteCardActive : ''}`}
-                onClick={() => openNote(note.id)}
-              >
-                <div className={styles.noteTitle}>{note.title}</div>
-                <div className={styles.notePath}>{note.path}</div>
-                {note.excerpt && (
-                  <div className={styles.noteExcerpt}>{note.excerpt}</div>
-                )}
-                <div className={styles.noteMeta}>
-                  {note.tags.slice(0, 3).map((tag) => (
-                    <span key={tag} className={styles.tag}>#{tag}</span>
-                  ))}
-                  <span className={styles.noteDate}>{formatDate(note.last_modified_at)}</span>
-                  <span className={styles.noteWords}>{formatWords(note.word_count)}w</span>
-                </div>
-              </button>
-            ))
-          )}
+      {tab === 'ontology' ? (
+        <div
+          id="obsidian-panel-ontology"
+          role="tabpanel"
+          aria-labelledby="obsidian-tab-ontology"
+        >
+          <OntologyTab />
         </div>
+      ) : (
+        <div id="obsidian-panel-notes" role="tabpanel" aria-labelledby="obsidian-tab-notes">
+          {/* Search */}
+          <div className={styles.searchRow}>
+            <input
+              className={styles.searchInput}
+              type="search"
+              placeholder="Search notes…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+            {notesData && (
+              <span className={styles.resultCount}>
+                {notesData.total.toLocaleString()} note{notesData.total !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
 
-        {/* Note viewer */}
-        {selectedNote && (
-          <div className={styles.viewer}>
-            <div className={styles.viewerHeader}>
-              <div>
-                <div className={styles.viewerTitle}>{selectedNote.title}</div>
-                <div className={styles.viewerPath}>{selectedNote.path}</div>
-              </div>
-              <button
-                type="button"
-                className={styles.closeBtn}
-                onClick={() => setSelectedNote(null)}
-              >
-                ×
-              </button>
+          {noteError && <p className={styles.noteError}>{noteError}</p>}
+
+          <div className={styles.layout}>
+            {/* Note list */}
+            <div className={styles.list}>
+              {notes.length === 0 ? (
+                <div className={styles.empty}>
+                  {query ? 'No notes match your search.' : 'No notes yet — click Sync Vault to import your vault.'}
+                </div>
+              ) : (
+                notes.map((note) => (
+                  <button
+                    key={note.id}
+                    type="button"
+                    className={`${styles.noteCard} ${selectedNote?.id === note.id ? styles.noteCardActive : ''}`}
+                    onClick={() => openNote(note.id)}
+                  >
+                    <div className={styles.noteTitle}>{note.title}</div>
+                    <div className={styles.notePath}>{note.path}</div>
+                    {note.excerpt && (
+                      <div className={styles.noteExcerpt}>{note.excerpt}</div>
+                    )}
+                    <div className={styles.noteMeta}>
+                      {note.tags.slice(0, 3).map((tag) => (
+                        <span key={tag} className={styles.tag}>#{tag}</span>
+                      ))}
+                      <span className={styles.noteDate}>{formatDate(note.last_modified_at)}</span>
+                      <span className={styles.noteWords}>{formatWords(note.word_count)}w</span>
+                    </div>
+                  </button>
+                ))
+              )}
             </div>
-            {selectedNote.tags.length > 0 && (
-              <div className={styles.viewerTags}>
-                {selectedNote.tags.map((t) => (
-                  <span key={t} className={styles.tag}>#{t}</span>
-                ))}
+
+            {/* Note viewer */}
+            {selectedNote && (
+              <div className={styles.viewer}>
+                <div className={styles.viewerHeader}>
+                  <div>
+                    <div className={styles.viewerTitle}>{selectedNote.title}</div>
+                    <div className={styles.viewerPath}>{selectedNote.path}</div>
+                  </div>
+                  <button
+                    type="button"
+                    className={styles.closeBtn}
+                    onClick={() => setSelectedNote(null)}
+                  >
+                    ×
+                  </button>
+                </div>
+                {selectedNote.tags.length > 0 && (
+                  <div className={styles.viewerTags}>
+                    {selectedNote.tags.map((t) => (
+                      <span key={t} className={styles.tag}>#{t}</span>
+                    ))}
+                  </div>
+                )}
+                <pre className={styles.noteContent}>{selectedNote.content}</pre>
               </div>
             )}
-            <pre className={styles.noteContent}>{selectedNote.content}</pre>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

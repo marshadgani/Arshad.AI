@@ -1,5 +1,6 @@
-import DomainPage from '../components/DomainPage';
+import DomainComingSoon from '../components/DomainComingSoon';
+import { COMING_SOON_DOMAINS } from '../data/comingSoonDomains';
 
 export default function Learning() {
-  return <DomainPage slug="learning" />;
+  return <DomainComingSoon {...COMING_SOON_DOMAINS.learning} />;
 }

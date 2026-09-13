@@ -94,6 +94,7 @@ async def lifespan(app: FastAPI):
                     pass
         await close_redis()
         await close_whoop_client()
+        await close_github_client()
 
 
 app = FastAPI(title="Arshad.AI Backend", version="0.1.0", lifespan=lifespan)
@@ -171,6 +172,7 @@ async def health():
     return {"status": "ok"}
 
 
+from src.api.v1.finance import router as finance_router  # noqa: E402
 from src.integrations.routers import router as integrations_router  # noqa: E402
 
 app.include_router(auth_router)
@@ -185,4 +187,5 @@ app.include_router(obsidian_router)
 app.include_router(whoop_router)
 app.include_router(shopify_router)
 app.include_router(apple_health_router)
+app.include_router(finance_router)
 app.include_router(integrations_router)

@@ -401,6 +401,7 @@ Arshad.AI/
 │       ├── pages/                     ← Dashboard.tsx + 7 domain page wrappers
 │       ├── hooks/useFetch.ts          ← generic { data, isLoading, error } with AbortController
 │       ├── data/mockData.ts           ← TypeScript shape contracts (now type-only — runtime data is in Postgres)
+│       ├── data/comingSoonDomains.ts  ← Coming Soon copy (emoji/title/reason) for domains with no real integration yet — deliberately static frontend content, NOT seeded to Postgres (see FEAT-140; do not "fix" this by seeding it)
 │       └── styles/                    ← tokens.css (Jarvis design tokens) + globals.css
 │
 ├── data-pipelines/

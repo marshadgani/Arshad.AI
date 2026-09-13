@@ -1,0 +1,23 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-3, 12px);
+  padding: var(--s-8, 32px) var(--s-4, 16px);
+  border: 1px solid var(--status-danger, #ff4d6d);
+  border-radius: var(--radius-lg, 12px);
+  background: var(--status-danger-bg, rgba(255, 77, 109, 0.08));
+  color: var(--text-primary, #d8e6ff);
+  text-align: center;
+}
+
+.icon {
+  font-size: 1.6rem;
+  color: var(--status-danger, #ff4d6d);
+}
+
+.panel p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary, #8b9cba);
+}

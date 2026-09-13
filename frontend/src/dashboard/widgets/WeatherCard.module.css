@@ -1,0 +1,178 @@
+/* WeatherCard — bold, distinct-from-HUD aesthetic direction: a "sky" lane
+   (sun-gold → sky-cyan gradient) instead of the dashboard's flat cyan
+   accent, so the one widget backed by a live outdoor sensor reads as its
+   own visual territory, the same way --accent-health and --accent-commerce
+   already do for other domains. The gradient is only ever used here, but
+   its colours still come from tokens.css per .claude/rules/frontend.md —
+   no literal hex or rgba() below. */
+
+.card {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(160deg, var(--bg-elevated) 0%, var(--bg-panel) 65%);
+  border: 1px solid var(--border-faint);
+  border-radius: var(--radius-lg);
+  padding: var(--s-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  isolation: isolate;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  inset: -40% -20% auto auto;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--accent-commerce-gold-bg), transparent 70%);
+  z-index: -1;
+  pointer-events: none;
+}
+
+.hero {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+}
+
+.iconWrap {
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 34px;
+  line-height: 1;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-commerce-gold-faint), var(--accent-faint));
+  animation: float 4.5s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .iconWrap { animation: none; }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+.tempBlock { min-width: 0; }
+
+.temp {
+  font-family: var(--font-display);
+  font-size: 42px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  background: linear-gradient(90deg, var(--accent-commerce-gold), var(--accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.condition {
+  margin-top: var(--s-1);
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-transform: capitalize;
+}
+
+.city {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-top: 2px;
+}
+
+/* ── States ─────────────────────────────────────────────────────── */
+
+.skeletonHero {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+}
+.skeletonIcon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: linear-gradient(90deg, var(--bg-elevated) 0%, var(--accent-bg) 50%, var(--bg-elevated) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+.skeletonLines { flex: 1; display: flex; flex-direction: column; gap: var(--s-2); }
+.skeletonLine {
+  height: 14px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, var(--bg-elevated) 0%, var(--accent-bg) 50%, var(--bg-elevated) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+.skeletonLine:first-child { width: 55%; }
+.skeletonLine:last-child { width: 35%; }
+@media (prefers-reduced-motion: reduce) {
+  .skeletonIcon, .skeletonLine { animation: none; }
+}
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.stateBlock {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-3);
+  border-radius: var(--radius-md);
+  font-size: 12px;
+}
+.stateError {
+  border: 1px solid var(--status-danger);
+  background: var(--status-danger-bg);
+  color: var(--status-danger);
+}
+.stateEmpty {
+  border: 1px dashed var(--border-faint);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-2);
+}
+
+.stateGlyph { font-size: 20px; flex-shrink: 0; }
+
+.retryBtn,
+.connectLink {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: var(--s-1) var(--s-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--accent-faint);
+  color: var(--accent);
+  background: transparent;
+  cursor: pointer;
+  align-self: flex-start;
+}
+.retryBtn:hover,
+.connectLink:hover {
+  border-color: var(--accent);
+  box-shadow: var(--glow-cyan-soft);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

@@ -76,6 +76,34 @@ always-visible `/shopify` page tile, and a 401 there would trigger
 unrelated Shopify token expiring. `connected` / `needs_reauth` /
 `partial_failures` carry integration state in the body instead.
 
+`GET /api/v1/dashboard/weather` is the third endpoint on this pattern, for
+the same reason: it backs an always-visible dashboard tile, and an
+OpenWeatherMap key expiring must not make `frontend/src/hooks/useFetch.ts`
+call `clearToken()` and log the user out of Arshad.AI. It is always HTTP
+200; `connected` / `needs_reauth` / `degraded` carry integration state in
+the body. `connected: false` means OpenWeatherMap has never been connected
+and the tile renders a Connect CTA: the payload fields are then REQUIRED to
+be null — the seeded Phase-A `m.Weather` fallback was removed by FEAT-138,
+so there is no longer any row to show a disconnected user. Likewise,
+`needs_reauth` and `degraded` each force a null payload rather than pairing
+stale figures with a "reconnect"/"unavailable" prompt. See
+`WeatherResponse` in `schemas/dashboard.py`, whose validator enforces the
+four legal combinations.
+
+`GET /api/v1/finance/holdings` is the fourth endpoint on this pattern, for
+the same reason: it backs an always-visible tile on both `/finance` and
+`/stocks`, and an Upstox or Zerodha Kite token expiring (both expire daily —
+03:30 and 06:00 IST respectively) must not make
+`frontend/src/hooks/useFetch.ts` call `clearToken()` and log the user out of
+Arshad.AI. It is always HTTP 200; `connected` on the envelope and
+`status` / `needs_reauth` / `error` per broker carry integration state in the
+body. `error` is generic, server-authored copy — never
+`Integration.last_error`, which stays DB-only (see
+`services/finance/holdings.py::_safe_error_message`). This endpoint is also
+exempt from the pagination rule above: both providers' `sync()` cap the
+stored snapshot at 10 rows, so the projection is already fixed-size and a
+`limit`/`offset` contract on top of it would be redundant.
+
 ## Error Responses
 
 All error responses follow this shape:

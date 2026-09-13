@@ -9,6 +9,7 @@ Endpoint reference: https://docs.github.com/en/rest
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 import httpx
@@ -20,6 +21,42 @@ from ..token_service import get_access_token
 
 _BASE = "https://api.github.com"
 _TIMEOUT = 15.0
+
+# Every call used to open `async with httpx.AsyncClient(...)`, pay a fresh
+# TCP+TLS handshake to api.github.com, and tear the connection back down.
+# FEAT-139's ingestion run calls this twice per linked repo (issues + PRs)
+# in immediate succession, so that handshake cost was being paid on every
+# single call instead of once per run. A shared, lazily-built client with
+# keep-alive pooling (same lazy-singleton shape as middleware/cache.py's
+# get_redis and services/whoop/client.py's _get_client) lets consecutive
+# GitHub calls reuse a warm connection. Auth is per-user, so headers are
+# passed per-request rather than baked into the shared client.
+_client: httpx.AsyncClient | None = None
+_client_lock = asyncio.Lock()
+
+
+async def _get_client() -> httpx.AsyncClient:
+    global _client
+    if _client is not None:
+        return _client
+    async with _client_lock:
+        if _client is None:
+            _client = httpx.AsyncClient(
+                timeout=_TIMEOUT,
+                base_url=_BASE,
+                limits=httpx.Limits(max_keepalive_connections=10, max_connections=20),
+            )
+    return _client
+
+
+async def aclose_client() -> None:
+    """Close the shared client. Called from the app's shutdown hook so the
+    pooled connection doesn't outlive the process' event loop."""
+    global _client
+    async with _client_lock:
+        if _client is not None:
+            await _client.aclose()
+            _client = None
 
 
 async def request(
@@ -38,10 +75,8 @@ async def request(
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
     }
-    async with httpx.AsyncClient(
-        timeout=_TIMEOUT, base_url=_BASE, headers=headers
-    ) as client:
-        resp = await client.request(method, path, params=params, json=json)
+    client = await _get_client()
+    resp = await client.request(method, path, params=params, json=json, headers=headers)
 
     if resp.status_code == 401:
         raise ProviderReauthRequired("github")

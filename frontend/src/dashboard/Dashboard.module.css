@@ -38,6 +38,11 @@
 @media (max-width: 767.98px) {
   .row { gap: var(--s-4); }
 }
+/* Vertical stack of independently-loading cards inside one grid cell — used
+   where two cards must share a column slot without becoming grid siblings
+   (WeatherCard + CommuteNewsCard, split out of one card in FEAT-138). */
+.stack { display: flex; flex-direction: column; gap: var(--s-6); }
+
 .cols2 { composes: cols2 from '../styles/grid.module.css'; }
 .cols3 { composes: cols3 from '../styles/grid.module.css'; }
 .cols4 { composes: cols4 from '../styles/grid.module.css'; }
@@ -97,6 +102,87 @@
 
 /* ── List rows ──────────────────────────────────────────────────── */
 .list { display: flex; flex-direction: column; gap: var(--s-1); }
+
+/* ── Widget states: loading / error / empty ────────────────────── */
+.srOnly {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skeletonRow {
+  height: 30px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(
+    90deg,
+    var(--bg-elevated) 0%,
+    var(--accent-bg) 50%,
+    var(--bg-elevated) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeletonRow { animation: none; }
+}
+@keyframes skeletonShimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.stateError {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-3);
+  border: 1px solid var(--status-danger);
+  border-radius: var(--radius-md);
+  background: rgba(255, 77, 109, 0.08);
+  color: var(--status-danger);
+  font-size: 12px;
+}
+
+.stateEmpty {
+  padding: var(--s-4) var(--s-2);
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+.badgeLive,
+.badgeSeed {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 3px;
+  margin-left: var(--s-2);
+}
+.badgeLive {
+  color: var(--accent);
+  background: var(--accent-faint);
+  box-shadow: 0 0 6px var(--accent-faint);
+  animation: badgeLivePulse 2.4s ease-in-out infinite;
+}
+.badgeSeed {
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+  border: 1px dashed var(--border-faint);
+}
+@keyframes badgeLivePulse {
+  0%, 100% { box-shadow: 0 0 4px var(--accent-faint); }
+  50% { box-shadow: 0 0 10px var(--accent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .badgeLive { animation: none; }
+}
 
 .row3 {
   display: grid;

@@ -11,11 +11,10 @@ from __future__ import annotations
 
 import logging
 
-import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...integrations.base import IntegrationError
+from ...integrations.base import needs_reauth as _needs_reauth
 from ...models.integration import Integration
 
 _log = logging.getLogger(__name__)
@@ -60,29 +59,14 @@ def classify_error(exc: Exception, reauth_codes: frozenset[str]) -> tuple[bool, 
     """Decide whether re-authentication is required, and the HTTP status to
     fall back to when it is not. Returns (needs_reauth, fallback_status).
 
-    Pure: no I/O, no mutation, no Integration or session argument.
-
-    Ordering is load-bearing. `.response` is only ever accessed inside the
-    `isinstance(exc, httpx.HTTPStatusError)` branch. `httpx.RequestError`
-    (ConnectTimeout, ReadTimeout, ConnectError, ...) is a sibling of
-    HTTPStatusError under httpx.HTTPError and has NO `.response` attribute —
-    touching it there would raise AttributeError while handling the
-    original exception.
+    Pure: no I/O, no mutation, no Integration or session argument. The
+    needs_reauth half is delegated to integrations.base.needs_reauth — the
+    single, shared definition of "the user must reconnect" — so this module
+    owns only the HTTP-fallback-status half, which is a services/ concern
+    the integrations layer must not own.
     """
-    if isinstance(exc, IntegrationError):
-        if exc.code in reauth_codes:
-            return True, 0
-        return False, UPSTREAM_FALLBACK_STATUS
-
-    if isinstance(exc, httpx.HTTPStatusError):
-        if exc.response.status_code in (401, 403):
-            return True, 0
-        return False, UPSTREAM_FALLBACK_STATUS
-
-    if isinstance(exc, httpx.RequestError):
-        return False, UPSTREAM_FALLBACK_STATUS
-
-    return False, UPSTREAM_FALLBACK_STATUS
+    reauth = _needs_reauth(exc, reauth_codes)
+    return reauth, (0 if reauth else UPSTREAM_FALLBACK_STATUS)
 
 
 async def apply_error_status(

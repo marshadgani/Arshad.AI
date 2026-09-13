@@ -7,6 +7,15 @@ export interface UseFetchResult<T> {
   isLoading: boolean;
   error: Error | null;
   /**
+   * Additive envelope field some collection endpoints attach (e.g.
+   * dashboard `/tasks`, `/agent-activity`, `/notifications` set
+   * `"mode": "live" | "seed"` to say whether the rows came from a real
+   * ingested source or the Phase-A seed fallback). `undefined` when the
+   * endpoint's envelope doesn't carry it — callers that don't care can
+   * ignore this field entirely.
+   */
+  mode?: string;
+  /**
    * Re-run the request now, without waiting for refreshInterval. Stable
    * across renders, so it is safe as an effect dependency or an onClick.
    *
@@ -48,6 +57,7 @@ export function useFetch<T>(url: string, options?: UseFetchOptions): UseFetchRes
   const [data, setData] = useState<T | null>(null);
   const [isLoading, setIsLoading] = useState(!skip);
   const [error, setError] = useState<Error | null>(null);
+  const [mode, setMode] = useState<string | undefined>(undefined);
   // Incrementing this triggers a re-fetch without changing the URL.
   const [tick, setTick] = useState(0);
   const refetch = useCallback(() => setTick((t) => t + 1), []);
@@ -84,10 +94,13 @@ export function useFetch<T>(url: string, options?: UseFetchOptions): UseFetchRes
           const body = await res.text();
           throw new Error(`${res.status} ${res.statusText}: ${body.slice(0, 200)}`);
         }
-        return res.json() as Promise<{ data: T }>;
+        return res.json() as Promise<{ data: T; mode?: string }>;
       })
       .then((body) => {
-        if (!controller.signal.aborted) setData(body.data);
+        if (!controller.signal.aborted) {
+          setData(body.data);
+          setMode(body.mode);
+        }
       })
       .catch((err: Error) => {
         if (err.name === 'AbortError') return;
@@ -102,8 +115,8 @@ export function useFetch<T>(url: string, options?: UseFetchOptions): UseFetchRes
   }, [url, tick, skip]);
 
   if (skip) {
-    return { data: null, isLoading: false, error: null, refetch };
+    return { data: null, isLoading: false, error: null, mode: undefined, refetch };
   }
 
-  return { data, isLoading, error, refetch };
+  return { data, isLoading, error, mode, refetch };
 }

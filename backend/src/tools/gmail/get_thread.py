@@ -67,6 +67,33 @@ def _walk_for_plain(part: dict[str, Any]) -> str | None:
     return None
 
 
+async def get_thread_metadata(
+    *, user: User, db: AsyncSession, thread_id: str
+) -> tuple[str | None, str | None]:
+    """Lightweight thread fetch — Subject + Date headers only.
+
+    Internal helper for the email ingestion enrichment phase. Deliberately
+    NOT a registered Tool and NOT referenced from GetThreadInput — it must
+    never appear in Claude's tool-use schema. Uses ``format=metadata`` so
+    Gmail skips returning message bodies entirely (cheaper than
+    ``gmail_get_thread``'s ``format=full``).
+    """
+    data = await gmail.request(
+        db=db,
+        user=user,
+        method="GET",
+        path=f"/users/me/threads/{thread_id}",
+        params={"format": "metadata", "metadataHeaders": ["Subject", "Date"]},
+    )
+    if not isinstance(data, dict):
+        return None, None
+    messages = data.get("messages") or []
+    if not messages:
+        return None, None
+    headers = (messages[0].get("payload") or {}).get("headers") or []
+    return _header(headers, "Subject"), _header(headers, "Date")
+
+
 @register
 class GmailGetThread(Tool):
     name = "gmail_get_thread"

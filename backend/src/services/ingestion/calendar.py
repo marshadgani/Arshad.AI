@@ -11,7 +11,6 @@ to (now - 90d, now + 365d).
 
 from __future__ import annotations
 
-import os
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -22,15 +21,9 @@ from ...models.ingested import IngestedCalendarEvent
 from ...models.user import User
 from ...tools.calendar.list_events import CalendarListEvents, ListEventsInput
 from .. import event_bus
+from .config import max_batch_size
 
 _DEFAULT_LOOKAHEAD_DAYS = 30
-
-
-def _max_batch() -> int:
-    try:
-        return max(1, int(os.getenv("MAX_INGEST_BATCH_SIZE", "100")))
-    except ValueError:
-        return 100
 
 
 def _parse_event_start(raw: dict[str, Any]) -> datetime:
@@ -67,7 +60,7 @@ async def ingest(
         payload=ListEventsInput(
             time_min=time_min.isoformat(),
             time_max=time_max.isoformat(),
-            max_results=_max_batch(),
+            max_results=max_batch_size(),
         ),
     )
     items: list[dict[str, Any]] = (result.data or {}).get("items", [])
