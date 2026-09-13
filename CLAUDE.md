@@ -812,6 +812,9 @@ This registry is the source of truth for weekly auto-updates.
 | `marketingskills` | https://github.com/coreyhaines31/marketingskills | skills | ~55 marketing skills (SEO, ads, copywriting, CRO, email, social, pricing, retention) | 2026-09-12 |
 | `impeccable` | https://github.com/pbakaus/impeccable | skills+agents+commands | 1 skill (impeccable — visual polish/design-critique toolchain: audit, craft, harden, polish, typeset, live-preview), 4 agents (asset-producer, documenter, finish-reviewer, manual-edit-applier), 1 command | 2026-09-12 |
 | `taste-skill` | https://github.com/Leonxlnx/taste-skill | skills | 13 design-taste skills (brandkit, redesign, minimalist, brutalist, soft, stitch, image-to-code, imagegen-frontend web/mobile, output, gpt-tasteskill) | 2026-09-12 |
+| `awesome-claude-design` | https://github.com/VoltAgent/awesome-claude-design | reference | curated Claude design-resource list (no SKILL.md extractables) | 2026-09-13 |
+| `design-md-chrome` | https://github.com/bergside/design-md-chrome | reference | Chrome extension project (no SKILL.md extractables) | 2026-09-13 |
+| `design-motion-principles` | https://github.com/kylezantos/design-motion-principles | skills | 1 skill (design-motion-principles — UI motion/animation audit + creation workflow, references named designers' principles, accessibility & performance guidance) | 2026-09-13 |
 
 > This table is updated automatically by `scripts/fetch-github-repo.sh` when a new repo is integrated.
 
