@@ -1,27 +1,29 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from 'react';
+import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react';
 
-import { clearToken, getToken, setToken } from './tokenStorage';
+import { navigateToLogin } from './loginUrl';
+import { OAUTH_PROVIDERS, type OAuthProvider } from './providers';
+import { useAuthSession, type AuthUser } from './useAuthSession';
 
-export type AuthUser = {
-  id: string;
-  email: string;
-  name: string | null;
-  avatarUrl: string | null;
-};
+/**
+ * Distributes the auth session and the two commands that change it.
+ *
+ * Everything substantive lives one level down and is independently
+ * testable — `useAuthSession` (token + /me lifecycle) and `loginUrl`
+ * (the absolute-backend-origin rule that FEAT-142 turned on). This file
+ * is deliberately thin: it exists to put that state on the React tree,
+ * not to implement it.
+ */
+
+// Re-exported so existing call sites (TopBar, Login, AuthCallback) keep a
+// single import point while the underlying modules stay decoupled.
+export { OAUTH_PROVIDERS };
+export type { AuthUser, OAuthProvider };
 
 type AuthState = {
   token: string | null;
   user: AuthUser | null;
   isLoading: boolean;
-  loginWith: (provider: 'google' | 'github') => void;
+  loginWith: (provider: OAuthProvider) => void;
   logout: () => Promise<void>;
   setTokenFromCallback: (token: string) => void;
 };
@@ -29,54 +31,10 @@ type AuthState = {
 const AuthContext = createContext<AuthState | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setTokenState] = useState<string | null>(() => getToken());
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(Boolean(token));
+  const { token, user, isLoading, adoptToken, endSession } = useAuthSession();
 
-  useEffect(() => {
-    if (!token) {
-      setUser(null);
-      setIsLoading(false);
-      return;
-    }
-    const controller = new AbortController();
-    let active = true;
-    setIsLoading(true);
-    fetch('/api/v1/auth/me', {
-      headers: { Authorization: `Bearer ${token}` },
-      signal: controller.signal,
-    })
-      .then(async (res) => {
-        if (!active) return;
-        if (!res.ok) {
-          clearToken();
-          setTokenState(null);
-          setUser(null);
-          return;
-        }
-        const body = await res.json();
-        if (active) setUser(body.data as AuthUser);
-      })
-      .catch((err) => {
-        if (err?.name === 'AbortError') return;
-        if (!active) return;
-        clearToken();
-        setTokenState(null);
-        setUser(null);
-      })
-      .finally(() => {
-        if (active) setIsLoading(false);
-      });
-    return () => {
-      active = false;
-      controller.abort();
-    };
-  }, [token]);
-
-  const loginWith = useCallback((provider: 'google' | 'github') => {
-    // Top-level navigation (NOT fetch) — fetch can't follow the cross-origin
-    // redirect to the provider's consent page; the browser must own the URL bar.
-    window.location.href = `/api/v1/auth/${provider}/login`;
+  const loginWith = useCallback((provider: OAuthProvider) => {
+    navigateToLogin(provider);
   }, []);
 
   const logout = useCallback(async () => {
@@ -85,19 +43,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // server-side noop — ignore network errors
     }
-    clearToken();
-    setTokenState(null);
-    setUser(null);
-  }, []);
-
-  const setTokenFromCallback = useCallback((nextToken: string) => {
-    setToken(nextToken);
-    setTokenState(nextToken);
-  }, []);
+    endSession();
+  }, [endSession]);
 
   const value = useMemo<AuthState>(
-    () => ({ token, user, isLoading, loginWith, logout, setTokenFromCallback }),
-    [token, user, isLoading, loginWith, logout, setTokenFromCallback],
+    () => ({
+      token,
+      user,
+      isLoading,
+      loginWith,
+      logout,
+      setTokenFromCallback: adoptToken,
+    }),
+    [token, user, isLoading, loginWith, logout, adoptToken],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
