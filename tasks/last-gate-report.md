@@ -3,41 +3,43 @@
 **Source branch:** `claude/ai-personal-assistant-CcA11`
 **Target branch:** `claude/ai-personal-assistant-main`
 **Date:** 2026-09-13
-**Diff scope:** 143 files, +43774/-12 lines. Third-party skill/agent/command reference content vendored via `/fetch-github-repo` from 7 external GitHub repos (impeccable, taste-skill, awesome-claude-design, design-md-chrome, design-motion-principles, omniroute, one-skill-to-rule-them-all) — none of it wired into the running FastAPI/React application. Plus `CLAUDE.md` doc updates (new PERMANENT pipeline-management rule + registry rows) and `tasks/pipeline-queue.md`/`tasks/.feature-counter` bookkeeping recording the settled FEAT-136-141 dev-team-pipeline run. Zero application source code touched — confirmed no `backend/src/api`, `backend/src/services`, `backend/src/models`, `backend/alembic`, or `frontend/src` files in the diff.
+**Diff scope:** 17 files, +830/-90 lines. **FEAT-142** — fixes a login OAuth `invalid_state` failure that reproduced 100% of the time in production (a cross-origin cookie-scope bug: the login leg was proxied through the Vercel frontend origin while the OAuth callback hits the backend origin directly, so the CSRF nonce cookie set on one domain was never sent on the other). Fix is frontend-only (`frontend/src/auth/**`, `frontend/src/api/auth.ts`, `frontend/src/pages/Login.tsx`, `frontend/vite.config.ts`) — `backend/src/auth/**` is confirmed untouched throughout. Also includes small `CLAUDE.md`/`tasks/pipeline-queue.md` doc updates recording the dev-team pipeline runs that produced this fix.
 
 ## Verdict: GATE PASSED ✅ (WARN)
 
-All 8 gate agents ran against the diff. No Critical findings, no FAIL gates. 4 PASS outright, 4 WARN — all WARN items are documentation-accuracy or repo-hygiene findings, not defects in application behavior. Per CLAUDE.md §20, WARN findings are not auto-fixed; they're recorded below as a checklist for follow-up.
+All 8 gate agents ran an **independent** review of the actual code — not a rubber stamp of the dev-team pipeline's own prior sign-off. No Critical findings, no FAIL gates. 4 PASS outright, 4 WARN — all non-blocking. This diff already went through a full 30-stage dev-team pipeline (Enterprise Architect: SHIP) before reaching this gate.
 
 ## Agent-by-agent results
 
 | # | Agent | Verdict | Summary |
 |---|---|---|---|
-| 1 | `code-reviewer` | WARN | Spot-checked all 138 vendored files plus every executable script for payloads — clean. Found a genuine self-contradiction: CLAUDE.md line 237's pipeline-execution-files table still describes the old `resumeFromRunId`-to-add-a-feature behavior that the new PERMANENT rule (lines 89-112) explicitly forbids. Also flagged the `resumeFromRunId` code snippet as structurally orphaned inside step 3's "leave it running" prose, and the omniroute skill count as undercounted (34 claimed vs 46 actual). Separately noted (as governance, not security) that the newly-fetched `one-skill-to-rule-them-all` skill's own frontmatter asserts a session-start self-activation directive — benign, but worth a conscious decision rather than an accidental one. |
-| 2 | `security-auditor` | PASS | Full read of the one executable file in the diff (`impeccable`'s launcher, mode 755) — fail-closed, checksum-verified binary download, no eval/exfiltration. Full read of the 13k-line `live-browser.js` bundle — no obfuscation, no unexpected network calls beyond localhost/same-origin font fetches. Zero secrets found across the full diff. Confirmed `fetch-github-repo.sh`'s clone-URL allowlist is unchanged (file doesn't even appear in this diff). |
-| 3 | `debugger` | PASS | No runtime code touched. `tasks/.feature-counter` (140→141) matches the highest FEAT_ID in `pipeline-queue.md`. FEAT-136/137/138→completed and FEAT-139/140/141→halted transitions are internally coherent with their stated reasons. One WARN carried: the file's own "## Completed" section wasn't updated to include FEAT-136/137/138 alongside FEAT-118/119/120 — cosmetic, pre-existing gap. |
-| 4 | `test-writer` | PASS (N/A) | Zero `.py`/`.ts`/`.tsx` files in the diff — the 70% coverage threshold doesn't apply to a 100% documentation/reference-content diff. |
-| 5 | `refactorer` | WARN | No code issues (there's no code). Five repo-hygiene suggestions, all recurring from prior cycles plus two new: no `.gitattributes` marking vendored paths, no git-SHA pinning at fetch time, no license/integrity audit of vendored repos, `fetch-github-repo.sh` still clones "reference-only, no extractables" repos needlessly, and still no removal mechanism as the vendor set grows past 40 sources. |
-| 6 | `doc-writer` | WARN | Inline comments on the pipeline-rule rewrite are clear. `pipeline-queue.md`'s Active-run/Queue/dependency notes are internally consistent, no orphaned references. Three doc-accuracy items: omniroute's "~34 skills" undercounts the actual 46 (independently confirmed by code-reviewer, exact count verified directly: 46); `impeccable`'s "1 skill" description slightly simplifies the registry's 2 distinct slugs (`impeccable` + `audit`); the new pipeline rule and the "Always-On Pipeline" section don't cross-reference each other, a minor navigation gap (no logical contradiction at that level — the actual contradiction is the one code-reviewer found at line 237). |
-| 7 | `silent-failure-hunter` | PASS | Confirmed no application error-handling surface exists in this diff — no try/catch, no HTTP handlers, nothing to audit. |
-| 8 | `pr-test-analyzer` | PASS | No testable behavior changed; the coverage criterion is vacuously satisfied. |
+| 1 | `code-reviewer` | WARN | Verified the root-cause claim against the actual backend code (`routers.py:153-179`) — confirmed correct. Ran `tsc` (clean) and the full test suite (273/273 pass) independently. Confirmed the `vite.config.ts` proxy-rewrite removal is a real bonus fix (was causing 404s in local dev). One Important, non-code finding: production login will fail *differently but still fail* until `VITE_API_BASE_URL` is set in Vercel — already known, already documented, not a code defect. |
+| 2 | `security-auditor` | PASS | Independently verified the URL-scheme validation rejects `javascript:`/`data:`/protocol-relative/relative inputs and refuses plaintext `http://` in production. Confirmed `backend/src/auth/**` untouched, no secrets, no CORS/proxy widening. |
+| 3 | `debugger` | PASS | Traced every failure path in `oauthLoginUrl.ts` by hand — each either produces a correct URL or throws a diagnosable error; none fall through to the old relative-path bug. Confirmed the built URL matches the backend's actual route paths. Re-ran the full suite independently (273/273). |
+| 4 | `test-writer` | PASS | Ran the suite directly: 273/273 tests pass across 36 files. Confirmed the new tests pin the exact regression this fix closes with an explicit negative assertion. |
+| 5 | `refactorer` | WARN | Core fix correct and proportionate. Two non-blocking notes: `oauthLoginUrl.ts` redundantly re-validates an invariant `resolveBackendOrigin` already enforces (unreachable path in prod, not unsafe, just duplicate); `Login.tsx` carries unrelated cosmetic/CSS changes that inflated the diff beyond the ~3-line confirmed fix. |
+| 6 | `doc-writer` | PASS | All new comments explain WHY (cross-origin cookie-scope reasoning, build-time env inlining, selective session-clearing rationale), never WHAT. `pipeline-queue.md`'s FEAT-142 claims verified accurate against the actual landed code. |
+| 7 | `silent-failure-hunter` | WARN | One real one-line gap: `Login.tsx`'s catch block shows the user an error but doesn't `console.error` it, inconsistent with the logging convention established elsewhere in this same diff. Two other noted behaviors (logout's console-only server-failure log, session-preserved-on-network-error) are deliberate, documented, correct design decisions — not defects. |
+| 8 | `pr-test-analyzer` | WARN | Test quality is genuinely good (real behavioral tests, not tautological). One real gap: `AuthContext`'s own 401/403-vs-other-error session-restore branch has no direct test — the pieces around it are tested, but not that specific conditional. |
 
 ## Fixes applied
 
-None — zero Critical findings, zero FAIL gates. Per CLAUDE.md §20, WARN findings are not auto-fixed.
+None — zero Critical findings, zero FAIL gates. Per CLAUDE.md §20, WARN findings are not auto-fixed; recorded below as a checklist.
 
 ## WARN checklist (not blocking — for follow-up)
 
-- [ ] **Fix CLAUDE.md line 237** — the "Pipeline execution files" table still says `resumeFromRunId` can be used "same session, to add a feature to an active run," which directly contradicts the new PERMANENT rule at lines 89-112 forbidding exactly that. This is the one finding worth prioritizing: a future session reading the reference table instead of the full protocol could do the now-forbidden thing.
-- [ ] Move the `Workflow({..., resumeFromRunId})` code snippet out of step 3's "leave it running" prose (where it currently reads as an instruction for the wrong case) into step 4 or a new step 3b for "run has settled."
-- [ ] Correct CLAUDE.md §18: `omniroute` row should read 46 skills (not ~34) — confirmed via direct `find` count.
-- [ ] Consider a one-line note that `impeccable`'s registry description covers 2 distinct skill slugs (`impeccable` + `audit`), not 1.
-- [ ] Cross-reference the new pipeline rule (step 3) from the "Always-On Pipeline" section for navigational clarity.
-- [ ] Decide consciously whether `one-skill-to-rule-them-all`'s self-activation frontmatter (asserting it should run before every session's first tool call) is wanted — it's benign but now competes with CLAUDE.md's own session-start protocol. Not a security issue; a governance choice.
-- [ ] Update `tasks/pipeline-queue.md`'s "## Completed" section to include FEAT-136/137/138 alongside FEAT-118/119/120 (currently only tracked correctly in the Queue table above it).
-- [ ] Repo-hygiene backlog (recurring, non-blocking): add `.gitattributes` marking vendored skill/agent paths `linguist-vendored`; pin the fetched git SHA (not just a date) in the registry; skip cloning "reference-only" repos entirely in `fetch-github-repo.sh`; add a removal/pruning mechanism now that 40+ repos are vendored; audit licenses of bulkier vendored content (`impeccable`, `design-motion-principles`).
-- [ ] `fetch-github-repo.sh` de-duplication defect (cosmetic): `impeccable`'s 4 agents are each written twice (`<name>.md` and `<name>.agent.md`), and `.claude/github-repos.json` lists them duplicated accordingly.
+- [ ] **Set `VITE_API_BASE_URL=https://arshad-ai.onrender.com` in Vercel (Production + Preview scopes) and trigger a rebuild** — the fix cannot take effect in production without this. No MCP tool in this session can set Vercel env vars; this requires manual action. Until done, login fails loudly with a diagnosable config error instead of the old silent `invalid_state` — strictly better, but still broken.
+- [ ] Add `console.error(...)` to `Login.tsx`'s catch block, matching the logging convention in `AuthContext.tsx`'s two catch blocks (one-line fix).
+- [ ] Add a direct test for `AuthContext`'s session-restore branch (401/403 → sign out; network/5xx → preserve session) — currently only the surrounding pieces (`fetchCurrentUser`'s status-carrying, `loginWith`) are tested, not this specific conditional.
+- [ ] Consider consolidating `oauthLoginUrl.ts`'s scheme-validation with `resolveBackendOrigin`'s — currently the same invariant (absolute https in prod) is checked twice, once unreachably.
+- [ ] Consider splitting `Login.tsx`'s cosmetic/CSS changes (eyebrow text, title, subtitle, CSS overhaul) into a separate commit from the bug fix — unrelated to the root cause, inflated the diff.
+- [ ] Add an explicit 403 case to `api/auth.test.ts` alongside the existing 401/500 cases (the status-carrying mechanism is verified, but 403 specifically isn't pinned).
+- [ ] `pipeline-queue.md`'s "27 tests added" undercounts — actual count is 38 across the 6 new/changed suites. Doc accuracy nit, harmless.
+
+## Post-merge verification required
+
+Per CLAUDE.md §23, once `VITE_API_BASE_URL` is set and a fresh Vercel build deploys, verify a real login attempt produces no `invalid_state` line in Render app logs before considering this bug fully closed.
 
 ## Pre-existing, out of scope
 
-None new — the mangled `Deep-Research-Skills` directory and the two pre-existing `|| true` suppressions in `fetch-github-repo.sh` noted in the prior gate cycle are unchanged by this diff.
+None new — this diff's only pre-existing carryover is the operational Vercel env var gap noted above, which was already flagged before this gate ran.
