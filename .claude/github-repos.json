@@ -3055,6 +3055,225 @@
         "hooks": [],
         "token_optimization": []
       }
+    },
+    "impeccable": {
+      "url": "https://github.com/pbakaus/impeccable.git",
+      "name": "impeccable",
+      "last_fetched": "2026-09-12 23:54 UTC",
+      "components": {
+        "skills": [
+          "impeccable",
+          "impeccable",
+          "impeccable",
+          "impeccable",
+          "impeccable",
+          "impeccable",
+          "impeccable",
+          "impeccable",
+          "impeccable",
+          "impeccable",
+          "impeccable",
+          "impeccable",
+          "impeccable",
+          "impeccable",
+          "audit",
+          "impeccable",
+          "impeccable",
+          "impeccable",
+          "impeccable",
+          "impeccable",
+          "impeccable",
+          "impeccable",
+          "impeccable",
+          "impeccable"
+        ],
+        "agents": [
+          "impeccable-finish-reviewer",
+          "impeccable-documenter",
+          "impeccable-manual-edit-applier",
+          "impeccable-asset-producer",
+          "impeccable-finish-reviewer",
+          "impeccable-documenter",
+          "impeccable-manual-edit-applier",
+          "impeccable-asset-producer",
+          "impeccable-asset-producer.agent",
+          "impeccable-documenter.agent",
+          "impeccable-manual-edit-applier.agent",
+          "impeccable-finish-reviewer.agent",
+          "impeccable-finish-reviewer",
+          "impeccable-documenter",
+          "impeccable-manual-edit-applier",
+          "impeccable-asset-producer",
+          "impeccable-finish-reviewer",
+          "impeccable-documenter",
+          "impeccable-manual-edit-applier",
+          "impeccable-asset-producer",
+          "impeccable-finish-reviewer",
+          "impeccable-documenter",
+          "impeccable-manual-edit-applier",
+          "impeccable-asset-producer",
+          "impeccable-finish-reviewer",
+          "impeccable-documenter",
+          "impeccable-manual-edit-applier",
+          "impeccable-asset-producer"
+        ],
+        "commands": [
+          "impeccable"
+        ],
+        "hooks": [],
+        "token_optimization": []
+      }
+    },
+    "taste-skill": {
+      "url": "https://github.com/Leonxlnx/taste-skill.git",
+      "name": "taste-skill",
+      "last_fetched": "2026-09-12 23:54 UTC",
+      "components": {
+        "skills": [
+          "brandkit",
+          "redesign-skill",
+          "imagegen-frontend-web",
+          "soft-skill",
+          "brutalist-skill",
+          "taste-skill",
+          "taste-skill-v1",
+          "stitch-skill",
+          "output-skill",
+          "image-to-code-skill",
+          "gpt-tasteskill",
+          "imagegen-frontend-mobile",
+          "minimalist-skill"
+        ],
+        "agents": [],
+        "commands": [],
+        "hooks": [],
+        "token_optimization": []
+      }
+    },
+    "awesome-claude-design": {
+      "url": "https://github.com/VoltAgent/awesome-claude-design.git",
+      "name": "awesome-claude-design",
+      "last_fetched": "2026-09-13 00:08 UTC",
+      "components": {
+        "skills": [],
+        "agents": [],
+        "commands": [],
+        "hooks": [],
+        "token_optimization": []
+      }
+    },
+    "design-md-chrome": {
+      "url": "https://github.com/bergside/design-md-chrome.git",
+      "name": "design-md-chrome",
+      "last_fetched": "2026-09-13 00:08 UTC",
+      "components": {
+        "skills": [],
+        "agents": [],
+        "commands": [],
+        "hooks": [],
+        "token_optimization": []
+      }
+    },
+    "design-motion-principles": {
+      "url": "https://github.com/kylezantos/design-motion-principles.git",
+      "name": "design-motion-principles",
+      "last_fetched": "2026-09-13 00:08 UTC",
+      "components": {
+        "skills": [
+          "design-motion-principles"
+        ],
+        "agents": [],
+        "commands": [],
+        "hooks": [],
+        "token_optimization": []
+      }
+    },
+    "omniroute": {
+      "url": "https://github.com/diegosouzapw/OmniRoute.git",
+      "name": "OmniRoute",
+      "last_fetched": "2026-09-13 00:11 UTC",
+      "components": {
+        "skills": [
+          "omni-context-rtk",
+          "ponytail",
+          "omni-sync-cloud",
+          "cli-backup-sync",
+          "cli-tunnel",
+          "cli-routing",
+          "cli-eval",
+          "cli-compression",
+          "omni-api-keys",
+          "omni-cache",
+          "omni-models",
+          "omni-webhooks",
+          "cli-providers",
+          "cli-skill-collector",
+          "omni-cli-tools",
+          "cli-contexts",
+          "cli-policy-audit",
+          "omni-resilience",
+          "cli-resilience",
+          "cli-a2a",
+          "omni-tunnels",
+          "cli-plugins-skills",
+          "omni-auth",
+          "omni-proxies",
+          "omni-inference",
+          "omni-providers",
+          "cli-batches",
+          "omni-version-manager",
+          "config-codex-cli",
+          "cli-mcp",
+          "omni-combos-routing",
+          "cli-models",
+          "omni-agents-a2a",
+          "cli-chat",
+          "cli-serve",
+          "omni-mcp",
+          "omni-compression",
+          "omni-db-backups",
+          "cli-cost-usage",
+          "cli-keys",
+          "cli-setup",
+          "omni-budget",
+          "omni-usage-logs",
+          "omni-github-skills",
+          "cli-health",
+          "omni-settings",
+          "bridge-proof"
+        ],
+        "agents": [],
+        "commands": [
+          "bridge-check"
+        ],
+        "hooks": [],
+        "token_optimization": [
+          "SKILL.md",
+          "SKILL.md",
+          "combo.ts",
+          "settingsSchemas.ts",
+          "providerSpecificData.ts",
+          "sameAccountTransportRetry.ts",
+          "sessionAffinityPin.ts",
+          "chat.ts",
+          "projectCombo.ts",
+          "requestDefaults.ts"
+        ]
+      }
+    },
+    "one-skill-to-rule-them-all": {
+      "url": "https://github.com/rebelytics/one-skill-to-rule-them-all.git",
+      "name": "one-skill-to-rule-them-all",
+      "last_fetched": "2026-09-13 00:11 UTC",
+      "components": {
+        "skills": [
+          "one-skill-to-rule-them-all"
+        ],
+        "agents": [],
+        "commands": [],
+        "hooks": [],
+        "token_optimization": []
+      }
     }
   }
 }

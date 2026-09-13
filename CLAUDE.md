@@ -86,8 +86,18 @@ change are the only exception — answer those directly.
 **Protocol, every time:**
 1. Read `tasks/.feature-counter`, increment it, assign `FEAT-{N}`.
 2. Append a row to `tasks/pipeline-queue.md` (status: `queued`) with the requirement text.
-3. If a Workflow run is already active **this session** (check `tasks/pipeline-queue.md`
-   → Active run → `active_run_id`), resume it with the new feature appended:
+3. **Do NOT `TaskStop` a live Workflow run just to fold in a new feature or an
+   amended requirement (PERMANENT, per Arshad's explicit instruction 2026-09-13).**
+   Only ever interrupt an in-flight run when Arshad explicitly says to. If a run is
+   already active **this session** (check `tasks/pipeline-queue.md` → Active run →
+   `active_run_id`), leave it running and just queue the new/amended feature —
+   it picks it up the next time the run naturally settles (completes, halts, or
+   errors) and a fresh `Workflow` invocation is made, or the next time a session
+   starts fresh. If Arshad amends a requirement for a feature that's mid-flight in
+   the active run, still don't stop it: update the row in `tasks/pipeline-queue.md`
+   with the amended text and a note that it supersedes what the current run is
+   building, and let the *next* invocation (after this run settles) pick up the
+   amended version.
    ```
    Workflow({
      scriptPath: ".claude/workflows/dev-team-pipeline.js",
@@ -95,8 +105,10 @@ change are the only exception — answer those directly.
      args: { features: [...every queued/in_flight feature, old ones unchanged...] }
    })
    ```
-   Unchanged features return instantly from cache (same prompt+opts); only the new
-   one's agent calls actually run — and it interleaves with whatever's still in
+   This resume form is only for when the run has already settled (or Arshad
+   explicitly asked to stop it) — never call it against a run still `running`.
+   Unchanged features return instantly from cache (same prompt+opts); only new or
+   amended ones' agent calls actually run — interleaved with whatever's still in
    flight, respecting the per-role lock (below).
 4. If this is a **new session** (no active run_id, or the prior session ended),
    start a fresh run with only the still-`queued`/`in_flight` features — completed
@@ -810,6 +822,13 @@ This registry is the source of truth for weekly auto-updates.
 | `claude-skills` | https://github.com/alirezarezvani/claude-skills | skills+agents+commands+hooks | Large mixed pack — hundreds of skills/agents/commands spanning C-level advisors, marketing, product, engineering, compliance, and ops roles, plus 5 hooks (karpathy-gate, on-session-end, error-capture, detect-playwright, validate-test) | 2026-09-12 |
 | `codegraph` | https://github.com/colbymchenry/codegraph | skills | 2 skills (agent-eval, add-lang) | 2026-09-12 |
 | `marketingskills` | https://github.com/coreyhaines31/marketingskills | skills | ~55 marketing skills (SEO, ads, copywriting, CRO, email, social, pricing, retention) | 2026-09-12 |
+| `impeccable` | https://github.com/pbakaus/impeccable | skills+agents+commands | 1 skill (impeccable — visual polish/design-critique toolchain: audit, craft, harden, polish, typeset, live-preview), 4 agents (asset-producer, documenter, finish-reviewer, manual-edit-applier), 1 command | 2026-09-12 |
+| `taste-skill` | https://github.com/Leonxlnx/taste-skill | skills | 13 design-taste skills (brandkit, redesign, minimalist, brutalist, soft, stitch, image-to-code, imagegen-frontend web/mobile, output, gpt-tasteskill) | 2026-09-12 |
+| `awesome-claude-design` | https://github.com/VoltAgent/awesome-claude-design | reference | curated Claude design-resource list (no SKILL.md extractables) | 2026-09-13 |
+| `design-md-chrome` | https://github.com/bergside/design-md-chrome | reference | Chrome extension project (no SKILL.md extractables) | 2026-09-13 |
+| `design-motion-principles` | https://github.com/kylezantos/design-motion-principles | skills | 1 skill (design-motion-principles — UI motion/animation audit + creation workflow, references named designers' principles, accessibility & performance guidance) | 2026-09-13 |
+| `omniroute` | https://github.com/diegosouzapw/OmniRoute | skills+commands | ~34 skills (multi-provider LLM routing/proxy CLI toolchain — auth, budget, cache, resilience, tunnels, MCP, webhooks, usage logs, version manager), 1 command (bridge-check) | 2026-09-13 |
+| `one-skill-to-rule-them-all` | https://github.com/rebelytics/one-skill-to-rule-them-all | skills | 1 skill (one-skill-to-rule-them-all) | 2026-09-13 |
 
 > This table is updated automatically by `scripts/fetch-github-repo.sh` when a new repo is integrated.
 
