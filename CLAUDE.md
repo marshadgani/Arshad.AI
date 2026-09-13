@@ -86,8 +86,18 @@ change are the only exception — answer those directly.
 **Protocol, every time:**
 1. Read `tasks/.feature-counter`, increment it, assign `FEAT-{N}`.
 2. Append a row to `tasks/pipeline-queue.md` (status: `queued`) with the requirement text.
-3. If a Workflow run is already active **this session** (check `tasks/pipeline-queue.md`
-   → Active run → `active_run_id`), resume it with the new feature appended:
+3. **Do NOT `TaskStop` a live Workflow run just to fold in a new feature or an
+   amended requirement (PERMANENT, per Arshad's explicit instruction 2026-09-13).**
+   Only ever interrupt an in-flight run when Arshad explicitly says to. If a run is
+   already active **this session** (check `tasks/pipeline-queue.md` → Active run →
+   `active_run_id`), leave it running and just queue the new/amended feature —
+   it picks it up the next time the run naturally settles (completes, halts, or
+   errors) and a fresh `Workflow` invocation is made, or the next time a session
+   starts fresh. If Arshad amends a requirement for a feature that's mid-flight in
+   the active run, still don't stop it: update the row in `tasks/pipeline-queue.md`
+   with the amended text and a note that it supersedes what the current run is
+   building, and let the *next* invocation (after this run settles) pick up the
+   amended version.
    ```
    Workflow({
      scriptPath: ".claude/workflows/dev-team-pipeline.js",
@@ -95,8 +105,10 @@ change are the only exception — answer those directly.
      args: { features: [...every queued/in_flight feature, old ones unchanged...] }
    })
    ```
-   Unchanged features return instantly from cache (same prompt+opts); only the new
-   one's agent calls actually run — and it interleaves with whatever's still in
+   This resume form is only for when the run has already settled (or Arshad
+   explicitly asked to stop it) — never call it against a run still `running`.
+   Unchanged features return instantly from cache (same prompt+opts); only new or
+   amended ones' agent calls actually run — interleaved with whatever's still in
    flight, respecting the per-role lock (below).
 4. If this is a **new session** (no active run_id, or the prior session ended),
    start a fresh run with only the still-`queued`/`in_flight` features — completed
