@@ -46,6 +46,38 @@ export class ConnectError extends Error {
   }
 }
 
+/**
+ * POST /api/v1/integrations/{slug}/sync — ask the backend to re-run a
+ * provider's sync() now. Resolves on success, rejects on any non-2xx.
+ *
+ * Extracted from useFinanceHoldings so that hook holds sync *state* only
+ * and no longer carries a second, divergent copy of the auth-header and
+ * response-check rules this module already owns.
+ *
+ * Two deliberate differences from connectIntegration above, both
+ * preserving the behaviour this call already had:
+ *  - the Authorization header is omitted entirely when no token is
+ *    stored, rather than sent as a literal `Bearer null`;
+ *  - the response body is never read. Sync failures surface as a status
+ *    code; a rejection here must not depend on the error envelope being
+ *    parseable, and must never clear the session token — only useFetch's
+ *    401 handling owns that path.
+ */
+export async function syncIntegration(slug: string): Promise<void> {
+  const token = getToken();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  // Encoded, not interpolated raw: `slug` is server-supplied today, but a
+  // path segment built by concatenation is one upstream change away from
+  // traversing to a different endpoint ('../disconnect').
+  const res = await fetch(`/api/v1/integrations/${encodeURIComponent(slug)}/sync`, {
+    method: 'POST',
+    headers,
+  });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+}
+
 export async function connectIntegration(
   slug: string,
   payload: Record<string, unknown> = {},

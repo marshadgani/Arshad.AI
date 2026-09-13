@@ -32,6 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..api.errors import http_error
 from ..auth.dependencies import get_current_user
+from ..middleware.rate_limit import enforce_rate_limit
 from ..models.database import get_db
 from ..models.integration import Integration
 from ..models.user import User
@@ -46,6 +47,18 @@ def _frontend_url_env() -> str:
 
 
 router = APIRouter(prefix="/api/v1/integrations", tags=["integrations"])
+
+# A sync fans out an authenticated, unbounded outbound call to a third-party
+# provider (broker portfolio reads, Google/Shopify APIs). The "Sync now"
+# button on /finance and /stocks fires one per connected broker, and its
+# only guard is a client-side in-flight flag -- trivially bypassed by
+# replaying the POST. Without a server-side bound, one session can drive an
+# arbitrary request rate at the provider and burn the account's upstream
+# quota (or trip the broker's own abuse controls, which locks the user out
+# of the integration entirely). Fails open on a Redis outage, like every
+# other bucket -- see middleware/rate_limit.py.
+_SYNC_RATE_LIMIT = 10
+_SYNC_RATE_WINDOW_SECONDS = 60
 
 
 def _provider_descriptor(p: IntegrationProvider) -> dict[str, Any]:
@@ -167,6 +180,15 @@ async def sync_integration(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     provider = _require_provider(slug)
+    await enforce_rate_limit(
+        bucket="integration_sync",
+        identity=f"{user.id}:{slug}",
+        limit=_SYNC_RATE_LIMIT,
+        window_seconds=_SYNC_RATE_WINDOW_SECONDS,
+        message=(
+            f"Too many sync requests. Retry after {_SYNC_RATE_WINDOW_SECONDS} seconds."
+        ),
+    )
     integration = await _find_user_integration(slug, user, db)
     if integration is None:
         raise http_error(

@@ -30,6 +30,7 @@ from ..base import (
     StatusReport,
     SyncResult,
 )
+from ._holdings_snapshot import MAX_STORED_HOLDINGS as MAX_STORED_HOLDINGS  # noqa: F401
 
 
 def _frontend_url() -> str:

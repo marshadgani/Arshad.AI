@@ -21,7 +21,7 @@ import os
 import secrets
 import time
 import uuid
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, ClassVar
@@ -31,7 +31,7 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...auth.crypto import decrypt, encrypt
+from ...auth.crypto import TokenDecryptError, decrypt, encrypt
 from ...middleware.cache import get_redis
 from ...models.integration import Integration, IntegrationOAuthToken
 from ...models.user import User
@@ -41,6 +41,7 @@ from ..base import (
     IntegrationProvider,
     StatusReport,
     SyncResult,
+    needs_reauth,
 )
 
 _STATE_TTL_SECONDS = 600  # 10 min — generous for slow consent flows
@@ -297,6 +298,23 @@ class OAuthIntegrationProvider(IntegrationProvider):
             extra=extra,
         )
 
+    def sync_headers(self, access_token: str) -> dict[str, str]:
+        """Request headers for this provider's sync read.
+
+        The overwhelming majority of providers are plain bearer-token, so
+        that is the default. A provider whose API authenticates
+        differently (Kite wants `token <api_key>:<access_token>` plus a
+        version header) overrides this instead of re-implementing sync().
+
+        Called by make_oauth_sync_via_api inside its guarded block, so an
+        override that touches config -- e.g. `self._client_id()`, which
+        raises IntegrationError('missing_client_id') when the env var is
+        unset or rotated -- is classified by record_sync_failure like any
+        other sync failure rather than escaping unclassified and leaving
+        integration.status stuck at its previous value.
+        """
+        return {"Authorization": f"Bearer {access_token}"}
+
     async def get_access_token(
         self, *, integration: Integration, db: AsyncSession
     ) -> str:
@@ -318,14 +336,36 @@ class OAuthIntegrationProvider(IntegrationProvider):
             and row.encrypted_refresh_token
         ):
             await self._refresh(row=row, db=db)
-        return decrypt(row.encrypted_access_token)
+        try:
+            return decrypt(row.encrypted_access_token)
+        except TokenDecryptError as exc:
+            # Corrupted ciphertext or a rotated OAUTH_ENCRYPTION_KEY makes
+            # this row permanently unusable -- no retry will ever succeed.
+            # Bare TokenDecryptError is invisible to integrations.base.
+            # needs_reauth (it only recognises IntegrationError and
+            # httpx.HTTPStatusError), so left unwrapped it was classified
+            # as a transient 'error' by record_sync_failure even though
+            # "token_decryption_failed" is already declared in REAUTH_CODES
+            # for exactly this case. Wrapping it here is what makes that
+            # declared code actually reachable, and turns the wire message
+            # from the misleading "Try syncing again" into "Reconnect".
+            raise IntegrationError(
+                "token_decryption_failed",
+                f"{self.display_name} access token could not be decrypted.",
+            ) from exc
 
     async def _refresh(self, *, row: IntegrationOAuthToken, db: AsyncSession) -> None:
-        rt = (
-            decrypt(row.encrypted_refresh_token)
-            if row.encrypted_refresh_token
-            else None
-        )
+        try:
+            rt = (
+                decrypt(row.encrypted_refresh_token)
+                if row.encrypted_refresh_token
+                else None
+            )
+        except TokenDecryptError as exc:
+            raise IntegrationError(
+                "token_decryption_failed",
+                f"{self.display_name} refresh token could not be decrypted.",
+            ) from exc
         if not rt:
             raise IntegrationError(
                 "no_refresh_token",
@@ -435,35 +475,116 @@ async def upsert_oauth_integration(
     return integration
 
 
+_LAST_ERROR_MAX_CHARS = 500
+
+
+async def record_sync_failure(
+    integration: Integration,
+    exc: BaseException,
+    db: AsyncSession,
+    *,
+    slug: str,
+    extra_codes: frozenset[str] = frozenset(),
+) -> bool:
+    """Classify `exc` and persist the resulting status on `integration`.
+
+    Returns the needs_reauth bool so the caller can shape its own error
+    message. Never raises — a failure to persist status must not mask the
+    original sync failure the caller is about to re-raise. The raw
+    exception text is written to Integration.last_error (truncated, DB-only
+    — never serialised to the client, see services/finance/holdings.py) and
+    logged here, since that log line is the only remaining signal once the
+    wire response is sanitised.
+    """
+    reauth = needs_reauth(exc, extra_codes)
+    try:
+        integration.status = "expired" if reauth else "error"
+        integration.last_error = f"{type(exc).__name__}: {exc}"[:_LAST_ERROR_MAX_CHARS]
+        _log.warning(
+            "sync failed slug=%s status=%s err=%s: %s",
+            slug,
+            integration.status,
+            type(exc).__name__,
+            exc,
+        )
+        await db.commit()
+    except Exception:  # noqa: BLE001
+        _log.exception("Failed to persist sync failure status for slug=%s", slug)
+    return reauth
+
+
+ParseSync = Callable[[Any], dict[str, Any]]
+Summarise = Callable[[str, dict[str, Any]], str]
+SyncMethod = Callable[..., Awaitable[SyncResult]]
+
+
 def make_oauth_sync_via_api(
     *,
     sync_url: str,
-    parse_sync: Any,
+    parse_sync: ParseSync | None,
     summary_fmt: str = "{name}: refreshed",
-):
+    summarise: Summarise | None = None,
+    extra_reauth_codes: frozenset[str] = frozenset(),
+) -> SyncMethod:
     """Helper for OAuth providers whose sync just calls a single API endpoint
-    with the bearer token and stores parse_sync(body) in integration.config.
+    and stores parse_sync(body) in integration.config.
+
+    This is the one implementation of the sync lifecycle -- preflight
+    token, guarded read, failure classification, config merge, commit --
+    and therefore the one place the "never leave integration.status stuck
+    at its previous value" invariant has to hold. Providers vary only in
+    what they declare: the URL, how the body parses, how the request
+    authenticates (OAuthIntegrationProvider.sync_headers), and what the
+    summary line says.
+
+    `summarise` takes (display_name, config_update) and exists for
+    providers whose summary quotes something the parse produced (a row
+    count). Without it, `summary_fmt` is formatted with the display name.
     """
 
     async def _sync(self, *, integration: Integration, db: AsyncSession) -> SyncResult:
         started = time.perf_counter()
-        access_token = await self.get_access_token(integration=integration, db=db)
+        # Every step that can fail is inside this one guarded block, which is
+        # what enforces the invariant above: the preflight token fetch, the
+        # header build (an override such as Kite's sync_headers reads provider
+        # config and can raise), the HTTP read, and the parse of a possibly
+        # malformed upstream body. Anything left outside would propagate
+        # unclassified and strand integration.status at its previous value.
         try:
+            access_token = await self.get_access_token(integration=integration, db=db)
             async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT_SECONDS) as client:
                 resp = await client.get(
                     sync_url,
-                    headers={"Authorization": f"Bearer {access_token}"},
+                    headers=self.sync_headers(access_token),
                 )
                 resp.raise_for_status()
                 body = resp.json()
+            config_update = parse_sync(body) if parse_sync else {"ok": True}
         except Exception as exc:  # noqa: BLE001
-            integration.status = "error"
-            integration.last_error = f"{type(exc).__name__}: {exc}"[:500]
-            await db.commit()
-            raise IntegrationError("sync_failed", f"{type(exc).__name__}: {exc}")
+            reauth = await record_sync_failure(
+                integration, exc, db, slug=self.slug, extra_codes=extra_reauth_codes
+            )
+            # The message on this exception is rendered verbatim by
+            # integrations/routers.py into a 400 error envelope, i.e. it is
+            # wire-facing. The raw exception text (class name, upstream URL,
+            # upstream status/body fragment) must never go there per
+            # .claude/rules/api.md -- it is already persisted to
+            # Integration.last_error and logged by record_sync_failure above,
+            # which are the diagnostic channels. Two generic sentences, chosen
+            # by the same reauth classification the status column uses, so the
+            # client still learns whether reconnecting will help.
+            raise IntegrationError(
+                "sync_failed",
+                (
+                    f"Your {self.display_name} connection expired. "
+                    "Reconnect it and try again."
+                    if reauth
+                    else f"Couldn't reach {self.display_name}. Try syncing again."
+                ),
+            ) from exc
         integration.config = {
             **(integration.config or {}),
-            **(parse_sync(body) if parse_sync else {"ok": True}),
+            **config_update,
         }
         integration.last_synced_at = datetime.now(timezone.utc)
         integration.last_error = None
@@ -471,7 +592,11 @@ def make_oauth_sync_via_api(
         await db.commit()
         return SyncResult(
             rows_written=0,
-            summary=summary_fmt.format(name=self.display_name),
+            summary=(
+                summarise(self.display_name, config_update)
+                if summarise
+                else summary_fmt.format(name=self.display_name)
+            ),
             duration_ms=int((time.perf_counter() - started) * 1000),
         )
 
