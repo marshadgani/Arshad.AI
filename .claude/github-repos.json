@@ -3260,6 +3260,20 @@
           "requestDefaults.ts"
         ]
       }
+    },
+    "one-skill-to-rule-them-all": {
+      "url": "https://github.com/rebelytics/one-skill-to-rule-them-all.git",
+      "name": "one-skill-to-rule-them-all",
+      "last_fetched": "2026-09-13 00:11 UTC",
+      "components": {
+        "skills": [
+          "one-skill-to-rule-them-all"
+        ],
+        "agents": [],
+        "commands": [],
+        "hooks": [],
+        "token_optimization": []
+      }
     }
   }
 }
