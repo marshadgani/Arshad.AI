@@ -98,6 +98,8 @@ change are the only exception — answer those directly.
    with the amended text and a note that it supersedes what the current run is
    building, and let the *next* invocation (after this run settles) pick up the
    amended version.
+3b. **Once a run has settled** (or Arshad explicitly asked to stop it — never while
+   it's still `running`), resume it with every queued/amended feature appended:
    ```
    Workflow({
      scriptPath: ".claude/workflows/dev-team-pipeline.js",
@@ -105,8 +107,6 @@ change are the only exception — answer those directly.
      args: { features: [...every queued/in_flight feature, old ones unchanged...] }
    })
    ```
-   This resume form is only for when the run has already settled (or Arshad
-   explicitly asked to stop it) — never call it against a run still `running`.
    Unchanged features return instantly from cache (same prompt+opts); only new or
    amended ones' agent calls actually run — interleaved with whatever's still in
    flight, respecting the per-role lock (below).
@@ -234,7 +234,7 @@ through `Workflow`'s `agentType` option, which resolves from the same registry.
 
 | File | Purpose |
 |---|---|
-| `.claude/workflows/dev-team-pipeline.js` | The canonical 28-30 stage Workflow script. Invoke by `name: "dev-team-pipeline"` (fresh session) or `scriptPath` + `resumeFromRunId` (same session, to add a feature to an active run). |
+| `.claude/workflows/dev-team-pipeline.js` | The canonical 28-30 stage Workflow script. Invoke by `name: "dev-team-pipeline"` (fresh session) or `scriptPath` + `resumeFromRunId` (same session, only to resume a run that has already settled — never against a run still `running`; see § "Auto-Trigger — No command needed" step 3). |
 | `tasks/pipeline-queue.md` | Living queue of features — queued/in_flight/completed/halted/error — plus the current session's `active_run_id`. Read this FIRST every time before deciding whether to resume or start fresh. |
 | `tasks/pipeline-runs.md` | Append-only run history (one row per completed feature), written by the pipeline's own final "Ship" stage. |
 | `tasks/agent-outputs/<role>/<FEAT_ID>.json` | Per-stage outputs, written when a stage is run manually outside the Workflow (e.g. to seed a run) — not written by the Workflow itself, which keeps state in-memory across the script's single execution. |
@@ -827,7 +827,7 @@ This registry is the source of truth for weekly auto-updates.
 | `awesome-claude-design` | https://github.com/VoltAgent/awesome-claude-design | reference | curated Claude design-resource list (no SKILL.md extractables) | 2026-09-13 |
 | `design-md-chrome` | https://github.com/bergside/design-md-chrome | reference | Chrome extension project (no SKILL.md extractables) | 2026-09-13 |
 | `design-motion-principles` | https://github.com/kylezantos/design-motion-principles | skills | 1 skill (design-motion-principles — UI motion/animation audit + creation workflow, references named designers' principles, accessibility & performance guidance) | 2026-09-13 |
-| `omniroute` | https://github.com/diegosouzapw/OmniRoute | skills+commands | ~34 skills (multi-provider LLM routing/proxy CLI toolchain — auth, budget, cache, resilience, tunnels, MCP, webhooks, usage logs, version manager), 1 command (bridge-check) | 2026-09-13 |
+| `omniroute` | https://github.com/diegosouzapw/OmniRoute | skills+commands | 46 skills (multi-provider LLM routing/proxy CLI toolchain — auth, budget, cache, resilience, tunnels, MCP, webhooks, usage logs, version manager), 1 command (bridge-check) | 2026-09-13 |
 | `one-skill-to-rule-them-all` | https://github.com/rebelytics/one-skill-to-rule-them-all | skills | 1 skill (one-skill-to-rule-them-all) | 2026-09-13 |
 
 > This table is updated automatically by `scripts/fetch-github-repo.sh` when a new repo is integrated.
