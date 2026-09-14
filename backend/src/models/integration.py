@@ -116,7 +116,9 @@ class IntegrationIngestToken(Base, TimestampedMixin):
     last_used_at: Mapped[datetime | None] = mapped_column(
         TIMESTAMP(timezone=True), nullable=True
     )
-    revoked_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
 
 
 class ApiKeyCredential(Base, TimestampedMixin):

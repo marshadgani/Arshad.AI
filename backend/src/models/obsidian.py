@@ -15,7 +15,7 @@ from sqlalchemy import ForeignKey, Index, Integer, String, Text, UniqueConstrain
 from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from .base import Base
+from .base import Base, utcnow
 
 
 class IngestedObsidianNote(Base):
@@ -50,8 +50,8 @@ class IngestedObsidianNote(Base):
     # GitHub blob SHA — used to skip unchanged files on re-sync
     blob_sha: Mapped[str] = mapped_column(String(40), nullable=False, default="")
     last_modified_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), nullable=False, default=datetime.utcnow
+        TIMESTAMP(timezone=True), nullable=False, default=utcnow
     )
     ingested_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), nullable=False, default=datetime.utcnow
+        TIMESTAMP(timezone=True), nullable=False, default=utcnow
     )

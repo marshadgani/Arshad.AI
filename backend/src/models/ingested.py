@@ -17,7 +17,7 @@ from sqlalchemy import ForeignKey, Index, Numeric, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from .base import Base
+from .base import Base, utcnow
 
 
 class IngestedCalendarEvent(Base):
@@ -43,7 +43,7 @@ class IngestedCalendarEvent(Base):
     provider_id: Mapped[str] = mapped_column(String(255), nullable=False)
     raw: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
     ingested_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), nullable=False, default=datetime.utcnow
+        TIMESTAMP(timezone=True), nullable=False, default=utcnow
     )
 
 
@@ -70,7 +70,7 @@ class IngestedGmailThread(Base):
     provider_id: Mapped[str] = mapped_column(String(255), nullable=False)
     raw: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
     ingested_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), nullable=False, default=datetime.utcnow
+        TIMESTAMP(timezone=True), nullable=False, default=utcnow
     )
 
 
@@ -101,7 +101,7 @@ class IngestedGitHubActivity(Base):
     provider_id: Mapped[str] = mapped_column(String(255), nullable=False)
     raw: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
     ingested_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), nullable=False, default=datetime.utcnow
+        TIMESTAMP(timezone=True), nullable=False, default=utcnow
     )
 
 
@@ -132,5 +132,5 @@ class IngestedAnalyticsSummary(Base):
     metric_value: Mapped[Decimal] = mapped_column(Numeric, nullable=False)
     raw: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
     ingested_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), nullable=False, default=datetime.utcnow
+        TIMESTAMP(timezone=True), nullable=False, default=utcnow
     )
