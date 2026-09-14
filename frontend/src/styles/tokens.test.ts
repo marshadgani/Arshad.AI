@@ -97,4 +97,19 @@ describe('tokens.test.ts', () => {
     );
     expect(violations).toEqual([{ name: '--totally-made-up-token-xyz', line: 2 }]);
   });
+
+  // A guard's own regex is not a CSS parser: it caught the undefined-token
+  // class of bug fine, but a stray */ inside a comment (a real incident —
+  // "--accent-*/" in an earlier draft of this file's own tokens.css edit)
+  // corrupts CSS syntax in a way plain-text matching can't detect at all.
+  // This check can't tell whether a comment is well-formed either, but it
+  // can catch the specific, cheap-to-verify symptom: an unequal count of
+  // comment openers and closers, which a properly paired (non-nesting)
+  // set of CSS comments always has equal.
+  it('tokens.css has a matching number of comment openers and closers', () => {
+    const css = readFileSync(TOKENS_FILE, 'utf-8');
+    const opens = css.match(/\/\*/g)?.length ?? 0;
+    const closes = css.match(/\*\//g)?.length ?? 0;
+    expect(closes).toBe(opens);
+  });
 });
