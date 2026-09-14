@@ -97,3 +97,11 @@ verify after deploy: `Application startup complete`, then optionally run
 `set_password.py` and confirm a real password login succeeds and is still gated by
 the FEAT-158 allowlist (test with a disallowed email if possible, expect 403
 `email_not_allowed`).
+
+## Merge-conflict resolution verified (commit `0c339d73`)
+
+Reconciled against `main`'s FEAT-158 (merged since this branch's base) — see the
+merge-conflict note above. Full backend suite re-run after resolution: 616 passed,
+7 failed, all 7 confirmed pre-existing (5 need a live Postgres this sandbox lacks,
+2 in `test_token_service.py` already documented broken on `main` in FEAT-158's own
+gate report) — none introduced by this merge. Verdict stands: **GATE PASSED**.
