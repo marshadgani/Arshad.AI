@@ -1,40 +1,107 @@
-# Merge-to-Main Gate Report
+# Merge-to-Main Gate Report — FEAT-159 (Password Login alongside OAuth)
 
-**Source branch:** `claude/ai-personal-assistant-CcA11`
+**Branch:** `dev-team/feat-143-password-auth-halted-denylist` (feature itself renumbered FEAT-143 → FEAT-159 during this merge — see `tasks/pipeline-queue.md`'s "Second ID collision note")
 **Target branch:** `claude/ai-personal-assistant-main`
 **Date:** 2026-09-14
-**Diff scope:** 23 files, +1114/-18 lines. **FEAT-158** — emergency fix for a confirmed-live production vulnerability, done by Arshad's direct request ("Do this"): there was no login allowlist anywhere in `backend/src/auth/`, so any Google/GitHub account could create a session, and combined with `_find_user_integration` matching `Integration.user_id IS NULL` (shared, project-scoped rows: Stripe, Cloudflare, Render, Vercel, Supabase, the Anthropic admin key) for every authenticated user by design, any signed-in stranger could read/sync/disconnect/overwrite the deployment's shared credentials. Discovered independently by 3 Security Auditor runs during earlier FEAT-156/145/146 pipeline attempts (see `tasks/pipeline-queue.md`). Also carries FEAT-149 (Home & IoT/Learning/Travel honest "Coming soon" relabel), a small isolated fix that rode along on this branch, already separately verified (tsc clean, tests passing) before this gate ran.
 
-## Verdict: GATE PASSED ✅
+## GATE PASSED — verdict: WARN (auto-merge eligible per CLAUDE.md §20)
 
-Ran the full 8-agent panel independently against this diff — not a rubber stamp of anything upstream. First pass returned 2 Critical and several converging WARN/Critical findings across agents; **all were fixed directly and the fixes verified** before this report was written. No Critical or FAIL findings remain.
+The gate initially came back **BLOCKED** (a coverage FAIL plus a security-exception
+WARN, which auto-upgrades to FAIL per this repo's rules). Both were fixed and
+verified before this report was first written. Everything else is WARN-level,
+non-blocking, and listed as a checklist below for Arshad's discretion. Per §20's
+Gate Verdicts table, WARN (zero FAIL, zero unresolved Critical) merges the same as
+PASS.
 
-## Agent-by-agent results (first pass — before fixes)
+**Merge-conflict note (added after the original gate, before this push):** `main`
+advanced past this branch's base with FEAT-158, an emergency `AUTH_ALLOWED_EMAILS`
+login-allowlist fix for a live production vulnerability. Reconciling the two
+required adding the same `is_email_allowed()` check to `password_login`
+(`backend/src/auth/routers.py`), mirroring `_handle_callback`'s placement exactly
+— after credentials are confirmed valid, before a token is issued — otherwise
+password login would have been a live bypass of FEAT-158's fix from the moment
+this merged. `get_current_user` already re-checks the allowlist on every
+authenticated request regardless of how the JWT was obtained, so this addition is
+defense-in-depth (matching the OAuth path's behavior) rather than the only thing
+standing between a disallowed account and a working session — but it closes the
+gap between "OAuth blocks unauthorized logins with a 403" and "password login
+would have silently issued a 200" that a naive conflict resolution could have left
+in place.
 
-| # | Agent | Verdict | Summary |
-|---|---|---|---|
-| 1 | `code-reviewer` | 2 Critical, 3 Important | **Critical:** existing sessions/JWTs issued before this fix are never revoked — only new logins were gated. **Critical:** shared-integration read paths (`list_integrations`, `integration_status`) were still ungated. Also flagged: fail-open default coupled to an unreliable production heuristic, Google `email_verified` never checked, and deploy-ordering risk (env var must be set before merge). |
-| 2 | `security-auditor` | WARN (→ FAIL per project policy) | SEC-001: the `_is_production()` heuristic (`BACKEND_URL` scheme) could silently fail to fire, leaving the entire gate inert with no error. Confirmed the core mechanism (ordering, `provider.kind` trustworthiness, `user_id IS NULL` gating, no debug bypass) was otherwise sound. |
-| 3 | `debugger` | No real issues found | Traced every path by hand (empty email, `os.getenv` edge cases, circular imports, `provider.kind` always set, `_require_owner` no bypass via `personal_apikey`). Independently re-ran the full suite against a fresh `origin/main` worktree to confirm the 4 pre-existing failures predate this diff. |
-| 4 | `test-writer` | 1 High gap | No test exercised `main.py`'s startup fail-closed guard at all — a real gap for a critical safety mechanism. Every other criterion (happy path, rejection, permissive-when-unset, case-insensitivity, shared-vs-personal asymmetry) was covered. |
-| 5 | `refactorer` | Moderate | Flagged duplicated production-detection logic between `main.py` and `auth/routers.py`, `_require_owner`'s placement, and an inconsistent connect-vs-sync/disconnect gating signal. |
-| 6 | `doc-writer` | Minor | One public function (`allowed_emails`) missing a docstring; everything else — module docstring, `.env.example` entry, `RuntimeError` message — rated clearly actionable. |
-| 7 | `silent-failure-hunter` | 2 Warning, 1 Suggestion | Independently confirmed the same production-heuristic fragility (Warning 1). New: `connect_integration`'s gate keyed off `provider.kind` rather than ground truth, so a future shared-but-mis-kinded provider could silently bypass only that check (Warning 2). Suggested `is_email_allowed()` defend against `None`/empty input rather than relying on callers. |
-| 8 | `pr-test-analyzer` | 3 gaps | Confirmed assertions are genuinely behavioral (`assert_not_awaited()` on the protected side effect, not just exception presence). Gaps: no positive "owner succeeds" test for `sync`, no test of connect's kind-based gate on a personal-kind provider, and the same `main.py` startup-guard gap test-writer found. |
+## What this feature is
 
-## Fixes applied (all Critical/blocking findings, before this report)
+Adds username/password login as a second auth method alongside the existing
+Google/GitHub OAuth flow, on one combined login screen. This is the 3rd design
+iteration — the first two were rejected by Architecture Critic (timing oracle,
+untestable test, self-lockout rate limiter, silent scope change; then a rate-limit
+topology claim that wasn't empirically checked). This 3rd design converged cleanly
+and was then blocked only by the pipeline's own `backend/src/auth/` denylist —
+Arshad reviewed and approved that exception directly (recorded in
+`.claude/workflows/dev-team-pipeline.js`'s `DENY_EXCEPTIONS`, same precedent as
+FEAT-120).
 
-- **`backend/src/auth/dependencies.py`** — `get_current_user` now re-checks `AUTH_ALLOWED_EMAILS` on every authenticated request (401 `email_not_allowed`), not just at login. Closes both Critical findings from code-reviewer at once: revokes any session issued before/during a gap in the gate, and (since every route depends on it) closes the two previously-ungated read routes for free. Verified against production (Supabase `dslnjhuciypccowyiwaa`): only one user row exists (Arshad's own, created 2026-04-27) — no rogue accounts from the vulnerability window to purge.
-- **`backend/src/auth/allowlist.py`** — `is_email_allowed()` now denies by default when `AUTH_ALLOWED_EMAILS` is empty, gated behind an explicit `AUTH_ALLOW_ALL_LOGINS` opt-in for local dev, removing reliance on production-detection for the core decision (closes SEC-001/Warning 1/Finding 3). Added `is_production_backend()` (checks `RENDER=="true"` — Render's own guaranteed signal — in addition to the `BACKEND_URL` scheme) for the startup check's early-feedback role. Also denies `None`/empty email defensively (silent-failure-hunter's suggestion).
-- **`backend/src/main.py`** — startup check extracted into a testable `_enforce_login_allowlist()` function using the hardened production signal.
-- **`backend/src/integrations/routers.py`** — `connect_integration`'s owner gate now fails closed on any `provider.kind` not in an explicit `_PERSONAL_KINDS` set, instead of an allowlist-of-shared-kinds a new `IntegrationKind` could silently bypass (Warning 2). Fixed a duplicate `app.dependency_overrides.clear()` line in the test file.
-- **`backend/src/auth/providers/google.py`** — `fetch_user_info` now rejects an unverified email, matching GitHub's existing check, since the email is now the entire login/ownership decision and account-linking key (Important Finding 4).
-- **Tests** — 5 new tests for the `main.py` startup guard, 4 for `get_current_user`'s allowlist check, 3 for Google's `email_verified` check, plus the sync-owner-succeeds and connect-kind-gate gaps pr-test-analyzer/test-writer flagged. Full backend suite: 592 passed, same 4 pre-existing unrelated failures as before this diff (2 need a live Postgres this sandbox lacks, 2 in `test_token_service.py` already broken on `main` — verified via `git stash` and a fresh worktree against `origin/main`).
+## Fixed in this gate cycle
+
+### 1. Coverage FAIL → fixed (test-writer gate)
+`lockout.py` — the actual brute-force defense for this feature — sat at ~35-40%
+coverage; every existing test bypassed it via a fixture or only hit the
+Redis-outage escape hatch. Added 10 tests covering the actual 429-at-threshold
+enforcement, `record_failure`/`clear_failures` call verification with the
+normalized email, the Redis pipeline itself, and the missed kill-switch sentinel
+values (`"0"`, `"no"`). Commit `3078bd98`.
+
+### 2. Security WARN → fixed (security-auditor: SEC-001; code-reviewer: W3)
+The global rate-limit backstop (`identity="global"`, was `limit=10/min`) is a
+single shared counter any anonymous caller could hold saturated indefinitely,
+429-ing the real owner's login attempts too — while its own docstring claimed it
+"cannot lock the owner out." Raised the limit to 100/min (a genuine-flood
+threshold, not a casual-retry one) and corrected the docstring to state the
+tradeoff honestly: it's a CPU backstop, not an account guard; the per-email
+lockout is the real brute-force defense; OAuth is on a separate route/bucket and
+stays available whenever this one saturates. Commit `b258268e`.
+
+### 3. Merge conflict with FEAT-158's allowlist → fixed (this push)
+See the merge-conflict note above. Commit is this branch's merge commit.
+
+## Agent-by-agent results
+
+| Agent | Verdict | Findings |
+|---|---|---|
+| code-reviewer | WARN | W1: `set_password.py` has no 128-char cap matching the login endpoint's `max_length`, so an over-length password locks the owner out with no diagnostic. W2: the 422 handler's `json.dumps` has no `default=`, latent crash if a future validator ever raises with a non-serializable `ctx` value. W3: **fixed above** (folded into SEC-001 fix). |
+| security-auditor | WARN→fixed | SEC-001: **fixed above**. SEC-002–006: informational, no action needed — accepted tradeoffs already documented (self-DoS via targeted lockout, bcrypt cost/pre-hash design, `set_password.py` credential handling, JWT parity with OAuth, localStorage token storage). |
+| debugger | WARN | Malformed `password_hash` in the DB crashes `bcrypt.checkpw` with an unhandled 500 instead of the clean 401 every other branch returns (also breaks the timing-oracle invariant on that one branch). `set_password.py` commits the new hash *before* its own post-write verification check, so a failed check reports "not confirmed set" when the write already landed. Plus 4 lower-severity suggestions (soft check-then-act race in the lockout counter, `ctx` audit note, import-time `_DUMMY_HASH` cost, `set_password.py` connection-error handling). |
+| test-writer (coverage) | FAIL→fixed | **Fixed above.** |
+| refactorer | WARN | Dead `_envelope()` helper in `routers.py` — note: this exists independently on `main` too (still in active use by OAuth routes there), so it's genuinely pre-existing, not introduced by this feature; the new password-login code already uses `http_error()` correctly. Two low-severity clarity suggestions (a `lockout.py` docstring gap, a redundant double-`instanceof` ternary in `Login.tsx`). |
+| doc-writer | WARN | Missing typed Pydantic response model on `POST /password/login` (returns raw `dict`), missing OpenAPI `responses=` annotation for the three distinct error codes, two minor comment gaps. The substantive design docstrings (timing-oracle rationale, lockout fail-closed rationale, `set_password.py` runbook) were called out as done well. |
+| silent-failure-hunter | WARN | Redis-swallow points in `lockout.py` log a warning but emit no metric — sustained (not full-outage) Redis flakiness could erode the lockout guarantee without paging anyone; caught only by the manual post-deploy log check. One low-severity suggestion (unguarded `res.json()` on the frontend success path, inconsistent with the guarded error path next to it). |
+| pr-test-analyzer (test quality) | Gap→fixed | Same lockout coverage gap as test-writer, **fixed above**. Confirmed both historical anti-patterns (wall-clock timing test, false-green kill-switch test) are genuinely resolved, not just renamed away. |
+
+## Non-blocking checklist for Arshad (WARN-level, not auto-fixed per gate protocol)
+
+- [ ] `set_password.py`: enforce the same 128-char password cap the login endpoint has, so an over-length password can't be set and then silently rejected at login.
+- [ ] 422 handler in `main.py`: use `jsonable_encoder` on the scrubbed error list to avoid a latent crash if a future validator's `ctx` ever carries a non-JSON-serializable value.
+- [ ] `password.py`: guard `bcrypt.checkpw`'s `ValueError` (malformed stored hash) and treat it as verification failure, so it returns the same clean 401 as every other branch instead of an unhandled 500.
+- [ ] `set_password.py`: reorder so the post-write verification happens before `commit()`, or make the failure message accurate about the write already having landed.
+- [ ] Add a typed `PasswordLoginResponse` model and `responses=` OpenAPI annotations to `POST /password/login`.
+- [ ] Consider a metric (not just a log line) on `lockout.py`'s Redis-swallow points for real-time observability of sustained Redis flakiness.
+- [ ] Guard `res.json()` on the frontend success path in `api/auth.ts` (currently only the error path is guarded).
+
+None of these block the merge. They're real, worth doing, and left for Arshad to prioritize alongside the rest of the backlog.
 
 ## Post-merge verification required
 
-Per CLAUDE.md §23: `AUTH_ALLOWED_EMAILS=m.arshadgani@gmail.com` is already set on Render (`srv-d7m9kub7uimc73cq9afg`) — set *before* this merge specifically so the fail-closed startup check doesn't crash-loop the deploy. After deploy, confirm `Application startup complete` (not a `RuntimeError` on `AUTH_ALLOWED_EMAILS`) and that a real login from `m.arshadgani@gmail.com` still succeeds.
+Password login is inert until `backend/scripts/set_password.py` is run against
+Render/Supabase (no password is set for any account yet — every account currently
+authenticates via OAuth only, so this ships dark by default). Per CLAUDE.md §23,
+verify after deploy: `Application startup complete`, then optionally run
+`set_password.py` and confirm a real password login succeeds and is still gated by
+the FEAT-158 allowlist (test with a disallowed email if possible, expect 403
+`email_not_allowed`).
 
-## Pre-existing, out of scope
+## Merge-conflict resolution verified (commit `0c339d73`)
 
-The 4 unrelated test failures noted above (Postgres connectivity in this sandbox; a pre-existing `ProviderReauthRequired` message-format mismatch in `test_token_service.py`) — confirmed pre-existing on `origin/main` before this diff, not introduced by it.
+Reconciled against `main`'s FEAT-158 (merged since this branch's base) — see the
+merge-conflict note above. Full backend suite re-run after resolution: 616 passed,
+7 failed, all 7 confirmed pre-existing (5 need a live Postgres this sandbox lacks,
+2 in `test_token_service.py` already documented broken on `main` in FEAT-158's own
+gate report) — none introduced by this merge. Verdict stands: **GATE PASSED**.
