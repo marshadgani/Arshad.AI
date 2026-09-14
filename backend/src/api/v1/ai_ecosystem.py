@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import Float, cast, func, select
+from sqlalchemy import cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.auth.dependencies import get_current_user
 from src.models.ai_ecosystem import AgentRegistry, AgentUsageLog
@@ -107,7 +107,9 @@ async def get_metrics(
                 func.coalesce(func.avg(AgentUsageLog.tokens_used), 0).label(
                     "avg_tokens"
                 ),
-                func.avg(cast(AgentUsageLog.success, Float)).label("success_rate"),
+                # Postgres/asyncpg refuses a direct bool->double cast
+                # (CannotCoerceError); int->double is the standard detour.
+                func.avg(cast(AgentUsageLog.success, Integer)).label("success_rate"),
             )
             .where(AgentUsageLog.invoked_at >= since)
             .group_by(AgentUsageLog.agent_name)

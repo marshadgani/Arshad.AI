@@ -1,5 +1,6 @@
 import { type Notification, type Severity } from '../../data/mockData';
 import { CardHeader } from '../CardHeader';
+import { CardSkeleton, EmptyState } from '../CardStatus';
 import styles from '../Dashboard.module.css';
 
 export interface NotificationsCardProps {
@@ -14,22 +15,29 @@ const sevClass: Record<Severity, string> = {
 };
 
 export function NotificationsCard({ notifications }: NotificationsCardProps) {
-  const rows = notifications ?? [];
-
   return (
     <section className={styles.card}>
-      <CardHeader title="Notifications" meta={`${rows.length} new`} />
+      <CardHeader
+        title="Notifications"
+        meta={notifications === null ? '···' : `${notifications.length} new`}
+      />
       <div className={styles.list}>
-        {rows.map((n) => (
-          <div key={n.id} className={styles.notif}>
-            <span className={`${styles.notifPin} ${sevClass[n.severity]}`} />
-            <div className={styles.notifBody}>
-              <span className={styles.notifTitle}>{n.title}</span>
-              <span className={styles.notifDetail}>{n.detail}</span>
+        {notifications === null ? (
+          <CardSkeleton />
+        ) : notifications.length === 0 ? (
+          <EmptyState message="No new notifications." />
+        ) : (
+          notifications.map((n) => (
+            <div key={n.id} className={styles.notif}>
+              <span className={`${styles.notifPin} ${sevClass[n.severity]}`} />
+              <div className={styles.notifBody}>
+                <span className={styles.notifTitle}>{n.title}</span>
+                <span className={styles.notifDetail}>{n.detail}</span>
+              </div>
+              <span className={styles.notifTime}>{n.time}</span>
             </div>
-            <span className={styles.notifTime}>{n.time}</span>
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </section>
   );

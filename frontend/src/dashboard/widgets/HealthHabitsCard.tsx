@@ -1,3 +1,4 @@
+import { CardSkeleton, EmptyState } from '../CardStatus';
 import { type HabitRes } from '../useDashboardData';
 import { CardHeader } from '../CardHeader';
 import styles from '../Dashboard.module.css';
@@ -10,15 +11,21 @@ export function HealthHabitsCard({ healthHabits }: HealthHabitsCardProps) {
   return (
     <section className={styles.card}>
       <CardHeader title="Health & habits" meta="last 24 h" />
-      <div className={styles.healthGrid}>
-        {(healthHabits ?? []).map((h) => (
-          <div key={h.name} className={styles.healthCell}>
-            <div className={styles.healthLabel}>{h.name}</div>
-            <div className={styles.healthValue}>{h.value}</div>
-            <div className={styles.healthDelta}>{h.delta}</div>
-          </div>
-        ))}
-      </div>
+      {healthHabits === null ? (
+        <CardSkeleton rows={4} />
+      ) : healthHabits.length === 0 ? (
+        <EmptyState message="Connect Whoop or Apple Health to see habits here." />
+      ) : (
+        <div className={styles.healthGrid}>
+          {healthHabits.map((h) => (
+            <div key={h.name} className={styles.healthCell}>
+              <div className={styles.healthLabel}>{h.name}</div>
+              <div className={styles.healthValue}>{h.value}</div>
+              <div className={styles.healthDelta}>{h.delta}</div>
+            </div>
+          ))}
+        </div>
+      )}
     </section>
   );
 }

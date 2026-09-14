@@ -1,3 +1,4 @@
+import { CardSkeleton } from '../CardStatus';
 import { type FocusRes } from '../useDashboardData';
 import styles from '../Dashboard.module.css';
 
@@ -11,10 +12,18 @@ export function FocusCard({ focus }: FocusCardProps) {
   return (
     <section className={styles.focusBig}>
       <div className={styles.cardTitle}><span className={styles.dot} />Focus now</div>
-      <h2 className={styles.focusTitle}>{focus?.title ?? '—'}</h2>
-      <div className={styles.focusSubtitle}>{focus?.subtitle ?? ''}</div>
-      <p className={styles.focusContext}>{focus?.context ?? ''}</p>
-      <button className={styles.focusBtn}>{focus?.action ?? 'Open'}</button>
+      {focus ? (
+        <>
+          <h2 className={styles.focusTitle}>{focus.title}</h2>
+          <div className={styles.focusSubtitle}>{focus.subtitle}</div>
+          <p className={styles.focusContext}>{focus.context}</p>
+          <button className={styles.focusBtn}>{focus.action}</button>
+        </>
+      ) : (
+        <div className={styles.heroSkeleton}>
+          <CardSkeleton rows={3} />
+        </div>
+      )}
     </section>
   );
 }

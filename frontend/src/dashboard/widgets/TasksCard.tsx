@@ -1,5 +1,6 @@
 import { type Task } from '../../data/mockData';
 import { CardHeader } from '../CardHeader';
+import { CardSkeleton, EmptyState } from '../CardStatus';
 import styles from '../Dashboard.module.css';
 
 export interface TasksCardProps {
@@ -19,21 +20,25 @@ function dueClass(due: string): string {
 }
 
 export function TasksCard({ tasks }: TasksCardProps) {
-  const rows = tasks ?? [];
-
   return (
     <section className={styles.card}>
-      <CardHeader title="My tasks" meta={`${rows.length} open`} />
+      <CardHeader title="My tasks" meta={tasks === null ? '···' : `${tasks.length} open`} />
       <div className={styles.list}>
-        {rows.slice(0, VISIBLE_TASKS).map((t) => (
-          <div key={t.id} className={styles.row3}>
-            <span className={`${styles.priority} ${styles[t.priority]}`}>{t.priority.toUpperCase()}</span>
-            <span className={styles.rowText}>
-              {t.title}<span className={styles.tag}>{t.source}</span>
-            </span>
-            <span className={`${styles.due} ${dueClass(t.due)}`}>{t.due}</span>
-          </div>
-        ))}
+        {tasks === null ? (
+          <CardSkeleton />
+        ) : tasks.length === 0 ? (
+          <EmptyState message="No open tasks — inbox zero." />
+        ) : (
+          tasks.slice(0, VISIBLE_TASKS).map((t) => (
+            <div key={t.id} className={styles.row3}>
+              <span className={`${styles.priority} ${styles[t.priority]}`}>{t.priority.toUpperCase()}</span>
+              <span className={styles.rowText}>
+                {t.title}<span className={styles.tag}>{t.source}</span>
+              </span>
+              <span className={`${styles.due} ${dueClass(t.due)}`}>{t.due}</span>
+            </div>
+          ))
+        )}
       </div>
     </section>
   );
