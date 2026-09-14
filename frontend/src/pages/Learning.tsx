@@ -1,5 +1,11 @@
-import DomainPage from '../components/DomainPage';
+import ComingSoonPage from '../components/ComingSoonPage';
 
 export default function Learning() {
-  return <DomainPage slug="learning" />;
+  return (
+    <ComingSoonPage
+      title="Learning"
+      emoji="📚"
+      reason="Learning provider integrations are planned. No course platforms or study-tracking services are connected yet."
+    />
+  );
 }
