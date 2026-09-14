@@ -1,0 +1,354 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-6);
+}
+
+.intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+}
+
+.introTitle {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.introBody {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin: 0;
+  max-width: 640px;
+  line-height: 1.5;
+}
+
+/* ── Domain grid ─────────────────────────────────────────────────── */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--s-4);
+}
+
+@media (max-width: 767.98px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.domainCard {
+  --domain-accent: var(--accent);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  padding: var(--s-4) var(--s-5);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-faint);
+  background: var(--bg-panel);
+  overflow: hidden;
+  transition: border-color 160ms, box-shadow 160ms;
+}
+
+.domainCard::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: var(--domain-accent);
+  opacity: 0.85;
+}
+
+.domainCard:focus-within,
+.domainCard:hover {
+  border-color: var(--domain-accent);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--domain-accent) 22%, transparent);
+}
+
+.domainCardError {
+  border-color: var(--status-danger);
+}
+
+.domainCardError::before {
+  background: var(--status-danger);
+}
+
+.domainCardHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  cursor: pointer;
+}
+
+.checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--domain-accent);
+  cursor: pointer;
+}
+
+.domainGlyph {
+  font-size: 1.1rem;
+  color: var(--domain-accent);
+  line-height: 1;
+}
+
+.domainLabel {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.domainStats {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+  margin: 0;
+}
+
+.statRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-2);
+  font-size: 0.78rem;
+}
+
+.statRow dt {
+  color: var(--text-muted);
+}
+
+.statRow dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  text-align: right;
+}
+
+.domainError {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--status-danger);
+  line-height: 1.4;
+}
+
+/* ── Empty state ─────────────────────────────────────────────────── */
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-8) var(--s-6);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  text-align: center;
+}
+
+.emptyGlyph {
+  font-size: 1.6rem;
+  color: var(--accent);
+  text-shadow: var(--glow-cyan-soft);
+}
+
+.emptyText {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  max-width: 420px;
+}
+
+/* ── Error state ─────────────────────────────────────────────────── */
+
+.errorState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-8) var(--s-6);
+  border: 1px solid var(--status-danger);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--status-danger) 6%, var(--bg-panel));
+  text-align: center;
+}
+
+.errorGlyph {
+  font-size: 1.6rem;
+  color: var(--status-danger);
+}
+
+.errorMessage {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 0.88rem;
+}
+
+.retryBtn {
+  padding: var(--s-2) var(--s-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--status-danger);
+  background: transparent;
+  color: var(--status-danger);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 120ms;
+}
+
+.retryBtn:hover {
+  background: color-mix(in srgb, var(--status-danger) 12%, transparent);
+}
+
+/* ── Loading skeleton ────────────────────────────────────────────── */
+
+.skeletonCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  padding: var(--s-4) var(--s-5);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-faint);
+  background: var(--bg-panel);
+  overflow: hidden;
+  position: relative;
+}
+
+.skeletonCard::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    var(--accent-faint) 50%,
+    transparent 70%
+  );
+  background-size: 200% 100%;
+  animation: scan 1.6s ease-in-out infinite;
+}
+
+.skeletonGlyph {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  background: var(--border-faint);
+}
+
+.skeletonLine {
+  height: 10px;
+  width: 70%;
+  border-radius: var(--radius-sm);
+  background: var(--border-faint);
+}
+
+.skeletonLineShort {
+  height: 10px;
+  width: 40%;
+  border-radius: var(--radius-sm);
+  background: var(--border-faint);
+}
+
+@keyframes scan {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.loadingHint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonCard::after {
+    animation: none;
+  }
+}
+
+/* ── Action row ──────────────────────────────────────────────────── */
+
+.actionRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--s-3);
+  padding-top: var(--s-2);
+  border-top: 1px solid var(--border-faint);
+}
+
+.jobStatus {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
+.jobDone {
+  color: var(--status-ok);
+}
+
+.jobError {
+  color: var(--status-danger);
+}
+
+.spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--accent-faint);
+  border-top-color: var(--accent);
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
+}
+
+.exportBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-5);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--accent);
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 120ms, box-shadow 120ms;
+}
+
+.exportBtn:hover:not(:disabled) {
+  box-shadow: var(--glow-cyan-soft);
+}
+
+.exportBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.triggerError {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--status-danger);
+}

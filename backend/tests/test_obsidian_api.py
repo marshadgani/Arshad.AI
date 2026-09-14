@@ -35,7 +35,7 @@ class TestNoteSummaryShape:
     """_note_summary must produce the fields the frontend reads."""
 
     def _fn(self, note):
-        from src.api.v1.obsidian import _note_summary
+        from src.api.v1.obsidian_serializers import note_summary as _note_summary
 
         return _note_summary(note)
 
@@ -92,7 +92,7 @@ class TestListNotesResponseEnvelope:
     """
 
     def _build_response(self, rows, total):
-        from src.api.v1.obsidian import _note_summary
+        from src.api.v1.obsidian_serializers import note_summary as _note_summary
 
         return {
             "data": {

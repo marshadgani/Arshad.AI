@@ -1,25 +1,29 @@
-"""Obsidian vault API — sync, browse, create, and update notes."""
+"""Obsidian vault endpoints — sync, export, browse, create, and update notes.
+
+This module is routing and wire shape only. The work it coordinates lives
+in src/services/obsidian/: queue plumbing in jobs.py, browse queries in
+notes_repository.py, the exportable-domain registry in domains.py. Response
+shapes are in obsidian_serializers.py.
+"""
 
 from __future__ import annotations
 
-import json
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import cast as sa_cast
-from sqlalchemy import func, select, text
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...auth.dependencies import get_current_user
-from ...models.dag_trigger import DagTriggerQueue
 from ...models.database import get_db
-from ...models.obsidian import IngestedObsidianNote
 from ...models.user import User
+from ...services.obsidian import jobs, notes_repository
+from ...services.obsidian.domains import DOMAIN_NAMES
 from ...tools.base import ToolError
+from ..errors import http_error
+from .obsidian_serializers import domain_export_status, note_full, note_summary
 
 router = APIRouter(
     prefix="/api/v1/obsidian",
@@ -28,14 +32,7 @@ router = APIRouter(
 )
 
 
-def _err(code: int, error_code: str, message: str) -> HTTPException:
-    return HTTPException(
-        status_code=code,
-        detail={"error": {"code": error_code, "message": message, "details": {}}},
-    )
-
-
-# ── Sync ───────────────────────────────────────────────────────────
+# ── Sync (inbound: vault -> Arshad.AI) ─────────────────────────────
 
 
 @router.post("/sync", summary="Trigger vault sync from GitHub")
@@ -43,16 +40,7 @@ async def trigger_sync(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    job = DagTriggerQueue(
-        id=uuid.uuid4(),
-        dag_id="obsidian_ingestor",
-        user_id=user.id,
-        payload={},
-        status="pending",
-        requested_at=datetime.now(timezone.utc),
-    )
-    db.add(job)
-    await db.commit()
+    job = await jobs.enqueue(db, user, jobs.INGEST_DAG_ID, {})
     return {"data": {"job_id": str(job.id), "status": "pending"}}
 
 
@@ -61,24 +49,59 @@ async def sync_status(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    row = await db.scalar(
-        select(DagTriggerQueue)
-        .where(
-            DagTriggerQueue.user_id == user.id,
-            DagTriggerQueue.dag_id == "obsidian_ingestor",
+    job = await jobs.latest_job(db, user, jobs.INGEST_DAG_ID)
+    return {"data": jobs.job_summary(job) if job else None}
+
+
+# ── Export (outbound: Arshad.AI -> vault) ─────────────────────────
+
+
+class TriggerExportRequest(BaseModel):
+    domains: list[str] | None = None
+    since: datetime | None = None
+
+
+@router.post(
+    "/export",
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Trigger outbound export of ingested records to the vault",
+)
+async def trigger_export(
+    body: TriggerExportRequest = TriggerExportRequest(),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    domains = body.domains or list(DOMAIN_NAMES)
+    invalid = [d for d in domains if d not in DOMAIN_NAMES]
+    if invalid:
+        raise http_error(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "invalid_domain",
+            f"Unknown domain(s): {', '.join(invalid)}. "
+            f"Valid domains: {', '.join(DOMAIN_NAMES)}.",
         )
-        .order_by(DagTriggerQueue.requested_at.desc())
-        .limit(1)
-    )
-    if row is None:
-        return {"data": None}
+
+    payload: dict[str, Any] = {"domains": domains}
+    if body.since is not None:
+        payload["since"] = body.since.isoformat()
+
+    job = await jobs.enqueue(db, user, jobs.EXPORT_DAG_ID, payload)
+    return {"data": {"job_id": str(job.id), "status": "pending", "domains": domains}}
+
+
+@router.get("/export/status", summary="Per-domain export state for the current user")
+async def export_status(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    by_domain = await notes_repository.export_state_by_domain(db, user)
+    latest = await jobs.latest_job(db, user, jobs.EXPORT_DAG_ID)
     return {
         "data": {
-            "job_id": str(row.id),
-            "status": row.status,
-            "requested_at": row.requested_at.isoformat() if row.requested_at else None,
-            "completed_at": row.completed_at.isoformat() if row.completed_at else None,
-            "error": row.error_text,
+            "domains": {
+                name: domain_export_status(by_domain.get(name)) for name in DOMAIN_NAMES
+            },
+            "latest_job": jobs.job_summary(latest) if latest else None,
         }
     }
 
@@ -91,27 +114,7 @@ async def stats(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    total_notes = await db.scalar(
-        select(func.count()).where(IngestedObsidianNote.user_id == user.id)
-    )
-    total_words = await db.scalar(
-        select(func.sum(IngestedObsidianNote.word_count)).where(
-            IngestedObsidianNote.user_id == user.id
-        )
-    )
-    last_sync_row = await db.scalar(
-        select(IngestedObsidianNote.ingested_at)
-        .where(IngestedObsidianNote.user_id == user.id)
-        .order_by(IngestedObsidianNote.ingested_at.desc())
-        .limit(1)
-    )
-    return {
-        "data": {
-            "total_notes": total_notes or 0,
-            "total_words": total_words or 0,
-            "last_synced_at": last_sync_row.isoformat() if last_sync_row else None,
-        }
-    }
+    return {"data": await notes_repository.vault_stats(db, user)}
 
 
 # ── Notes list + search ────────────────────────────────────────────
@@ -121,54 +124,20 @@ async def stats(
 async def list_notes(
     q: str | None = None,
     tags: str | None = None,
-    limit: int = 20,
-    offset: int = 0,
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    if limit > 100:
-        limit = 100
     if q and len(q) > 1000:
-        raise _err(
+        raise http_error(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
             "query_too_long",
             "Search query must be ≤ 1000 characters.",
         )
 
-    stmt = select(IngestedObsidianNote).where(IngestedObsidianNote.user_id == user.id)
-
-    if q and q.strip():
-        stmt = stmt.where(
-            text(
-                "to_tsvector('english', "
-                "coalesce(title, '') || ' ' || coalesce(content, '')) "
-                "@@ plainto_tsquery('english', :q)"
-            ).bindparams(q=q.strip())
-        )
-
-    if tags:
-        for tag in (t.strip() for t in tags.split(",") if t.strip()):
-            # json.dumps handles escaping; sa_cast gives Postgres the correct JSONB type.
-            stmt = stmt.where(
-                IngestedObsidianNote.tags.op("@>")(sa_cast(json.dumps([tag]), JSONB))
-            )
-
-    count_stmt = select(func.count()).select_from(stmt.subquery())
-    total = await db.scalar(count_stmt) or 0
-
-    stmt = (
-        stmt.order_by(IngestedObsidianNote.last_modified_at.desc())
-        .limit(limit)
-        .offset(offset)
-    )
-    rows = (await db.execute(stmt)).scalars().all()
-
-    return {
-        "data": {
-            "notes": [_note_summary(n) for n in rows],
-            "total": total,
-        },
-    }
+    rows, total = await notes_repository.search_notes(db, user, q, tags, limit, offset)
+    return {"data": {"notes": [note_summary(n) for n in rows], "total": total}}
 
 
 # ── Single note ────────────────────────────────────────────────────
@@ -182,24 +151,19 @@ async def get_note(
 ) -> dict[str, Any]:
     try:
         note_uuid = uuid.UUID(note_id)
-    except ValueError:
-        raise _err(
+    except ValueError as exc:
+        raise http_error(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
             "invalid_id",
             "note_id must be a UUID.",
-        )
+        ) from exc
 
-    note = await db.scalar(
-        select(IngestedObsidianNote).where(
-            IngestedObsidianNote.id == note_uuid,
-            IngestedObsidianNote.user_id == user.id,
-        )
-    )
+    note = await notes_repository.get_note(db, user, note_uuid)
     if note is None:
-        raise _err(
+        raise http_error(
             status.HTTP_404_NOT_FOUND, "note_not_found", f"No note with id '{note_id}'."
         )
-    return {"data": _note_full(note)}
+    return {"data": note_full(note)}
 
 
 # ── Create note ────────────────────────────────────────────────────
@@ -225,7 +189,7 @@ async def create_note(
             payload=CreateNoteInput(path=body.path, content=body.content),
         )
     except ToolError as exc:
-        raise _err(status.HTTP_400_BAD_REQUEST, exc.code, exc.message)
+        raise http_error(status.HTTP_400_BAD_REQUEST, exc.code, exc.message) from exc
     return {"data": result.model_dump()}
 
 
@@ -257,30 +221,5 @@ async def update_note(
             if exc.code == "note_not_found"
             else status.HTTP_400_BAD_REQUEST
         )
-        raise _err(status_code, exc.code, exc.message)
+        raise http_error(status_code, exc.code, exc.message) from exc
     return {"data": result.model_dump()}
-
-
-# ── Serialisers ────────────────────────────────────────────────────
-
-
-def _note_summary(note: IngestedObsidianNote) -> dict[str, Any]:
-    return {
-        "id": str(note.id),
-        "title": note.title,
-        "path": note.github_path,
-        "excerpt": note.content[:200].strip(),
-        "tags": note.tags if isinstance(note.tags, list) else [],
-        "word_count": note.word_count,
-        "last_modified_at": note.last_modified_at.isoformat(),
-    }
-
-
-def _note_full(note: IngestedObsidianNote) -> dict[str, Any]:
-    return {
-        **_note_summary(note),
-        "content": note.content,
-        "frontmatter": note.frontmatter,
-        "blob_sha": note.blob_sha,
-        "ingested_at": note.ingested_at.isoformat(),
-    }

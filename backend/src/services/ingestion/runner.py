@@ -59,5 +59,9 @@ async def run(
         from . import obsidian as obsidian_runner
 
         return await obsidian_runner.ingest(user=user, db=db, payload=payload)
+    if dag_id == "obsidian_exporter":
+        from ..obsidian import export_service
+
+        return await export_service.export_notes(user=user, db=db, payload=payload)
 
     raise IngestionError(f"unknown_dag_id: {dag_id}")
