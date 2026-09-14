@@ -9,8 +9,9 @@ import { findCssFiles, relPath, SRC_DIR } from './sourceFiles.test-helpers';
 // the hardcoded fallback instead of the app's real theme — with no error,
 // no lint warning, and every existing test still green. Walks every
 // *.module.css file in src/ rather than only the files fixed in that pass,
-// so a future file making the same mistake fails loudly instead of shipping
-// an off-palette screen unnoticed.
+// so a future CSS Module making the same mistake fails loudly instead of
+// shipping an off-palette screen unnoticed. Scoped to CSS Modules only —
+// does not cover inline var(--x) in .tsx style props or globals.css.
 
 const TOKENS_FILE = resolve(SRC_DIR, 'styles/tokens.css');
 

@@ -87,13 +87,12 @@
   letter-spacing: 0.03em;
 }
 
-/* Opus/Sonnet/Haiku are one accent family (single-accent-color rule) but
-   read as three tiers via weight, not hue: Opus solid, Sonnet faint+soft,
-   Haiku its own status color (already distinct, unchanged). */
+/* Opus and Sonnet share the --accent family, differentiated by fill weight
+   (solid vs faint+soft) to satisfy the single-accent-color rule. Haiku
+   keeps its separate --status-ok hue, unchanged from before. */
 .modelOpus {
   background: var(--accent);
   color: var(--bg-deep);
-  border: 1px solid var(--accent);
 }
 
 .modelSonnet {

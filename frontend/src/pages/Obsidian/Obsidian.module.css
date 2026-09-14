@@ -203,11 +203,12 @@
 
 /* ── Note viewer ── */
 
-/* position: sticky pins .viewer to the viewport (not to .list) because
-   .list carries its own overflow-y + bounded max-height above, which
-   establishes .list as its own scroll container — leaving the page
-   viewport as .viewer's nearest scrolling ancestor. Removing .list's
-   max-height/overflow-y would silently break this. */
+/* position: sticky pins .viewer to the page viewport, its nearest scrolling
+   ancestor (.list is a sibling, not an ancestor, so its own scroll
+   behavior doesn't affect this). .list's bounded max-height keeps .list
+   from growing tall enough to push .viewer out of the sticky range —
+   the two must stay in sync for the layout to read as intentional on
+   scroll. */
 .viewer {
   border: 1px solid var(--border-faint);
   border-radius: 8px;
