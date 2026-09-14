@@ -8,15 +8,23 @@ import { findCssFiles, findFiles, relPath, SRC_DIR } from './sourceFiles.test-he
 // tokens.css, so the custom property silently and permanently resolved to
 // the hardcoded fallback instead of the app's real theme — with no error,
 // no lint warning, and every existing test still green. Walks every
-// *.module.css file, globals.css, and every .ts/.tsx source in src/ (FEAT-144
-// shipped this scoped to *.module.css only; FEAT-145 widened it after gate
-// agents found inline var(--x) in .tsx style props and healthFormat.ts were
-// unguarded) so a future reference to an undefined token — wherever it's
-// written — fails loudly instead of shipping unnoticed.
+// *.module.css file, globals.css, tokens.css itself, and every .ts/.tsx
+// source in src/ (FEAT-144 shipped this scoped to *.module.css only;
+// FEAT-160 widened it after gate agents found inline var(--x) in .tsx style
+// props, tokens.css's own body{} rule, and healthFormat.ts were unguarded)
+// so a future reference to an undefined token — wherever it's written —
+// fails loudly instead of shipping unnoticed. Comments are stripped before
+// matching so a var(--x) or --x: mentioned only in prose doesn't count as
+// real usage or a real definition — this is a plain-text guard, not a full
+// CSS parser, so a malformed comment that corrupts real CSS syntax (as
+// FEAT-160's own tokens.css edit briefly did — a stray */ inside a comment
+// terminated it early) can still slip past; always confirm with a real
+// build after touching tokens.css.
 
 const TOKENS_FILE = resolve(SRC_DIR, 'styles/tokens.css');
 const GLOBALS_FILE = resolve(SRC_DIR, 'styles/globals.css');
 const VAR_REFERENCE = /var\(\s*(--[a-zA-Z0-9-]+)/g;
+const CSS_COMMENT = /\/\*[\s\S]*?\*\//g;
 
 // Excludes test files (and their shared helpers) so this suite's own
 // fixture below — a deliberately undefined var(--x) used to prove the
@@ -26,7 +34,7 @@ const VAR_REFERENCE = /var\(\s*(--[a-zA-Z0-9-]+)/g;
 const NOT_SOURCE = /(\.test\.tsx?|\.test-helpers\.ts|^setupTests\.ts)$/;
 
 function definedTokens(): Set<string> {
-  const css = readFileSync(TOKENS_FILE, 'utf-8');
+  const css = readFileSync(TOKENS_FILE, 'utf-8').replace(CSS_COMMENT, '');
   const tokens = new Set<string>();
   for (const [, name] of css.matchAll(/(--[a-zA-Z0-9-]+)\s*:/g)) {
     tokens.add(name);
@@ -38,14 +46,15 @@ function definedTokens(): Set<string> {
 // test below can prove the detection logic itself works without needing a
 // planted fixture file.
 function undefinedVarRefs(source: string, tokens: Set<string>): { name: string; line: number }[] {
+  const stripped = source.replace(CSS_COMMENT, (comment) => comment.replace(/[^\n]/g, ' '));
   const found: { name: string; line: number }[] = [];
   let match: RegExpExecArray | null;
   const regex = new RegExp(VAR_REFERENCE);
 
-  while ((match = regex.exec(source)) !== null) {
+  while ((match = regex.exec(stripped)) !== null) {
     const name = match[1];
     if (tokens.has(name)) continue;
-    const line = source.slice(0, match.index).split('\n').length;
+    const line = stripped.slice(0, match.index).split('\n').length;
     found.push({ name, line });
   }
 
@@ -67,6 +76,7 @@ function findViolations(): string[] {
   const sourceFiles = [
     ...findCssFiles(),
     GLOBALS_FILE,
+    TOKENS_FILE,
     ...findFiles(SRC_DIR, (name) => /\.tsx?$/.test(name) && !NOT_SOURCE.test(name)),
   ];
 

@@ -26,10 +26,10 @@
   --status-info:   #4facfe;
   --status-neutral: #8b9cba;
 
-  /* --status-warn alpha triad — mirrors the --accent-*/--accent-health-*
-     pattern above, for "pending"/caution UI (e.g. ComingSoonPage's status
-     chip) that needs a soft background/border without a whole new lane. */
-  --status-warn-soft:  rgba(245, 166, 35, 0.65);
+  /* status-warn alpha variants, mirroring the accent and accent-health
+     token families' faint/bg pattern, for pending or caution UI such as
+     the ComingSoonPage status chip that needs a soft background and
+     border without a whole new colour lane. */
   --status-warn-faint: rgba(245, 166, 35, 0.18);
   --status-warn-bg:    rgba(245, 166, 35, 0.07);
 
