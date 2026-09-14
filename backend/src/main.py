@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 import src.integrations  # noqa: F401 — package __init__ triggers @register side-effects
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
@@ -144,6 +145,48 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
     if isinstance(exc.detail, dict) and "error" in exc.detail:
         return JSONResponse(status_code=exc.status_code, content=exc.detail)
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    """Scrub Pydantic v2's raw submitted value out of every 422 body.
+
+    ``RequestValidationError.errors()`` includes an ``"input"`` key holding
+    the raw value that failed validation, and (for request bodies) an
+    ``"url"`` key that's just a docs link. For a field like the password on
+    POST /api/v1/auth/password/login, echoing ``input`` back means a
+    too-long or malformed password is returned verbatim in the response
+    body — into browser devtools, any proxy log, any error tracker. This
+    handler rebuilds every error entry from an explicit allow-list
+    (``loc``, ``msg``, ``type``, ``ctx``) instead of deleting known-bad
+    keys, so a future Pydantic version adding another value-bearing key
+    can't reintroduce the leak silently. ``ctx`` is kept — it carries
+    constraint bounds (e.g. max_length) and never the submitted value, so
+    dropping it would make 422s unactionable for no security gain.
+
+    Applies to every route, not just the password login one: no frontend
+    code and no existing backend test depends on FastAPI's native 422
+    shape (this codebase's error handling goes through the project's
+    ``{"error": {...}}`` envelope), so there is no regression risk in
+    scrubbing globally — and a route-specific handler would leave every
+    other endpoint still echoing raw inputs.
+    """
+    scrubbed = [
+        {key: entry[key] for key in ("loc", "msg", "type", "ctx") if key in entry}
+        for entry in exc.errors()
+    ]
+    return JSONResponse(
+        status_code=422,
+        content={
+            "error": {
+                "code": "validation_error",
+                "message": "Request validation failed.",
+                "details": {"errors": scrubbed},
+            }
+        },
+    )
 
 
 @app.exception_handler(Exception)

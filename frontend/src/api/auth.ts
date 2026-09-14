@@ -47,3 +47,32 @@ export async function requestLogout(): Promise<void> {
     throw new AuthRequestError(`POST ${AUTH_BASE}/logout responded ${res.status}`, res.status);
   }
 }
+
+/**
+ * Deliberately raw `fetch`, NOT the `useFetch` hook used elsewhere in this
+ * codebase. `useFetch` treats ANY 401 response as an Arshad.AI session
+ * expiry and calls `clearToken()` — routing a password login through it
+ * would mean a WRONG PASSWORD triggers an app-wide sign-out of whatever
+ * session the browser already held. This is a real, non-obvious trap: a
+ * future "tidy this up" refactor that swaps this for `useFetch` looks
+ * correct and is not. Do not make that change.
+ */
+export async function loginWithPassword(email: string, password: string): Promise<string> {
+  const res = await fetch(`${AUTH_BASE}/password/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) {
+    let message = `POST ${AUTH_BASE}/password/login responded ${res.status}`;
+    try {
+      const body = await res.json();
+      if (body?.error?.message) message = body.error.message;
+    } catch {
+      // Non-JSON error body — fall back to the generic message above.
+    }
+    throw new AuthRequestError(message, res.status);
+  }
+  const body = await res.json();
+  return body.data.token as string;
+}

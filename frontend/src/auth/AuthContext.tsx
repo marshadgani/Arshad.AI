@@ -8,7 +8,12 @@ import {
   type ReactNode,
 } from 'react';
 
-import { AuthRequestError, fetchCurrentUser, requestLogout } from '../api/auth';
+import {
+  AuthRequestError,
+  fetchCurrentUser,
+  loginWithPassword as apiLoginWithPassword,
+  requestLogout,
+} from '../api/auth';
 import { oauthLoginUrl } from './oauthLoginUrl';
 import { clearToken, getToken, setToken } from './tokenStorage';
 import type { AuthState, AuthUser, OAuthProvider } from './types';
@@ -90,9 +95,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setTokenState(nextToken);
   }, []);
 
+  const loginWithPassword = useCallback(
+    async (email: string, password: string) => {
+      const nextToken = await apiLoginWithPassword(email, password);
+      setTokenFromCallback(nextToken);
+    },
+    [setTokenFromCallback],
+  );
+
   const value = useMemo<AuthState>(
-    () => ({ token, user, isLoading, loginWith, logout, setTokenFromCallback }),
-    [token, user, isLoading, loginWith, logout, setTokenFromCallback],
+    () => ({
+      token,
+      user,
+      isLoading,
+      loginWith,
+      loginWithPassword,
+      logout,
+      setTokenFromCallback,
+    }),
+    [token, user, isLoading, loginWith, loginWithPassword, logout, setTokenFromCallback],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
