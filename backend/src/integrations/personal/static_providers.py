@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ...models.integration import Integration
 from ...models.user import User
 from ..base import (
+    NOTHING_TO_REVOKE,
     ConnectResult,
     IntegrationError,
     IntegrationProvider,
@@ -72,6 +73,7 @@ class HackerNewsIntegration(IntegrationProvider):
     description = "Top stories. No auth required — just toggle on."
     docs_url = "https://github.com/HackerNews/API"
     icon = "hackernews"
+    upstream_revocation = NOTHING_TO_REVOKE
 
     async def connect(
         self, *, user: User | None, db: AsyncSession, payload: dict[str, Any]
@@ -128,6 +130,7 @@ class OpenMeteoIntegration(IntegrationProvider):
     description = "Free weather API — no key. Provide lat/lon in config."
     docs_url = "https://open-meteo.com/en/docs"
     icon = "weather"
+    upstream_revocation = NOTHING_TO_REVOKE
 
     async def connect(
         self, *, user: User | None, db: AsyncSession, payload: dict[str, Any]

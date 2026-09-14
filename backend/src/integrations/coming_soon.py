@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..models.integration import Integration
 from ..models.user import User
 from .base import (
+    NOTHING_TO_REVOKE,
     ConnectResult,
     IntegrationError,
     IntegrationProvider,
@@ -60,6 +61,12 @@ def _make_coming_soon(
                 extra={"reason": reason},
             )
 
+    # A coming-soon provider can never have been connected, so it holds
+    # no credential and nothing upstream trusts it. Declared explicitly
+    # anyway: registry.register() requires it of every provider, and
+    # carving out an exemption for stubs is how a stub quietly becomes a
+    # real provider that still revokes nothing.
+    _Stub.upstream_revocation = NOTHING_TO_REVOKE
     _Stub.slug = slug
     _Stub.kind = "personal_oauth"  # cosmetic — never actually used since coming_soon
     _Stub.display_name = display_name

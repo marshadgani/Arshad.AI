@@ -1,0 +1,50 @@
+/* ── Domain header + KPIs ──────────────────────────────────────────── */
+.header {
+  background: linear-gradient(135deg, var(--bg-panel), var(--bg-elevated));
+  border: 1px solid var(--border-faint);
+  border-radius: var(--radius-xl);
+  padding: var(--s-6) var(--s-8);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--s-6);
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+}
+.header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at top right, var(--accent-faint), transparent 70%);
+  pointer-events: none;
+}
+
+.headerEmoji {
+  font-size: 48px;
+  line-height: 1;
+}
+
+.headerText { display: flex; flex-direction: column; gap: var(--s-1); }
+.headerKicker { font-family: var(--font-mono); font-size: 10px; color: var(--accent); letter-spacing: 0.12em; text-transform: uppercase; }
+.headerTitle { font-size: 28px; }
+.headerTagline { color: var(--text-secondary); font-size: 13px; }
+
+.kpis {
+  composes: tiles4 from '../../../styles/grid.module.css';
+  grid-column: 1 / -1;
+  gap: var(--s-3);
+  margin-top: var(--s-4);
+}
+.kpi { background: var(--bg-deep); border: 1px solid var(--border-faint); border-radius: var(--radius-md); padding: var(--s-3) var(--s-4); }
+.kpiLabel { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.kpiValue { font-size: 22px; font-weight: 600; margin-top: 2px; }
+.kpiDelta { font-family: var(--font-mono); font-size: 10px; color: var(--accent-soft); margin-top: 2px; }
+
+/* Only the header's own two-track layout collapses here. The KPI tile
+   count comes from styles/grid.module.css. */
+/* breakpoints.ts: mobile */
+@media (max-width: 767.98px) {
+  /* grid-exempt: the header's emoji/text two-track layout, not a card
+     ladder — it has no tablet step and no multi-column mobile form. */
+  .header { grid-template-columns: 1fr; }
+}

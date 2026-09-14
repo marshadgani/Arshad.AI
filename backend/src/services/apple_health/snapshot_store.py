@@ -95,6 +95,31 @@ async def load(redis_client: Redis, integration_id: str) -> AppleHealthSnapshot 
     return decode_snapshot(raw)
 
 
+async def discard(redis_client: Redis, integration_id: str) -> None:
+    """Drop the cached snapshot for an integration, now rather than at TTL.
+
+    Called on disconnect: the snapshot is encrypted, but it is still the
+    user's biometric data held on the strength of a consent they have just
+    withdrawn, and leaving it to expire keeps it readable for up to
+    CACHE_TTL_SECONDS afterwards. The read path already refuses to serve a
+    disconnected integration, so this is defence in depth rather than an
+    access-control fix — it shortens the window in which a Redis
+    snapshot/backup can still contain it.
+
+    Absorbs RedisError for the same reason load() does: a cache that
+    cannot be reached will expire the key on its own, and an outage must
+    not fail a disconnect the user asked for.
+    """
+    try:
+        await redis_client.delete(snapshot_cache_key(integration_id))
+    except redis.exceptions.RedisError:
+        _log.warning(
+            "apple_health.snapshot_store: Redis unavailable — cached snapshot "
+            "for integration %s will expire on its own TTL instead",
+            integration_id,
+        )
+
+
 async def has_snapshot(redis_client: Redis, integration_id: str) -> bool:
     """Whether a push is still within the cache window.
 

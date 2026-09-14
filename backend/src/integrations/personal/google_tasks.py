@@ -23,6 +23,7 @@ from ..base import (
 )
 from ..registry import register
 from ._shared import (
+    SHARED_GOOGLE_GRANT_REVOCATION,
     status_from_oauth_account,
     upsert_personal_integration,
 )
@@ -37,6 +38,7 @@ class GoogleTasksIntegration(IntegrationProvider):
     description = "Task lists and items synced from Google Tasks."
     docs_url = "https://developers.google.com/tasks"
     icon = "google-tasks"
+    upstream_revocation = SHARED_GOOGLE_GRANT_REVOCATION
 
     async def connect(
         self, *, user: User | None, db: AsyncSession, payload: dict[str, Any]

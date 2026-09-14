@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any
 
 import httpx
 
+from ..base import cannot_revoke, revokes_via
 from ..registry import register
 from ._oauth_base import OAuthIntegrationProvider, make_oauth_sync_via_api
 
@@ -49,6 +50,13 @@ class SpotifyIntegration(OAuthIntegrationProvider):
     client_id_env = "SPOTIFY_CLIENT_ID"
     client_secret_env = "SPOTIFY_CLIENT_SECRET"
     use_basic_auth_for_token = True
+    # The Spotify Web API has no token-revocation endpoint of any kind:
+    # consent is withdrawn only by the user, from their account page.
+    upstream_revocation = cannot_revoke(
+        "Spotify provides no way for an app to revoke its own access. "
+        "Remove Arshad.AI at spotify.com/account/apps to complete the "
+        "revocation on Spotify's side."
+    )
 
     async def fetch_profile(self, access_token: str) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -91,6 +99,14 @@ class StravaIntegration(OAuthIntegrationProvider):
     client_id_env = "STRAVA_CLIENT_ID"
     client_secret_env = "STRAVA_CLIENT_SECRET"
     additional_auth_params = {"approval_prompt": "auto"}
+    # Strava calls it "deauthorize" rather than "revoke"; it takes the
+    # access token in the query string and invalidates the whole grant.
+    revoke_url = "https://www.strava.com/oauth/deauthorize"
+    revoke_style = "query_token"
+    upstream_revocation = revokes_via(
+        "POST https://www.strava.com/oauth/deauthorize — Strava stops "
+        "honouring the token immediately."
+    )
 
     async def fetch_profile(self, access_token: str) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -139,6 +155,12 @@ class OuraIntegration(OAuthIntegrationProvider):
     scopes = ["personal", "daily", "heartrate", "session"]
     client_id_env = "OURA_CLIENT_ID"
     client_secret_env = "OURA_CLIENT_SECRET"
+    revoke_url = "https://api.ouraring.com/oauth/revoke"
+    revoke_style = "query_token"
+    upstream_revocation = revokes_via(
+        "POST https://api.ouraring.com/oauth/revoke — Oura invalidates the "
+        "token and the app's access to your ring data."
+    )
 
     async def fetch_profile(self, access_token: str) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -192,6 +214,12 @@ class FitbitIntegration(OAuthIntegrationProvider):
     client_id_env = "FITBIT_CLIENT_ID"
     client_secret_env = "FITBIT_CLIENT_SECRET"
     use_basic_auth_for_token = True
+    # RFC 7009, with the same HTTP Basic client auth the token grant uses.
+    revoke_url = "https://api.fitbit.com/oauth2/revoke"
+    upstream_revocation = revokes_via(
+        "POST https://api.fitbit.com/oauth2/revoke — Fitbit invalidates the "
+        "access and refresh tokens."
+    )
 
     async def fetch_profile(self, access_token: str) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -233,6 +261,11 @@ class CoinbaseIntegration(OAuthIntegrationProvider):
     scopes = ["wallet:user:read", "wallet:accounts:read"]
     client_id_env = "COINBASE_CLIENT_ID"
     client_secret_env = "COINBASE_CLIENT_SECRET"
+    revoke_url = "https://login.coinbase.com/oauth2/revoke"
+    upstream_revocation = revokes_via(
+        "POST https://login.coinbase.com/oauth2/revoke — Coinbase "
+        "invalidates the grant, ending all access to your wallet data."
+    )
 
     async def fetch_profile(self, access_token: str) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -281,6 +314,11 @@ class DiscordIntegration(OAuthIntegrationProvider):
     scopes = ["identify", "email", "guilds"]
     client_id_env = "DISCORD_CLIENT_ID"
     client_secret_env = "DISCORD_CLIENT_SECRET"
+    revoke_url = "https://discord.com/api/oauth2/token/revoke"
+    upstream_revocation = revokes_via(
+        "POST https://discord.com/api/oauth2/token/revoke — Discord "
+        "invalidates the token and removes the authorisation."
+    )
 
     async def fetch_profile(self, access_token: str) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -326,6 +364,11 @@ class RedditIntegration(OAuthIntegrationProvider):
     client_secret_env = "REDDIT_CLIENT_SECRET"
     use_basic_auth_for_token = True
     additional_auth_params = {"duration": "permanent"}
+    revoke_url = "https://www.reddit.com/api/v1/revoke_token"
+    upstream_revocation = revokes_via(
+        "POST https://www.reddit.com/api/v1/revoke_token — Reddit "
+        "invalidates the token."
+    )
 
     async def fetch_profile(self, access_token: str) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -376,6 +419,14 @@ class LinearIntegration(OAuthIntegrationProvider):
     scope_separator = ","
     client_id_env = "LINEAR_CLIENT_ID"
     client_secret_env = "LINEAR_CLIENT_SECRET"
+    # Linear authenticates the revocation with the token being revoked
+    # rather than with client credentials.
+    revoke_url = "https://api.linear.app/oauth/revoke"
+    revoke_style = "bearer_post"
+    upstream_revocation = revokes_via(
+        "POST https://api.linear.app/oauth/revoke — Linear invalidates the "
+        "token and removes the app's workspace access."
+    )
 
     async def fetch_profile(self, access_token: str) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -460,6 +511,16 @@ class WhoopIntegration(OAuthIntegrationProvider):
     client_secret_env = "WHOOP_CLIENT_SECRET"
 
     _BASE = "https://api.prod.whoop.com/developer/v1"
+
+    # Whoop models this as "revoke the app's access to my account"
+    # (DELETE, authenticated by the token itself) rather than as RFC 7009
+    # token revocation.
+    revoke_url = f"{_BASE}/user/access"
+    revoke_style = "bearer_delete"
+    upstream_revocation = revokes_via(
+        "DELETE https://api.prod.whoop.com/developer/v1/user/access — Whoop "
+        "withdraws the app's access to your recovery, sleep and strain data."
+    )
 
     async def fetch_profile(self, access_token: str) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=10.0) as client:

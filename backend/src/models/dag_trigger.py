@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import ForeignKey, Index, Integer, String, Text
+from sqlalchemy import ForeignKey, Index, Integer, String, Text, text
 from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -26,6 +26,30 @@ class DagTriggerQueue(Base):
             "ix_dag_trigger_queue_user_id_requested_at",
             "user_id",
             "requested_at",
+        ),
+        # The dedupe check in _shared.py.make_sync_via_dag and the poll query
+        # in routers.py.sync_job_status both filter on (user_id, dag_id) —
+        # neither existing index above includes dag_id, so both queries fall
+        # back to scanning every row for the user. This covers both.
+        Index(
+            "ix_dag_trigger_queue_user_id_dag_id_requested_at",
+            "user_id",
+            "dag_id",
+            "requested_at",
+        ),
+        # Hard safety net for the TOCTOU race in make_sync_via_dag: a
+        # SELECT ... FOR UPDATE only locks rows that already exist, so two
+        # concurrent "Sync now" requests that both see no pending row can
+        # both proceed to INSERT, producing duplicate queued jobs for the
+        # same (user, dag). This partial unique index makes the second
+        # concurrent INSERT fail at the database instead, and the app
+        # catches that IntegrityError and folds it into the dedupe path.
+        Index(
+            "uq_dag_trigger_queue_pending_user_dag",
+            "user_id",
+            "dag_id",
+            unique=True,
+            postgresql_where=text("status = 'pending'"),
         ),
     )
 

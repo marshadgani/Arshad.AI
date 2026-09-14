@@ -9,8 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from src.integrations.base import IntegrationError
-from src.integrations.personal.shopify import ShopifyIntegration, _shop_metadata_config
-
+from src.integrations.personal.shopify import ShopifyIntegration
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -31,36 +30,45 @@ def _make_db():
     return db
 
 
-# ── _shop_metadata_config ─────────────────────────────────────────────────────
+# The shop_metadata_config writer moved to services/shopify/state.py, which
+# now owns both directions of the Integration.config shape; its tests live in
+# test_shopify_state.py alongside the readers.
 
 
-def test_shop_metadata_config_maps_known_fields():
-    meta = {
-        "ianaTimezone": "Europe/London",
-        "currencyCode": "GBP",
-        "name": "London Store",
-    }
-
-    result = _shop_metadata_config(meta)
-
-    assert result["shop_timezone"] == "Europe/London"
-    assert result["currency_code"] == "GBP"
-    assert result["shop_name"] == "London Store"
+# ── description / sync() alignment ───────────────────────────────────────────
 
 
-def test_shop_metadata_config_defaults_timezone_and_currency_for_empty_meta():
-    result = _shop_metadata_config({})
+def test_description_does_not_overclaim_live_data_without_dashboard_context():
+    """REQ-SHOP-001/002 regression guard.
 
-    assert result["shop_timezone"] == "UTC"
-    assert result["currency_code"] == "USD"
-    assert result["shop_name"] is None
+    sync() is a metadata-only refresh (rows_written == 0 by design — see
+    test_sync_updates_config_and_returns_zero_rows_written); it never
+    ingests orders, revenue, or inventory. If the UI-facing description
+    claims all three, it must also say where that live data actually comes
+    from (GET /api/v1/shopify/dashboard), so a reader isn't misled into
+    thinking sync() populates it.
 
+    This intentionally does not pin an exact string — only the invariant
+    that "orders + revenue + inventory" claims must be paired with a
+    "dashboard" pointer. A future copy edit is free to reword either side
+    as long as the pairing holds.
+    """
+    provider = ShopifyIntegration()
+    desc = provider.description.lower()
 
-def test_shop_metadata_config_defaults_when_none_values_present():
-    result = _shop_metadata_config({"ianaTimezone": None, "currencyCode": None})
+    claims_live_orders_revenue_inventory = (
+        "orders" in desc and "revenue" in desc and "inventory" in desc
+    )
 
-    assert result["shop_timezone"] == "UTC"
-    assert result["currency_code"] == "USD"
+    assert not claims_live_orders_revenue_inventory or "dashboard" in desc, (
+        "ShopifyIntegration.description promises live orders/revenue/inventory "
+        f"but never mentions 'dashboard' to clarify that sync() (rows_written=0) "
+        f"is NOT the source. Got: {provider.description!r}. Fix by either (a) "
+        "adding '...from your Shopify store dashboard' so the description "
+        "points at GET /api/v1/shopify/dashboard, the actual live-read source, "
+        "or (b) implementing real order/revenue/inventory ingestion in sync() "
+        "so the claim is true of sync() itself."
+    )
 
 
 # ── connect ───────────────────────────────────────────────────────────────────
@@ -71,7 +79,9 @@ async def test_connect_raises_when_no_user():
     provider = ShopifyIntegration()
 
     with pytest.raises(IntegrationError) as exc_info:
-        await provider.connect(user=None, db=MagicMock(), payload={"shop": "test.myshopify.com"})
+        await provider.connect(
+            user=None, db=MagicMock(), payload={"shop": "test.myshopify.com"}
+        )
 
     assert exc_info.value.code == "auth_required"
 
@@ -87,7 +97,9 @@ async def test_connect_raises_integration_error_for_invalid_shop_domain(monkeypa
     monkeypatch.setenv("BACKEND_URL", "https://example.com")
 
     with pytest.raises((IntegrationError, Exception)):
-        await provider.connect(user=user, db=MagicMock(), payload={"shop": "not-a-shopify-domain"})
+        await provider.connect(
+            user=user, db=MagicMock(), payload={"shop": "not-a-shopify-domain"}
+        )
 
 
 @pytest.mark.asyncio
@@ -103,6 +115,7 @@ async def test_connect_returns_redirect_url_for_valid_shop(monkeypatch):
     # Patch where it is called (in the shopify module), not where defined.
     store_state = AsyncMock(return_value="random-state-token")
     import src.integrations.personal.shopify as shopify_mod
+
     monkeypatch.setattr(shopify_mod, "store_oauth_state", store_state)
 
     result = await provider.connect(
@@ -125,13 +138,15 @@ async def test_sync_updates_config_and_returns_zero_rows_written(monkeypatch):
 
     monkeypatch.setattr(provider, "get_access_token", AsyncMock(return_value="tok"))
 
-    import src.services.shopify.client as shopify_client_mod
     import src.services.shopify.cache as shopify_cache_mod
+    import src.services.shopify.client as shopify_client_mod
 
     monkeypatch.setattr(
         shopify_client_mod,
         "fetch_shop_metadata",
-        AsyncMock(return_value={"ianaTimezone": "UTC", "currencyCode": "USD", "name": "Test"}),
+        AsyncMock(
+            return_value={"ianaTimezone": "UTC", "currencyCode": "USD", "name": "Test"}
+        ),
     )
     monkeypatch.setattr(shopify_cache_mod, "del_dashboard_cache", AsyncMock())
 
@@ -151,8 +166,8 @@ async def test_sync_clears_dashboard_cache_after_metadata_update(monkeypatch):
 
     monkeypatch.setattr(provider, "get_access_token", AsyncMock(return_value="tok"))
 
-    import src.services.shopify.client as shopify_client_mod
     import src.services.shopify.cache as shopify_cache_mod
+    import src.services.shopify.client as shopify_client_mod
 
     monkeypatch.setattr(
         shopify_client_mod,
@@ -198,15 +213,13 @@ async def test_sync_metadata_fetch_failure_raises_integration_error_and_sets_err
 @pytest.mark.asyncio
 async def test_sync_summary_includes_shop_domain(monkeypatch):
     provider = ShopifyIntegration()
-    integration = _make_integration(
-        config={"shop_domain": "best-store.myshopify.com"}
-    )
+    integration = _make_integration(config={"shop_domain": "best-store.myshopify.com"})
     db = _make_db()
 
     monkeypatch.setattr(provider, "get_access_token", AsyncMock(return_value="tok"))
 
-    import src.services.shopify.client as shopify_client_mod
     import src.services.shopify.cache as shopify_cache_mod
+    import src.services.shopify.client as shopify_client_mod
 
     monkeypatch.setattr(
         shopify_client_mod,
@@ -295,3 +308,32 @@ async def test_record_sync_failure_truncates_long_error_messages():
         await ShopifyIntegration._record_sync_failure(integration, exc, db)
 
     assert len(integration.last_error) <= 500
+
+
+# ── SEC: sync-failure detail must not leak request URLs / credentials ────────
+
+
+@pytest.mark.asyncio
+async def test_record_sync_failure_does_not_persist_or_echo_request_url():
+    """SEC-001 regression (see tests/test_integration_error_leakage.py):
+    integration.last_error is returned verbatim by GET /{slug}/status and the
+    raised message becomes the 400 body of POST /{slug}/sync. httpx puts the
+    full request URL — including any query-string credential — in the message
+    of every HTTPStatusError, so both must carry safe_detail(exc) only.
+    """
+    import httpx
+
+    integration = _make_integration()
+    db = _make_db()
+    leaky_url = "https://store.myshopify.com/admin/api/graphql.json?token=zzSECRETzz"
+    request = httpx.Request("POST", leaky_url)
+    exc = httpx.HTTPStatusError(
+        "boom", request=request, response=httpx.Response(401, request=request)
+    )
+
+    with pytest.raises(IntegrationError) as exc_info:
+        await ShopifyIntegration._record_sync_failure(integration, exc, db)
+
+    assert "zzSECRETzz" not in exc_info.value.message
+    assert "zzSECRETzz" not in integration.last_error
+    assert "401" in integration.last_error

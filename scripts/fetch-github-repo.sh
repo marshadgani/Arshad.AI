@@ -242,30 +242,44 @@ fi
 
 # ── Update registry (.claude/github-repos.json) ────────────────────────────────
 if [ "$DRY_RUN" != "--dry-run" ]; then
-  SKILLS_JSON="$(printf '"%s",' "${FOUND_SKILLS[@]:-}" | sed 's/,$//')"
-  AGENTS_JSON="$(printf '"%s",' "${FOUND_AGENTS[@]:-}" | sed 's/,$//')"
-  COMMANDS_JSON="$(printf '"%s",' "${FOUND_COMMANDS[@]:-}" | sed 's/,$//')"
-  HOOKS_JSON="$(printf '"%s",' "${FOUND_HOOKS[@]:-}" | sed 's/,$//')"
+  # Every value below is attacker-controlled: REPO_NAME/REPO_SLUG/REPO_URL come
+  # from the URL pasted into a prompt, and FOUND_* are directory basenames read
+  # out of the freshly cloned third-party repo. They are passed to python3 as
+  # argv + environment and the heredoc is QUOTED ('PYEOF'), so the shell does
+  # no expansion inside it. Interpolating them into the Python source instead
+  # (the previous implementation) let a repo containing a directory named with
+  # a `"""` sequence close the string literal and execute arbitrary Python.
+  # Newline-separated rather than space-separated so a name containing spaces
+  # stays one entry.
+  SKILLS_LIST="$(printf '%s\n' "${FOUND_SKILLS[@]:-}")" \
+  AGENTS_LIST="$(printf '%s\n' "${FOUND_AGENTS[@]:-}")" \
+  COMMANDS_LIST="$(printf '%s\n' "${FOUND_COMMANDS[@]:-}")" \
+  HOOKS_LIST="$(printf '%s\n' "${FOUND_HOOKS[@]:-}")" \
+  TOKEN_OPT_LIST="$(printf '%s\n' "${FOUND_TOKEN_OPT[@]:-}")" \
+  python3 - "$REGISTRY" "$REPO_SLUG" "$REPO_URL" "$REPO_NAME" "$FETCH_DATE" <<'PYEOF'
+import json, os, sys
 
-  # Use python to safely update JSON (avoids bash json juggling)
-  python3 - <<PYEOF
-import json, sys
+registry_path, repo_slug, repo_url, repo_name, fetch_date = sys.argv[1:6]
 
-registry_path = "$REGISTRY"
+
+def entries(var):
+    return [line.strip() for line in os.environ.get(var, "").splitlines() if line.strip()]
+
+
 with open(registry_path) as f:
     reg = json.load(f)
 
-reg["repos"]["$REPO_SLUG"] = {
-    "url": "$REPO_URL",
-    "name": "$REPO_NAME",
-    "last_fetched": "$FETCH_DATE",
+reg.setdefault("repos", {})[repo_slug] = {
+    "url": repo_url,
+    "name": repo_name,
+    "last_fetched": fetch_date,
     "components": {
-        "skills":   [x for x in """${FOUND_SKILLS[*]:-}""".split() if x],
-        "agents":   [x for x in """${FOUND_AGENTS[*]:-}""".split() if x],
-        "commands": [x for x in """${FOUND_COMMANDS[*]:-}""".split() if x],
-        "hooks":    [x for x in """${FOUND_HOOKS[*]:-}""".split() if x],
-        "token_optimization": [x for x in """${FOUND_TOKEN_OPT[*]:-}""".split() if x],
-    }
+        "skills": entries("SKILLS_LIST"),
+        "agents": entries("AGENTS_LIST"),
+        "commands": entries("COMMANDS_LIST"),
+        "hooks": entries("HOOKS_LIST"),
+        "token_optimization": entries("TOKEN_OPT_LIST"),
+    },
 }
 
 with open(registry_path, "w") as f:
@@ -275,21 +289,28 @@ PYEOF
   log "Registry updated: .claude/github-repos.json"
 fi
 
-# ── Sync skills to DB (best-effort — non-fatal if DB not reachable) ───────────
+# ── Regenerate skills manifest (committed build artifact) ─────────────────────
+# .claude/ is outside the backend Docker build context, so no in-container
+# process can read it — this generates backend/src/skills/manifest.json, which
+# IS inside the build context, and syncs into skill_registry at next container
+# start via seed_from_mock.py::sync_skills_from_manifest.
 if [ "$CHANGED" -eq 1 ] && [ "$DRY_RUN" != "--dry-run" ]; then
   REGISTER_SCRIPT="$REPO_ROOT/backend/scripts/register_skills.py"
   if [ -f "$REGISTER_SCRIPT" ]; then
-    log "Syncing skills to DB via register_skills.py..."
-    (cd "$REPO_ROOT/backend" && DATABASE_URL="${DATABASE_URL:-}" PYTHONPATH=. python3 "$REGISTER_SCRIPT" 2>&1) \
-      && log "Skills DB sync complete" \
-      || log "WARNING: skills DB sync failed (non-fatal — skills will sync on next app start)"
+    log "Regenerating skills manifest via register_skills.py..."
+    (python3 "$REGISTER_SCRIPT" \
+        --skills-dir "$REPO_ROOT/.claude/skills" \
+        --registry "$REPO_ROOT/.claude/github-repos.json" \
+        --emit-manifest "$REPO_ROOT/backend/src/skills/manifest.json" 2>&1) \
+      && log "Skills manifest regenerated; syncs into skill_registry at next container start" \
+      || log "WARNING: skills manifest generation failed (non-fatal — manifest left as-is)"
   fi
 fi
 
 # ── Commit if changed ──────────────────────────────────────────────────────────
 if [ "$CHANGED" -eq 1 ] && [ "$DRY_RUN" != "--dry-run" ]; then
   cd "$REPO_ROOT"
-  git add .claude/github-repos.json .claude/skills/ backend/src/agents/ backend/src/commands/ backend/src/hooks/ 2>/dev/null || true
+  git add .claude/github-repos.json .claude/skills/ backend/src/agents/ backend/src/commands/ backend/src/hooks/ backend/src/skills/manifest.json 2>/dev/null || true
   git diff --cached --quiet && log "Nothing new to commit" || {
     git commit -m "Integrated external repo: $REPO_NAME on $FETCH_DATE_SHORT
 

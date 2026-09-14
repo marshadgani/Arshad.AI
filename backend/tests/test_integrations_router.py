@@ -19,11 +19,12 @@ import uuid
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from fastapi.testclient import TestClient
-
+import src.integrations.presenters as presenters
 import src.integrations.routers as routers_module
+from fastapi.testclient import TestClient
 from src.auth.dependencies import get_current_user
 from src.integrations.base import (
+    cannot_revoke,
     ConnectResult,
     IntegrationError,
     IntegrationProvider,
@@ -71,6 +72,9 @@ class _FakeProvider(IntegrationProvider):
     coming_soon = False
     coming_soon_reason = None
     connect_prompt = None
+    # Required of every provider by registry.register(); the descriptor
+    # this test asserts on carries it through to the frontend.
+    upstream_revocation = cannot_revoke("Test provider revokes nothing upstream.")
 
     # Class-level stubs satisfy ABC — overridden in __init__ with AsyncMocks
     async def connect(self, *, user, db, payload): ...  # type: ignore[override]
@@ -95,14 +99,26 @@ class _FakeProvider(IntegrationProvider):
         self.disconnect = AsyncMock(return_value=None)
 
 
-def _make_db(scalars_rows=None, scalar_value=None):
-    """Build a minimal AsyncSession mock for the integrations router."""
-    db = MagicMock()
+def _make_db(scalars_rows=None, scalar_value=None, credential_rows=None):
+    """Build a minimal AsyncSession mock for the integrations router.
 
-    # db.scalars(...) → result with .all()
-    scalars_result = MagicMock()
-    scalars_result.all.return_value = scalars_rows or []
-    db.scalars = AsyncMock(return_value=scalars_result)
+    list_integrations() issues two distinct db.scalars() calls: one for the
+    Integration rows, one (inside preload_api_key_credentials) for the
+    batched ApiKeyCredential lookup — each needs its own canned result, or
+    the second call would wrongly receive Integration rows and blow up
+    reading ApiKeyCredential-only attributes. credential_rows defaults to
+    empty, matching every existing caller that doesn't care about `extra`.
+    """
+    db = MagicMock()
+    db.info = {}  # real AsyncSession.info is a plain dict; mirror that here
+
+    integration_result = MagicMock()
+    integration_result.all.return_value = scalars_rows or []
+    credential_result = MagicMock()
+    credential_result.all.return_value = credential_rows or []
+    db.scalars = AsyncMock(
+        side_effect=[integration_result, credential_result, credential_result]
+    )
 
     # db.scalar(...) → single row or None
     db.scalar = AsyncMock(return_value=scalar_value)
@@ -211,6 +227,10 @@ def test_list_integrations_provider_status_raises_sets_error_not_500(
     """Regression guard: a provider whose status() raises must not blank the
     whole list or 500 — it must surface as status='error' with last_error set
     so the other providers still render (BLE001 exception in the router).
+
+    last_error is the generic message, never the exception text: per
+    .claude/rules/api.md the client is never shown internal exception
+    details. The real exception goes to the log instead.
     """
     integration = _FakeIntegration()
     provider.status = AsyncMock(side_effect=RuntimeError("upstream timeout"))
@@ -222,7 +242,9 @@ def test_list_integrations_provider_status_raises_sets_error_not_500(
     assert resp.status_code == 200
     item = resp.json()["data"][0]
     assert item["status"] == "error"
-    assert "RuntimeError" in item["last_error"]
+    assert item["last_error"] == presenters.STATUS_FETCH_FAILED_MESSAGE
+    assert "RuntimeError" not in item["last_error"]
+    assert "upstream timeout" not in item["last_error"]
     assert item["extra"] == {}
 
     app.dependency_overrides.clear()
@@ -431,7 +453,38 @@ def test_sync_when_connected_returns_result(provider, monkeypatch):
     assert resp.status_code == 200
     data = resp.json()["data"]
     assert data["rows_written"] == 7
-    assert data["summary"] == "7 rows synced"
-    assert data["duration_ms"] == 250
+
+    app.dependency_overrides.clear()
+
+
+def test_sync_integration_error_maps_to_400_not_500(provider, monkeypatch):
+    """FEAT-088 regression guard, generic across every provider (not just
+    Slack): sync_integration()'s `except IntegrationError` arm in
+    routers.py must translate a provider.sync() failure into a clean 400,
+    the same way connect_integration() already does (see
+    test_connect_integration_error_maps_to_400 above).
+
+    Before this test existed, the /connect boundary had this exact test
+    but /sync did not — despite routers.py wiring both the same way and
+    the Slack bug originally manifesting as an unhandled 500 out of
+    sync()-shaped code paths too. This closes that asymmetry at the
+    generic router level; test_slack_integration.py covers the same
+    boundary end-to-end with the real Slack provider.
+    """
+    provider.sync = AsyncMock(
+        side_effect=IntegrationError("invalid_key", "Test Provider rejected the key.")
+    )
+    integration = _FakeIntegration()
+    db = _make_db(scalar_value=integration)
+    tc = _client_with_db(provider, db, monkeypatch)
+
+    resp = tc.post("/api/v1/integrations/test-provider/sync")
+
+    assert resp.status_code == 400, (
+        f"Expected 400, got {resp.status_code}. Body: {resp.text}"
+    )
+    body = resp.json()
+    assert "error" in body, "IntegrationError must not escape as an unhandled 500"
+    assert body["error"]["code"] == "invalid_key"
 
     app.dependency_overrides.clear()

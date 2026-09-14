@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { clearToken, getToken } from '../../auth/tokenStorage';
 import { useFetch } from '../../hooks/useFetch';
+import { isTerminalPhase, useSyncJob } from '../../hooks/useSyncJob';
 import styles from './Obsidian.module.css';
 
 interface NoteStats {
@@ -42,13 +43,29 @@ function formatWords(n: number): string {
 export default function Obsidian() {
   const [query, setQuery] = useState('');
   const [selectedNote, setSelectedNote] = useState<NoteFull | null>(null);
-  const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [noteError, setNoteError] = useState<string | null>(null);
+  const syncJob = useSyncJob();
+  const syncing = syncJob.state.phase !== 'idle';
 
-  const { data: stats } = useFetch<NoteStats>('/api/v1/obsidian/stats', {
+  const { data: stats, refetch: refetchStats } = useFetch<NoteStats>('/api/v1/obsidian/stats', {
     refreshInterval: 30_000,
   });
+
+  // Terminal state reached: surface failure/stall text, then refresh
+  // stats so last_synced_at reflects the sync that actually happened
+  // (written by backend/src/services/ingestion/runner.py) rather than
+  // the moment the job was merely enqueued.
+  useEffect(() => {
+    const { phase, message } = syncJob.state;
+    if (phase === 'failed' || phase === 'stalled') {
+      setSyncError(message);
+    }
+    if (isTerminalPhase(phase)) {
+      refetchStats();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [syncJob.state.phase]);
 
   const notesUrl = query.trim()
     ? `/api/v1/obsidian/notes?q=${encodeURIComponent(query)}&limit=50`
@@ -67,7 +84,6 @@ export default function Obsidian() {
   }
 
   async function handleSync() {
-    setSyncing(true);
     setSyncError(null);
     try {
       const resp = await fetch('/api/v1/obsidian/sync', {
@@ -75,11 +91,14 @@ export default function Obsidian() {
         headers: authHeaders(),
       });
       if (resp.status === 401) { handle401(); return; }
-      if (!resp.ok) setSyncError(`Sync failed (${resp.status})`);
+      if (!resp.ok) {
+        setSyncError(`Sync failed (${resp.status})`);
+        return;
+      }
+      const body = (await resp.json()) as { data: { job_id: string } };
+      syncJob.start(body.data.job_id, '/api/v1/obsidian/sync/status');
     } catch {
       setSyncError('Sync failed: network error');
-    } finally {
-      setTimeout(() => setSyncing(false), 2000);
     }
   }
 
@@ -118,7 +137,7 @@ export default function Obsidian() {
             onClick={handleSync}
             disabled={syncing}
           >
-            {syncing ? 'Syncing…' : '↺ Sync Vault'}
+            {syncing ? syncJob.state.message || 'Syncing…' : '↺ Sync Vault'}
           </button>
           {syncError && <p className={styles.syncError}>{syncError}</p>}
         </div>

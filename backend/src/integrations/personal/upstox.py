@@ -16,6 +16,7 @@ from typing import Any
 
 import httpx
 
+from ..base import revokes_via
 from ..registry import register
 from ._oauth_base import OAuthIntegrationProvider, make_oauth_sync_via_api
 
@@ -33,6 +34,15 @@ class UpstoxIntegration(OAuthIntegrationProvider):
     scopes: list[str] = []  # Upstox doesn't use scope query param
     client_id_env = "UPSTOX_CLIENT_ID"
     client_secret_env = "UPSTOX_CLIENT_SECRET"
+    # Upstox exposes session termination as "logout" — a DELETE
+    # authenticated by the token it invalidates.
+    revoke_url = "https://api.upstox.com/v2/logout"
+    revoke_style = "bearer_delete"
+    upstream_revocation = revokes_via(
+        "DELETE https://api.upstox.com/v2/logout — Upstox ends the session, "
+        "invalidating the token immediately rather than at the next 3:30 AM "
+        "IST expiry."
+    )
 
     async def fetch_profile(self, access_token: str) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=10.0) as client:

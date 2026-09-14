@@ -57,6 +57,20 @@ p { margin: 0; }
 
 .mono { font-family: var(--font-mono); }
 
+/* App-level reduced-motion override, set from Settings → Appearance
+   (see hooks/usePreferences.ts). Mirrors what `@media (prefers-reduced-
+   motion: reduce)` already does per-component throughout the app, but as
+   a single universal-selector rule so the in-app toggle doesn't require
+   plumbing a "reduced" flag through every component that animates. */
+:root[data-motion='reduced'] *,
+:root[data-motion='reduced'] *::before,
+:root[data-motion='reduced'] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
 /* Visually hides content while keeping it in the accessibility tree —
    use for labels that a placeholder or icon already conveys visually. */
 .sr-only {

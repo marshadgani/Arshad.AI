@@ -161,6 +161,22 @@ async def _start_login(provider_name: str) -> RedirectResponse:
     return response
 
 
+def _allowed_login_emails() -> set[str]:
+    """Emails permitted to complete a login, from AUTH_ALLOWED_EMAILS.
+
+    Arshad.AI is a single-user deployment (CLAUDE.md §1) but the OAuth
+    callback creates a User row for *any* Google/GitHub account that
+    completes consent, and every authenticated user can then read, sync,
+    overwrite and disconnect the deployment-wide `project_apikey`
+    integrations (Stripe, Cloudflare, the Anthropic admin key) — those
+    rows have user_id IS NULL, which `_find_user_integration` matches for
+    everybody. An empty set means "unrestricted", preserving today's
+    behaviour for local dev; production must set this.
+    """
+    raw = os.getenv("AUTH_ALLOWED_EMAILS", "")
+    return {e.strip().lower() for e in raw.split(",") if e.strip()}
+
+
 async def _handle_callback(
     provider_name: str,
     code: str,
@@ -209,6 +225,14 @@ async def _handle_callback(
             status.HTTP_502_BAD_GATEWAY,
             "oauth_provider_unreachable",
             f"Could not reach {provider_name}: {type(exc).__name__}.",
+        )
+
+    allowed = _allowed_login_emails()
+    if allowed and info.email.lower() not in allowed:
+        raise _envelope(
+            status.HTTP_403_FORBIDDEN,
+            "email_not_allowed",
+            "This account is not permitted to sign in to this deployment.",
         )
 
     user = await upsert_user_from_oauth(

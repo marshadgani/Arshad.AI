@@ -176,6 +176,9 @@ export interface DomainAgent {
   lastAction: string;
   lastRun: string;
 }
+// Named rather than inlined in DomainConfig so the activity feed component
+// can state what it renders without depending on the whole domain shape.
+export interface DomainFeedItem { id: string; message: string; time: string; }
 export interface DomainConfig {
   slug: string;
   title: string;
@@ -184,7 +187,7 @@ export interface DomainConfig {
   kpis: DomainKPI[];
   applications: Application[];
   agents: DomainAgent[];
-  feed: { id: string; message: string; time: string }[];
+  feed: DomainFeedItem[];
 }
 
 export const domains: Record<string, DomainConfig> = {

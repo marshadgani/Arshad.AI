@@ -24,7 +24,7 @@ from urllib.parse import urlencode
 
 import httpx
 
-from ..base import ConnectResult, IntegrationError
+from ..base import ConnectResult, IntegrationError, revokes_via
 from ..registry import register
 from ._oauth_base import (
     OAuthIntegrationProvider,
@@ -45,6 +45,52 @@ class ZerodhaKiteIntegration(OAuthIntegrationProvider):
     scopes: list[str] = []
     client_id_env = "ZERODHA_KITE_CLIENT_ID"
     client_secret_env = "ZERODHA_KITE_CLIENT_SECRET"
+    upstream_revocation = revokes_via(
+        "DELETE https://api.kite.trade/session/token — Kite invalidates the "
+        "session, so the token stops working before its usual end-of-day "
+        "expiry."
+    )
+
+    async def _revoke_upstream(self, *, integration, db) -> None:  # type: ignore[override]
+        """Kite's logout is a DELETE on the session with BOTH the api_key
+        and the access_token in the query string — it is not RFC 7009 and
+        not bearer-authenticated, so it does not fit any `revoke_style`.
+
+        Adding a fifth style for a single provider would push
+        Kite-specific knowledge into the shared base; overriding here
+        keeps it in the one module that already knows Kite's checksum
+        auth and `token <api_key>:<access_token>` header format. Credential
+        reading still goes through the base's _stored_tokens(), so the
+        decrypt and no-row-yet cases stay handled in one place.
+
+        Errors propagate — disconnect() logs them and deletes the local
+        rows regardless — but only as an IntegrationError naming the
+        status code. The access token is in this request's *query string*,
+        and httpx puts the full URL in its exception messages, so an
+        escaping httpx error would be written verbatim into the log line
+        disconnect() emits with exc_info=True. Same rule as
+        _oauth_base._post_revocation() and base.safe_detail().
+        """
+        tokens = await self._stored_tokens(integration=integration, db=db)
+        if tokens is None:
+            return None
+        access_token, _ = tokens
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.delete(
+                    "https://api.kite.trade/session/token",
+                    params={"api_key": self._client_id(), "access_token": access_token},
+                )
+                resp.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            raise IntegrationError(
+                "revoke_failed",
+                f"Kite revocation returned {exc.response.status_code}.",
+            ) from None
+        except httpx.HTTPError as exc:
+            raise IntegrationError(
+                "revoke_failed", f"Kite revocation failed: {type(exc).__name__}."
+            ) from None
 
     async def connect(self, *, user, db, payload):  # type: ignore[override]
         """Kite uses 'api_key' not 'client_id' in the auth URL."""

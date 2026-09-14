@@ -1,0 +1,15 @@
+/* Panel chrome for every section of a domain page (Applications, Agents,
+   Recent activity). The section's own content grid lives with the component
+   that renders it, not here. */
+
+.section {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-faint);
+  border-radius: var(--radius-lg);
+  padding: var(--s-6);
+}
+
+.sectionHead { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--s-4); }
+.sectionTitle { font-size: 14px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-secondary); display: flex; align-items: center; gap: var(--s-2); }
+.sectionTitle::before { content: ''; width: 3px; height: 14px; background: var(--accent); display: inline-block; }
+.sectionMeta { font-size: 10px; color: var(--text-muted); font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.08em; }

@@ -1,0 +1,18 @@
+/* Applications grid */
+.appGrid { composes: cols4 from '../../../styles/grid.module.css'; gap: var(--s-4); }
+.app {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-faint);
+  border-radius: var(--radius-md);
+  padding: var(--s-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+.appName { font-size: 14px; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.appDesc { font-size: 12px; color: var(--text-secondary); flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.appFoot { display: flex; align-items: center; justify-content: space-between; margin-top: var(--s-2); }
+.statusTag { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; padding: 2px 6px; border-radius: 3px; }
+.live { color: var(--status-ok); background: rgba(0, 255, 156, 0.1); border: 1px solid rgba(0, 255, 156, 0.2); }
+.beta { color: var(--accent); background: var(--accent-faint); border: 1px solid var(--accent-faint); }
+.planned { color: var(--text-muted); background: var(--bg-deep); border: 1px solid var(--border-faint); }

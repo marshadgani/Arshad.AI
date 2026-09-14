@@ -24,7 +24,7 @@ import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Literal
 from urllib.parse import urlencode
 
 import httpx
@@ -135,11 +135,31 @@ class CallbackOutcome:
     config_extra: dict[str, Any] = field(default_factory=dict)
 
 
+# How a provider's revocation endpoint wants to be called. There is an
+# RFC for this (7009) and roughly half the providers here follow it; the
+# rest each invented their own, so the shape has to be declared per
+# provider. Naming the styles — rather than letting each provider
+# hand-roll an httpx call — keeps the one part that must not be got wrong
+# (reading and decrypting the stored token, failing open on error) in a
+# single place.
+#
+#   rfc7009       POST, form-encoded `token=`, client credentials attached
+#                 the same way the token grant attaches them.
+#   query_token   POST with `?access_token=` in the query string (Strava,
+#                 Oura). No client credentials.
+#   bearer_delete DELETE with `Authorization: Bearer <token>` (Whoop,
+#                 Upstox) — "delete my access", addressed by the token
+#                 itself.
+#   bearer_post   POST with `Authorization: Bearer <token>` (Linear).
+RevokeStyle = Literal["rfc7009", "query_token", "bearer_delete", "bearer_post"]
+
+
 class OAuthIntegrationProvider(IntegrationProvider):
     """Subclasses declare:
 
       auth_url, token_url, scopes, client_id_env, client_secret_env
       Optional: additional_auth_params, profile_url, scope_separator
+      Optional: revoke_url + revoke_style — see _revoke_upstream() below
 
     And implement:
       async def fetch_profile(self, access_token) -> dict[str, Any]
@@ -155,6 +175,11 @@ class OAuthIntegrationProvider(IntegrationProvider):
     additional_auth_params: ClassVar[dict[str, str]] = {}
     scope_separator: ClassVar[str] = " "
     use_basic_auth_for_token: ClassVar[bool] = False
+    # None = this provider publishes no revocation endpoint, and must say
+    # so via `upstream_revocation = cannot_revoke(...)`. The two are kept
+    # consistent by _assert_revocation_config_matches_claim() below.
+    revoke_url: ClassVar[str | None] = None
+    revoke_style: ClassVar[RevokeStyle] = "rfc7009"
 
     def _redirect_uri(self) -> str:
         return f"{_backend_url()}/api/v1/integrations/oauth/{self.slug}/callback"
@@ -296,6 +321,197 @@ class OAuthIntegrationProvider(IntegrationProvider):
             last_error=integration.last_error,
             extra=extra,
         )
+
+    async def _revoke_upstream(
+        self, *, integration: Integration, db: AsyncSession
+    ) -> None:
+        """Ask the provider to stop honouring this integration's tokens.
+
+        Shared by every OAuth provider that sets `revoke_url`; they get
+        working revocation by declaring a URL and a style rather than by
+        each writing their own httpx call and each getting the
+        fail-open/decrypt/absent-row edge cases subtly different.
+
+        Three deliberate choices:
+
+        * **The refresh token is revoked first, when there is one.** With
+          every provider here that issues one, revoking the refresh token
+          invalidates the whole grant including access tokens minted from
+          it; revoking only the access token would leave a credential
+          that can mint a new one. Both are attempted because "revoking
+          the refresh token cascades" is a convention, not a guarantee,
+          and these calls are idempotent.
+        * **The two attempts are independent.** A failed refresh-token
+          revocation must not skip the access-token one. Not every
+          provider accepts both kinds at its endpoint — the `query_token`
+          style (Strava, Oura) has no `token_type_hint` to offer and
+          simply posts whatever it is given as `access_token`, so
+          presenting a refresh token there is rejected. Aborting on that
+          rejection left the *access* token live at the provider while
+          the local copy was deleted and the dialog had already promised
+          "revoked with the provider" — a silent false promise, which is
+          the exact failure this feature exists to remove. The first
+          failure is re-raised only after both attempts have been made,
+          so disconnect() still logs that something went wrong.
+        * **A missing token row is success, not an error.** disconnect()
+          is idempotent by design (a double-click, a retry after a failed
+          local delete), and the second call has nothing left to present.
+        * **Decryption failure is not fatal.** After an
+          OAUTH_ENCRYPTION_KEY rotation the ciphertext is unreadable —
+          documented and expected (CLAUDE.md §6). The right outcome is
+          still to delete the local rows, so this raises and disconnect()
+          logs and continues, exactly as it does for an unreachable
+          provider.
+
+        Errors propagate to disconnect(), which logs and proceeds with
+        local deletion — the user asked us to forget the credential, and
+        a third party being down cannot veto that.
+        """
+        if self.revoke_url is None:
+            return None
+
+        tokens = await self._stored_tokens(integration=integration, db=db)
+        if tokens is None:
+            return None
+        access_token, refresh_token = tokens
+
+        failures: list[IntegrationError] = []
+        if refresh_token:
+            failures += await self._try_revocation(
+                refresh_token, token_type_hint="refresh_token"
+            )
+        failures += await self._try_revocation(
+            access_token, token_type_hint="access_token"
+        )
+        if failures:
+            raise failures[0]
+
+    async def _try_revocation(
+        self, token: str, *, token_type_hint: str
+    ) -> list[IntegrationError]:
+        """One revocation attempt, reported rather than raised.
+
+        Only IntegrationError is collected: that is the single type
+        _post_revocation() raises, and it is the only one already known to
+        be credential-free (see its docstring). Anything else is
+        unexpected and propagates immediately rather than being folded
+        into a list and re-raised out of its original context.
+        """
+        try:
+            await self._post_revocation(token, token_type_hint=token_type_hint)
+        except IntegrationError as exc:
+            return [exc]
+        return []
+
+    async def _stored_tokens(
+        self, *, integration: Integration, db: AsyncSession
+    ) -> tuple[str, str | None] | None:
+        """(access_token, refresh_token) in cleartext, or None if no row.
+
+        Separate from get_access_token() because that method refreshes an
+        expired token — the last thing wanted on the disconnect path,
+        where the goal is to destroy the grant, not renew it. Both values
+        are read and decrypted up front so the session is not left in use
+        while a revocation request is in flight (database.md).
+
+        Shared with providers whose revocation call is too idiosyncratic
+        for `revoke_style` (see ZerodhaKiteIntegration), so they override
+        only the request shape, not the credential handling.
+        """
+        row = await db.scalar(
+            select(IntegrationOAuthToken).where(
+                IntegrationOAuthToken.integration_id == integration.id
+            )
+        )
+        if row is None:
+            return None
+        return (
+            decrypt(row.encrypted_access_token),
+            decrypt(row.encrypted_refresh_token)
+            if row.encrypted_refresh_token
+            else None,
+        )
+
+    async def _post_revocation(self, token: str, *, token_type_hint: str) -> None:
+        """Issue one revocation call in this provider's declared style.
+
+        A failure is raised, not swallowed — disconnect() must be able to
+        log *that* the provider refused — but it is raised as an
+        IntegrationError carrying only the upstream status code, never the
+        httpx exception.
+
+        That is not tidiness, it is the same rule `safe_detail()` in
+        base.py exists for. httpx puts the full request URL in the message
+        of both HTTPStatusError and RequestError, and the `query_token`
+        style (Strava, Oura) puts the access token *in that URL*. Letting
+        httpx's exception reach disconnect(), which logs it with
+        `exc_info=True`, would write a live OAuth token into the Render
+        application log in cleartext — defeating the AES-GCM-at-rest
+        design one line before the token is deleted. `from None` matters
+        for the same reason: a chained `__cause__` would put the original
+        message back into the traceback.
+        """
+        url = self.revoke_url
+        if url is None:  # unreachable via _revoke_upstream; belt and braces
+            return
+
+        try:
+            async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT_SECONDS) as client:
+                resp = await self._send_revocation(client, url, token, token_type_hint)
+                resp.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            raise IntegrationError(
+                "revoke_failed",
+                f"{self.display_name} revocation returned {exc.response.status_code}.",
+            ) from None
+        except httpx.HTTPError as exc:
+            raise IntegrationError(
+                "revoke_failed",
+                f"{self.display_name} revocation failed: {type(exc).__name__}.",
+            ) from None
+
+    async def _send_revocation(
+        self,
+        client: httpx.AsyncClient,
+        url: str,
+        token: str,
+        token_type_hint: str,
+    ) -> httpx.Response:
+        """The request shape for each `revoke_style`, and nothing else.
+
+        Split from _post_revocation so that the credential-safe error
+        handling wraps every style uniformly — a style added here cannot
+        accidentally bypass it.
+        """
+        if self.revoke_style == "rfc7009":
+            data = {"token": token, "token_type_hint": token_type_hint}
+            if self.use_basic_auth_for_token:
+                return await client.post(
+                    url, data=data, auth=(self._client_id(), self._client_secret())
+                )
+            return await client.post(
+                url,
+                data={
+                    **data,
+                    "client_id": self._client_id(),
+                    "client_secret": self._client_secret(),
+                },
+            )
+        if self.revoke_style == "query_token":
+            return await client.post(url, params={"access_token": token})
+        if self.revoke_style == "bearer_delete":
+            return await client.delete(
+                url, headers={"Authorization": f"Bearer {token}"}
+            )
+        return await client.post(url, headers={"Authorization": f"Bearer {token}"})
+
+    # This override is real, but it only *does* anything when the subclass
+    # also sets revoke_url — so on its own it must not be mistaken for
+    # evidence that the provider revokes upstream. registry.register()
+    # reads this marker to tell "overrode the hook" apart from "overrode
+    # the hook and supplied what it needs", and rejects a provider
+    # claiming revokes_via(...) on the strength of the former alone.
+    _revoke_upstream.requires_attr = "revoke_url"  # type: ignore[attr-defined]
 
     async def get_access_token(
         self, *, integration: Integration, db: AsyncSession

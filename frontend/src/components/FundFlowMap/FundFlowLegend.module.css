@@ -1,0 +1,28 @@
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: var(--s-4);
+  padding-bottom: var(--s-4);
+  border-bottom: 1px dashed var(--border-faint);
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-muted);
+}
+
+.legendDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  /* color is set inline alongside background so box-shadow can pick up
+     each legend item's own hue via currentColor — one shared rule
+     instead of 12 hardcoded per-color glow declarations. */
+  box-shadow: 0 0 4px currentColor;
+}

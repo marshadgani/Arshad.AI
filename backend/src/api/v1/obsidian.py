@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -15,10 +14,11 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...auth.dependencies import get_current_user
-from ...models.dag_trigger import DagTriggerQueue
 from ...models.database import get_db
 from ...models.obsidian import IngestedObsidianNote
 from ...models.user import User
+from ...services import dag_queue
+from ...services.sync_status import project_job
 from ...tools.base import ToolError
 
 router = APIRouter(
@@ -26,6 +26,11 @@ router = APIRouter(
     tags=["obsidian"],
     dependencies=[Depends(get_current_user)],
 )
+
+
+# The one DAG this vault's sync maps to. Named once so the enqueue and the
+# poll can never disagree about which queue rows belong to Obsidian.
+OBSIDIAN_DAG_ID = "obsidian_ingestor"
 
 
 def _err(code: int, error_code: str, message: str) -> HTTPException:
@@ -43,16 +48,9 @@ async def trigger_sync(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    job = DagTriggerQueue(
-        id=uuid.uuid4(),
-        dag_id="obsidian_ingestor",
-        user_id=user.id,
-        payload={},
-        status="pending",
-        requested_at=datetime.now(timezone.utc),
+    job = await dag_queue.enqueue(
+        db, dag_id=OBSIDIAN_DAG_ID, user_id=user.id, payload={}
     )
-    db.add(job)
-    await db.commit()
     return {"data": {"job_id": str(job.id), "status": "pending"}}
 
 
@@ -61,26 +59,14 @@ async def sync_status(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    row = await db.scalar(
-        select(DagTriggerQueue)
-        .where(
-            DagTriggerQueue.user_id == user.id,
-            DagTriggerQueue.dag_id == "obsidian_ingestor",
-        )
-        .order_by(DagTriggerQueue.requested_at.desc())
-        .limit(1)
-    )
+    row = await dag_queue.latest_job(db, user_id=user.id, dag_id=OBSIDIAN_DAG_ID)
     if row is None:
         return {"data": None}
-    return {
-        "data": {
-            "job_id": str(row.id),
-            "status": row.status,
-            "requested_at": row.requested_at.isoformat() if row.requested_at else None,
-            "completed_at": row.completed_at.isoformat() if row.completed_at else None,
-            "error": row.error_text,
-        }
-    }
+    # project_job's output is a strict superset of this endpoint's
+    # historical shape (job_id, status, requested_at, completed_at,
+    # error) plus picked_at/attempt/dag_id/message — additive, so
+    # existing clients are unaffected. See services/sync_status.py.
+    return {"data": project_job(row)}
 
 
 # ── Stats ──────────────────────────────────────────────────────────

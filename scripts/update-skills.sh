@@ -179,10 +179,27 @@ done
 date +%s > "$TIMESTAMP_FILE"
 log "Timestamp updated"
 
+# ── Regenerate the skills manifest (committed build artifact) ─────────────────
+if [ "$CHANGED" -eq 1 ]; then
+  REGISTER_SCRIPT="$REPO_ROOT/backend/scripts/register_skills.py"
+  if [ -f "$REGISTER_SCRIPT" ]; then
+    log "Regenerating skills manifest..."
+    if python3 "$REGISTER_SCRIPT" \
+        --skills-dir "$SKILLS_DIR" \
+        --registry "$REPO_ROOT/.claude/github-repos.json" \
+        --emit-manifest "$REPO_ROOT/backend/src/skills/manifest.json"; then
+      log "Skills manifest regenerated"
+    else
+      log "ERROR: skills manifest generation failed — commit skipped to avoid pushing skills without a matching manifest"
+      exit 1
+    fi
+  fi
+fi
+
 # ── Commit if anything changed ─────────────────────────────────────────────────
 if [ "$CHANGED" -eq 1 ]; then
   cd "$REPO_ROOT"
-  git add .claude/skills/ .claude/agents/ .claude/commands/ 2>/dev/null || true
+  git add .claude/skills/ .claude/agents/ .claude/commands/ backend/src/skills/manifest.json 2>/dev/null || true
   git diff --cached --quiet && log "Nothing to commit" || {
     git commit -m "chore: weekly skill/agent/command update [$(date '+%Y-%m-%d')]
 

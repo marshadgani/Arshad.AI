@@ -1,0 +1,13 @@
+/* Activity feed */
+.feed { display: flex; flex-direction: column; }
+.feedRow {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--s-3);
+  padding: var(--s-2) var(--s-3);
+  font-size: 12px;
+  border-bottom: 1px dashed var(--border-faint);
+}
+.feedRow:last-child { border-bottom: 0; }
+.feedTime { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); white-space: nowrap; }
+.feedMsg { color: var(--text-secondary); min-width: 0; overflow-wrap: anywhere; }

@@ -24,6 +24,7 @@ from src.models import dashboard as dm
 from src.models import domain as dom
 from src.models.ai_ecosystem import AgentRegistry
 from src.models.database import AsyncSessionLocal
+from src.skills.service import sync_from_manifest
 
 # ── Hand-translated mockData ───────────────────────────────────────
 TASKS: list[dict[str, Any]] = [
@@ -1147,13 +1148,27 @@ async def seed() -> None:
                     tagline=d["tagline"],
                 )
             )
-            for ord_, kpi in enumerate(d["kpis"]):
+            # These four collections are OPTIONAL per domain — `.get(k, ())`,
+            # not `d[k]`. FEAT-119 deleted the "kpis" key from the shopify
+            # domain (its KPIs now come live from
+            # GET /api/v1/shopify/dashboard) and the subscript here started
+            # raising KeyError on every single run of this script.
+            #
+            # That is not a cosmetic failure: seed() is the *only* caller of
+            # sync_from_manifest(), and the skills sync happens further down
+            # this same function. A crash here means the Dockerfile CMD's
+            # `|| echo '[startup] seed skipped/failed — non-fatal'` swallows
+            # the error, uvicorn starts, and skill_registry is never
+            # populated — the empty Skills tab this feature exists to fix.
+            # On Render it is worse: render.yaml's preDeployCommand has no
+            # `||` fallback, so the whole deploy fails.
+            for ord_, kpi in enumerate(d.get("kpis", ())):
                 s.add(dom.DomainKPI(domain_slug=d["slug"], ord=ord_, **kpi))
-            for app in d["applications"]:
+            for app in d.get("applications", ()):
                 s.add(dom.DomainApplication(domain_slug=d["slug"], **app))
-            for agent in d["agents"]:
+            for agent in d.get("agents", ()):
                 s.add(dom.DomainAgent(domain_slug=d["slug"], **agent))
-            for row in d["feed"]:
+            for row in d.get("feed", ()):
                 s.add(dom.DomainFeedRow(domain_slug=d["slug"], **row))
 
         s.add_all([dom.NavItem(**n) for n in NAV_ITEMS])
@@ -1164,10 +1179,17 @@ async def seed() -> None:
         agent_count = await sync_agents_from_disk(s)
         await s.commit()
 
+        # Sync the committed skills manifest into SkillRegistry (upsert + reconcile).
+        # Own commit so a skills-sync failure can never roll back the agent sync.
+        skill_stats = await sync_from_manifest(s)
+        await s.commit()
+
         print(
             f"Seed complete: {len(DOMAINS)} domains, {len(TASKS)} tasks, "
             f"{len(EVENTS)} events, {len(NAV_ITEMS)} nav items, "
-            f"{agent_count} agents synced."
+            f"{agent_count} agents synced, "
+            f"{skill_stats['registered']} skills synced "
+            f"({skill_stats['deleted']} stale removed)."
         )
 
 

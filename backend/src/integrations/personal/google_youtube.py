@@ -26,6 +26,7 @@ from ..base import (
 )
 from ..registry import register
 from ._shared import (
+    SHARED_GOOGLE_GRANT_REVOCATION,
     status_from_oauth_account,
     upsert_personal_integration,
 )
@@ -40,6 +41,7 @@ class YouTubeIntegration(IntegrationProvider):
     description = "Subscriptions, channel info, recent uploads."
     docs_url = "https://developers.google.com/youtube/v3"
     icon = "youtube"
+    upstream_revocation = SHARED_GOOGLE_GRANT_REVOCATION
 
     async def connect(
         self, *, user: User | None, db: AsyncSession, payload: dict[str, Any]

@@ -27,7 +27,13 @@ from urllib.parse import urlencode
 
 import httpx
 
-from .base import OAuthProvider, OAuthTokenBundle, OAuthUserInfo, required_env
+from .base import (
+    OAuthError,
+    OAuthProvider,
+    OAuthTokenBundle,
+    OAuthUserInfo,
+    required_env,
+)
 
 _AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 _TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -105,6 +111,18 @@ class GoogleOAuthProvider(OAuthProvider):
             )
         resp.raise_for_status()
         data = resp.json()
+        # Account linking in auth/service.py is keyed on the lowered email:
+        # a second provider identity with a matching email is merged into the
+        # existing user. An *unverified* Google email would therefore let
+        # anyone who can set that address on a Google account take over the
+        # user who owns it on GitHub. Google documents email_verified as the
+        # check that makes the claim trustworthy; without it the linking rule
+        # is an account-takeover primitive.
+        if data.get("email_verified") is not True:
+            raise OAuthError(
+                "google_email_not_verified",
+                "Google account has no verified email address.",
+            )
         return OAuthUserInfo(
             provider_user_id=data["sub"],
             email=data["email"].lower(),

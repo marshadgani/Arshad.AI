@@ -1,0 +1,129 @@
+/* Settings — Jarvis HUD aesthetic (see styles/tokens.css). Matches
+   Integrations.module.css's header/section/card rhythm so the two
+   "Account" surfaces of the app (Integrations = external accounts,
+   Settings = the app account) read as one visual language. */
+
+.page {
+  padding: var(--s-8) var(--s-8) var(--s-12);
+  color: var(--text-primary);
+  max-width: 720px;
+  margin: 0 auto;
+  font-family: var(--font-display);
+}
+
+.header {
+  margin-bottom: var(--s-6);
+}
+
+.title {
+  margin: 0 0 var(--s-1);
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  background: linear-gradient(90deg, var(--text-primary), var(--accent-soft));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.sub {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.section {
+  margin-bottom: var(--s-8);
+}
+
+.sectionTitle {
+  margin: 0 0 var(--s-3);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+}
+
+.card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-faint);
+  border-radius: var(--radius-lg);
+  padding: var(--s-4) var(--s-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-1);
+}
+
+.identity {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  padding-bottom: var(--s-4);
+  border-bottom: 1px solid var(--border-faint);
+  margin-bottom: var(--s-4);
+}
+
+.avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, #ff6b9d, #c44569);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 1rem;
+  color: white;
+}
+
+.identityText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.name {
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.email {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.signOut {
+  align-self: flex-start;
+  background: transparent;
+  border: 1px solid var(--status-danger);
+  color: var(--status-danger);
+  padding: var(--s-2) var(--s-4);
+  border-radius: var(--radius-md);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.signOut:hover {
+  background: rgba(255, 77, 109, 0.12);
+}
+
+.signOut:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .signOut {
+    transition: none;
+  }
+}

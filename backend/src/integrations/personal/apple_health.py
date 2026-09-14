@@ -49,7 +49,6 @@ from __future__ import annotations
 import logging
 import secrets
 import time
-from datetime import datetime, timezone
 from typing import Any
 
 import redis.exceptions
@@ -62,6 +61,7 @@ from ...models.user import User
 from ...services.apple_health import snapshot_store
 from ...services.apple_health.ingest_auth import hash_ingest_token
 from ..base import (
+    NOTHING_TO_REVOKE,
     ConnectResult,
     IntegrationError,
     IntegrationProvider,
@@ -85,6 +85,12 @@ class AppleHealthIntegration(IntegrationProvider):
     )
     docs_url = "https://developer.apple.com/documentation/healthkit"
     icon = "apple-health"
+    # The ingest token authenticates the user's iOS Shortcut *inbound to
+    # us*; Apple never issued us anything and holds nothing to revoke.
+    # Disconnect still soft-revokes the token here (base.disconnect →
+    # scrub_credentials), which is what actually stops the Shortcut
+    # working.
+    upstream_revocation = NOTHING_TO_REVOKE
 
     async def connect(
         self, *, user: User | None, db: AsyncSession, payload: dict[str, Any]
@@ -205,18 +211,35 @@ class AppleHealthIntegration(IntegrationProvider):
             extra={"has_recent_push": has_cached_snapshot},
         )
 
-    async def disconnect(self, *, integration: Integration, db: AsyncSession) -> None:
-        """Revoke the ingest token too — the default base implementation
-        only flips integration.status, which would leave a still-valid
-        bearer token able to keep authenticating POSTs after 'disconnect'.
+    async def disconnect(
+        self, *, integration: Integration, db: AsyncSession
+    ) -> None:
+        """Base disconnect (soft-revokes the ingest token, flips status),
+        plus the one thing no other provider has: a cached copy of the
+        user's biometric data.
+
+        Credential scrubbing itself is entirely inherited — the generic
+        default soft-revokes IntegrationIngestToken rows (revoked_at=now(),
+        row preserved for audit), which is exactly the behaviour this
+        class used to hand-roll. What is added here is the Redis snapshot,
+        which is *not* a credential and so is deliberately out of scope for
+        services/integration_credentials.py, but is the user's health data
+        held under a consent they have just withdrawn. Without this it
+        stays in Redis (and in any RDB/AOF snapshot taken meanwhile) for up
+        to snapshot_store.CACHE_TTL_SECONDS — six hours — after the
+        disconnect dialog told them their data was deleted.
+
+        Ordering: the base call first, so a failed credential scrub still
+        rolls back and raises without having already destroyed the cache.
         """
-        token_row = await db.scalar(
-            select(IntegrationIngestToken).where(
-                IntegrationIngestToken.integration_id == integration.id
+        await super().disconnect(integration=integration, db=db)
+        try:
+            redis_client = await get_redis()
+        except redis.exceptions.RedisError:
+            _log.warning(
+                "apple_health: Redis unavailable on disconnect — cached "
+                "snapshot for integration %s will expire on its own TTL",
+                integration.id,
             )
-        )
-        if token_row is not None:
-            token_row.revoked_at = datetime.now(timezone.utc)
-        integration.status = "disconnected"
-        integration.last_error = None
-        await db.commit()
+            return
+        await snapshot_store.discard(redis_client, str(integration.id))

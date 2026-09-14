@@ -15,13 +15,15 @@ import { SRC_DIR, findCssFiles, findFiles, relPath } from './sourceFiles.test-he
 
 // ── I1 — no overflow-x:hidden on enumerated layout roots ────────────────
 // Enumerated, not inferred: an undefined notion of "layout selector" would
-// be unverifiable. Deliberately excludes FundFlowMap.module.css:68
-// (overflow-x:auto), which is correct behaviour for a horizontally
-// scrollable map, not a bug.
+// be unverifiable. Deliberately excludes FundFlowMap.module.css's
+// .canvasWrap (overflow-x:auto), which is correct behaviour for a
+// horizontally scrollable map, not a bug. Referenced by selector rather
+// than line number, which drifts whenever that file is edited.
 const LAYOUT_ROOT_SELECTORS: Record<string, string[]> = {
   'components/AppLayout.module.css': ['.app', '.main', '.content'],
   'dashboard/Dashboard.module.css': ['.page', '.row'],
-  'components/DomainPage.module.css': ['.page', '.section'],
+  'components/DomainPage/DomainPage.module.css': ['.page'],
+  'components/DomainPage/DomainSection/DomainSection.module.css': ['.section'],
   'chat/ChatPanel.module.css': ['.panel'],
 };
 
@@ -89,7 +91,9 @@ function findI2Violations(): string[] {
 // it was deleted, not hardened.
 const MIN_WIDTH_ZERO_TARGETS: Record<string, string[]> = {
   'dashboard/Dashboard.module.css': ['.rowText', '.tickMsg', '.notifBody', '.notifTitle', '.notifDetail', '.eventTitle'],
-  'components/DomainPage.module.css': ['.agentName', '.appName', '.appDesc', '.feedMsg'],
+  'components/DomainPage/AgentList/AgentList.module.css': ['.agentName'],
+  'components/DomainPage/ApplicationList/ApplicationList.module.css': ['.appName', '.appDesc'],
+  'components/DomainPage/ActivityFeed/ActivityFeed.module.css': ['.feedMsg'],
 };
 
 function findI3Violations(): string[] {

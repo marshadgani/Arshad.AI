@@ -8,9 +8,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...models.integration import Integration
 from ...models.user import User
-from ..base import ConnectResult, IntegrationProvider, StatusReport, SyncResult
+from ..base import (
+    ConnectResult,
+    EnqueuedResult,
+    IntegrationProvider,
+    StatusReport,
+)
 from ..registry import register
 from ._shared import (
+    SHARED_GOOGLE_GRANT_REVOCATION,
     make_sync_via_dag,
     status_from_oauth_account,
     upsert_personal_integration,
@@ -26,6 +32,8 @@ class GmailIntegration(IntegrationProvider):
     description = "Search threads, draft replies, and label your Gmail."
     docs_url = "https://developers.google.com/gmail/api"
     icon = "gmail"
+    sync_dag_id = "email_ingestor"
+    upstream_revocation = SHARED_GOOGLE_GRANT_REVOCATION
 
     async def connect(
         self, *, user: User | None, db: AsyncSession, payload: dict[str, Any]
@@ -36,8 +44,10 @@ class GmailIntegration(IntegrationProvider):
             user=user, db=db, slug=self.slug, oauth_provider="google"
         )
 
-    async def sync(self, *, integration: Integration, db: AsyncSession) -> SyncResult:
-        return await make_sync_via_dag("email_ingestor")(integration=integration, db=db)
+    async def sync(
+        self, *, integration: Integration, db: AsyncSession
+    ) -> EnqueuedResult:
+        return await make_sync_via_dag(self.sync_dag_id)(integration=integration, db=db)
 
     async def status(
         self, *, integration: Integration, db: AsyncSession

@@ -137,6 +137,59 @@ jobs:
             echo "| **Decision** | **\`${decision}\`** |"
           } | tee -a "$DIAG" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Check skills manifest freshness
+        id: manifest_guard
+        run: |
+          set -uo pipefail
+          gen_failed=false
+          if [ -f backend/scripts/register_skills.py ]; then
+            if ! python3 backend/scripts/register_skills.py \
+              --skills-dir .claude/skills \
+              --registry .claude/github-repos.json \
+              --emit-manifest backend/src/skills/manifest.json > /tmp/manifest-gen.log 2>&1; then
+              # Generator crashed (e.g. duplicate/oversized skill_name -> sys.exit(1)).
+              # Its exit code was previously discarded here, so a broken generator
+              # silently reported stale=false and let auto-merge proceed with
+              # whatever manifest.json happened to already be on disk. Treat a
+              # failed run as stale/blocking instead.
+              gen_failed=true
+              stale=true
+            elif git diff --exit-code -- backend/src/skills/manifest.json > /tmp/manifest-diff.log 2>&1; then
+              stale=false
+            else
+              stale=true
+              git checkout -- backend/src/skills/manifest.json
+            fi
+          else
+            stale=false
+          fi
+
+          {
+            echo "## Skills manifest freshness"
+            echo "| Check | Value |"
+            echo "|---|---|"
+            echo "| Manifest generator failed | \`${gen_failed}\` |"
+            echo "| Manifest stale vs \`.claude/skills/\` | \`${stale}\` |"
+          } | tee -a "$DIAG" >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "${gen_failed}" = "true" ]; then
+            {
+              echo "backend/scripts/register_skills.py FAILED to run:"
+              echo '```'
+              cat /tmp/manifest-gen.log
+              echo '```'
+            } | tee -a "$DIAG" >> "$GITHUB_STEP_SUMMARY"
+          elif [ "${stale}" = "true" ]; then
+            {
+              echo "backend/src/skills/manifest.json is out of date. Run:"
+              echo '```'
+              echo "python3 backend/scripts/register_skills.py"
+              echo '```'
+              echo "and commit the result."
+            } | tee -a "$DIAG" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "stale=${stale}" >> "$GITHUB_OUTPUT"
+
       - name: Open or update PR
         id: pr
         env:
@@ -194,7 +247,7 @@ jobs:
           echo "number=${PR_NUM}" >> "$GITHUB_OUTPUT"
 
       - name: Auto-merge (squash) if gate-finished
-        if: steps.gate.outputs.merge == 'true'
+        if: steps.gate.outputs.merge == 'true' && steps.manifest_guard.outputs.stale != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ steps.pr.outputs.number }}

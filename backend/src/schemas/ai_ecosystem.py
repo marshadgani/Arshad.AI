@@ -6,6 +6,7 @@ import uuid
 from typing import Literal
 
 from pydantic import Field
+from src.skills.categories import SkillCategory
 
 from . import ORMBase
 
@@ -67,8 +68,9 @@ class RegisterAgentRequest(ORMBase):
 
 
 # ── Skills ────────────────────────────────────────────────────────────────────
-
-SkillCategory = Literal["development", "security", "data", "other"]
+# SkillCategory itself is imported from src.skills.categories (single source
+# of truth shared with the SQLAlchemy model's CHECK constraint) rather than
+# redefined here.
 
 
 class SkillResponse(ORMBase):
@@ -76,7 +78,7 @@ class SkillResponse(ORMBase):
     display_name: str
     description: str
     source_repo: str
-    category: str
+    category: SkillCategory
 
 
 class RegisterSkillRequest(ORMBase):

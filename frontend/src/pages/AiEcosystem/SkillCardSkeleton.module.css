@@ -1,0 +1,78 @@
+.card {
+  background: var(--surface, #161b22);
+  border: 1px solid var(--border, #30363d);
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  animation: fadeIn 400ms ease both;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.bar {
+  display: block;
+  border-radius: 6px;
+  background: linear-gradient(
+    100deg,
+    var(--border, #30363d) 30%,
+    var(--surface-hover, #21262d) 50%,
+    var(--border, #30363d) 70%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+.name {
+  width: 60%;
+  height: 14px;
+}
+
+.pill {
+  width: 44px;
+  height: 16px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.line {
+  width: 100%;
+  height: 10px;
+}
+
+.lineShort {
+  width: 70%;
+  height: 10px;
+}
+
+.footer {
+  margin-top: auto;
+}
+
+.badge {
+  width: 90px;
+  height: 16px;
+  border-radius: 6px;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card { animation: none; }
+  .bar { animation: none; }
+}

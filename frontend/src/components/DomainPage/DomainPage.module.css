@@ -1,0 +1,4 @@
+/* Page-level stacking only. Every section's own chrome and grid lives with
+   the component that renders it (DomainHeader, DomainSection,
+   ApplicationList, AgentList, ActivityFeed). */
+.page { display: flex; flex-direction: column; gap: var(--s-6); }

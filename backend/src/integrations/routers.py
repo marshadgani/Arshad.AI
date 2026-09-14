@@ -8,25 +8,57 @@ POST   /api/v1/integrations/{slug}/connect
        OAuth → returns {redirect_url}. API-key → body {api_key}.
 
 POST   /api/v1/integrations/{slug}/sync
-       Triggers a sync. Returns {rows_written, summary, duration_ms}.
+       Triggers a sync. Synchronous providers return
+       {mode: 'completed', rows_written, summary, duration_ms}. Queue/DAG-
+       backed providers (google_calendar, gmail, github) return
+       {mode: 'queued', job_id, status: 'pending', summary} instead of a
+       fabricated success — actual completion must be polled via
+       GET /{slug}/sync/status. See CLAUDE.md FEAT-144.
 
 POST   /api/v1/integrations/{slug}/disconnect
-       Marks integration disconnected; revokes upstream where possible.
+       Clears every stored per-integration credential atomically, then
+       marks the integration disconnected. Which tables hold credentials
+       and how each is cleared is defined once, in
+       services/integration_credentials.py — deliberately not restated
+       here, so this docstring cannot go stale against the policy it
+       describes. Whether the third party is also told to stop honouring
+       the credential is per-provider and declared by each one as
+       `upstream_revocation` (base.py) — surfaced on every integration
+       card so the disconnect dialog states what will really happen
+       rather than one blanket claim. Where revocation is supported, its
+       failure is logged and never blocks the local deletion.
 
 GET    /api/v1/integrations/{slug}/status
-       Returns the latest status snapshot.
+       Returns the latest connection status snapshot (last_synced_at,
+       last_error) — NOT the same thing as sync/status below, which
+       tracks one specific enqueued job.
+
+GET    /api/v1/integrations/{slug}/sync/status
+       Polls the latest DagTriggerQueue job for this (user, slug). 404 for
+       providers with no sync_dag_id (synchronous providers have no job to
+       poll — check GET /{slug}/status instead).
+
+This module handles HTTP concerns only — auth dependencies, status codes,
+and turning provider outcomes into responses. Two things it deliberately
+no longer does itself:
+
+  - response shaping lives in presenters.py, so the list endpoint and the
+    per-slug status endpoint cannot describe the same integration two
+    different ways;
+  - dag_trigger_queue access lives in services/dag_queue.py, so the
+    "always scope by user_id" rule behind job polling is enforced in one
+    place shared with the Obsidian sync endpoints.
 """
 
 from __future__ import annotations
 
 import logging
 import os
+import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query, Request, status
-from fastapi.responses import (
-    RedirectResponse,  # noqa: F401 — used by oauth_callback below
-)
+from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -35,7 +67,11 @@ from ..auth.dependencies import get_current_user
 from ..models.database import get_db
 from ..models.integration import Integration
 from ..models.user import User
+from ..services import dag_queue
+from ..services.sync_status import project_job
+from . import presenters
 from .base import IntegrationError, IntegrationProvider
+from .project._shared import preload_api_key_credentials
 from .registry import INTEGRATION_REGISTRY, get_provider
 
 _log = logging.getLogger(__name__)
@@ -46,21 +82,6 @@ def _frontend_url_env() -> str:
 
 
 router = APIRouter(prefix="/api/v1/integrations", tags=["integrations"])
-
-
-def _provider_descriptor(p: IntegrationProvider) -> dict[str, Any]:
-    return {
-        "slug": p.slug,
-        "kind": p.kind,
-        "display_name": p.display_name,
-        "category": p.category,
-        "description": p.description,
-        "docs_url": p.docs_url,
-        "icon": p.icon,
-        "coming_soon": p.coming_soon,
-        "coming_soon_reason": p.coming_soon_reason,
-        "connect_prompt": p.connect_prompt,
-    }
 
 
 def _require_provider(slug: str) -> IntegrationProvider:
@@ -95,6 +116,29 @@ async def _find_user_integration(
     )
 
 
+async def _status_fields_for(
+    provider: IntegrationProvider,
+    existing: Integration | None,
+    db: AsyncSession,
+) -> dict[str, Any]:
+    """Per-user status half of a card, with the "one broken provider must
+    not blank the whole list" guarantee applied once, here, rather than
+    as a try/except nested inside the list comprehension's caller."""
+    if existing is None:
+        return presenters.disconnected_status_fields()
+    try:
+        report = await provider.status(integration=existing, db=db)
+    except Exception:  # noqa: BLE001 — one bad provider must not blank the list
+        # The full exception is captured here; per .claude/rules/api.md the
+        # client only ever sees the generic message from presenters.
+        _log.exception(
+            "provider.status() raised for %s during list_integrations",
+            provider.slug,
+        )
+        return presenters.unavailable_status_fields()
+    return presenters.status_fields(report)
+
+
 @router.get("", summary="List integrations + per-user status")
 async def list_integrations(
     user: User = Depends(get_current_user),
@@ -109,31 +153,19 @@ async def list_integrations(
     ).all()
     by_slug: dict[str, Integration] = {r.slug: r for r in rows}
 
-    items = []
-    for provider in INTEGRATION_REGISTRY.values():
-        meta = _provider_descriptor(provider)
-        existing = by_slug.get(provider.slug)
-        if existing is not None:
-            try:
-                report = await provider.status(integration=existing, db=db)
-                meta["status"] = report.status
-                meta["last_synced_at"] = report.last_synced_at
-                meta["last_error"] = report.last_error
-                meta["extra"] = report.extra
-            except Exception as exc:  # noqa: BLE001 — one bad provider must not blank the list
-                _log.exception(
-                    "provider.status() raised for %s during list_integrations",
-                    provider.slug,
-                )
-                meta["status"] = "error"
-                meta["last_error"] = f"{type(exc).__name__}: {exc}"
-                meta["extra"] = {}
-        else:
-            meta["status"] = "disconnected"
-            meta["last_synced_at"] = None
-            meta["last_error"] = None
-            meta["extra"] = {}
-        items.append(meta)
+    # Batch-load every api-key provider's credential row in one query
+    # instead of the N sequential SELECTs project_status() would otherwise
+    # issue below — one per registered provider (~20+, growing with every
+    # bulk_providers.py addition) on every page load of /integrations.
+    await preload_api_key_credentials(db, [r.id for r in rows])
+
+    items = [
+        {
+            **presenters.provider_descriptor(provider),
+            **await _status_fields_for(provider, by_slug.get(provider.slug), db),
+        }
+        for provider in INTEGRATION_REGISTRY.values()
+    ]
 
     items.sort(key=lambda m: (m["category"], m["display_name"]))
     return {"data": items, "total": len(items)}
@@ -152,11 +184,11 @@ async def connect_integration(
     except IntegrationError as exc:
         raise http_error(status.HTTP_400_BAD_REQUEST, exc.code, exc.message) from exc
     return {
-        "data": {
-            "integration_id": result.integration_id,
-            "redirect_url": result.redirect_url,
-            "ingest_token": result.ingest_token,
-        }
+        "data": presenters.connect_payload(
+            integration_id=result.integration_id,
+            redirect_url=result.redirect_url,
+            ingest_token=result.ingest_token,
+        )
     }
 
 
@@ -178,13 +210,8 @@ async def sync_integration(
         result = await provider.sync(integration=integration, db=db)
     except IntegrationError as exc:
         raise http_error(status.HTTP_400_BAD_REQUEST, exc.code, exc.message) from exc
-    return {
-        "data": {
-            "rows_written": result.rows_written,
-            "summary": result.summary,
-            "duration_ms": result.duration_ms,
-        }
-    }
+
+    return {"data": presenters.sync_trigger_payload(result)}
 
 
 @router.post("/{slug}/disconnect", summary="Disconnect integration")
@@ -210,25 +237,53 @@ async def integration_status(
     provider = _require_provider(slug)
     integration = await _find_user_integration(slug, user, db)
     if integration is None:
-        return {
-            "data": {
-                "slug": slug,
-                "status": "disconnected",
-                "last_synced_at": None,
-                "last_error": None,
-                "extra": {},
-            }
-        }
+        return {"data": presenters.disconnected_status_payload(slug)}
     report = await provider.status(integration=integration, db=db)
-    return {
-        "data": {
-            "slug": slug,
-            "status": report.status,
-            "last_synced_at": report.last_synced_at,
-            "last_error": report.last_error,
-            "extra": report.extra,
-        }
-    }
+    return {"data": presenters.status_payload(slug, report)}
+
+
+def _parse_job_id(job_id: str | None) -> uuid.UUID | None:
+    """Validate the optional ?job_id filter at the HTTP boundary.
+
+    The scoping guarantee it feeds into (job_id is only ever AND'd onto
+    user_id, never a substitute for it) is enforced by dag_queue.latest_job.
+    """
+    if not job_id:
+        return None
+    try:
+        return uuid.UUID(job_id)
+    except ValueError:
+        raise http_error(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "invalid_job_id",
+            "job_id must be a UUID.",
+        ) from None
+
+
+@router.get("/{slug}/sync/status", summary="Poll the latest enqueued sync job")
+async def sync_job_status(
+    slug: str,
+    job_id: str | None = Query(None),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    provider = _require_provider(slug)
+    if provider.sync_dag_id is None:
+        raise http_error(
+            status.HTTP_404_NOT_FOUND,
+            "unknown_sync_job",
+            f"'{slug}' syncs synchronously — there is no job to poll.",
+        )
+
+    row = await dag_queue.latest_job(
+        db,
+        user_id=user.id,
+        dag_id=provider.sync_dag_id,
+        job_id=_parse_job_id(job_id),
+    )
+    if row is None:
+        return {"data": None}
+    return {"data": project_job(row)}
 
 
 # ── Generic OAuth callback (Phase H) ─────────────────────────────────────

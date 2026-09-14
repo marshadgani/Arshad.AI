@@ -1,26 +1,29 @@
-"""AI Ecosystem Skills API — skill registry endpoints.
+"""AI Ecosystem Skills API — HTTP adapter over the skill registry.
 
 Endpoints:
   GET  /api/v1/ai-ecosystem/skills           list all registered skills
   POST /api/v1/ai-ecosystem/skills/register  upsert a skill (idempotent)
+
+This module is deliberately thin: request validation, status codes and
+response shaping only. Query construction lives in `src.skills.repository`
+and the upsert rule in `src.skills.service`, so the same behaviour is
+reachable from the startup sync and from scripts without going through HTTP.
 """
 
 from __future__ import annotations
 
-import uuid
-
-from fastapi import APIRouter, Depends
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.auth.dependencies import get_current_user
 from src.models.database import get_db
-from src.models.skill import SkillRegistry
 from src.schemas.ai_ecosystem import (
     RegisterSkillRequest,
+    SkillCategory,
     SkillListResponse,
     SkillRegisterResponse,
     SkillResponse,
 )
+from src.skills import repository, service
 
 router = APIRouter(
     prefix="/api/v1/ai-ecosystem",
@@ -31,24 +34,22 @@ router = APIRouter(
 
 @router.get(
     "/skills",
-    summary="List all registered skills",
+    summary="List registered skills (paginated, filterable, searchable)",
     response_model=SkillListResponse,
 )
-async def list_skills(db: AsyncSession = Depends(get_db)) -> SkillListResponse:
-    rows = (
-        (
-            await db.execute(
-                select(SkillRegistry).order_by(
-                    SkillRegistry.category,
-                    SkillRegistry.display_name,
-                )
-            )
-        )
-        .scalars()
-        .all()
+async def list_skills(
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    category: SkillCategory | None = Query(default=None),
+    q: str | None = Query(default=None, max_length=100),
+    db: AsyncSession = Depends(get_db),
+) -> SkillListResponse:
+    rows, total = await repository.list_page(
+        db, limit=limit, offset=offset, category=category, q=q
     )
-    skills = [SkillResponse.model_validate(r) for r in rows]
-    return SkillListResponse(data=skills, total=len(skills))
+    return SkillListResponse(
+        data=[SkillResponse.model_validate(r) for r in rows], total=total
+    )
 
 
 @router.post(
@@ -61,27 +62,6 @@ async def register_skill(
     body: RegisterSkillRequest,
     db: AsyncSession = Depends(get_db),
 ) -> SkillRegisterResponse:
-    """Upsert a skill into the registry. Called automatically after every skill installation."""
-    existing = await db.scalar(
-        select(SkillRegistry).where(SkillRegistry.skill_name == body.skill_name)
-    )
-    if existing:
-        existing.display_name = body.display_name
-        existing.description = body.description
-        existing.source_repo = body.source_repo
-        existing.category = body.category
-        action = "updated"
-    else:
-        db.add(
-            SkillRegistry(
-                id=uuid.uuid4(),
-                skill_name=body.skill_name,
-                display_name=body.display_name,
-                description=body.description,
-                source_repo=body.source_repo,
-                category=body.category,
-            )
-        )
-        action = "registered"
-    await db.commit()
+    """Upsert a skill into the registry. Called after every skill installation."""
+    action = await service.register_skill(db, body)
     return SkillRegisterResponse(skill_name=body.skill_name, action=action)

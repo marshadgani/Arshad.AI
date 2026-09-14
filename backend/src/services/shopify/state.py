@@ -1,16 +1,16 @@
 """Thin binding over src/services/integrations/state.py for the 'shopify'
-slug, plus Shopify-specific config accessors.
+slug, plus sole ownership of the Shopify Integration.config shape.
 
-Config-shape ownership is split in exactly two: those keys are written in
-one place (ShopifyIntegration._shop_metadata_config) and read on the
-request path in one place (here). Request-path callers ask for a
-ShopContext or a ShopPresentation, never for a config key, so a change to
-the stored shape touches only those two files.
+Both directions of that shape live here: shop_metadata_config() builds the
+keys, shop_context()/shop_presentation() read them. Callers on either side
+pass a metadata dict in or take a dataclass out, never a config key, so a
+change to the stored shape touches this file alone.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -41,6 +41,22 @@ def classify_error(exc: Exception) -> tuple[bool, int]:
 
 apply_error_status = _shared.apply_error_status
 mark_healthy = _shared.mark_healthy
+
+
+def shop_metadata_config(meta: dict[str, Any]) -> dict[str, Any]:
+    """Shop metadata (as returned by services/shopify/client.py) -> the
+    Integration.config keys read below.
+
+    One writer for those keys, shared by the OAuth callback and sync, so the
+    two cannot drift apart in what they persist. The defaults are applied
+    here rather than at read time so a shop whose metadata probe failed
+    still lands with a usable timezone/currency.
+    """
+    return {
+        "shop_timezone": meta.get("ianaTimezone") or "UTC",
+        "currency_code": meta.get("currencyCode") or "USD",
+        "shop_name": meta.get("name"),
+    }
 
 
 def shop_domain(integration: Integration) -> str:

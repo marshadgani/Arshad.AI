@@ -44,6 +44,87 @@ CORS_ORIGINS = [
 ]
 
 
+def _is_production() -> bool:
+    return bool(os.getenv("RENDER")) or (
+        os.getenv("ENVIRONMENT", "").lower() == "production"
+    )
+
+
+def _enforce_login_allowlist() -> None:
+    """Refuse to boot in production with no login allowlist configured.
+
+    AUTH_ALLOWED_EMAILS unset means *any* Google/GitHub account that
+    completes consent gets a User row (auth/routers.py::
+    _allowed_login_emails), and every authenticated user can reach the
+    deployment-wide `project_apikey` integrations — those rows have
+    user_id IS NULL, which integrations/routers.py::_find_user_integration
+    matches for everybody. Since disconnect() became genuinely destructive
+    (it now deletes the encrypted key outright, and revokes it upstream
+    where the provider supports it) the cost of that gap is no longer a
+    recoverable status flip: a single internet stranger completing OAuth
+    can permanently destroy the deployment's Stripe/Cloudflare/Anthropic
+    admin credentials before the owner ever notices.
+
+    This previously only logged CRITICAL and let the boot continue — the
+    fail-*open* default a security audit (2026-09-14) flagged as the one
+    ship-blocking finding on FEAT-144: a log line nobody is guaranteed to
+    be watching is not a control. Mirrors the existing SECRET_KEY check
+    above: raise, don't degrade, so Render marks the deploy failed instead
+    of serving traffic with the allowlist off. Local/docker-compose and
+    non-Render CI are unaffected — _is_production() is false there.
+    """
+    if not _is_production():
+        return
+    if os.getenv("AUTH_ALLOWED_EMAILS", "").strip():
+        return
+    raise RuntimeError(
+        "AUTH_ALLOWED_EMAILS must be set in production — without it, ANY "
+        "Google/GitHub account that completes OAuth can sign in and can "
+        "permanently delete the deployment-wide project API-key "
+        "integrations. Set AUTH_ALLOWED_EMAILS in the Render environment "
+        "(comma-separated list of permitted emails)."
+    )
+
+
+_enforce_login_allowlist()
+
+
+def _log_worker_mode(*, started: bool) -> None:
+    """Announce whether anything will actually drain dag_trigger_queue.
+
+    Google Calendar / Gmail / GitHub "Sync now" only enqueues a
+    dag_trigger_queue row (see integrations/personal/_shared.py) — nothing
+    processes it unless this worker is running, and Render doesn't run
+    Airflow. A production boot without the worker therefore means every sync
+    silently never completes, which is the exact failure this whole feature
+    exists to surface, so it gets CRITICAL: the level CLAUDE.md §23's
+    deployment verification protocol greps for.
+
+    CRITICAL only in production so a docker-compose dev box (where Airflow
+    legitimately drains the queue) or a pytest run never raises a false alarm.
+
+    Extracted from lifespan() rather than left inline so the tests in
+    tests/test_main_lifespan_worker_validation.py can exercise this exact
+    code. Inline, the only way to test it was to reimplement the branch in
+    the test file — which passes just as happily when the real block is
+    deleted.
+    """
+    if started:
+        _log.info("ENABLE_INPROCESS_WORKER=true; queue worker started")
+    elif _is_production():
+        _log.critical(
+            "ENABLE_INPROCESS_WORKER is not 'true' — Google Calendar, "
+            "Gmail, and GitHub sync jobs will be enqueued but NEVER "
+            "processed (no Airflow runs on Render). Set "
+            "ENABLE_INPROCESS_WORKER=true in the Render environment."
+        )
+    else:
+        _log.info(
+            "ENABLE_INPROCESS_WORKER=false; queue worker not started "
+            "(expected in local/docker-compose — Airflow drains the queue)"
+        )
+
+
 async def _probe_db() -> None:
     """Verify the database is reachable. Raises on any connection failure."""
     async with AsyncSessionLocal() as session:
@@ -77,7 +158,7 @@ async def lifespan(app: FastAPI):
     if queue_worker.is_enabled():
         stop_event = asyncio.Event()
         worker_task = asyncio.create_task(queue_worker.run_worker(stop_event))
-        _log.info("ENABLE_INPROCESS_WORKER=true; queue worker started")
+    _log_worker_mode(started=worker_task is not None)
 
     try:
         yield
@@ -168,7 +249,10 @@ async def health():
                 ),
             },
         )
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "queue_worker": "enabled" if queue_worker.is_enabled() else "disabled",
+    }
 
 
 from src.integrations.routers import router as integrations_router  # noqa: E402

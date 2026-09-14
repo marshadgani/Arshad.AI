@@ -13,11 +13,9 @@ import time
 from typing import Any
 
 import httpx
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...auth.crypto import decrypt
-from ...models.integration import ApiKeyCredential, Integration
+from ...models.integration import Integration
 from ...models.user import User
 from ..base import (
     ConnectResult,
@@ -25,9 +23,12 @@ from ..base import (
     IntegrationProvider,
     StatusReport,
     SyncResult,
+    cannot_revoke,
+    safe_detail,
 )
 from ..registry import register
 from ._shared import (
+    load_api_key,
     mark_error,
     mark_synced,
     project_status,
@@ -59,6 +60,12 @@ class RenderIntegration(IntegrationProvider):
     description = "Read service status, deploys, and quotas from Render."
     docs_url = "https://api-docs.render.com/reference/introduction"
     icon = "render"
+    upstream_revocation = cannot_revoke(
+        "Render has no API for deleting an API key, so the key itself is "
+        "not revoked — only Arshad.AI's encrypted copy is deleted. Delete "
+        "the key at dashboard.render.com → Account Settings → API Keys "
+        "to revoke it fully."
+    )
 
     async def connect(
         self, *, user: User | None, db: AsyncSession, payload: dict[str, Any]
@@ -82,14 +89,9 @@ class RenderIntegration(IntegrationProvider):
 
     async def sync(self, *, integration: Integration, db: AsyncSession) -> SyncResult:
         started = time.perf_counter()
-        creds = await db.scalar(
-            select(ApiKeyCredential).where(
-                ApiKeyCredential.integration_id == integration.id
-            )
+        api_key = await load_api_key(
+            integration=integration, db=db, display_name=self.display_name
         )
-        if creds is None:
-            raise IntegrationError("not_connected", "Render API key not stored.")
-        api_key = decrypt(creds.encrypted_key)
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
                 resp = await client.get(
@@ -100,7 +102,7 @@ class RenderIntegration(IntegrationProvider):
                 services = resp.json() or []
         except Exception as exc:  # noqa: BLE001
             await mark_error(integration=integration, db=db, err=exc)
-            raise IntegrationError("sync_failed", f"{type(exc).__name__}: {exc}")
+            raise IntegrationError("sync_failed", safe_detail(exc)) from exc
         integration.config = {
             "service_count": len(services),
             "services": [

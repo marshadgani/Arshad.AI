@@ -25,6 +25,8 @@ from ..base import (
     IntegrationProvider,
     StatusReport,
     SyncResult,
+    cannot_revoke,
+    safe_detail,
 )
 from ..project._shared import (
     mark_error,
@@ -47,6 +49,11 @@ class StackOverflowIntegration(IntegrationProvider):
     description = "Reputation, recent answers, top tags."
     docs_url = "https://api.stackexchange.com/docs"
     icon = "stackoverflow"
+    upstream_revocation = cannot_revoke(
+        "Stack Exchange has no API for deleting an API key, so the key itself is "
+        "not revoked — only Arshad.AI's encrypted copy is deleted. Delete "
+        "the key at stackapps.com (your registered app) to revoke it fully."
+    )
 
     async def connect(
         self, *, user: User | None, db: AsyncSession, payload: dict[str, Any]
@@ -113,7 +120,7 @@ class StackOverflowIntegration(IntegrationProvider):
                 body = resp.json() or {}
         except Exception as exc:  # noqa: BLE001
             await mark_error(integration=integration, db=db, err=exc)
-            raise IntegrationError("sync_failed", f"{type(exc).__name__}: {exc}")
+            raise IntegrationError("sync_failed", safe_detail(exc)) from exc
         items = body.get("items") or []
         profile = items[0] if items else {}
         integration.config = {

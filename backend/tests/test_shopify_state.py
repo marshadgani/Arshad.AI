@@ -1,6 +1,7 @@
 """Tests for src/services/shopify/state.py and src/services/shopify/parsers.py.
 
 Covers:
+  - shop_metadata_config config writer
   - shop_domain / shop_context / shop_presentation accessors
   - day_window timestamp format (bare-Z suffix, not +00:00)
   - find_integration delegation
@@ -17,7 +18,6 @@ from src.services.shopify import state as shopify_state
 from src.services.shopify import tokens as shopify_tokens
 from src.services.shopify.parsers import day_window
 
-
 # ── Helper ────────────────────────────────────────────────────────────────────
 
 
@@ -27,6 +27,40 @@ def _make_integration(config: dict | None = None, status: str = "connected"):
     integration.status = status
     integration.config = config or {}
     return integration
+
+
+# ── shop_metadata_config ──────────────────────────────────────────────────────
+
+
+def test_shop_metadata_config_maps_known_fields():
+    meta = {
+        "ianaTimezone": "Europe/London",
+        "currencyCode": "GBP",
+        "name": "London Store",
+    }
+
+    result = shopify_state.shop_metadata_config(meta)
+
+    assert result["shop_timezone"] == "Europe/London"
+    assert result["currency_code"] == "GBP"
+    assert result["shop_name"] == "London Store"
+
+
+def test_shop_metadata_config_defaults_timezone_and_currency_for_empty_meta():
+    result = shopify_state.shop_metadata_config({})
+
+    assert result["shop_timezone"] == "UTC"
+    assert result["currency_code"] == "USD"
+    assert result["shop_name"] is None
+
+
+def test_shop_metadata_config_defaults_when_none_values_present():
+    result = shopify_state.shop_metadata_config(
+        {"ianaTimezone": None, "currencyCode": None}
+    )
+
+    assert result["shop_timezone"] == "UTC"
+    assert result["currency_code"] == "USD"
 
 
 # ── shop_domain ───────────────────────────────────────────────────────────────
@@ -228,6 +262,7 @@ def test_classify_error_shopify_shop_missing_returns_needs_reauth_true():
 
 def test_classify_error_generic_exception_returns_needs_reauth_false():
     import httpx
+
     exc = httpx.ConnectTimeout("timed out")
 
     needs_reauth, _ = shopify_state.classify_error(exc)

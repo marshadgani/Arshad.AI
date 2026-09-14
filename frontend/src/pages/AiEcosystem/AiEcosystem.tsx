@@ -1,9 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useFetch } from '../../hooks/useFetch';
+import { usePaginatedFetch } from '../../hooks/usePaginatedFetch';
 import AgentCard, { AgentData, AgentMetric } from './AgentCard';
-import SkillCard, { SkillData } from './SkillCard';
+import SkillCard, { asSkillCategory, SkillCategory, SkillData } from './SkillCard';
+import SkillCardSkeleton from './SkillCardSkeleton';
 import styles from './AiEcosystem.module.css';
 import TimePeriodFilter, { Period } from './TimePeriodFilter';
+
+const SKILLS_SKELETON_COUNT = 12;
 
 interface MetricsInner {
   period: Period;
@@ -20,7 +24,10 @@ interface SummaryInner {
 
 type View = 'agents' | 'skills';
 type AgentFilterKey = 'development' | 'cicd' | 'other';
-type SkillFilterKey = 'development' | 'security' | 'data' | 'other';
+// Reuses SkillData's category union instead of redeclaring the same four
+// literals a third time (the backend Literal and SkillData already had it
+// independently) — one more place these could have silently drifted apart.
+type SkillFilterKey = SkillCategory;
 
 const AGENT_FILTERS: { key: AgentFilterKey; label: string }[] = [
   { key: 'development', label: 'Development' },
@@ -34,6 +41,9 @@ const SKILL_FILTERS: { key: SkillFilterKey; label: string }[] = [
   { key: 'data', label: 'Data' },
   { key: 'other', label: 'Other' },
 ];
+
+const SKILLS_PAGE_SIZE = 50;
+const SKILLS_SEARCH_DEBOUNCE_MS = 300;
 
 const CICD_KEYWORDS = ['cicd', 'devops', 'deploy', 'pipeline', 'workflow', 'release', 'infra', 'kubernetes', 'docker', 'monitor', 'heal'];
 
@@ -56,21 +66,44 @@ export default function AiEcosystem() {
   const [activeAgentFilters, setActiveAgentFilters] = useState<Set<AgentFilterKey>>(
     new Set(['development', 'cicd', 'other'])
   );
-  const [activeSkillFilters, setActiveSkillFilters] = useState<Set<SkillFilterKey>>(
-    new Set(['development', 'security', 'data', 'other'])
-  );
+  const [skillCategory, setSkillCategory] = useState<SkillFilterKey | 'all'>('all');
+  const [skillSearchInput, setSkillSearchInput] = useState('');
+  const [skillSearch, setSkillSearch] = useState('');
+  const [skillOffset, setSkillOffset] = useState(0);
 
   const { data: agentsData } = useFetch<AgentData[]>('/api/v1/ai-ecosystem/agents', {
     refreshInterval: 30_000,
   });
   const { data: metricsData } = useFetch<MetricsInner>(`/api/v1/ai-ecosystem/metrics?period=${period}`);
   const { data: summaryData } = useFetch<SummaryInner>(`/api/v1/ai-ecosystem/summary?period=${period}`);
-  const { data: skillsData, isLoading: skillsLoading, error: skillsError } = useFetch<SkillData[]>('/api/v1/ai-ecosystem/skills', {
-    refreshInterval: 30_000,
+
+  // Debounce free-text search before it hits the URL/network.
+  useEffect(() => {
+    const id = setTimeout(() => {
+      setSkillSearch(skillSearchInput.trim());
+      setSkillOffset(0);
+    }, SKILLS_SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(id);
+  }, [skillSearchInput]);
+
+  const skillsParams = new URLSearchParams({
+    limit: String(SKILLS_PAGE_SIZE),
+    offset: String(skillOffset),
   });
+  if (skillCategory !== 'all') skillsParams.set('category', skillCategory);
+  if (skillSearch) skillsParams.set('q', skillSearch);
+
+  const {
+    data: skills,
+    total: skillsTotal,
+    isLoading: skillsLoading,
+    error: skillsError,
+    refetch: refetchSkills,
+  } = usePaginatedFetch<SkillData>(`/api/v1/ai-ecosystem/skills?${skillsParams.toString()}`);
+
+  const skillFiltersActive = skillCategory !== 'all' || skillSearch !== '';
 
   const agents = agentsData ?? [];
-  const skills = skillsData ?? [];
   const metricMap = new Map<string, AgentMetric>(
     (metricsData?.agents ?? []).map((m) => [m.agent_name, m])
   );
@@ -84,10 +117,6 @@ export default function AiEcosystem() {
       return a.display_name.localeCompare(b.display_name);
     });
 
-  const visibleSkills = skills
-    .filter((s) => activeSkillFilters.has((s.category as SkillFilterKey) ?? 'other'))
-    .sort((a, b) => a.display_name.localeCompare(b.display_name));
-
   function toggleAgentFilter(key: AgentFilterKey) {
     setActiveAgentFilters((prev) => {
       const next = new Set(prev);
@@ -100,21 +129,18 @@ export default function AiEcosystem() {
     });
   }
 
-  function toggleSkillFilter(key: SkillFilterKey) {
-    setActiveSkillFilters((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) {
-        if (next.size > 1) next.delete(key);
-      } else {
-        next.add(key);
-      }
-      return next;
-    });
+  function selectSkillFilter(key: SkillFilterKey) {
+    setSkillCategory((prev) => (prev === key ? 'all' : key));
+    setSkillOffset(0);
   }
+
+  const skillsRangeStart = skillsTotal === 0 ? 0 : skillOffset + 1;
+  const skillsRangeEnd = Math.min(skillOffset + skills.length, skillsTotal);
+  const hasNextSkillsPage = skillOffset + skills.length < skillsTotal;
 
   const subtitle = activeView === 'agents'
     ? `${agents.length} agents registered`
-    : `${skills.length} skills registered`;
+    : `${skillsTotal} skills registered`;
 
   return (
     <div className={styles.page}>
@@ -159,7 +185,7 @@ export default function AiEcosystem() {
           onClick={() => setActiveView('skills')}
         >
           Skills
-          <span className={styles.filterCount}>{skills.length}</span>
+          <span className={styles.filterCount}>{skillsTotal}</span>
         </button>
       </div>
 
@@ -208,29 +234,111 @@ export default function AiEcosystem() {
                 <button
                   key={key}
                   type="button"
-                  className={`${styles.filterBtn} ${activeSkillFilters.has(key) ? styles.filterBtnActive : ''}`}
-                  onClick={() => toggleSkillFilter(key)}
+                  className={`${styles.filterBtn} ${skillCategory === key ? styles.filterBtnActive : ''}`}
+                  onClick={() => selectSkillFilter(key)}
                 >
                   {label}
-                  <span className={styles.filterCount}>
-                    {skills.filter((s) => (s.category ?? 'other') === key).length}
-                  </span>
                 </button>
               ))}
             </div>
+            <input
+              type="text"
+              className={styles.searchInput}
+              placeholder="Search skills…"
+              value={skillSearchInput}
+              onChange={(e) => setSkillSearchInput(e.target.value)}
+              aria-label="Search skills"
+            />
           </div>
 
           {skillsError ? (
-            <div className={styles.empty}>Failed to load skills — {skillsError.message}</div>
-          ) : visibleSkills.length > 0 ? (
-            <div className={styles.grid}>
-              {visibleSkills.map((skill) => (
-                <SkillCard key={skill.skill_name} skill={skill} />
+            <div className={styles.errorState} role="alert">
+              <span className={styles.errorGlyph} aria-hidden="true">
+                !
+              </span>
+              <div>
+                <p className={styles.errorTitle}>Couldn&apos;t load skills</p>
+                <p className={styles.errorDetail}>{skillsError.message}</p>
+              </div>
+              <button type="button" className={styles.retryBtn} onClick={refetchSkills}>
+                Retry
+              </button>
+            </div>
+          ) : skillsLoading && skills.length === 0 ? (
+            <div className={styles.grid} aria-busy="true" aria-live="polite">
+              <span className={styles.srOnly}>Loading skills…</span>
+              {Array.from({ length: SKILLS_SKELETON_COUNT }).map((_, i) => (
+                <SkillCardSkeleton key={i} index={i} />
               ))}
+            </div>
+          ) : skills.length > 0 ? (
+            <>
+              <div className={styles.grid}>
+                {skills.map((skill, i) => (
+                  <SkillCard
+                    key={skill.skill_name}
+                    // usePaginatedFetch trusts the wire response's shape via
+                    // an unchecked type cast (see its `as Promise<...>`) — it
+                    // does not runtime-validate that `category` is actually
+                    // one of the four known values, so normalize at the
+                    // boundary where the fetched row turns into UI, rather
+                    // than trusting the static type all the way into render.
+                    skill={{ ...skill, category: asSkillCategory(skill.category) }}
+                    index={i}
+                  />
+                ))}
+              </div>
+              <div className={styles.pagination}>
+                <span className={styles.pageInfo}>
+                  Showing {skillsRangeStart}–{skillsRangeEnd} of {skillsTotal}
+                </span>
+                <button
+                  type="button"
+                  className={styles.pageBtn}
+                  onClick={() => setSkillOffset((o) => Math.max(0, o - SKILLS_PAGE_SIZE))}
+                  disabled={skillOffset === 0}
+                >
+                  Prev
+                </button>
+                <button
+                  type="button"
+                  className={styles.pageBtn}
+                  onClick={() => setSkillOffset((o) => o + SKILLS_PAGE_SIZE)}
+                  disabled={!hasNextSkillsPage}
+                >
+                  Next
+                </button>
+              </div>
+            </>
+          ) : skillFiltersActive ? (
+            <div className={styles.empty}>
+              <p className={styles.emptyTitle}>No skills match</p>
+              <p className={styles.emptyDetail}>
+                Nothing found{skillSearch ? ` for “${skillSearch}”` : ''}
+                {skillCategory !== 'all' ? ` in ${skillCategory}` : ''}. Try a different search or
+                category.
+              </p>
+              <button
+                type="button"
+                className={styles.retryBtn}
+                onClick={() => {
+                  setSkillCategory('all');
+                  setSkillSearchInput('');
+                  setSkillSearch('');
+                  setSkillOffset(0);
+                }}
+              >
+                Clear filters
+              </button>
             </div>
           ) : (
             <div className={styles.empty}>
-              {skillsLoading ? 'Loading skills…' : skills.length === 0 ? 'No skills registered yet.' : 'No skills match the selected filters.'}
+              <p className={styles.emptyTitle}>Skill registry is empty</p>
+              <p className={styles.emptyDetail}>
+                No skills have been synced from <code>.claude/skills/</code> yet. Run{' '}
+                <code>backend/scripts/register_skills.py</code> to regenerate the manifest, then
+                restart the backend so the seed step converges it into the database.
+              </p>
             </div>
           )}
         </>

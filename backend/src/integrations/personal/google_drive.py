@@ -28,6 +28,7 @@ from ..base import (
 )
 from ..registry import register
 from ._shared import (
+    SHARED_GOOGLE_GRANT_REVOCATION,
     status_from_oauth_account,
     upsert_personal_integration,
 )
@@ -42,6 +43,7 @@ class GoogleDriveIntegration(IntegrationProvider):
     description = "Files, folders, search across your Drive."
     docs_url = "https://developers.google.com/drive"
     icon = "google-drive"
+    upstream_revocation = SHARED_GOOGLE_GRANT_REVOCATION
 
     async def connect(
         self, *, user: User | None, db: AsyncSession, payload: dict[str, Any]

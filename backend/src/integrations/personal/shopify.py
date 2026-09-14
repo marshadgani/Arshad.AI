@@ -22,10 +22,11 @@ expires_at and encrypted_refresh_token are always null, so
 OAuthIntegrationProvider.get_access_token() falls straight through to
 decrypt() without entering the refresh branch.
 
-Shopify has no public token-revocation endpoint — revocation happens only
-when the merchant uninstalls the app from the Shopify admin. disconnect()
-therefore uses the base class default (marks the row disconnected locally)
-and deliberately does not touch the dashboard cache: the read path checks
+Shopify has no public token-revocation endpoint — the merchant must
+uninstall the app from the Shopify admin to fully revoke the token.
+disconnect() therefore uses the base class default, which deletes the
+stored IntegrationOAuthToken row and marks the integration disconnected.
+It also deliberately does not touch the dashboard cache: the read path checks
 find_integration() before ever consulting cache, so a disconnected
 integration's cache entry is unreachable and expires within 120s on its own
 — touching Redis from this layer would be an unnecessary L3->L2 dependency.
@@ -36,7 +37,7 @@ revenue analysis beyond 60 days must not be built on this foundation.
 
 This module holds the OAuth *lifecycle* only. Its two neighbours:
   - shopify_oauth.py       — pure shop-domain and callback verification rules
-  - services/shopify/*     — HTTP transport, parsing, caching, state
+  - services/shopify/*     — HTTP transport, parsing, caching, config shape
 
 Imports of services.shopify are deliberately function-local. src.services.
 shopify.client imports integrations.base, which executes
@@ -54,7 +55,18 @@ from datetime import datetime, timezone
 from typing import Any, NoReturn
 from urllib.parse import urlencode
 
-from ..base import ConnectResult, IntegrationError, StatusReport, SyncResult
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ...models.integration import Integration
+from ...models.user import User
+from ..base import (
+    ConnectResult,
+    IntegrationError,
+    StatusReport,
+    SyncResult,
+    cannot_revoke,
+    safe_detail,
+)
 from ..registry import register
 from . import shopify_oauth
 from ._oauth_base import (
@@ -69,34 +81,29 @@ _LAST_ERROR_MAX_CHARS = 500
 _log = logging.getLogger(__name__)
 
 
-def _shop_metadata_config(meta: dict[str, Any]) -> dict[str, Any]:
-    """Shop metadata -> the Integration.config keys read by
-    services/shopify/state.py.
-
-    One writer for those keys, shared by the OAuth callback and sync, so the
-    two cannot drift apart in what they persist. The defaults are applied
-    here rather than at read time so a shop whose metadata probe failed
-    still lands with a usable timezone/currency.
-    """
-    return {
-        "shop_timezone": meta.get("ianaTimezone") or "UTC",
-        "currency_code": meta.get("currencyCode") or "USD",
-        "shop_name": meta.get("name"),
-    }
-
-
 @register
 class ShopifyIntegration(OAuthIntegrationProvider):
     slug = "shopify"
     display_name = "Shopify"
     category = "Commerce"
-    description = "Live orders, revenue, and inventory from your Shopify store."
+    # Describes GET /api/v1/shopify/dashboard, not sync() — see sync().
+    description = (
+        "Live orders, revenue, and inventory from your Shopify store dashboard."
+    )
     docs_url = "https://shopify.dev/docs/apps/build/authentication-authorization"
     icon = "shopify"
     connect_prompt = {
         "label": "Shopify Store Domain",
         "placeholder": "my-store.myshopify.com",
     }
+    # Shopify publishes no token-revocation endpoint; an offline access
+    # token stays valid until the app is uninstalled from the store. See
+    # the module docstring.
+    upstream_revocation = cannot_revoke(
+        "Shopify provides no token-revocation API — an app's access token "
+        "stays valid until the app is uninstalled. Uninstall Arshad.AI from "
+        "your Shopify admin (Settings → Apps) to revoke it on Shopify's side."
+    )
 
     # OAuthIntegrationProvider ClassVars — auth_url/token_url are built
     # per-shop below, so these are placeholders that are never dereferenced.
@@ -112,7 +119,9 @@ class ShopifyIntegration(OAuthIntegrationProvider):
     client_id_env = "SHOPIFY_CLIENT_ID"
     client_secret_env = "SHOPIFY_CLIENT_SECRET"
 
-    async def connect(self, *, user, db, payload):  # type: ignore[override]
+    async def connect(
+        self, *, user: User | None, db: AsyncSession, payload: dict[str, Any]
+    ) -> ConnectResult:
         if user is None:
             raise IntegrationError("auth_required", "User context required.")
         shop = shopify_oauth.validate_shop_domain((payload or {}).get("shop"))
@@ -135,6 +144,7 @@ class ShopifyIntegration(OAuthIntegrationProvider):
         self, *, context: OAuthCallbackContext
     ) -> CallbackOutcome:
         from ...services.shopify import client as shopify_client
+        from ...services.shopify import state as shopify_state
 
         stored_shop = context.stored.get("shop")
         if not stored_shop:
@@ -179,15 +189,23 @@ class ShopifyIntegration(OAuthIntegrationProvider):
         return CallbackOutcome(
             token_response=token_response,
             profile={},
-            config_extra={"shop_domain": stored_shop, **_shop_metadata_config(meta)},
+            config_extra={
+                "shop_domain": stored_shop,
+                **shopify_state.shop_metadata_config(meta),
+            },
         )
 
     async def fetch_profile(self, access_token: str) -> dict[str, Any]:
         # No-op: all shop metadata is fetched inside complete_callback().
         return {}
 
-    async def sync(self, *, integration, db):  # type: ignore[override]
-        from ...services.shopify import cache as shopify_cache
+    async def sync(self, *, integration: Integration, db: AsyncSession) -> SyncResult:
+        """Refresh stored shop metadata.
+
+        rows_written is 0 by design: orders, revenue and inventory are read
+        live per dashboard request (see services/shopify/dashboard.py) and
+        are never ingested here.
+        """
         from ...services.shopify import client as shopify_client
         from ...services.shopify import state as shopify_state
 
@@ -199,9 +217,25 @@ class ShopifyIntegration(OAuthIntegrationProvider):
         except Exception as exc:  # noqa: BLE001
             await self._record_sync_failure(integration, exc, db)
 
+        await self._record_metadata_refresh(integration, meta, db)
+
+        return SyncResult(
+            rows_written=0,
+            summary=f"Refreshed shop metadata for {shop}",
+            duration_ms=int((time.perf_counter() - started) * 1000),
+        )
+
+    @staticmethod
+    async def _record_metadata_refresh(
+        integration: Integration, meta: dict[str, Any], db: AsyncSession
+    ) -> None:
+        """Persist a successful refresh — the counterpart to _record_sync_failure."""
+        from ...services.shopify import cache as shopify_cache
+        from ...services.shopify import state as shopify_state
+
         integration.config = {
             **(integration.config or {}),
-            **_shop_metadata_config(meta),
+            **shopify_state.shop_metadata_config(meta),
         }
         integration.last_synced_at = datetime.now(timezone.utc)
         integration.last_error = None
@@ -211,36 +245,41 @@ class ShopifyIntegration(OAuthIntegrationProvider):
         # changed, so the cached payload built from the old values is stale.
         await shopify_cache.del_dashboard_cache(str(integration.id))
 
-        return SyncResult(
-            rows_written=0,
-            summary=f"Refreshed shop metadata for {shop}",
-            duration_ms=int((time.perf_counter() - started) * 1000),
-        )
-
     @staticmethod
-    async def _record_sync_failure(integration, exc: Exception, db) -> NoReturn:  # type: ignore[no-untyped-def]
+    async def _record_sync_failure(
+        integration: Integration, exc: Exception, db: AsyncSession
+    ) -> NoReturn:
         """Persist the failed-sync status, then re-raise as sync_failed.
 
         NoReturn is load-bearing: sync() relies on this never falling
         through, so the value it was computing stays definitely-assigned.
+
+        Both the persisted status and the raised message carry
+        ``safe_detail(exc)``, never ``str(exc)``: ``integration.last_error``
+        is returned verbatim by GET /api/v1/integrations/shopify/status and
+        the raised message becomes the 400 body of POST /{slug}/sync, while
+        httpx embeds the full request URL in the message of every
+        HTTPStatusError/RequestError. See base.safe_detail and
+        tests/test_integration_error_leakage.py — this provider was the last
+        personal integration still on the leaky shape.
         """
         # Logged in addition to the DB write: the deployment verification
         # protocol (CLAUDE.md §23) diagnoses production issues by grepping
         # Render app logs for warning/error lines, not by querying Postgres
         # — a failure recorded only in integration.last_error is invisible
-        # to that workflow.
+        # to that workflow. The log gets the full exception; only the
+        # operator can read it.
         _log.warning(
-            "Shopify sync failed for integration_id=%s: %s: %s",
-            integration.id,
-            type(exc).__name__,
-            exc,
+            "Shopify sync failed for integration_id=%s", integration.id, exc_info=exc
         )
         integration.status = "error"
-        integration.last_error = f"{type(exc).__name__}: {exc}"[:_LAST_ERROR_MAX_CHARS]
+        integration.last_error = safe_detail(exc)[:_LAST_ERROR_MAX_CHARS]
         await db.commit()
-        raise IntegrationError("sync_failed", f"{type(exc).__name__}: {exc}")
+        raise IntegrationError("sync_failed", safe_detail(exc)) from exc
 
-    async def status(self, *, integration, db) -> StatusReport:  # type: ignore[override]
+    async def status(
+        self, *, integration: Integration, db: AsyncSession
+    ) -> StatusReport:
         report = await super().status(integration=integration, db=db)
         config = integration.config or {}
         report.extra.update(

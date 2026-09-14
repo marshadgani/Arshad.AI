@@ -1,3 +1,5 @@
+import { formatRelativeTime } from './relativeTime';
+
 export function formatMoney(amount: string | null | undefined, currency: string | null | undefined): string {
   if (amount == null) return '—';
   const value = Number(amount);
@@ -12,15 +14,9 @@ export function formatMoney(amount: string | null | undefined, currency: string 
   }
 }
 
-export function formatRelativeTime(iso: string | null | undefined): string {
-  if (!iso) return '—';
-  const ms = Date.now() - new Date(iso).getTime();
-  if (Number.isNaN(ms)) return '—';
-  if (ms < 60_000) return 'Just now';
-  if (ms < 3_600_000) return `${Math.floor(ms / 60_000)}m ago`;
-  if (ms < 86_400_000) return `${Math.floor(ms / 3_600_000)}h ago`;
-  return `${Math.floor(ms / 86_400_000)}d ago`;
-}
+// Re-exported, not redefined: formatRelativeTime is app-wide (see
+// utils/relativeTime). Existing Shopify callers keep their import path.
+export { formatRelativeTime };
 
 export function staleLabel(cachedAt: string | null | undefined): string | null {
   if (!cachedAt) return null;

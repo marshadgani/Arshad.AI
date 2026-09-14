@@ -1,0 +1,260 @@
+/* Activity Log — Jarvis HUD aesthetic (see styles/tokens.css). A vertical
+   timeline with glowing cyan markers, echoing the "readout" feel of the
+   dashboard rather than a plain table of rows. */
+
+.page {
+  padding: var(--s-8) var(--s-8) var(--s-12);
+  color: var(--text-primary);
+  max-width: 900px;
+  margin: 0 auto;
+  font-family: var(--font-display);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--s-6);
+  gap: var(--s-4);
+}
+
+.title {
+  margin: 0 0 var(--s-1);
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  background: linear-gradient(90deg, var(--text-primary), var(--accent-soft));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.sub {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.refresh {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
+  padding: var(--s-2) var(--s-4);
+  border-radius: var(--radius-md);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.refresh:hover:not(:disabled) {
+  border-color: var(--accent);
+  box-shadow: var(--glow-cyan-soft);
+}
+
+.refresh:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.refresh:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+
+.banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-4);
+  background: var(--accent-health-bg);
+  border: 1px solid var(--accent-health-faint);
+  color: var(--status-danger);
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--s-4);
+  font-size: 0.85rem;
+}
+
+.bannerRetry {
+  background: transparent;
+  border: 1px solid currentColor;
+  color: inherit;
+  padding: 0.3rem 0.7rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.bannerRetry:hover {
+  background: rgba(255, 77, 109, 0.12);
+}
+
+.bannerRetry:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  /* The timeline line is a single background gradient behind the whole
+     list rather than a per-item border, so it reads as one continuous
+     rail instead of N disconnected segments. */
+  position: relative;
+}
+
+.list::before {
+  content: '';
+  position: absolute;
+  left: 15px;
+  top: 8px;
+  bottom: 8px;
+  width: 1px;
+  background: var(--border-faint);
+}
+
+.entry {
+  position: relative;
+}
+
+.entryLink {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-4);
+  padding: var(--s-3) var(--s-3);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  transition: background 0.15s ease;
+}
+
+.entryLink:hover {
+  background: var(--accent-bg);
+}
+
+.entryLink:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.dot {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: var(--bg-deep);
+  border: 2px solid var(--accent);
+  box-shadow: var(--glow-cyan-soft);
+}
+
+.entryBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.entryTitle {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entryMeta {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.empty {
+  text-align: center;
+  padding: var(--s-12);
+  color: var(--text-muted);
+  border: 1px dashed var(--border-faint);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  align-items: center;
+}
+
+.emptyCta {
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.emptyCta:hover {
+  color: var(--accent-soft);
+}
+
+/* Skeleton — loading state. Mirrors .entry geometry so the layout doesn't
+   jump once real data replaces it. */
+.skeletonEntry {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-4);
+  padding: var(--s-3) var(--s-3);
+}
+
+.skeletonDot {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: var(--border-strong);
+}
+
+.skeletonBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  flex: 1;
+}
+
+.skeletonBar,
+.skeletonBarShort {
+  height: 12px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(
+    90deg,
+    var(--bg-panel) 25%,
+    var(--border-faint) 37%,
+    var(--bg-panel) 63%
+  );
+  background-size: 400% 100%;
+  animation: skeleton-shimmer 1.4s ease infinite;
+}
+
+.skeletonBar { width: 55%; }
+.skeletonBarShort { width: 30%; height: 10px; }
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonBar,
+  .skeletonBarShort {
+    animation: none;
+  }
+}

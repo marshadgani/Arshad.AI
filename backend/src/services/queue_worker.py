@@ -22,11 +22,18 @@ from sqlalchemy import select
 from ..models.dag_trigger import DagTriggerQueue
 from ..models.database import AsyncSessionLocal
 from .ingestion import runner as ingestion_runner
+from .worker_health import WorkerHealth
 
 _log = logging.getLogger(__name__)
 
 _DEFAULT_POLL_INTERVAL = 5.0
 _MAX_ATTEMPTS = 3
+
+# In-memory heartbeat, advisory only — never persisted, never shared across
+# processes. Lets sync_status.py distinguish "worker enabled but wedged"
+# from "worker enabled and legitimately busy" without a DB write on every
+# poll loop iteration. Single-process assumption (true on Render).
+LAST_POLL_AT: datetime | None = None
 
 
 def _poll_interval() -> float:
@@ -38,6 +45,13 @@ def _poll_interval() -> float:
 
 def is_enabled() -> bool:
     return os.getenv("ENABLE_INPROCESS_WORKER", "false").lower() == "true"
+
+
+def health() -> WorkerHealth:
+    """Current liveness snapshot, for callers that must explain to a user
+    why a queued job isn't moving. Reading LAST_POLL_AT is this module's
+    job — consumers take the snapshot, not the global."""
+    return WorkerHealth(enabled=is_enabled(), last_poll_at=LAST_POLL_AT)
 
 
 async def _claim_one() -> DagTriggerQueue | None:
@@ -100,11 +114,13 @@ async def _process(row_id, dag_id: str, user_id, payload: dict, attempt: int) ->
 
 
 async def run_worker(stop_event: asyncio.Event) -> None:
+    global LAST_POLL_AT
     base_interval = _poll_interval()
     backoff = base_interval
     _log.info("queue worker started poll_interval=%s", base_interval)
     while not stop_event.is_set():
         claim_failed = False
+        LAST_POLL_AT = datetime.now(timezone.utc)
         try:
             row = await _claim_one()
         except Exception as exc:  # noqa: BLE001 — DB transient errors should retry

@@ -1,22 +1,32 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import AppLayout from './components/AppLayout';
 import AuthCallback from './pages/AuthCallback';
-import AiEcosystem from './pages/AiEcosystem';
-import Chat from './pages/Chat';
-import Obsidian from './pages/Obsidian';
 import Dashboard from './dashboard/Dashboard';
-import HealthFitness from './pages/HealthFitness';
-import HomeIoT from './pages/HomeIoT';
-import Integrations from './pages/Integrations';
-import Learning from './pages/Learning';
 import Login from './pages/Login';
-import PersonalFinance from './pages/PersonalFinance';
-import ShopifyStore from './pages/ShopifyStore';
-import StockMarket from './pages/StockMarket';
-import Travel from './pages/Travel';
 import styles from './App.module.css';
+
+/* Code-split every routed page: each is only fetched when its route is
+   actually visited, instead of all being bundled into the initial JS
+   payload every user downloads regardless of which page (if any) they
+   open. PersonalFinance alone pulls in a ~37KB static SVG string
+   (FundFlowMap/fundFlowDiagram.ts) that has no reason to load before the
+   /finance route is hit. Dashboard, Login and AuthCallback stay eager —
+   they're on the landing path virtually every session takes. */
+const ActivityLog = lazy(() => import('./pages/ActivityLog'));
+const AiEcosystem = lazy(() => import('./pages/AiEcosystem'));
+const Chat = lazy(() => import('./pages/Chat'));
+const Obsidian = lazy(() => import('./pages/Obsidian'));
+const HealthFitness = lazy(() => import('./pages/HealthFitness'));
+const HomeIoT = lazy(() => import('./pages/HomeIoT'));
+const Integrations = lazy(() => import('./pages/Integrations'));
+const Learning = lazy(() => import('./pages/Learning'));
+const PersonalFinance = lazy(() => import('./pages/PersonalFinance'));
+const Settings = lazy(() => import('./pages/Settings'));
+const ShopifyStore = lazy(() => import('./pages/ShopifyStore'));
+const StockMarket = lazy(() => import('./pages/StockMarket'));
+const Travel = lazy(() => import('./pages/Travel'));
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
@@ -65,22 +75,26 @@ function ProtectedRoutes() {
 
   return (
     <AppLayout>
-      <Routes>
-        <Route path="/"                   element={<Dashboard />} />
-        <Route path="/chat"               element={<Chat />} />
-        <Route path="/chat/:sessionId"    element={<Chat />} />
-        <Route path="/finance"            element={<PersonalFinance />} />
-        <Route path="/shopify"            element={<ShopifyStore />} />
-        <Route path="/stocks"             element={<StockMarket />} />
-        <Route path="/health"             element={<HealthFitness />} />
-        <Route path="/learning"           element={<Learning />} />
-        <Route path="/home-iot"           element={<HomeIoT />} />
-        <Route path="/travel"             element={<Travel />} />
-        <Route path="/integrations"       element={<Integrations />} />
-        <Route path="/ai-ecosystem"       element={<AiEcosystem />} />
-        <Route path="/obsidian"           element={<Obsidian />} />
-        <Route path="*"                   element={<Navigate to="/" replace />} />
-      </Routes>
+      <Suspense fallback={<div className={styles.statusMessage}>Loading…</div>}>
+        <Routes>
+          <Route path="/"                   element={<Dashboard />} />
+          <Route path="/chat"               element={<Chat />} />
+          <Route path="/chat/:sessionId"    element={<Chat />} />
+          <Route path="/finance"            element={<PersonalFinance />} />
+          <Route path="/shopify"            element={<ShopifyStore />} />
+          <Route path="/stocks"             element={<StockMarket />} />
+          <Route path="/health"             element={<HealthFitness />} />
+          <Route path="/learning"           element={<Learning />} />
+          <Route path="/home-iot"           element={<HomeIoT />} />
+          <Route path="/travel"             element={<Travel />} />
+          <Route path="/integrations"       element={<Integrations />} />
+          <Route path="/ai-ecosystem"       element={<AiEcosystem />} />
+          <Route path="/obsidian"           element={<Obsidian />} />
+          <Route path="/settings"           element={<Settings />} />
+          <Route path="/activity-log"       element={<ActivityLog />} />
+          <Route path="*"                   element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
     </AppLayout>
   );
 }

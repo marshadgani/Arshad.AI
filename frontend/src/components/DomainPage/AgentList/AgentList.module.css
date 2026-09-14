@@ -1,0 +1,35 @@
+/* Agents */
+.agents { composes: cols3 from '../../../styles/grid.module.css'; gap: var(--s-4); }
+.agent {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-faint);
+  border-radius: var(--radius-md);
+  padding: var(--s-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  position: relative;
+}
+.agentHead { display: flex; align-items: center; gap: var(--s-2); }
+.healthDot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.healthHealthy  { background: var(--status-ok);    box-shadow: 0 0 6px var(--status-ok); }
+.healthDegraded { background: var(--status-warn);  box-shadow: 0 0 6px var(--status-warn); }
+.healthOffline  { background: var(--status-danger); box-shadow: 0 0 6px var(--status-danger); }
+.healthTraining { background: var(--accent);       box-shadow: 0 0 6px var(--accent); }
+.agentName { font-family: var(--font-mono); font-size: 13px; min-width: 0; overflow-wrap: anywhere; }
+.agentDesc { font-size: 12px; color: var(--text-secondary); }
+
+.agentMetrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-2);
+  border-top: 1px dashed var(--border-faint);
+  padding-top: var(--s-2);
+}
+.metric { display: flex; flex-direction: column; }
+.metricLabel { font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.metricValue { font-family: var(--font-mono); font-size: 12px; color: var(--text-primary); }
+
+.agentLast { font-size: 11px; color: var(--text-muted); margin-top: var(--s-1); }
+.agentFoot { display: flex; align-items: center; justify-content: space-between; margin-top: var(--s-2); font-family: var(--font-mono); font-size: 10px; }
+.agentRun { color: var(--text-muted); }

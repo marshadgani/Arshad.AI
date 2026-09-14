@@ -1,0 +1,539 @@
+/* Integrations — Jarvis HUD aesthetic (see styles/tokens.css).
+   Bold display type, cyan accent glow, and motion cues that make the
+   honest queued → running → completed sync lifecycle legible at a glance
+   instead of a static "Sync now" button lying about instant success. */
+
+.page {
+  padding: var(--s-8) var(--s-8) var(--s-12);
+  color: var(--text-primary);
+  max-width: 1200px;
+  margin: 0 auto;
+  font-family: var(--font-display);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--s-6);
+  gap: var(--s-4);
+}
+
+.header h1 {
+  margin: 0 0 var(--s-1);
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  background: linear-gradient(90deg, var(--text-primary), var(--accent-soft));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.sub {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  max-width: 46ch;
+}
+
+.refresh {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
+  padding: var(--s-2) var(--s-4);
+  border-radius: var(--radius-md);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.refresh:hover:not(:disabled) {
+  border-color: var(--accent);
+  box-shadow: var(--glow-cyan-soft);
+}
+
+.refresh:focus-visible,
+.actions button:focus-visible,
+.modalInput:focus-visible,
+.docsLink:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.refresh:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+
+.banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-4);
+  background: var(--accent-health-bg);
+  border: 1px solid var(--accent-health-faint);
+  color: var(--status-danger);
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--s-4);
+  font-size: 0.85rem;
+}
+
+.bannerRetry {
+  background: transparent;
+  border: 1px solid currentColor;
+  color: inherit;
+  padding: 0.3rem 0.7rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.bannerRetry:hover {
+  background: rgba(255, 77, 109, 0.12);
+}
+
+.section {
+  margin-bottom: var(--s-8);
+}
+
+.sectionTitle {
+  margin: 0 0 var(--s-3);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+  gap: var(--s-4);
+}
+
+.card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-faint);
+  border-radius: var(--radius-lg);
+  padding: var(--s-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.card:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+
+.cardSyncing {
+  border-color: var(--accent-faint);
+  box-shadow: var(--glow-cyan-soft);
+}
+
+.cardHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--s-2);
+}
+
+.cardTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+}
+
+.cardTitle strong {
+  font-size: 0.98rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.iconBox {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-md);
+  background: var(--bg-panel);
+  border: 1px solid var(--border-faint);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1rem;
+  text-transform: uppercase;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.kind {
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-sm);
+  background: var(--bg-panel);
+  border: 1px solid var(--border-faint);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin-top: 0.15rem;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.dotPulse {
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 currentColor; }
+  50% { opacity: 0.55; box-shadow: 0 0 0 4px transparent; }
+}
+
+.desc {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  flex-grow: 1;
+}
+
+.meta {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+.comingSoonReason {
+  font-size: 0.72rem;
+  background: var(--accent-pending-bg);
+  border: 1px solid var(--accent-pending-faint);
+  color: var(--accent-pending);
+  padding: var(--s-2);
+  border-radius: var(--radius-sm);
+  line-height: 1.4;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.errBanner {
+  font-size: 0.75rem;
+  background: var(--accent-health-bg);
+  border: 1px solid var(--accent-health-faint);
+  color: var(--status-danger);
+  padding: var(--s-2);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  margin-top: var(--s-1);
+}
+
+.actions button {
+  padding: 0.45rem 0.9rem;
+  border-radius: var(--radius-md);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-panel);
+  color: var(--text-primary);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.actions button:hover:not(:disabled) {
+  border-color: var(--accent);
+  box-shadow: var(--glow-cyan-soft);
+}
+
+.actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.syncing {
+  position: relative;
+  overflow: hidden;
+  color: var(--accent);
+  border-color: var(--accent-faint) !important;
+}
+
+.syncing::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--accent-faint),
+    transparent
+  );
+  animation: shimmer 1.6s linear infinite;
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.primary {
+  background: var(--status-ok) !important;
+  border-color: var(--status-ok) !important;
+  color: var(--bg-deep) !important;
+}
+
+.primary:hover:not(:disabled) {
+  box-shadow: 0 0 16px rgba(0, 255, 156, 0.35);
+}
+
+.secondary {
+  color: var(--text-muted) !important;
+  background: transparent !important;
+}
+
+.docsLink {
+  margin-left: auto;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.docsLink:hover {
+  color: var(--accent);
+}
+
+.empty {
+  text-align: center;
+  padding: var(--s-12);
+  color: var(--text-muted);
+  border: 1px dashed var(--border-faint);
+  border-radius: var(--radius-lg);
+}
+
+/* Skeleton — loading state. Mirrors .card geometry so the layout doesn't
+   jump once real data replaces it. */
+.skeletonCard {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-faint);
+  border-radius: var(--radius-lg);
+  padding: var(--s-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.skeletonRow {
+  height: 12px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(
+    90deg,
+    var(--bg-panel) 25%,
+    var(--border-faint) 37%,
+    var(--bg-panel) 63%
+  );
+  background-size: 400% 100%;
+  animation: skeleton-shimmer 1.4s ease infinite;
+}
+
+.skeletonRow:nth-child(1) { width: 60%; height: 16px; }
+.skeletonRow:nth-child(2) { width: 90%; }
+.skeletonRow:nth-child(3) { width: 40%; }
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dotPulse,
+  .syncing::after,
+  .skeletonRow {
+    animation: none;
+  }
+}
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-modal);
+}
+
+.modal {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: var(--s-6);
+  width: 420px;
+  max-width: 90vw;
+  box-shadow: var(--glow-cyan-soft);
+}
+
+.modal h3 {
+  margin: 0 0 var(--s-2);
+  font-size: 1.1rem;
+}
+
+/* Destructive-action variant — DisconnectConfirmModal. Danger red
+   replaces the cyan glow so a "we are about to destroy something" modal
+   never reads as just another connect prompt. */
+.modalDanger {
+  border-color: var(--accent-health-faint);
+  box-shadow: 0 0 20px rgba(255, 77, 109, 0.18);
+}
+
+.modalDanger h3 {
+  color: var(--status-danger);
+}
+
+.danger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  background: var(--status-danger) !important;
+  border-color: var(--status-danger) !important;
+  color: var(--bg-deep) !important;
+  font-weight: 700 !important;
+}
+
+.danger:hover:not(:disabled) {
+  box-shadow: 0 0 16px rgba(255, 77, 109, 0.4);
+}
+
+.danger:disabled {
+  opacity: 0.75;
+  cursor: progress;
+}
+
+.spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid rgba(5, 8, 17, 0.35);
+  border-top-color: var(--bg-deep);
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
+}
+
+.modalDesc {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin: 0 0 var(--s-4);
+  line-height: 1.5;
+}
+
+/* The disconnect dialog's second paragraph, when the provider CANNOT
+   revoke upstream and the user has to finish the job themselves.
+   Given a left rule in the warn colour so it reads as "action still
+   required", not as more reassurance — the whole point of showing it is
+   that the user must not walk away believing revocation was handled. */
+.modalNote {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 0 0 var(--s-4);
+  padding-left: var(--s-3);
+  border-left: 2px solid var(--status-warn);
+}
+
+.modalInput {
+  width: 100%;
+  padding: var(--s-2) var(--s-3);
+  font-size: 0.9rem;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-faint);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  box-sizing: border-box;
+}
+
+.modalInput:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--glow-cyan-soft);
+}
+
+.modalErr {
+  margin-top: var(--s-2);
+  font-size: 0.8rem;
+  color: var(--status-danger);
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--s-2);
+  margin-top: var(--s-6);
+}
+
+.modalActions button {
+  padding: var(--s-2) var(--s-4);
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-panel);
+  color: var(--text-primary);
+}
+
+.toast {
+  position: fixed;
+  bottom: var(--s-6);
+  right: var(--s-6);
+  background: var(--bg-elevated);
+  border: 1px solid var(--accent-faint);
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  box-shadow: var(--glow-cyan-soft);
+  z-index: var(--z-toast);
+}

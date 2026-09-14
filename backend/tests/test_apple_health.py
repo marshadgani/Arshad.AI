@@ -50,6 +50,12 @@ class _FakeRedis:
         self.store[key] = (str(current), ttl)
         return current
 
+    async def delete(self, *keys):
+        removed = 0
+        for key in keys:
+            removed += 1 if self.store.pop(key, None) is not None else 0
+        return removed
+
     async def expire(self, key, seconds, nx=False):
         value, ttl = self.store.get(key, (None, None))
         if nx and ttl is not None:
@@ -342,3 +348,41 @@ async def test_sync_reports_no_recent_push_without_raising(monkeypatch):
     result = await provider.sync(integration=integration, db=db)
 
     assert "no recent data" in result.summary
+
+
+@pytest.mark.asyncio
+async def test_disconnect_drops_the_cached_biometric_snapshot(monkeypatch):
+    """The snapshot is health data, not a credential, so the generic
+    credential scrub in base.disconnect() does not reach it — yet the
+    disconnect dialog tells the user their data is deleted. Left alone it
+    stayed readable in Redis (and in any RDB/AOF snapshot) for up to six
+    hours after the consent it was held under was withdrawn.
+    """
+    import src.integrations.personal.apple_health as provider_module
+
+    integration = Integration(
+        id=uuid.uuid4(),
+        user_id=USER_ID,
+        slug="apple_health",
+        kind="personal_push",
+        status="connected",
+    )
+    fake_redis = _FakeRedis()
+    key = f"apple_health:snapshot:{integration.id}"
+    await fake_redis.set(key, "AH1:fake", ex=100)
+    monkeypatch.setattr(
+        provider_module, "get_redis", AsyncMock(return_value=fake_redis)
+    )
+
+    db = MagicMock()
+    db.in_transaction = MagicMock(return_value=False)
+    db.commit = AsyncMock()
+    db.rollback = AsyncMock()
+    execute_result = MagicMock()
+    execute_result.rowcount = 1
+    db.execute = AsyncMock(return_value=execute_result)
+
+    await AppleHealthIntegration().disconnect(integration=integration, db=db)
+
+    assert key not in fake_redis.store
+    assert integration.status == "disconnected"

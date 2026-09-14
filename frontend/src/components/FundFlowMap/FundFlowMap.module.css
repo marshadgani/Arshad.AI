@@ -3,6 +3,12 @@
   border: 1px solid var(--border-faint);
   border-radius: var(--radius-lg);
   padding: var(--s-6);
+  animation: fundFlowFadeIn 0.4s ease-out;
+}
+
+@keyframes fundFlowFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .sectionHead {
@@ -13,8 +19,9 @@
 }
 
 .sectionTitle {
+  font-family: var(--font-display);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--text-secondary);
@@ -39,30 +46,53 @@
   letter-spacing: 0.08em;
 }
 
-.legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-  margin-bottom: var(--s-4);
-  padding-bottom: var(--s-4);
-  border-bottom: 1px dashed var(--border-faint);
-}
-
-.legendItem {
+.titleGroup {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-family: 'Space Mono', monospace;
-  font-size: 9px;
-  color: var(--text-muted);
+  gap: var(--s-3);
 }
 
-.legendDot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+.manualBadge {
+  display: inline-flex;
+  align-items: center;
   flex-shrink: 0;
+  padding: 4px 10px;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--status-warn);
+  background: var(--status-warn-bg);
+  border: 1px solid var(--status-warn-faint);
+  border-radius: 999px;
+  animation: manualBadgePulse 2.4s ease-in-out infinite;
 }
+
+/* Deliberately understated — a slow glow, not a blink. The badge exists to
+   be noticed, not to distract from the diagram it's labelling. */
+@keyframes manualBadgePulse {
+  0%, 100% { box-shadow: 0 0 0 rgba(245, 166, 35, 0); }
+  50%      { box-shadow: 0 0 8px rgba(245, 166, 35, 0.35); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .section,
+  .manualBadge {
+    animation: none;
+  }
+}
+
+.diagramCaption {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin: 0 0 var(--s-3);
+  max-width: 62ch;
+}
+
+/* Legend styles live with the legend component in
+   FundFlowLegend.module.css — this module styles the section shell only. */
 
 .canvasWrap {
   overflow-x: auto;
@@ -70,6 +100,16 @@
   border-radius: var(--radius-md);
   background: #0f1117;
   border: 1px solid #1e2433;
+  transition: border-color 0.2s ease;
+}
+
+.canvasWrap:hover {
+  border-color: var(--border-strong);
+}
+
+.canvasWrap:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* Diagram is 1820px — intentionally wider than a laptop viewport.
