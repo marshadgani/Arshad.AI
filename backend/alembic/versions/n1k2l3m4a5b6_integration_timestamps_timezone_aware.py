@@ -30,6 +30,12 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    # These tables are tiny at this app's single-user scale, so the
+    # ACCESS EXCLUSIVE lock + rewrite each ALTER COLUMN TYPE takes is
+    # itself cheap — but with no timeout, a stuck connection holding even
+    # an ACCESS SHARE lock on one of them would hang the migration (and
+    # every query queued behind it) indefinitely instead of failing loud.
+    op.execute("SET LOCAL lock_timeout = '5s'")
     op.alter_column(
         "integrations",
         "last_synced_at",
