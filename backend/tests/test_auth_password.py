@@ -28,6 +28,7 @@ import src.auth.lockout as lockout_mod
 import src.auth.password as password_mod
 import src.auth.routers as routers_mod
 import src.middleware.rate_limit as rate_limit_mod
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from src.auth.providers import GoogleOAuthProvider
 from src.auth.service import normalize_email
@@ -263,6 +264,106 @@ def test_lockout_fails_closed_on_redis_outage(monkeypatch, no_backstop):
     assert response.status_code == 503
     assert response.json()["error"]["code"] == "login_temporarily_unavailable"
     assert "Retry-After" not in response.headers
+
+
+# ── T9b — lockout THRESHOLD path (the actual brute-force guard), not just
+# its Redis-outage escape hatch. Added post-gate: coverage review found
+# every other test bypasses this module via the `no_lockout` fixture or
+# only exercises the outage branch, leaving the module's actual job — the
+# 429-at-5-failures enforcement — untested. ──────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_lockout_allows_below_threshold(monkeypatch):
+    fake_redis = MagicMock()
+    fake_redis.get = AsyncMock(return_value=str(lockout_mod._THRESHOLD - 1).encode())
+    monkeypatch.setattr(lockout_mod, "get_redis", AsyncMock(return_value=fake_redis))
+    await lockout_mod.assert_not_locked("a@example.com")  # must not raise
+
+
+@pytest.mark.asyncio
+async def test_lockout_raises_429_with_retry_after_at_threshold(monkeypatch):
+    fake_redis = MagicMock()
+    fake_redis.get = AsyncMock(return_value=str(lockout_mod._THRESHOLD).encode())
+    monkeypatch.setattr(lockout_mod, "get_redis", AsyncMock(return_value=fake_redis))
+
+    with pytest.raises(HTTPException) as exc_info:
+        await lockout_mod.assert_not_locked("a@example.com")
+
+    assert exc_info.value.status_code == 429
+    assert exc_info.value.detail["error"]["code"] == "too_many_login_attempts"
+    assert exc_info.value.headers["Retry-After"] == str(lockout_mod._WINDOW_SECONDS)
+
+
+def test_record_failure_called_with_normalized_email_on_wrong_password(
+    monkeypatch, no_backstop
+):
+    monkeypatch.setattr(lockout_mod, "assert_not_locked", AsyncMock(return_value=None))
+    spy = AsyncMock(return_value=None)
+    monkeypatch.setattr(lockout_mod, "record_failure", spy)
+    monkeypatch.setattr(password_mod, "_checkpw", AsyncMock(return_value=False))
+    _override_db(_FakeUser("arshad@example.com", "somehash"))
+
+    response = client.post(
+        LOGIN_URL, json={"email": " Arshad@Example.COM ", "password": "wrong"}
+    )
+
+    assert response.status_code == 401
+    spy.assert_awaited_once_with("arshad@example.com")
+
+
+def test_clear_failures_called_with_normalized_email_on_success(
+    monkeypatch, no_backstop
+):
+    monkeypatch.setattr(lockout_mod, "assert_not_locked", AsyncMock(return_value=None))
+    spy = AsyncMock(return_value=None)
+    monkeypatch.setattr(lockout_mod, "clear_failures", spy)
+    monkeypatch.setattr(password_mod, "_checkpw", AsyncMock(return_value=True))
+    _override_db(_FakeUser("arshad@example.com", "somehash"))
+
+    response = client.post(
+        LOGIN_URL, json={"email": " Arshad@Example.COM ", "password": "correct"}
+    )
+
+    assert response.status_code == 200
+    spy.assert_awaited_once_with("arshad@example.com")
+
+
+@pytest.mark.asyncio
+async def test_record_failure_increments_and_sets_ttl_once(monkeypatch):
+    fake_redis = MagicMock()
+    fake_pipe = MagicMock()
+    fake_pipe.incr = MagicMock()
+    fake_pipe.expire = MagicMock()
+    fake_pipe.execute = AsyncMock(return_value=None)
+    fake_redis.pipeline = MagicMock(return_value=fake_pipe)
+    monkeypatch.setattr(lockout_mod, "get_redis", AsyncMock(return_value=fake_redis))
+
+    await lockout_mod.record_failure("a@example.com")
+
+    key = lockout_mod._bucket_key("a@example.com")
+    fake_pipe.incr.assert_called_once_with(key)
+    fake_pipe.expire.assert_called_once_with(key, lockout_mod._WINDOW_SECONDS, nx=True)
+    fake_pipe.execute.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_clear_failures_deletes_bucket_key(monkeypatch):
+    fake_redis = MagicMock()
+    fake_redis.delete = AsyncMock(return_value=None)
+    monkeypatch.setattr(lockout_mod, "get_redis", AsyncMock(return_value=fake_redis))
+
+    await lockout_mod.clear_failures("a@example.com")
+
+    fake_redis.delete.assert_awaited_once_with(lockout_mod._bucket_key("a@example.com"))
+
+
+@pytest.mark.parametrize("sentinel", ["0", "no", "No", "0 "])
+def test_kill_switch_disabled_sentinels(monkeypatch, sentinel, no_backstop, no_lockout):
+    monkeypatch.setenv("PASSWORD_AUTH_ENABLED", sentinel)
+    response = client.post(LOGIN_URL, json={"email": "a@example.com", "password": "x"})
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "password_auth_disabled"
 
 
 # ── T10 — OAuth CALLBACK leg survives a Redis outage ───────────────────────
