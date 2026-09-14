@@ -1,6 +1,7 @@
 import { type Notification, type Severity } from '../../data/mockData';
 import { CardHeader } from '../CardHeader';
-import { CardSkeleton, EmptyState } from '../CardStatus';
+import { CardSkeleton } from '../CardSkeleton';
+import { EmptyState } from '../EmptyState';
 import styles from '../Dashboard.module.css';
 
 export interface NotificationsCardProps {

@@ -26,7 +26,10 @@
 }
 
 .heroGreeting { font-size: 28px; margin-top: var(--s-2); }
-.heroSkeleton { margin-top: var(--s-4); max-width: 500px; }
+/* Shared wrapper for a loading skeleton inside a hero-style card (spacing
+   matches the real content it stands in for) — used by both BriefingHero
+   and FocusCard, hence the generic name rather than "hero"-specific. */
+.cardSkeletonWrap { margin-top: var(--s-4); max-width: 500px; }
 .heroDate { color: var(--text-muted); font-family: var(--font-mono); font-size: 12px; margin-top: var(--s-1); }
 .heroSummary { color: var(--text-secondary); margin-top: var(--s-4); max-width: 800px; line-height: 1.6; }
 

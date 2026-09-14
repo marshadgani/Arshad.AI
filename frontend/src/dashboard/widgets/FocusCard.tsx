@@ -1,4 +1,4 @@
-import { CardSkeleton } from '../CardStatus';
+import { CardSkeleton } from '../CardSkeleton';
 import { type FocusRes } from '../useDashboardData';
 import styles from '../Dashboard.module.css';
 
@@ -20,7 +20,7 @@ export function FocusCard({ focus }: FocusCardProps) {
           <button className={styles.focusBtn}>{focus.action}</button>
         </>
       ) : (
-        <div className={styles.heroSkeleton}>
+        <div className={styles.cardSkeletonWrap}>
           <CardSkeleton rows={3} />
         </div>
       )}

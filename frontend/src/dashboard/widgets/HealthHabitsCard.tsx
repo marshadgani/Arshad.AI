@@ -1,4 +1,5 @@
-import { CardSkeleton, EmptyState } from '../CardStatus';
+import { CardSkeleton } from '../CardSkeleton';
+import { EmptyState } from '../EmptyState';
 import { type HabitRes } from '../useDashboardData';
 import { CardHeader } from '../CardHeader';
 import styles from '../Dashboard.module.css';

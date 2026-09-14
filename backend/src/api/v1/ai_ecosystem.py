@@ -123,7 +123,12 @@ async def get_metrics(
             "usage_count": r.usage_count,
             "total_tokens": int(r.total_tokens),
             "avg_tokens_per_use": int(r.avg_tokens),
-            "success_rate": float(r.success_rate or 1.0),
+            # `or 1.0` would be wrong here: avg() over an all-failed group
+            # is a genuine 0, and 0 is falsy, so `or` silently reported a
+            # 100%-failure agent as 100% success. GROUP BY only emits groups
+            # with >=1 row and `success` is a non-null int cast, so the only
+            # real case to guard is "no rows at all" (r.success_rate is None).
+            "success_rate": float(r.success_rate) if r.success_rate is not None else 1.0,
         }
         for r in rows
     ]

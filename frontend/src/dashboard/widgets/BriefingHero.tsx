@@ -1,4 +1,4 @@
-import { CardSkeleton } from '../CardStatus';
+import { CardSkeleton } from '../CardSkeleton';
 import { type BriefingRes } from '../useDashboardData';
 import styles from '../Dashboard.module.css';
 
@@ -22,7 +22,7 @@ export function BriefingHero({ briefing }: BriefingHeroProps) {
         // exact same bold heading style as the real greeting reads as
         // broken/stuck content rather than a loading state, so this uses
         // the same shimmer every other widget uses instead.
-        <div className={styles.heroSkeleton}>
+        <div className={styles.cardSkeletonWrap}>
           <CardSkeleton rows={3} />
         </div>
       )}

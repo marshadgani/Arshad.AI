@@ -2,155 +2,198 @@
 
 **Branch:** `claude/ui-repos-reference-jusj4c` → `claude/ai-personal-assistant-main`
 **Triggered by:** "Merge to Main"
-**Scope:** FEAT-160 (originally assigned FEAT-145; renumbered — see ID Collision note below) —
-FEAT-144's Merge-to-Main gate follow-up, plus a real merge with main and its fallout
+**Scope:** FEAT-161 — live-browser UI Design Council audit
 
 ---
 
 ## What happened in this cycle (read this first)
 
-This "Merge to Main" run was unusually eventful and is worth summarizing before the
-agent table, because two things went wrong and were caught before shipping:
+This was a live, browser-based end-user audit rather than a static code
+review: Playwright/Chromium logged into the deployed app
+(`https://arshad-ai-seven.vercel.app`) with real user credentials and
+walked all 12 authenticated routes plus a mobile (390px) pass, capturing
+screenshots, console/page errors, and network failures.
 
-1. **A squash-divergence repair mistake, caught before pushing.** Per CLAUDE.md §20
-   Step 0, `git merge origin/main --strategy=ours` is the prescribed fix for a
-   branch that's fallen behind main via squash-merges. That assumption broke here:
-   main had ~2600 lines of genuinely new, unrelated work (FEAT-156/157/158/159 —
-   an emergency auth allowlist, password login, ComingSoonPage) that this branch
-   never saw. `--strategy=ours` would have silently discarded all of it on push.
-   Caught by inspecting the diff before pushing; redone as a real `git merge`,
-   resolving conflicts by hand (kept both branches' pipeline-queue.md updates,
-   kept this branch's more-complete tokens.test.ts, took main's tracking-file
-   state where main was ahead).
+Two real, live bugs were found and fixed:
 
-2. **An ID collision.** This branch had independently assigned FEAT-145 to the
-   tokens.test.ts scope-widening follow-up. A concurrent session had also
-   assigned FEAT-145 — to an unrelated `disconnect()` credential-revocation bug
-   — and reached main first. Renumbered this branch's work to **FEAT-160** (next
-   free ID after main's counter, which had reached 159 from its own prior
-   collision-resolution renumbering).
+1. **`GET /api/v1/ai-ecosystem/metrics` returned HTTP 500 on every load**,
+   confirmed via a captured network failure and cross-checked against live
+   Render logs, which showed the exact traceback:
+   `asyncpg.exceptions.CannotCoerceError: cannot cast type boolean to
+   double precision` — Postgres refuses a direct `bool → double` cast.
+   Fixed by casting to `Integer` first (`func.avg(cast(AgentUsageLog.success,
+   Integer))`), the standard detour. The frontend was silently swallowing
+   this failure — the AI Ecosystem page just showed all-zero usage stats
+   with no visible error.
 
-3. **The real merge immediately exposed a real, live bug.** Main's `ComingSoonPage`
-   component (routed at `/learning`, `/home-iot`, `/travel`) referenced
-   `--accent-pending`/`-faint`/`-bg` — none defined anywhere in `tokens.css`. This
-   branch's widened `tokens.test.ts` caught it the moment the merge landed. Fixed
-   by adding a `--status-warn-soft/-faint/-bg` triad and repointing the component
-   to it — "pending" reads correctly as the app's existing amber warn color.
+2. **Every dashboard widget rendered "loading" (`null`) and "genuinely
+   empty" (`[]`) identically** — confirmed live on both desktop and mobile
+   (`BriefingHero`'s literal `"Loading…"` text sat in the real heading
+   style for 6–12+ seconds; every list widget showed `"0 waiting"`, `"0
+   open"`, `"0 new"`, or a bare `"—"`). Added a shared
+   `CardSkeleton`/`EmptyState` pair and wired the `null` vs `[]`
+   distinction into all 9 widgets.
 
-4. **The fix for #3 introduced a CRITICAL bug of its own**, caught by this gate's
-   code-reviewer: the new tokens.css comment contained the literal text
-   `--accent-*/`, whose `*/` prematurely closed the CSS comment block, corrupting
-   the rest of the file's syntax (`--status-warn-soft`'s declaration was silently
-   swallowed into the malformed comment tail; `vite build` emitted
-   `css-syntax-error` warnings). Fixed by rewording the comment; re-verified with
-   a real `vite build` (zero warnings) and by inspecting the compiled CSS output.
+**The gate then caught a real regression in fix #1**, independently and
+convergently by **6 of the 8 gate agents** (security-auditor, debugger,
+silent-failure-hunter, refactorer, pr-test-analyzer, code-reviewer): the
+diff changed `cast(..., Float)` to `cast(..., Integer)` but a formatting
+pass dropped the `Integer` import, so `GET /metrics` would have raised
+`NameError` instead — the bug this feature exists to fix would not
+actually have been fixed. **Fixed immediately** (commit `15657cb3`) and
+independently re-verified by every subsequent agent.
 
-5. **Closed the detection gap that let #4 through.** `tokens.test.ts`'s plain-text
-   regex matching can't parse CSS well enough to catch a malformed comment.
-   Added a cheap, dependency-free proxy — a well-formed CSS file always has an
-   equal count of `/*` and `*/` — and proved it against the actual incident text
-   (re-injected the exact original bug, confirmed the new test fails 16-vs-17,
-   reverted, confirmed clean).
+The gate also surfaced (and this cycle fixed) three smaller real issues:
+a pre-existing `float(x or 1.0)` bug that silently reports a 100%-failure
+agent as 100% successful (a genuine `Decimal(0)` is falsy in Python);
+`CardStatus.tsx` exporting two components from one file (violates
+`.claude/rules/frontend.md`'s one-component-per-file rule — split into
+`CardSkeleton.tsx` + `EmptyState.tsx`); and `WeatherCommuteNewsCard`
+being the one widget with no empty-state message for `news = []`
+(inconsistent with the other 8). Test coverage was widened from 3/9 to
+9/9 frontend widgets (25 tests) and from 0 to 3 real backend tests that
+exercise the actual route (not just the SQL in isolation).
 
-Net result: the gate did exactly what it's for. Zero of this reached main broken.
+Net result: the gate did exactly what it's for. Zero of this reached
+main broken — including a regression this feature's own fix introduced.
 
 ---
 
-## Gate Summary (first pass — before the CRITICAL fix)
+## Gate Summary (first pass)
 
 | # | Gate | Agent | Result | Critical | Warnings |
 |---|---|---|---|---|---|
-| 1 | Code Review | code-reviewer | ❌ FAIL | 1 | 4 |
-| 2 | Security Audit | security-auditor | ✅ PASS | 0 | 0 |
-| 3 | Bug Analysis | debugger | ✅ PASS | 0 | 0 |
-| 4 | Test Coverage | test-writer | ✅ PASS | 0 | 0 |
-| 5 | Code Quality | refactorer | ⚠️ WARN | 0 | 3 |
+| 1 | Code Review | code-reviewer | ❌ BLOCKED | 1 | 5 |
+| 2 | Security Audit | security-auditor | ❌ BLOCKED | 1 | 0 |
+| 3 | Bug Analysis | debugger | ❌ BLOCKED | 1 | 0 |
+| 4 | Test Coverage | test-writer | ⚠️ WARN/near-FAIL | 0 | 2 (coverage gaps) |
+| 5 | Code Quality | refactorer | ❌ BLOCKED | 1 | 3 |
 | 6 | Documentation | doc-writer | ⚠️ WARN | 0 | 2 |
-| 7 | Silent Failures | silent-failure-hunter | ✅ PASS | 0 | 0 |
+| 7 | Silent Failures | silent-failure-hunter | ❌ BLOCKED | 1 | 1 (HIGH, non-blocking) |
 | 8 | Test Quality | pr-test-analyzer | ⚠️ WARN | 0 | 2 |
 
-**First-pass verdict: ❌ BLOCKED** — code-reviewer's CRITICAL (the CSS comment
-corruption) required a fix before this could ship, per CLAUDE.md §20's auto-fix
-loop (Step 2).
+**First-pass verdict: ❌ BLOCKED** — 5 of 8 agents independently caught
+the same CRITICAL (missing `Integer` import). Per CLAUDE.md §20 Step 2,
+fixed immediately, plus every other real Warning finding closed in the
+same cycle rather than deferred.
 
-## Re-verification (after the CRITICAL fix, commit `ff314112`)
+## Re-verification (after all fixes)
 
-code-reviewer re-ran against the fix commit and independently proved the fix
-by re-injecting the original corruption and confirming `vite build` fails
-again, then confirming it's clean on the actual fixed state:
+- `Integer` import restored (commit `15657cb3`) — independently
+  re-confirmed present by re-reading the file after the initial hallucinated-vs-real
+  check (the finding was real, not a subagent hallucination — verified via
+  direct `Read` per `.claude/rules/subagent-verification.md`).
+- `float(r.success_rate or 1.0)` → `float(r.success_rate) if r.success_rate
+  is not None else 1.0`, with a new test proving a genuine 0.0 no longer
+  reports as 1.0.
+- `CardStatus.tsx` split into `CardSkeleton.tsx` + `EmptyState.tsx`
+  (one-component-per-file, matches `CardHeader.tsx`'s existing precedent
+  in the same directory).
+- `WeatherCommuteNewsCard`'s `news = []` now renders `EmptyState` like
+  every other widget.
+- `FocusCard`/`BriefingHero`'s misleadingly-named `.heroSkeleton` class
+  (only one of the two components is a "hero") renamed to
+  `.cardSkeletonWrap`.
+- Frontend test coverage widened from 3/9 to 9/9 widgets — 25 tests total
+  in `loadingStates.test.tsx`, covering null/empty/populated (or the
+  2-state null/populated pattern for `BriefingHero`/`FocusCard`) for
+  every touched widget.
+- Backend test coverage added from 0 to 3 real endpoint tests in
+  `test_ai_ecosystem.py` (`TestGetMetricsEndpoint`) — these mock only
+  `db.execute()`, so the `select(...)` statement (where the `Integer`
+  NameError actually lived) is built in real Python on every test run.
+  Installed the full backend dependency set and ran these against the
+  real FastAPI app + TestClient (not just eyeballed): **52/52 passed**
+  in `test_ai_ecosystem.py`; **619/626** in the full backend suite (7
+  pre-existing, unrelated failures in `test_auth.py` /
+  `test_auth_password.py` / `test_token_service.py` — confirmed via
+  `git diff --stat -- backend/` that this diff touches only
+  `ai_ecosystem.py`, so those failures are pre-existing network/environment
+  gaps, not a regression from this branch).
 
-**Re-verification verdict: ⚠️ WARN — 0 CRITICAL, 2 WARNINGS.** CRITICAL fully
-resolved. One of the 2 remaining warnings (no automated check for malformed
-CSS comments) was then closed directly (commit `732ec343`) — see item 5 above.
+**Re-verification verdict: ⚠️ WARN — 0 CRITICAL, 0 BLOCKING.** All 5
+BLOCKED-triggering Criticals resolved (they were the same finding,
+caught 5 ways). Every real Warning closed in this cycle rather than
+deferred; the one deliberately-deferred item is documented below.
 
 ## Overall Verdict
 
 ### ⚠️ GATE PASSED WITH WARNINGS — Ready for merge
 
-Zero FAIL gates, zero Critical issues in the current state. Security Audit,
-Bug Analysis, Test Coverage, and Silent Failures all came back fully clean on
-the first pass. The one CRITICAL finding was caught, fixed, and independently
-re-verified — including proof (not just claims) that the fix works and that
-the fix's own fix works.
+Zero FAIL/BLOCKED gates, zero Critical issues in the current state.
 
 ---
 
-## Detailed Findings (first-pass agents, condensed — see conversation history
-for full text)
+## Detailed Findings (condensed — see conversation history for full text)
 
-**code-reviewer (FAIL→fixed):** CRITICAL — CSS comment corruption in
-`tokens.css` (fixed, commit `ff314112`, re-verified). WARN — dangling
-`FEAT-145` comment reference (fixed), `tokens.css` missing from the widened
-scan's file list (fixed), `--status-warn-soft` unused (removed).
+**code-reviewer, security-auditor, debugger, refactorer, pr-test-analyzer
+(all independently CRITICAL→fixed):** missing `Integer` import —
+`GET /api/v1/ai-ecosystem/metrics` would `NameError` on every call,
+completely undoing the feature's stated fix. Fixed, re-verified by
+every subsequent agent, and closed with 3 new backend tests that
+actually invoke the route.
 
-**security-auditor (PASS):** No secrets in the diff. Confirmed
-`backend/src/auth/allowlist.py`, `dependencies.py`, `main.py` are
-byte-identical to main post-merge — FEAT-158's emergency allowlist was not
-weakened or reverted by the merge.
+**code-reviewer (Warning, fixed):** `float(r.success_rate or 1.0)`
+silently reports a genuine 0% success rate as 100% (Python falsy-zero
+bug) — pre-existing but only reachable once C1 was fixed. Fixed with a
+regression test.
 
-**debugger (PASS):** Confirmed `ComingSoonPage` is genuinely reachable
-(routed, not dead code) — the tokens bug was real and user-visible. Confirmed
-the `--status-warn-bg` fix has adequate contrast (the legible content uses
-fully-opaque `--status-warn`, not the low-alpha variant).
+**code-reviewer, refactorer (Warning, fixed):** `CardStatus.tsx`
+violates the one-component-per-file rule (`.claude/rules/frontend.md`).
+Split into `CardSkeleton.tsx` + `EmptyState.tsx`.
 
-**test-writer (PASS):** Confirmed the widened `tokens.test.ts` is complete
-for its stated contract (token existence, not value-correctness by design).
+**code-reviewer, refactorer (Warning, fixed):** `WeatherCommuteNewsCard`
+was the one widget with no `EmptyState` for `news = []`. Fixed for
+consistency with the other 8 widgets.
 
-**refactorer (WARN):** `--status-warn-soft` dead code (fixed — 3rd
-independent agent to flag this). Organizational nit (triad split from base
-token, not fixed — defensible either way). Semantic-overloading note
-(`--status-warn` used for both "degraded" and "pending" states) — flagged as
-a real future design question, not fixed here; would need a new
-`--status-pending` hue to fully resolve, out of scope for a mechanical fix.
+**refactorer (Warning, fixed):** `FocusCard` reused `.heroSkeleton`, a
+class name that only made sense for `BriefingHero`. Renamed to the
+generic `.cardSkeletonWrap`.
 
-**doc-writer (WARN):** Comment inaccuracy — "mirrors --accent-*/--accent-health-*
-pattern above" was directionally wrong (accent-health is below, not above) —
-fixed as part of the CRITICAL rewrite. Dangling FEAT-145 reference — fixed.
+**test-writer, pr-test-analyzer, refactorer (Warning, fixed):** frontend
+test coverage was 3/9 widgets; backend had 0 tests for the actual
+`/metrics` route. Both closed — 25 frontend tests (9/9 widgets), 3 real
+backend endpoint tests (52/52 passing in the file, run against a live
+TestClient + FastAPI app, not just static analysis).
 
-**silent-failure-hunter (PASS):** Full-tree grep confirmed zero remaining
-undefined `var()` references anywhere, including main's newly-merged
-FEAT-159 Login work.
+**doc-writer (Warning, not auto-fixed per gate policy):** `CardSkeleton`
+(now its own file) used a `//` comment instead of JSDoc for an exported
+symbol; `rows` prop docstring described WHAT not WHY. Addressed in the
+`CardSkeleton.tsx`/`EmptyState.tsx` split with proper `/** */` docs and
+a WHY-focused `rows` description.
 
-**pr-test-analyzer (WARN):** Confirmed empirically (not by trusting the
-narrative) that the widened test catches the ComingSoonPage regression by
-directly reverting and re-running. Flagged that `tasks/last-gate-report.md`
-hadn't been refreshed yet for this cycle — this file is that refresh.
+**silent-failure-hunter (HIGH, explicitly NOT fixed this cycle — see
+Action Items):** all 13 of the dashboard's independent `useFetch` calls
+discard `error` entirely (`useDashboardData.ts` only reads `.data`), so
+a *persistently failing* endpoint — not just a slow one — now renders
+the same `CardSkeleton` shimmer forever, indistinguishable from "still
+loading." This is real and is the same root problem (a silent 500 looks
+fine to the user) one layer further down the stack than what this
+feature fixed. Not fixed here because it requires a genuine design
+decision (an `ErrorState` component + threading `error` through
+`useDashboardData` and all 13 call sites) that goes beyond this cycle's
+scope of style/behavior polish on an already-large diff — logged as an
+action item for a dedicated follow-up feature.
 
 ---
 
 ## Action Items
 
-Non-blocking follow-ups, none from this cycle require immediate action:
-
-- [ ] Consider whether `--status-warn` being reused for both "degraded
-      integration" and "pending/coming soon" states will eventually need a
-      dedicated `--status-pending` hue to avoid visual ambiguity if both
-      states ever appear together in one view (refactorer's finding).
-- [ ] `tokens.test.ts`'s comment-stripping in `.ts`/`.tsx` sources is a
-      plain-text regex, not aware of string/regex literals — a `/*` inside a
-      TS string literal could theoretically swallow a following real
-      `var()` reference. Currently inert (verified zero impact across the
-      actual codebase) but worth a inline note if this class of file grows.
+- [ ] **Dashboard error-state gap (HIGH, from silent-failure-hunter):**
+      `useDashboardData.ts` discards `error` from all 13 `useFetch` calls.
+      A persistently-failing endpoint now renders `CardSkeleton` forever
+      instead of a distinguishable error state. Needs a third `ErrorState`
+      branch threaded through `useDashboardData` + all 13 widgets — real
+      scope, deserves its own feature ticket rather than folding into an
+      already-large diff.
+- [ ] **Integrations page mobile scroll length** (from the live audit,
+      not the gate): 46+ rows across 9 categories render as one flat
+      ~9600px scroll on a 390px viewport with no collapse/accordion.
+      Real usability opportunity, logged as a backlog idea — bigger
+      structural/interaction change than the rest of this batch.
+- [ ] Consider whether `--status-warn` (FEAT-160) will eventually need a
+      dedicated `--status-pending` hue — unchanged carry-forward, not
+      from this cycle.
 
 ---
-*Generated by Arshad.AI Quality Gate · All 8 agents + 1 re-verification pass · claude/ui-repos-reference-jusj4c*
+*Generated by Arshad.AI Quality Gate · All 8 agents + full re-verification pass · claude/ui-repos-reference-jusj4c*

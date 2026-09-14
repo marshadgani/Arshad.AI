@@ -1,6 +1,7 @@
 import { type CommuteRes, type NewsRes, type WeatherRes } from '../useDashboardData';
 import { CardHeader } from '../CardHeader';
-import { CardSkeleton } from '../CardStatus';
+import { CardSkeleton } from '../CardSkeleton';
+import { EmptyState } from '../EmptyState';
 import styles from '../Dashboard.module.css';
 
 export interface WeatherCommuteNewsCardProps {
@@ -32,6 +33,8 @@ export function WeatherCommuteNewsCard({ weather, commute, news }: WeatherCommut
       </div>
       {news === null ? (
         <CardSkeleton rows={2} />
+      ) : news.length === 0 ? (
+        <EmptyState message="No headlines right now." />
       ) : (
         news.map((n) => (
           <div key={n.id} className={styles.wxRow}>
