@@ -1,7 +1,7 @@
 .card {
   background: var(--bg-panel);
   border: 1px solid var(--border-faint);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 1.5rem;
   position: relative;
   overflow: hidden;
@@ -40,7 +40,12 @@
   border-radius: 50%;
   background: var(--accent-health);
   box-shadow: 0 0 0 0 var(--accent-health-soft);
-  animation: pulse 2s infinite;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .liveDot {
+    animation: pulse 2s infinite;
+  }
 }
 
 @keyframes pulse {
@@ -65,15 +70,22 @@
 
 .skeletonBar,
 .skeletonTile {
-  background: linear-gradient(
-    90deg,
-    var(--bg-elevated) 25%,
-    var(--border-faint) 50%,
-    var(--bg-elevated) 75%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.4s ease-in-out infinite;
+  background: var(--bg-elevated);
   border-radius: 6px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .skeletonBar,
+  .skeletonTile {
+    background: linear-gradient(
+      90deg,
+      var(--bg-elevated) 25%,
+      var(--border-faint) 50%,
+      var(--bg-elevated) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.4s ease-in-out infinite;
+  }
 }
 
 .skeletonBar {
@@ -133,7 +145,7 @@
   font-weight: 700;
   font-size: 0.85rem;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   transition: opacity 0.15s, transform 0.1s;
 }
@@ -158,7 +170,10 @@
 
 .metric {
   text-align: center;
-  animation: fadeUp 0.35s ease both;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .metric { animation: fadeUp 0.35s ease both; }
 }
 
 @keyframes fadeUp {
@@ -212,7 +227,7 @@
   background: var(--bg-elevated);
   border: 1px solid var(--accent-health-faint);
   box-shadow: 0 0 40px rgba(255, 55, 95, 0.08);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 1.75rem;
   max-width: 480px;
   width: 100%;
@@ -240,7 +255,7 @@
   background: rgba(255, 77, 109, 0.1);
   color: var(--status-danger);
   padding: 0.6rem 0.85rem;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 0.8rem;
   margin-bottom: 1rem;
 }
@@ -251,7 +266,7 @@
   gap: 0.5rem;
   background: var(--bg-deep);
   border: 1px solid var(--border-strong);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 0.6rem 0.75rem;
   margin-bottom: 1.25rem;
 }
@@ -279,7 +294,7 @@
 .instructions {
   background: var(--bg-deep);
   border: 1px solid var(--border-faint);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 1rem 1.25rem;
   margin-bottom: 1.25rem;
 }
@@ -322,7 +337,7 @@
   font-weight: 700;
   font-size: 0.85rem;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 
@@ -333,7 +348,7 @@
   font-weight: 600;
   font-size: 0.85rem;
   border: 1px solid var(--border-strong);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 

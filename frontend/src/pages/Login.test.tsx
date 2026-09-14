@@ -19,12 +19,16 @@ import { useAuth } from '../auth/AuthContext';
 
 const mockUseAuth = vi.mocked(useAuth);
 
-function stubAuth(loginWith: (provider: 'google' | 'github') => void) {
+function stubAuth(
+  loginWith: (provider: 'google' | 'github') => void,
+  loginWithPassword: (email: string, password: string) => Promise<void> = vi.fn(),
+) {
   mockUseAuth.mockReturnValue({
     token: null,
     user: null,
     isLoading: false,
     loginWith,
+    loginWithPassword,
     logout: vi.fn(),
     setTokenFromCallback: vi.fn(),
   });
@@ -96,5 +100,53 @@ describe('Login', () => {
     expect(googleButton).toHaveAttribute('aria-busy', 'true');
     expect(googleButton).toHaveTextContent(/redirecting/i);
     expect(githubButton).toBeDisabled();
+  });
+
+  it('submits the password form via loginWithPassword', async () => {
+    const loginWithPassword = vi.fn().mockResolvedValue(undefined);
+    stubAuth(vi.fn(), loginWithPassword);
+    render(<Login />);
+
+    await userEvent.type(screen.getByLabelText(/email/i), 'arshad@example.com');
+    await userEvent.type(screen.getByLabelText(/password/i), 'correct-horse');
+    await userEvent.click(screen.getByRole('button', { name: /^sign in$/i }));
+
+    expect(loginWithPassword).toHaveBeenCalledWith('arshad@example.com', 'correct-horse');
+  });
+
+  it('shows an error and re-enables the form when password login fails', async () => {
+    const loginWithPassword = vi.fn().mockRejectedValue(new Error('Email or password is incorrect.'));
+    stubAuth(vi.fn(), loginWithPassword);
+    render(<Login />);
+
+    await userEvent.type(screen.getByLabelText(/email/i), 'arshad@example.com');
+    await userEvent.type(screen.getByLabelText(/password/i), 'wrong');
+    await userEvent.click(screen.getByRole('button', { name: /^sign in$/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Email or password is incorrect.',
+    );
+    expect(screen.getByRole('button', { name: /^sign in$/i })).not.toBeDisabled();
+  });
+
+  it('disables the OAuth buttons while the password form is submitting', async () => {
+    let resolveLogin: () => void = () => {};
+    const loginWithPassword = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveLogin = resolve;
+        }),
+    );
+    stubAuth(vi.fn(), loginWithPassword);
+    render(<Login />);
+
+    await userEvent.type(screen.getByLabelText(/email/i), 'arshad@example.com');
+    await userEvent.type(screen.getByLabelText(/password/i), 'correct-horse');
+    await userEvent.click(screen.getByRole('button', { name: /^sign in$/i }));
+
+    expect(screen.getByRole('button', { name: /continue with google/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /continue with github/i })).toBeDisabled();
+
+    resolveLogin();
   });
 });

@@ -17,7 +17,7 @@
 .title {
   font-size: 1.5rem;
   font-weight: 700;
-  color: var(--text, #e6edf3);
+  color: var(--text-primary);
   margin: 0 0 4px;
 }
 
@@ -65,9 +65,9 @@
   max-width: 480px;
   padding: 8px 14px;
   border-radius: 6px;
-  border: 1px solid var(--border, #30363d);
-  background: var(--surface, #161b22);
-  color: var(--text, #e6edf3);
+  border: 1px solid var(--border-faint);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
   font-size: 0.9rem;
   outline: none;
   transition: border-color 120ms;
@@ -75,6 +75,7 @@
 
 .searchInput:focus {
   border-color: var(--accent, #58a6ff);
+  box-shadow: var(--glow-cyan-soft);
 }
 
 .resultCount {
@@ -102,6 +103,10 @@
 
 /* ── Note list ── */
 
+/* The dynamic-viewport-unit line below wins where supported and accounts
+   for mobile browser chrome collapsing on scroll; the static-viewport-unit
+   line is the fallback for browsers without dvh support. Not a duplicate —
+   both lines are load-bearing. */
 .list {
   display: flex;
   flex-direction: column;
@@ -123,15 +128,15 @@
   text-align: left;
   padding: 12px 14px;
   border-radius: 8px;
-  border: 1px solid var(--border, #30363d);
-  background: var(--surface, #161b22);
+  border: 1px solid var(--border-faint);
+  background: var(--bg-elevated);
   cursor: pointer;
   transition: border-color 120ms, background 120ms;
 }
 
 .noteCard:hover {
   border-color: var(--accent, #58a6ff);
-  background: var(--surface-hover, #1c2128);
+  background: var(--bg-panel);
 }
 
 .noteCardActive {
@@ -142,7 +147,7 @@
 .noteTitle {
   font-size: 0.9rem;
   font-weight: 600;
-  color: var(--text, #e6edf3);
+  color: var(--text-primary);
   margin-bottom: 2px;
   white-space: nowrap;
   overflow: hidden;
@@ -198,16 +203,31 @@
 
 /* ── Note viewer ── */
 
+/* position: sticky pins .viewer to the page viewport, its nearest scrolling
+   ancestor (.list is a sibling, not an ancestor, so its own scroll
+   behavior doesn't affect this). .list's bounded max-height keeps .list
+   from growing tall enough to push .viewer out of the sticky range —
+   the two must stay in sync for the layout to read as intentional on
+   scroll. */
 .viewer {
-  border: 1px solid var(--border, #30363d);
+  border: 1px solid var(--border-faint);
   border-radius: 8px;
-  background: var(--surface, #161b22);
+  background: var(--bg-elevated);
   padding: 20px 24px;
   max-height: calc(100vh - 220px);
   max-height: calc(100dvh - 220px);
   overflow-y: auto;
   position: sticky;
   top: 16px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .viewer { animation: viewerIn 200ms; }
+}
+
+@keyframes viewerIn {
+  from { opacity: 0; transform: translateX(8px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
 .viewerHeader {
@@ -221,7 +241,7 @@
 .viewerTitle {
   font-size: 1.1rem;
   font-weight: 700;
-  color: var(--text, #e6edf3);
+  color: var(--text-primary);
 }
 
 .viewerPath {
@@ -244,19 +264,19 @@
   font-size: 1.4rem;
   cursor: pointer;
   line-height: 1;
-  padding: 0 4px;
+  padding: 10px;
   flex-shrink: 0;
 }
 
 .closeBtn:hover {
-  color: var(--text, #e6edf3);
+  color: var(--text-primary);
 }
 
 .noteContent {
-  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   font-size: 0.82rem;
   line-height: 1.65;
-  color: var(--text, #e6edf3);
+  color: var(--text-primary);
   white-space: pre-wrap;
   word-break: break-word;
   margin: 0;
@@ -266,12 +286,12 @@
 
 .syncError {
   font-size: 0.8rem;
-  color: var(--error, #f85149);
+  color: var(--status-danger);
   margin: 4px 0 0;
 }
 
 .noteError {
   font-size: 0.85rem;
-  color: var(--error, #f85149);
+  color: var(--status-danger);
   margin: 0;
 }

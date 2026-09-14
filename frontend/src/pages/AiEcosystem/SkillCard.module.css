@@ -1,6 +1,6 @@
 .card {
-  background: var(--surface, #161b22);
-  border: 1px solid var(--border, #30363d);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-faint);
   border-radius: 10px;
   padding: 16px;
   display: flex;
@@ -11,8 +11,8 @@
 }
 
 .card:hover {
-  border-color: var(--accent, #1f6feb);
-  box-shadow: 0 0 0 1px var(--accent, #1f6feb)22;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-faint);
 }
 
 .header {
@@ -25,7 +25,7 @@
 .name {
   font-size: 0.9rem;
   font-weight: 700;
-  color: var(--text, #e6edf3);
+  color: var(--text-primary);
   line-height: 1.3;
 }
 
@@ -40,27 +40,27 @@
 }
 
 .catdevelopment {
-  background: #1a2a3d;
-  color: #79c0ff;
-  border: 1px solid #1f6feb;
+  background: var(--accent-faint);
+  color: var(--accent);
+  border: 1px solid var(--accent-soft);
 }
 
 .catsecurity {
-  background: #3d1a1a;
-  color: #ff7b72;
-  border: 1px solid #f85149;
+  background: rgba(255, 77, 109, 0.12);
+  color: var(--status-danger);
+  border: 1px solid var(--status-danger);
 }
 
 .catdata {
-  background: #1a2f1a;
-  color: #56d364;
-  border: 1px solid #238636;
+  background: rgba(0, 255, 156, 0.12);
+  color: var(--status-ok);
+  border: 1px solid var(--status-ok);
 }
 
 .catother {
-  background: var(--surface-hover, #21262d);
+  background: var(--bg-panel);
   color: var(--text-muted, #8b949e);
-  border: 1px solid var(--border, #30363d);
+  border: 1px solid var(--border-faint);
 }
 
 .description {
@@ -90,10 +90,10 @@
 .repoBadge {
   font-size: 0.68rem;
   font-weight: 600;
-  color: var(--text, #e6edf3);
-  background: var(--bg, #0d1117);
-  border: 1px solid var(--border, #30363d);
+  color: var(--text-primary);
+  background: var(--bg-deep);
+  border: 1px solid var(--border-faint);
   border-radius: 6px;
   padding: 2px 8px;
-  font-family: monospace;
+  font-family: var(--font-mono);
 }

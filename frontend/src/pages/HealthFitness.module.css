@@ -8,7 +8,7 @@
  */
 
 .page {
-  padding: 2rem;
+  padding: var(--s-8);
   max-width: 1100px;
   margin: 0 auto;
   color: var(--text-primary);
@@ -18,7 +18,7 @@
   display: flex;
   align-items: baseline;
   gap: 1rem;
-  margin-bottom: 2rem;
+  margin-bottom: var(--s-8);
 }
 
 .title {
@@ -39,7 +39,7 @@
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
-  gap: 1.25rem;
+  gap: var(--s-5);
 }
 
 /* ── Page states ─────────────────────────────────────────────────────── */
@@ -65,7 +65,7 @@
   color: var(--text-secondary);
   background: var(--bg-panel);
   border: 1px solid var(--border-faint);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 0.85rem;
   text-align: center;
   padding: 0.6rem 0.9rem;
