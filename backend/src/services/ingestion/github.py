@@ -36,9 +36,13 @@ def _parse_iso(value: str | None) -> datetime:
     if not value:
         return datetime.now(timezone.utc)
     try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
         return datetime.now(timezone.utc)
+    # A value with no offset/Z parses to naive; occurred_at is
+    # TIMESTAMP WITH TIME ZONE, so treat an offset-less GitHub timestamp
+    # as UTC rather than let asyncpg reject the naive value.
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
 
 
 async def ingest(
