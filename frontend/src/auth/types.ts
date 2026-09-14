@@ -16,6 +16,7 @@ export type AuthState = {
   user: AuthUser | null;
   isLoading: boolean;
   loginWith: (provider: OAuthProvider) => void;
+  loginWithPassword: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   setTokenFromCallback: (token: string) => void;
 };

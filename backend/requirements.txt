@@ -24,3 +24,9 @@ httpx==0.28.1
 authlib==1.6.12
 cryptography==49.0.0
 pyjwt==2.13.0
+
+# FEAT-143 — password login. bcrypt only (not passlib): passlib is
+# unmaintained and its bcrypt backend has known 72-byte-detection bugs
+# against recent bcrypt releases; we call the bcrypt C extension directly
+# and pre-hash with sha256 ourselves (see src/auth/password.py).
+bcrypt==4.2.1

@@ -1,5 +1,11 @@
-import DomainPage from '../components/DomainPage';
+import ComingSoonPage from '../components/ComingSoonPage';
 
 export default function HomeIoT() {
-  return <DomainPage slug="home" />;
+  return (
+    <ComingSoonPage
+      title="Home & IoT"
+      emoji="🏠"
+      reason="Smart-home device integration is on the roadmap. No IoT providers are connected yet."
+    />
+  );
 }
