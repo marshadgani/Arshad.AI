@@ -103,6 +103,10 @@
 
 /* ── Note list ── */
 
+/* The dynamic-viewport-unit line below wins where supported and accounts
+   for mobile browser chrome collapsing on scroll; the static-viewport-unit
+   line is the fallback for browsers without dvh support. Not a duplicate —
+   both lines are load-bearing. */
 .list {
   display: flex;
   flex-direction: column;
@@ -199,6 +203,12 @@
 
 /* ── Note viewer ── */
 
+/* position: sticky pins .viewer to the page viewport, its nearest scrolling
+   ancestor (.list is a sibling, not an ancestor, so its own scroll
+   behavior doesn't affect this). .list's bounded max-height keeps .list
+   from growing tall enough to push .viewer out of the sticky range —
+   the two must stay in sync for the layout to read as intentional on
+   scroll. */
 .viewer {
   border: 1px solid var(--border-faint);
   border-radius: 8px;
@@ -209,16 +219,15 @@
   overflow-y: auto;
   position: sticky;
   top: 16px;
-  animation: viewerIn 200ms;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .viewer { animation: viewerIn 200ms; }
 }
 
 @keyframes viewerIn {
   from { opacity: 0; transform: translateX(8px); }
   to { opacity: 1; transform: translateX(0); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .viewer { animation: none; }
 }
 
 .viewerHeader {

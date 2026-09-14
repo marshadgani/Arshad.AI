@@ -66,6 +66,7 @@
 
 .canvasWrap {
   position: relative;
+  display: flex;
   overflow-x: auto;
   max-width: 100%;
   border-radius: var(--radius-md);
@@ -78,17 +79,21 @@
 .canvasWrap svg {
   display: block;
   min-width: 1820px;
+  flex-shrink: 0;
 }
 
-/* Right-edge fade to hint there's more diagram off-screen on narrow viewports. */
+/* Right-edge fade to hint there's more diagram off-screen on narrow
+   viewports. A flex row (not height:100%) so the pseudo-element's height
+   comes from the row's stretch alignment instead of a percentage against
+   .canvasWrap's auto height, which resolves to 0 and silently fails to
+   paint — the bug this comment exists to prevent regressing. */
 .canvasWrap::after {
   content: '';
   position: sticky;
   top: 0;
   right: 0;
-  float: right;
+  flex-shrink: 0;
   width: 24px;
-  height: 100%;
   margin-left: -24px;
   pointer-events: none;
   background: linear-gradient(to right, transparent, var(--bg-panel));

@@ -170,7 +170,10 @@
 
 .metric {
   text-align: center;
-  animation: fadeUp 0.35s ease both;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .metric { animation: fadeUp 0.35s ease both; }
 }
 
 @keyframes fadeUp {
