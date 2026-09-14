@@ -34,7 +34,7 @@
 
 | Field | Value |
 |---|---|
-| active_run_id | `wf_f057305c-e52` — resumed 2026-09-14 after a script-bug fix, recovering FEAT-148/153/155 from cache |
+| active_run_id | none — `wf_f057305c-e52`'s resume (task `w8729fdti`) was killed by a container restart on 2026-09-14 before reporting a result; work is lost, not resumable (`resumeFromRunId` only works within the session that created the run, and the crash happened inside that same session). FEAT-148/153/155's disk output was already committed to `dev-team/feat-143-155-resume-wip` (unreviewed) before the restart hit — see Queue table. Re-launch as a fresh run if these three need finishing. |
 | session | session_01S3fJzZzJykfHRA9jhMycuk |
 | started | 2026-09-13 (this run) |
 | FEAT-142 (OAuth invalid_state bug) | Settled 2026-09-13, second pass, 30/30 stages, EA SHIP, security PASS. Committed to `dev-team/feat-142-oauth-cookie-scope-fix`. Blocked only on a Vercel env var (`VITE_API_BASE_URL`) that Arshad needs to set manually — no MCP tool available to do it. |
