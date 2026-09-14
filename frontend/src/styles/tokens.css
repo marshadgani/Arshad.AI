@@ -46,10 +46,14 @@
   --accent-commerce-bg:    rgba(43, 255, 176, 0.07);
   --accent-commerce-gold:  #ffc857;
 
-  /* Text */
+  /* Text — each tier meets WCAG AA (4.5:1) against every --bg-* surface
+     and is visually distinct from its neighbors. --text-muted was lightened
+     to fix a contrast failure; --text-secondary was lightened alongside it
+     to keep the three-tier hierarchy legible (was #8b9cba, nearly equal to
+     the raised --text-muted). */
   --text-primary:   #d8e6ff;
-  --text-secondary: #8b9cba;
-  --text-muted:     #7d90b3;
+  --text-secondary: #a3b4d6;
+  --text-muted:     #7d90b3; /* WCAG AA (4.5:1) floor against --bg-panel; do not darken below this */
   --text-faint:     #3a4865;
 
   /* Type — sharp display + monospace data face. System fallbacks so

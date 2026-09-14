@@ -36,7 +36,7 @@
 }
 
 .refresh:hover:not(:disabled) {
-  background: var(--bg-hover);
+  background: var(--bg-panel);
 }
 
 .refresh:disabled {
@@ -84,7 +84,7 @@
 }
 
 .card:hover {
-  border-color: var(--border-hover, #444c56);
+  border-color: var(--border-strong);
 }
 
 .cardHead {
@@ -108,7 +108,7 @@
   width: 36px;
   height: 36px;
   border-radius: var(--radius-md);
-  background: var(--bg);
+  background: var(--bg-deep);
   border: 1px solid var(--border-faint);
   display: flex;
   align-items: center;
@@ -122,7 +122,7 @@
   font-size: 0.7rem;
   padding: 0.15rem 0.45rem;
   border-radius: var(--radius-sm);
-  background: var(--bg);
+  background: var(--bg-deep);
   border: 1px solid var(--border-faint);
   color: var(--text-muted);
   white-space: nowrap;
@@ -155,7 +155,7 @@
 .meta {
   font-size: 0.75rem;
   color: var(--text-muted);
-  font-family: var(--mono, ui-monospace, monospace);
+  font-family: var(--font-mono);
   overflow-wrap: anywhere;
 }
 
@@ -198,12 +198,12 @@
   font-size: 0.83rem;
   cursor: pointer;
   border: 1px solid var(--border-faint);
-  background: var(--bg);
+  background: var(--bg-deep);
   color: var(--text-primary);
 }
 
 .actions button:hover:not(:disabled) {
-  background: var(--bg-hover);
+  background: var(--bg-panel);
 }
 
 .actions button:disabled {
@@ -251,16 +251,15 @@
   align-items: center;
   justify-content: center;
   z-index: var(--z-modal);
-  animation: backdropIn 180ms;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .modalBackdrop { animation: backdropIn 180ms; }
 }
 
 @keyframes backdropIn {
   from { opacity: 0; }
   to { opacity: 1; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .modalBackdrop { animation: none; }
 }
 
 .modal {
@@ -270,16 +269,15 @@
   padding: 1.5rem;
   width: 420px;
   max-width: 90vw;
-  animation: modalIn 180ms;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .modal { animation: modalIn 180ms; }
 }
 
 @keyframes modalIn {
   from { opacity: 0; transform: scale(0.96); }
   to { opacity: 1; transform: scale(1); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .modal { animation: none; }
 }
 
 .modal h3 {
@@ -298,11 +296,11 @@
   width: 100%;
   padding: 0.55rem 0.7rem;
   font-size: 0.9rem;
-  background: var(--bg);
+  background: var(--bg-deep);
   border: 1px solid var(--border-faint);
   border-radius: 6px;
   color: var(--text-primary);
-  font-family: var(--mono, ui-monospace, monospace);
+  font-family: var(--font-mono);
   box-sizing: border-box;
 }
 
@@ -330,7 +328,7 @@
   font-size: 0.85rem;
   cursor: pointer;
   border: 1px solid var(--border-faint);
-  background: var(--bg);
+  background: var(--bg-deep);
   color: var(--text-primary);
 }
 
@@ -345,14 +343,13 @@
   font-size: 0.85rem;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   z-index: var(--z-toast);
-  animation: toastIn 200ms;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .toast { animation: toastIn 200ms; }
 }
 
 @keyframes toastIn {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .toast { animation: none; }
 }

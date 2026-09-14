@@ -112,16 +112,10 @@
 .rowText { min-width: 0; overflow-wrap: anywhere; }
 
 .checkbox {
-  position: relative;
   width: 14px; height: 14px;
   border: 1.5px solid var(--border-strong);
   border-radius: 3px;
   cursor: pointer;
-}
-.checkbox::before {
-  content: '';
-  position: absolute;
-  inset: -15px;
 }
 
 .tag {
