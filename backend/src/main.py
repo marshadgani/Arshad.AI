@@ -37,6 +37,32 @@ if not SECRET_KEY or SECRET_KEY == "change-me":
         "python -c 'import secrets; print(secrets.token_urlsafe(32))'"
     )
 
+
+def _enforce_login_allowlist() -> None:
+    """Fail startup loudly, in the one place an operator will definitely see
+    it, if this looks like a real deployment with no login allowlist set.
+
+    This is early/loud feedback, not the actual safety mechanism — that's
+    is_email_allowed()'s deny-by-default in auth/allowlist.py, enforced on
+    every request via auth/dependencies.py regardless of whether this
+    check fires. Extracted into its own function (rather than inline
+    module-level code) so it can be exercised directly by tests instead of
+    only at import time.
+    """
+    from src.auth.allowlist import is_production_backend
+
+    if is_production_backend() and not os.getenv("AUTH_ALLOWED_EMAILS", "").strip():
+        raise RuntimeError(
+            "AUTH_ALLOWED_EMAILS must be set in production — without it, "
+            "login is denied for everyone (AUTH_ALLOWED_EMAILS denies by "
+            "default when unset). Set AUTH_ALLOWED_EMAILS to a comma-"
+            "separated list of allowed emails (e.g. your own) in the "
+            "Render environment."
+        )
+
+
+_enforce_login_allowlist()
+
 CORS_ORIGINS = [
     origin.strip()
     for origin in os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")

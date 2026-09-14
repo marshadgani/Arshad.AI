@@ -1,129 +1,40 @@
-# Arshad.AI Quality Gate Report
+# Merge-to-Main Gate Report
 
-**Branch:** `claude/ui-repos-reference-jusj4c` → `claude/ai-personal-assistant-main`
-**Triggered by:** "Merge to Main"
-**Scope:** FEAT-144 — closes out FEAT-143's own Merge-to-Main gate follow-up checklist
+**Source branch:** `claude/ai-personal-assistant-CcA11`
+**Target branch:** `claude/ai-personal-assistant-main`
+**Date:** 2026-09-14
+**Diff scope:** 23 files, +1114/-18 lines. **FEAT-158** — emergency fix for a confirmed-live production vulnerability, done by Arshad's direct request ("Do this"): there was no login allowlist anywhere in `backend/src/auth/`, so any Google/GitHub account could create a session, and combined with `_find_user_integration` matching `Integration.user_id IS NULL` (shared, project-scoped rows: Stripe, Cloudflare, Render, Vercel, Supabase, the Anthropic admin key) for every authenticated user by design, any signed-in stranger could read/sync/disconnect/overwrite the deployment's shared credentials. Discovered independently by 3 Security Auditor runs during earlier FEAT-156/145/146 pipeline attempts (see `tasks/pipeline-queue.md`). Also carries FEAT-149 (Home & IoT/Learning/Travel honest "Coming soon" relabel), a small isolated fix that rode along on this branch, already separately verified (tsc clean, tests passing) before this gate ran.
 
----
+## Verdict: GATE PASSED ✅
 
-## Gate Summary
+Ran the full 8-agent panel independently against this diff — not a rubber stamp of anything upstream. First pass returned 2 Critical and several converging WARN/Critical findings across agents; **all were fixed directly and the fixes verified** before this report was written. No Critical or FAIL findings remain.
 
-| # | Gate | Agent | Result | Critical | Warnings |
-|---|---|---|---|---|---|
-| 1 | Code Review | code-reviewer | ⚠️ WARN | 0 | 2 |
-| 2 | Security Audit | security-auditor | ✅ PASS | 0 | 0 |
-| 3 | Bug Analysis | debugger | ✅ PASS | 0 | 0 |
-| 4 | Test Coverage | test-writer | ⚠️ WARN | 0 | 2 |
-| 5 | Code Quality | refactorer | ⚠️ WARN | 0 | 2 |
-| 6 | Documentation | doc-writer | ⚠️ WARN | 0 | 2 |
-| 7 | Silent Failures | silent-failure-hunter | ✅ PASS | 0 | 1 |
-| 8 | Test Quality | pr-test-analyzer | ⚠️ WARN | 0 | 2 |
+## Agent-by-agent results (first pass — before fixes)
 
-## Overall Verdict
+| # | Agent | Verdict | Summary |
+|---|---|---|---|
+| 1 | `code-reviewer` | 2 Critical, 3 Important | **Critical:** existing sessions/JWTs issued before this fix are never revoked — only new logins were gated. **Critical:** shared-integration read paths (`list_integrations`, `integration_status`) were still ungated. Also flagged: fail-open default coupled to an unreliable production heuristic, Google `email_verified` never checked, and deploy-ordering risk (env var must be set before merge). |
+| 2 | `security-auditor` | WARN (→ FAIL per project policy) | SEC-001: the `_is_production()` heuristic (`BACKEND_URL` scheme) could silently fail to fire, leaving the entire gate inert with no error. Confirmed the core mechanism (ordering, `provider.kind` trustworthiness, `user_id IS NULL` gating, no debug bypass) was otherwise sound. |
+| 3 | `debugger` | No real issues found | Traced every path by hand (empty email, `os.getenv` edge cases, circular imports, `provider.kind` always set, `_require_owner` no bypass via `personal_apikey`). Independently re-ran the full suite against a fresh `origin/main` worktree to confirm the 4 pre-existing failures predate this diff. |
+| 4 | `test-writer` | 1 High gap | No test exercised `main.py`'s startup fail-closed guard at all — a real gap for a critical safety mechanism. Every other criterion (happy path, rejection, permissive-when-unset, case-insensitivity, shared-vs-personal asymmetry) was covered. |
+| 5 | `refactorer` | Moderate | Flagged duplicated production-detection logic between `main.py` and `auth/routers.py`, `_require_owner`'s placement, and an inconsistent connect-vs-sync/disconnect gating signal. |
+| 6 | `doc-writer` | Minor | One public function (`allowed_emails`) missing a docstring; everything else — module docstring, `.env.example` entry, `RuntimeError` message — rated clearly actionable. |
+| 7 | `silent-failure-hunter` | 2 Warning, 1 Suggestion | Independently confirmed the same production-heuristic fragility (Warning 1). New: `connect_integration`'s gate keyed off `provider.kind` rather than ground truth, so a future shared-but-mis-kinded provider could silently bypass only that check (Warning 2). Suggested `is_email_allowed()` defend against `None`/empty input rather than relying on callers. |
+| 8 | `pr-test-analyzer` | 3 gaps | Confirmed assertions are genuinely behavioral (`assert_not_awaited()` on the protected side effect, not just exception presence). Gaps: no positive "owner succeeds" test for `sync`, no test of connect's kind-based gate on a personal-kind provider, and the same `main.py` startup-guard gap test-writer found. |
 
-### ⚠️ GATE PASSED WITH WARNINGS — Ready for merge
+## Fixes applied (all Critical/blocking findings, before this report)
 
-Zero FAIL gates, zero Critical issues across all 8 agents. Security Audit and
-Bug Analysis both came back fully clean. Multiple agents independently
-verified the diff by re-implementing `tokens.test.ts`'s own regex logic by
-hand against the pre-fix and post-fix files — confirming both the original
-bug (10 violations on `Integrations.module.css` before this diff) and the
-fix (0 violations after) are real, not self-reported.
+- **`backend/src/auth/dependencies.py`** — `get_current_user` now re-checks `AUTH_ALLOWED_EMAILS` on every authenticated request (401 `email_not_allowed`), not just at login. Closes both Critical findings from code-reviewer at once: revokes any session issued before/during a gap in the gate, and (since every route depends on it) closes the two previously-ungated read routes for free. Verified against production (Supabase `dslnjhuciypccowyiwaa`): only one user row exists (Arshad's own, created 2026-04-27) — no rogue accounts from the vulnerability window to purge.
+- **`backend/src/auth/allowlist.py`** — `is_email_allowed()` now denies by default when `AUTH_ALLOWED_EMAILS` is empty, gated behind an explicit `AUTH_ALLOW_ALL_LOGINS` opt-in for local dev, removing reliance on production-detection for the core decision (closes SEC-001/Warning 1/Finding 3). Added `is_production_backend()` (checks `RENDER=="true"` — Render's own guaranteed signal — in addition to the `BACKEND_URL` scheme) for the startup check's early-feedback role. Also denies `None`/empty email defensively (silent-failure-hunter's suggestion).
+- **`backend/src/main.py`** — startup check extracted into a testable `_enforce_login_allowlist()` function using the hardened production signal.
+- **`backend/src/integrations/routers.py`** — `connect_integration`'s owner gate now fails closed on any `provider.kind` not in an explicit `_PERSONAL_KINDS` set, instead of an allowlist-of-shared-kinds a new `IntegrationKind` could silently bypass (Warning 2). Fixed a duplicate `app.dependency_overrides.clear()` line in the test file.
+- **`backend/src/auth/providers/google.py`** — `fetch_user_info` now rejects an unverified email, matching GitHub's existing check, since the email is now the entire login/ownership decision and account-linking key (Important Finding 4).
+- **Tests** — 5 new tests for the `main.py` startup guard, 4 for `get_current_user`'s allowlist check, 3 for Google's `email_verified` check, plus the sync-owner-succeeds and connect-kind-gate gaps pr-test-analyzer/test-writer flagged. Full backend suite: 592 passed, same 4 pre-existing unrelated failures as before this diff (2 need a live Postgres this sandbox lacks, 2 in `test_token_service.py` already broken on `main` — verified via `git stash` and a fresh worktree against `origin/main`).
 
-**Three findings were fixed during this gate run**, before finalizing this
-report, because multiple agents independently caught the same issues in
-comments this diff itself added:
-- `tokens.css`'s new comment overclaimed WCAG AA conformance for
-  `--text-faint`, which measurably fails it (1.91–2.19:1, not 4.5:1) —
-  scoped the claim to the three tiers that actually meet it.
-- `AgentCard.module.css`'s new comment claimed the Opus/Sonnet/Haiku tiers
-  differ "via weight, not hue" while Haiku's green directly contradicts
-  that — reworded to describe Opus/Sonnet's weight-tier and Haiku's
-  separate hue honestly. Also dropped the now-pointless invisible border on
-  `.modelOpus` (same color as its own background).
-- `Obsidian.module.css`'s sticky-positioning comment made a factually wrong
-  causal claim (that `.list` is an ancestor of `.viewer` and therefore
-  establishes its scroll container — they're siblings) — corrected to the
-  real mechanism (the page viewport is `.viewer`'s nearest scrolling
-  ancestor; `.list`'s bounded height just keeps the layout from growing
-  past the sticky range).
+## Post-merge verification required
 
-Re-verified after those fixes: `tsc --noEmit` clean, `npm test` 37/37
-files, 274/274 tests.
+Per CLAUDE.md §23: `AUTH_ALLOWED_EMAILS=m.arshadgani@gmail.com` is already set on Render (`srv-d7m9kub7uimc73cq9afg`) — set *before* this merge specifically so the fail-closed startup check doesn't crash-loop the deploy. After deploy, confirm `Application startup complete` (not a `RuntimeError` on `AUTH_ALLOWED_EMAILS`) and that a real login from `m.arshadgani@gmail.com` still succeeds.
 
----
+## Pre-existing, out of scope
 
-## Detailed Findings
-
-### 1. Code Review (code-reviewer) — ⚠️ WARN
-Ran `tsc --noEmit`, `vitest run`, and `vite build` directly rather than
-self-reporting. Confirmed the style-only claim, the reduced-motion rewrites'
-selector/declaration parity, and that no malformed CSS was emitted. The two
-findings (the `--text-faint` WCAG overclaim, and `tokens.test.ts`'s scan
-scope being narrower than its own comment implied) are both fixed above.
-
-### 2. Security Audit (security-auditor) — ✅ PASS
-No secrets, no `url()` exfiltration vectors, confirmed `tokens.test.ts`'s
-`fs.readFileSync` usage has no traversal risk (fixed `SRC_DIR` constant, no
-attacker-controlled input, dev/CI-only).
-
-### 3. Bug Analysis (debugger) — ✅ PASS
-Traced all three targeted fixes (FundFlowMap's flex conversion against its
-SVG's intrinsic sizing, the 5 reduced-motion guard rewrites for exact
-selector/keyframe/duration parity, and `--text-secondary`'s hex change for
-any stale hardcoded duplicate) — all clean.
-
-### 4. Test Coverage (test-writer) — ⚠️ WARN
-`tokens.test.ts` correctly handles `var(--x, fallback)` and multiple
-`var()` calls per line, reuses the shared test helpers with no duplication.
-Two latent (not currently triggered) gaps: `globals.css` isn't in the scan
-scope, and the test has no self-verifying fixture proving it can actually
-catch a violation (relies on the current tree happening to be clean).
-
-### 5. Code Quality (refactorer) — ⚠️ WARN
-All 8 FEAT-144 items implemented correctly and consistently. Findings were
-the same comment-accuracy issues doc-writer found (fixed above) plus the
-invisible-border nit on `.modelOpus` (also fixed above).
-
-### 6. Documentation (doc-writer) — ⚠️ WARN
-5 of 6 new comment sets were accurate and genuinely WHY-oriented on first
-read. The two inaccurate ones (Obsidian sticky mechanic, AgentCard tier
-framing) are corrected above with the exact rewording doc-writer suggested.
-
-### 7. Silent Failures (silent-failure-hunter) — ✅ PASS
-Independently re-implemented the guard's regex against the *entire*
-`frontend/src` tree (not just the 7 touched files), including inline
-`var()` in `.tsx` and `globals.css` — zero undefined references exist
-anywhere today. Flagged the same scope gap as test-writer (currently inert,
-not a live bug).
-
-### 8. Test Quality (pr-test-analyzer) — ⚠️ WARN
-Manually replayed `tokens.test.ts`'s logic against the pre-fix
-`Integrations.module.css` and reproduced exactly the 10 violations the
-commit claims — confirms the test is a real regression guard, not
-tautological. Flagged that the reduced-motion guard-direction flip and the
-Opus/Sonnet recolor have no automated coverage of their own (only the CSS
-static-analysis category is guarded now) — a defensible gap given this
-repo's ban on snapshot tests, not a defect.
-
----
-
-## Action Items
-
-Priority order (all WARN-level — none block this merge):
-
-- [ ] Extend `tokens.test.ts`'s scan to cover `globals.css` and inline
-      `var(--x)` usage in `.tsx` style props (e.g.
-      `src/components/health/StrainCard.tsx`, `src/utils/healthFormat.ts`)
-      — currently both are clean, but unguarded.
-- [ ] Add a self-verifying fixture test to `tokens.test.ts` proving the
-      regex logic can actually catch a violation (a synthetic undefined
-      `var()` reference), so the guard doesn't silently pass vacuously if
-      its own logic ever breaks.
-- [ ] Consider adding minimal behavioral coverage for the two design
-      decisions this diff made without any test (the `prefers-reduced-motion`
-      guard direction, the Opus/Sonnet tier recolor) — a computed-style
-      assertion, not a snapshot, per this repo's conventions.
-
----
-*Generated by Arshad.AI Quality Gate · All 8 agents · claude/ui-repos-reference-jusj4c*
+The 4 unrelated test failures noted above (Postgres connectivity in this sandbox; a pre-existing `ProviderReauthRequired` message-format mismatch in `test_token_service.py`) — confirmed pre-existing on `origin/main` before this diff, not introduced by it.

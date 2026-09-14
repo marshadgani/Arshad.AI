@@ -31,6 +31,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..api.errors import http_error
+from ..auth.allowlist import is_email_allowed
 from ..auth.dependencies import get_current_user
 from ..models.database import get_db
 from ..models.integration import Integration
@@ -95,6 +96,35 @@ async def _find_user_integration(
     )
 
 
+# Kinds known to be scoped to one user (Integration.user_id is always set).
+# Used to fail closed in connect_integration below: an unrecognized/new kind
+# is treated as shared (owner-gated) rather than personal, so a newly added
+# IntegrationKind can't silently bypass the owner check by omission.
+_PERSONAL_KINDS = {"personal_oauth", "personal_apikey", "static", "personal_push"}
+
+
+def _require_owner(user: User) -> None:
+    """Gate mutation of a shared (project-scoped) integration to the owner.
+
+    Any authenticated user can otherwise read/sync/disconnect/overwrite a
+    project_apikey integration (Stripe, Cloudflare, Render, Vercel,
+    Supabase, the Anthropic admin key, ...) because those rows have
+    user_id IS NULL and are matched for every user by design (see
+    _find_user_integration above). This is defense-in-depth on top of the
+    AUTH_ALLOWED_EMAILS login gate (auth/allowlist.py and
+    auth/dependencies.py) — every authenticated request already re-checks
+    the allowlist, so this should never actually fire in practice; it
+    exists so a future weakening of that central check doesn't also
+    reopen access to the highest-value shared credentials.
+    """
+    if not is_email_allowed(user.email):
+        raise http_error(
+            status.HTTP_403_FORBIDDEN,
+            "not_integration_owner",
+            "Only the deployment owner may modify a shared integration.",
+        )
+
+
 @router.get("", summary="List integrations + per-user status")
 async def list_integrations(
     user: User = Depends(get_current_user),
@@ -147,6 +177,12 @@ async def connect_integration(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     provider = _require_provider(slug)
+    if provider.kind not in _PERSONAL_KINDS:
+        # Fail closed on any kind not explicitly known to be per-user, so a
+        # newly introduced IntegrationKind defaults to owner-gated rather
+        # than silently bypassing this check the way an allowlist-of-shared-
+        # kinds would.
+        _require_owner(user)
     try:
         result = await provider.connect(user=user, db=db, payload=payload or {})
     except IntegrationError as exc:
@@ -174,6 +210,8 @@ async def sync_integration(
             "not_connected",
             f"Integration '{slug}' is not connected. Connect it first.",
         )
+    if integration.user_id is None:
+        _require_owner(user)
     try:
         result = await provider.sync(integration=integration, db=db)
     except IntegrationError as exc:
@@ -197,6 +235,8 @@ async def disconnect_integration(
     integration = await _find_user_integration(slug, user, db)
     if integration is None:
         return {"data": {"status": "already_disconnected"}}
+    if integration.user_id is None:
+        _require_owner(user)
     await provider.disconnect(integration=integration, db=db)
     return {"data": {"status": "disconnected"}}
 
