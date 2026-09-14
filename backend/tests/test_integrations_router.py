@@ -19,9 +19,8 @@ import uuid
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from fastapi.testclient import TestClient
-
 import src.integrations.routers as routers_module
+from fastapi.testclient import TestClient
 from src.auth.dependencies import get_current_user
 from src.integrations.base import (
     ConnectResult,
@@ -129,6 +128,7 @@ def provider():
 def client(provider, monkeypatch):
     """TestClient with auth + DB stubbed out and registry pointing at the
     single fake provider."""
+    monkeypatch.setenv("AUTH_ALLOWED_EMAILS", _FakeUser.email)
 
     async def _override_user():
         return _FakeUser()
@@ -477,11 +477,30 @@ def test_connect_project_apikey_provider_allows_owner(provider, monkeypatch):
     app.dependency_overrides.clear()
 
 
-def test_connect_project_apikey_provider_allows_everyone_when_allowlist_unset(
+def test_connect_project_apikey_provider_denies_everyone_when_allowlist_unset_and_no_opt_in(
     provider, monkeypatch
 ):
-    """Empty AUTH_ALLOWED_EMAILS (local dev default) stays permissive."""
+    """Deny-by-default: empty AUTH_ALLOWED_EMAILS with no AUTH_ALLOW_ALL_LOGINS
+    opt-in denies, not permits."""
     monkeypatch.delenv("AUTH_ALLOWED_EMAILS", raising=False)
+    monkeypatch.delenv("AUTH_ALLOW_ALL_LOGINS", raising=False)
+    db = _make_db()
+    tc = _client_with_db(provider, db, monkeypatch)
+
+    resp = tc.post("/api/v1/integrations/test-provider/connect", json={})
+
+    assert resp.status_code == 403
+    assert resp.json()["error"]["code"] == "not_integration_owner"
+    provider.connect.assert_not_awaited()
+
+    app.dependency_overrides.clear()
+
+
+def test_connect_project_apikey_provider_allows_everyone_with_local_dev_opt_in(
+    provider, monkeypatch
+):
+    monkeypatch.delenv("AUTH_ALLOWED_EMAILS", raising=False)
+    monkeypatch.setenv("AUTH_ALLOW_ALL_LOGINS", "true")
     db = _make_db()
     tc = _client_with_db(provider, db, monkeypatch)
 
@@ -489,6 +508,43 @@ def test_connect_project_apikey_provider_allows_everyone_when_allowlist_unset(
 
     assert resp.status_code == 200
     provider.connect.assert_awaited_once()
+
+    app.dependency_overrides.clear()
+
+
+def test_connect_personal_kind_provider_ignores_owner_gate(provider, monkeypatch):
+    """The connect-time gate keys off provider.kind; a personal-scoped kind
+    (not in _PERSONAL_KINDS's complement) must never be owner-gated, even
+    when AUTH_ALLOWED_EMAILS excludes this user."""
+    monkeypatch.setenv("AUTH_ALLOWED_EMAILS", "someone-else@example.com")
+    provider.kind = "personal_oauth"
+    db = _make_db()
+    tc = _client_with_db(provider, db, monkeypatch)
+
+    resp = tc.post("/api/v1/integrations/test-provider/connect", json={})
+
+    assert resp.status_code == 200
+    provider.connect.assert_awaited_once()
+
+    app.dependency_overrides.clear()
+
+
+def test_connect_unrecognized_kind_fails_closed_and_requires_owner(
+    provider, monkeypatch
+):
+    """A kind not in _PERSONAL_KINDS is treated as shared (owner-gated) by
+    default, so a newly introduced IntegrationKind can't silently bypass
+    this check the way an allowlist-of-shared-kinds would."""
+    monkeypatch.setenv("AUTH_ALLOWED_EMAILS", "someone-else@example.com")
+    provider.kind = "some_future_kind"
+    db = _make_db()
+    tc = _client_with_db(provider, db, monkeypatch)
+
+    resp = tc.post("/api/v1/integrations/test-provider/connect", json={})
+
+    assert resp.status_code == 403
+    assert resp.json()["error"]["code"] == "not_integration_owner"
+    provider.connect.assert_not_awaited()
 
     app.dependency_overrides.clear()
 
@@ -553,5 +609,20 @@ def test_disconnect_shared_integration_allows_owner(provider, monkeypatch):
     provider.disconnect.assert_awaited_once()
 
     app.dependency_overrides.clear()
+
+
+def test_sync_shared_integration_allows_owner(provider, monkeypatch):
+    monkeypatch.setenv("AUTH_ALLOWED_EMAILS", "owner@example.com")
+    provider.sync.return_value = SyncResult(
+        rows_written=3, summary="3 rows synced", duration_ms=90
+    )
+    integration = _FakeIntegration(user_id=None)
+    db = _make_db(scalar_value=integration)
+    tc = _client_with_db(provider, db, monkeypatch)
+
+    resp = tc.post("/api/v1/integrations/test-provider/sync")
+
+    assert resp.status_code == 200
+    provider.sync.assert_awaited_once()
 
     app.dependency_overrides.clear()

@@ -276,12 +276,39 @@ async def test_handle_callback_allows_email_on_allowlist_case_insensitive(monkey
 
 
 @pytest.mark.asyncio
-async def test_handle_callback_allows_everyone_when_allowlist_unset(monkeypatch):
-    """Empty AUTH_ALLOWED_EMAILS (local dev default) stays permissive."""
+async def test_handle_callback_denies_everyone_when_allowlist_unset_and_no_opt_in(
+    monkeypatch,
+):
+    """Deny-by-default: empty AUTH_ALLOWED_EMAILS with no explicit
+    AUTH_ALLOW_ALL_LOGINS opt-in denies login, not permits it."""
     import src.auth.routers as routers_mod
 
     monkeypatch.setattr(routers_mod, "get_redis", _fake_redis_consumable())
     monkeypatch.delenv("AUTH_ALLOWED_EMAILS", raising=False)
+    monkeypatch.delenv("AUTH_ALLOW_ALL_LOGINS", raising=False)
+    monkeypatch.setattr(
+        routers_mod, "_provider", lambda name: _fake_provider("anyone@example.com")
+    )
+    upsert_mock = AsyncMock()
+    monkeypatch.setattr(routers_mod, "upsert_user_from_oauth", upsert_mock)
+
+    nonce = "gate-nonce-3"
+    signed = _make_signed_state(nonce)
+    with pytest.raises(Exception) as exc_info:
+        await _handle_callback("google", "code", signed, nonce, MagicMock())
+    assert exc_info.value.status_code == 403
+    assert exc_info.value.detail["error"]["code"] == "email_not_allowed"
+    upsert_mock.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_handle_callback_allows_everyone_with_local_dev_opt_in(monkeypatch):
+    """AUTH_ALLOW_ALL_LOGINS=true is the explicit local-dev escape hatch."""
+    import src.auth.routers as routers_mod
+
+    monkeypatch.setattr(routers_mod, "get_redis", _fake_redis_consumable())
+    monkeypatch.delenv("AUTH_ALLOWED_EMAILS", raising=False)
+    monkeypatch.setenv("AUTH_ALLOW_ALL_LOGINS", "true")
     monkeypatch.setattr(
         routers_mod, "_provider", lambda name: _fake_provider("anyone@example.com")
     )

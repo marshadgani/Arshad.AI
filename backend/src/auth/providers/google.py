@@ -27,7 +27,13 @@ from urllib.parse import urlencode
 
 import httpx
 
-from .base import OAuthProvider, OAuthTokenBundle, OAuthUserInfo, required_env
+from .base import (
+    OAuthError,
+    OAuthProvider,
+    OAuthTokenBundle,
+    OAuthUserInfo,
+    required_env,
+)
 
 _AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 _TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -105,6 +111,16 @@ class GoogleOAuthProvider(OAuthProvider):
             )
         resp.raise_for_status()
         data = resp.json()
+        # AUTH_ALLOWED_EMAILS (auth/allowlist.py) makes this email the whole
+        # login/ownership decision, and upsert_user_from_oauth links accounts
+        # across providers by email — an unverified email here would let an
+        # attacker who can set an arbitrary (unverified) address on their own
+        # Google account log in, or link into, the owner's identity.
+        if not data.get("email_verified"):
+            raise OAuthError(
+                "google_email_unverified",
+                "Google account email is not verified.",
+            )
         return OAuthUserInfo(
             provider_user_id=data["sub"],
             email=data["email"].lower(),
