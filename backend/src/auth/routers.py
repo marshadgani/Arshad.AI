@@ -1,4 +1,4 @@
-"""/api/v1/auth/* — login, callback, me, logout.
+"""/api/v1/auth/* — OAuth login/callback, password login, me, logout.
 
 OAuth CSRF / login-CSRF / session-fixation protection (SEC-002 fix,
 2026-09-07 — see tasks/pipeline-queue.md FEAT-118 for the finding this
@@ -32,6 +32,18 @@ Redis-getdel-single-use pattern already used correctly by
 integrations/personal/_oauth_base.py (store_oauth_state /
 consume_oauth_state) for connecting third-party integrations.
 
+FEAT-143 adds email/password login as a second, additive credential type
+(POST /password/login below) issuing the SAME JWT via the SAME
+encode_jwt() the OAuth path already uses. It shares this module for two
+reasons: it needs the exact same Redis-outage resilience story as OAuth
+(OAuth is the documented login fallback whenever password login is
+degraded — either by its fail-CLOSED per-email lockout or by the
+PASSWORD_AUTH_ENABLED kill-switch), and putting both paths in one file
+keeps that shared story auditable in one place. The two OAuth Redis
+calls below (`_start_login`'s `redis.set` and `_handle_callback`'s
+`redis.getdel`) are now guarded against RedisError so that claim holds
+in practice, not just in a comment.
+
 Logout is a stateless 204 — the frontend wipes its localStorage JWT.
 """
 
@@ -39,6 +51,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import logging
 import os
 import secrets
 import time
@@ -46,21 +59,34 @@ import time
 import httpx
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
+from pydantic import BaseModel, EmailStr, Field
+from redis.exceptions import RedisError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..api.errors import http_error
 from ..middleware.cache import get_redis
+from ..middleware.rate_limit import enforce_rate_limit
 from ..models.database import get_db
 from ..models.user import User
+from . import lockout
 from .dependencies import get_current_user
 from .jwt import encode_jwt
+from .password import dummy_verify, verify_password
 from .providers import GitHubOAuthProvider, GoogleOAuthProvider, OAuthProvider
 from .providers.base import OAuthError
-from .service import upsert_user_from_oauth
+from .service import authenticate_with_password, normalize_email, upsert_user_from_oauth
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
+_log = logging.getLogger(__name__)
+
 _STATE_TTL_SECONDS = 300
 _NONCE_COOKIE_NAME = "oauth_login_nonce"
+
+# Generic body returned on EVERY password-login failure branch (user not
+# found, OAuth-only account, wrong password) — identical status, message
+# and headers so the response itself carries no user-enumeration signal.
+_INVALID_CREDENTIALS_MESSAGE = "Email or password is incorrect."
 
 
 def _login_nonce_key(nonce: str) -> str:
@@ -147,9 +173,28 @@ async def _start_login(provider_name: str) -> RedirectResponse:
     signed_state = _make_signed_state(nonce)
 
     redis = await get_redis()
-    await redis.set(_login_nonce_key(nonce), "1", ex=_STATE_TTL_SECONDS)
+    try:
+        await redis.set(_login_nonce_key(nonce), "1", ex=_STATE_TTL_SECONDS)
+    except RedisError:
+        # Fail open: during an outage OAuth CSRF protection degrades from
+        # (HMAC-signed state AND browser cookie AND single-use Redis nonce)
+        # to (HMAC-signed state AND browser cookie) — see the matching
+        # getdel guard in _handle_callback below for the other half of
+        # this trade-off. Both surviving factors are attacker-unforgeable
+        # without SECRET_KEY or the user's browser, and the state is
+        # TTL-bounded, so this is a time-boxed, outage-only degradation —
+        # the price of keeping OAuth genuinely Redis-independent so it can
+        # serve as the login fallback while password login's per-email
+        # lockout is fail-CLOSED (see auth/lockout.py).
+        _log.warning(
+            "OAuth login-nonce store skipped — Redis unreachable; "
+            "state=%s continuing without single-use replay protection",
+            nonce,
+        )
 
-    response = RedirectResponse(provider.authorization_url(signed_state), status_code=302)
+    response = RedirectResponse(
+        provider.authorization_url(signed_state), status_code=302
+    )
     response.set_cookie(
         _NONCE_COOKIE_NAME,
         nonce,
@@ -184,8 +229,23 @@ async def _handle_callback(
         )
 
     redis = await get_redis()
-    consumed = await redis.getdel(_login_nonce_key(state_nonce))
-    if not consumed:
+    redis_down = False
+    try:
+        consumed = await redis.getdel(_login_nonce_key(state_nonce))
+    except RedisError:
+        # See the matching comment in _start_login. The single-use replay
+        # check is skipped ONLY when Redis itself is unreachable — an
+        # absent/already-consumed key with a HEALTHY Redis still 400s
+        # below, exactly as before. This distinction is what makes the
+        # outage-degradation safe rather than a blanket bypass.
+        redis_down = True
+        consumed = None
+        _log.warning(
+            "OAuth single-use nonce check skipped — Redis unreachable; "
+            "continuing callback for state=%s",
+            state_nonce,
+        )
+    if not consumed and not redis_down:
         raise _envelope(
             status.HTTP_400_BAD_REQUEST,
             "invalid_state",
@@ -271,3 +331,89 @@ async def me(user: User = Depends(get_current_user)) -> dict:
 )
 async def logout():
     pass
+
+
+# ── Password login (FEAT-143) ───────────────────────────────────────────────
+
+
+class PasswordLoginRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=1, max_length=128)
+
+
+def _password_auth_enabled() -> bool:
+    """Read the kill-switch AT REQUEST TIME (never cached, never read at
+    import time) so tests can monkeypatch.setenv against an
+    already-constructed TestClient/app and so a Render env change takes
+    effect on the very next request without a code deploy.
+
+    Defaults ON when unset. Render env vars are set by hand; a default-off
+    switch plus a forgotten variable would ship this feature dead behind a
+    green pipeline. This default is safe because the endpoint is already
+    inert for every account whose password_hash IS NULL — i.e. every
+    account, until backend/scripts/set_password.py is deliberately run
+    against it.
+    """
+    raw = os.getenv("PASSWORD_AUTH_ENABLED", "true").strip().lower()
+    return raw not in ("false", "0", "no")
+
+
+@router.post("/password/login", summary="Login with email and password")
+async def password_login(
+    payload: PasswordLoginRequest,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Fixed handler ordering — do not reorder these steps.
+
+    1. Kill-switch first: a disabled feature costs zero Redis and zero DB.
+    2. Normalize the email once: every downstream key (lockout bucket,
+       DB lookup) derives from this single value, closing the
+       whitespace-bypass gap between the limiter and the lookup.
+    3. Global backstop (fail-OPEN): bounds worst-case bcrypt CPU without
+       being able to lock the owner out over a Redis blip.
+    4. Per-email lockout (fail-CLOSED): the actual brute-force guard —
+       per-IP limiting was evaluated and found not viable on this
+       deployed stack (Vercel external rewrite + a publicly reachable
+       Render origin defeat any fixed trusted-hop index), so this bucket
+       carries the full defence and must not fail open.
+    5. DB lookup — cheap, no bcrypt.
+    6. Exactly ONE bcrypt operation, unconditionally, last: dummy_verify
+       when there is no real hash to check against (user not found, or
+       an OAuth-only account with password_hash IS NULL), verify_password
+       otherwise. This ordering — bcrypt last, on every branch — is what
+       prevents any earlier branch from turning into a timing oracle.
+    """
+    if not _password_auth_enabled():
+        raise http_error(
+            503,
+            "password_auth_disabled",
+            "Password authentication is disabled.",
+        )
+
+    email_norm = normalize_email(payload.email)
+
+    await enforce_rate_limit(
+        bucket="password_login",
+        identity="global",
+        limit=10,
+        window_seconds=60,
+        message="Too many login attempts. Try again shortly.",
+    )
+
+    await lockout.assert_not_locked(email_norm)
+
+    user = await authenticate_with_password(db, email_norm)
+
+    if user is None or user.password_hash is None:
+        await dummy_verify(payload.password)
+        ok = False
+    else:
+        ok = await verify_password(payload.password, user.password_hash)
+
+    if not ok or user is None:
+        await lockout.record_failure(email_norm)
+        raise http_error(401, "invalid_credentials", _INVALID_CREDENTIALS_MESSAGE)
+
+    await lockout.clear_failures(email_norm)
+    token = encode_jwt(user.id)
+    return {"data": {"token": token}}
