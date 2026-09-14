@@ -369,8 +369,18 @@ async def password_login(
     2. Normalize the email once: every downstream key (lockout bucket,
        DB lookup) derives from this single value, closing the
        whitespace-bypass gap between the limiter and the lookup.
-    3. Global backstop (fail-OPEN): bounds worst-case bcrypt CPU without
-       being able to lock the owner out over a Redis blip.
+    3. Global backstop (fail-OPEN): bounds worst-case aggregate bcrypt CPU
+       across ALL callers, not a per-account guard. It is a single shared
+       counter (identity="global") — an unauthenticated caller sending
+       requests at the limit can hold it saturated indefinitely, 429-ing
+       every other caller's password-login attempts including the real
+       owner's. This is a known, accepted tradeoff (Arshad, 2026-09-14,
+       see SEC-001): the limit is set high enough that it only engages
+       under a genuine flood, not casual retry traffic, and Google/GitHub
+       OAuth login is completely unaffected (separate route, separate
+       rate-limit bucket) and remains available whenever this bucket is
+       saturated — exactly the same fallback story as the per-email
+       lockout's fail-closed behaviour below.
     4. Per-email lockout (fail-CLOSED): the actual brute-force guard —
        per-IP limiting was evaluated and found not viable on this
        deployed stack (Vercel external rewrite + a publicly reachable
@@ -395,7 +405,9 @@ async def password_login(
     await enforce_rate_limit(
         bucket="password_login",
         identity="global",
-        limit=10,
+        # A CPU-flood backstop, not an account guard (see step 3 above) —
+        # sized to only engage under a genuine flood, not casual retries.
+        limit=100,
         window_seconds=60,
         message="Too many login attempts. Try again shortly.",
     )
