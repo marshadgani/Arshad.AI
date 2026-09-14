@@ -88,6 +88,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.execute("SET LOCAL lock_timeout = '5s'")
     op.alter_column(
         "integration_ingest_tokens",
         "revoked_at",

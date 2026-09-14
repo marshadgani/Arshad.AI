@@ -38,6 +38,9 @@ class Integration(Base, TimestampedMixin):
     status: Mapped[str] = mapped_column(
         String(32), nullable=False, default="disconnected"
     )
+    # Already TIMESTAMP WITH TIME ZONE in Postgres (confirmed directly
+    # against production 2026-09-14, see migration n1k2l3m4a5b6) — this
+    # declaration only fixes a model/DB drift, no migration needed.
     last_synced_at: Mapped[datetime | None] = mapped_column(
         TIMESTAMP(timezone=True), nullable=True
     )
@@ -67,6 +70,8 @@ class IntegrationOAuthToken(Base, TimestampedMixin):
     )
     encrypted_access_token: Mapped[bytes] = mapped_column(BYTEA, nullable=False)
     encrypted_refresh_token: Mapped[bytes | None] = mapped_column(BYTEA, nullable=True)
+    # Same model/DB drift fix as Integration.last_synced_at above — already
+    # TIMESTAMP WITH TIME ZONE in Postgres, no migration needed.
     expires_at: Mapped[datetime | None] = mapped_column(
         TIMESTAMP(timezone=True), nullable=True
     )
