@@ -46,8 +46,8 @@
   gap: var(--s-2);
   width: fit-content;
   padding: var(--s-1) var(--s-3);
-  background: var(--accent-pending-bg);
-  border: 1px solid var(--accent-pending-faint);
+  background: var(--status-warn-bg);
+  border: 1px solid var(--status-warn-faint);
   border-radius: var(--radius-sm);
 }
 
@@ -55,7 +55,7 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--accent-pending);
+  background: var(--status-warn);
 }
 
 .statusLabel {
@@ -63,7 +63,7 @@
   font-size: 12px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--accent-pending);
+  color: var(--status-warn);
 }
 
 .reason {
