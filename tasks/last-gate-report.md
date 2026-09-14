@@ -4,12 +4,13 @@
 **Diff base:** `claude/arshad-ai-e2e-testing-fdb9vc`
 **Date:** 2026-09-14
 
-## Verdict: ⚠️ WARN — fixed and ready for merge
+## GATE PASSED — verdict: WARN (auto-merge eligible per CLAUDE.md §20)
 
 The gate initially came back **BLOCKED** (a coverage FAIL plus a security-exception
 WARN, which auto-upgrades to FAIL per this repo's rules). Both have been fixed and
 verified in this branch. Everything remaining is WARN-level, non-blocking, and
-listed as a checklist below for Arshad's discretion.
+listed as a checklist below for Arshad's discretion. Per §20's Gate Verdicts table,
+WARN (zero FAIL, zero unresolved Critical) merges the same as PASS.
 
 ## What this feature is
 
