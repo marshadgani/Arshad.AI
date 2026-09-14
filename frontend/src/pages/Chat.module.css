@@ -15,23 +15,36 @@
   font-size: 0.9rem;
 }
 
+.statusMessage[role='alert'] {
+  border: 1px solid var(--status-danger);
+  background: var(--bg-elevated);
+  color: var(--status-danger);
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--radius-md);
+}
+
 .retryButton {
   appearance: none;
   border: 1px solid var(--border-strong);
   background: var(--bg-elevated);
   color: var(--text-primary);
-  padding: var(--s-2) var(--s-5);
+  padding: var(--s-3) var(--s-5);
   border-radius: var(--radius-md);
   font-size: 0.85rem;
   font-weight: 500;
   cursor: pointer;
-  transition: border-color 120ms, box-shadow 120ms;
+  transition: border-color 120ms, box-shadow 120ms, transform 100ms ease;
 }
 
 .retryButton:hover,
 .retryButton:focus-visible {
   border-color: var(--accent);
   box-shadow: var(--glow-cyan-soft);
+  transform: translateY(-1px);
+}
+
+.retryButton:active {
+  transform: translateY(0);
 }
 
 /* breakpoints.ts: mobile */
