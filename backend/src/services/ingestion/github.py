@@ -22,7 +22,7 @@ from ...models.user import User
 from ...tools.github.list_issues import GitHubListIssues, ListIssuesInput
 from ...tools.github.list_prs import GitHubListPrs, ListPrsInput
 from .. import event_bus
-from .runner import IngestionError
+from .errors import IngestionError
 
 
 def _max_batch() -> int:
