@@ -1,15 +1,16 @@
 .filter {
   display: flex;
   gap: 4px;
-  background: var(--surface, #161b22);
-  border: 1px solid var(--border, #30363d);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-faint);
   border-radius: 8px;
   padding: 4px;
   width: fit-content;
 }
 
 .btn {
-  padding: 6px 16px;
+  min-height: 44px;
+  padding: 10px 16px;
   border: none;
   border-radius: 6px;
   background: transparent;
@@ -22,16 +23,16 @@
 }
 
 .btn:hover {
-  background: var(--surface-hover, #21262d);
-  color: var(--text, #e6edf3);
+  background: var(--bg-panel);
+  color: var(--text-primary);
 }
 
 .btnActive {
-  background: var(--accent, #1f6feb);
-  color: #fff;
+  background: var(--accent);
+  color: var(--bg-deep);
 }
 
 .btnActive:hover {
-  background: var(--accent-hover, #388bfd);
-  color: #fff;
+  background: var(--accent-soft);
+  color: var(--bg-deep);
 }

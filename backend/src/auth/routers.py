@@ -32,7 +32,7 @@ Redis-getdel-single-use pattern already used correctly by
 integrations/personal/_oauth_base.py (store_oauth_state /
 consume_oauth_state) for connecting third-party integrations.
 
-FEAT-143 adds email/password login as a second, additive credential type
+FEAT-159 adds email/password login as a second, additive credential type
 (POST /password/login below) issuing the SAME JWT via the SAME
 encode_jwt() the OAuth path already uses. It shares this module for two
 reasons: it needs the exact same Redis-outage resilience story as OAuth
@@ -69,6 +69,7 @@ from ..middleware.rate_limit import enforce_rate_limit
 from ..models.database import get_db
 from ..models.user import User
 from . import lockout
+from .allowlist import is_email_allowed
 from .dependencies import get_current_user
 from .jwt import encode_jwt
 from .password import dummy_verify, verify_password
@@ -271,6 +272,13 @@ async def _handle_callback(
             f"Could not reach {provider_name}: {type(exc).__name__}.",
         )
 
+    if not is_email_allowed(info.email):
+        raise _envelope(
+            status.HTTP_403_FORBIDDEN,
+            "email_not_allowed",
+            "This deployment is restricted to its owner's account.",
+        )
+
     user = await upsert_user_from_oauth(
         db, provider=provider_name, info=info, bundle=bundle
     )
@@ -333,7 +341,7 @@ async def logout():
     pass
 
 
-# ── Password login (FEAT-143) ───────────────────────────────────────────────
+# ── Password login (FEAT-159) ───────────────────────────────────────────────
 
 
 class PasswordLoginRequest(BaseModel):
@@ -392,6 +400,14 @@ async def password_login(
        an OAuth-only account with password_hash IS NULL), verify_password
        otherwise. This ordering — bcrypt last, on every branch — is what
        prevents any earlier branch from turning into a timing oracle.
+    7. Allowlist check (FEAT-158), after credentials are confirmed valid:
+       same placement as _handle_callback's is_email_allowed() call below
+       — after identity is established, before a token is issued. Not
+       strictly load-bearing on its own (get_current_user re-checks the
+       allowlist on every authenticated request regardless of how the
+       JWT was obtained), but issuing a 403 here instead of a 200 matches
+       the OAuth path's behaviour exactly rather than silently diverging
+       from it.
     """
     if not _password_auth_enabled():
         raise http_error(
@@ -427,5 +443,13 @@ async def password_login(
         raise http_error(401, "invalid_credentials", _INVALID_CREDENTIALS_MESSAGE)
 
     await lockout.clear_failures(email_norm)
+
+    if not is_email_allowed(user.email):
+        raise http_error(
+            403,
+            "email_not_allowed",
+            "This deployment is restricted to its owner's account.",
+        )
+
     token = encode_jwt(user.id)
     return {"data": {"token": token}}

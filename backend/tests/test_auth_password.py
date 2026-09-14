@@ -125,12 +125,13 @@ def test_identical_401_bodies_across_failure_branches(
         )
         bodies.append((response.status_code, response.json()))
 
-    assert len(set(bodies)) == 1, (
+    assert all(b == bodies[0] for b in bodies), (
         "All three failure branches must return byte-identical bodies"
     )
 
 
 def test_exactly_one_bcrypt_op_on_success_branch(monkeypatch, no_backstop, no_lockout):
+    monkeypatch.setenv("AUTH_ALLOW_ALL_LOGINS", "true")
     spy = AsyncMock(return_value=True)
     monkeypatch.setattr(password_mod, "_checkpw", spy)
     _override_db(_FakeUser("a@example.com", "somehash"))
@@ -229,14 +230,17 @@ def test_router_uses_one_normalized_email_for_lookup_and_lockout(
 
 
 def test_global_backstop_fails_open_on_redis_outage(monkeypatch):
+    monkeypatch.setenv("AUTH_ALLOW_ALL_LOGINS", "true")
     monkeypatch.setattr(
         rate_limit_mod,
         "get_redis",
         AsyncMock(side_effect=redis.exceptions.RedisError("down")),
     )
-    # lockout uses .get(), not a pipeline — give it a client with a working .get()
+    # lockout uses .get() (assert_not_locked) and .delete() (clear_failures,
+    # reached on this success path) — both need to be awaitable.
     fake_lockout_redis = MagicMock()
     fake_lockout_redis.get = AsyncMock(return_value=None)
+    fake_lockout_redis.delete = AsyncMock(return_value=None)
     monkeypatch.setattr(
         lockout_mod, "get_redis", AsyncMock(return_value=fake_lockout_redis)
     )
@@ -315,6 +319,7 @@ def test_record_failure_called_with_normalized_email_on_wrong_password(
 def test_clear_failures_called_with_normalized_email_on_success(
     monkeypatch, no_backstop
 ):
+    monkeypatch.setenv("AUTH_ALLOW_ALL_LOGINS", "true")
     monkeypatch.setattr(lockout_mod, "assert_not_locked", AsyncMock(return_value=None))
     spy = AsyncMock(return_value=None)
     monkeypatch.setattr(lockout_mod, "clear_failures", spy)

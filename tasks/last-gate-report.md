@@ -1,16 +1,32 @@
-# Merge-to-Main Gate Report — FEAT-143 (Password Login alongside OAuth)
+# Merge-to-Main Gate Report — FEAT-159 (Password Login alongside OAuth)
 
-**Branch:** `dev-team/feat-143-password-auth-halted-denylist`
-**Diff base:** `claude/arshad-ai-e2e-testing-fdb9vc`
+**Branch:** `dev-team/feat-143-password-auth-halted-denylist` (feature itself renumbered FEAT-143 → FEAT-159 during this merge — see `tasks/pipeline-queue.md`'s "Second ID collision note")
+**Target branch:** `claude/ai-personal-assistant-main`
 **Date:** 2026-09-14
 
 ## GATE PASSED — verdict: WARN (auto-merge eligible per CLAUDE.md §20)
 
 The gate initially came back **BLOCKED** (a coverage FAIL plus a security-exception
-WARN, which auto-upgrades to FAIL per this repo's rules). Both have been fixed and
-verified in this branch. Everything remaining is WARN-level, non-blocking, and
-listed as a checklist below for Arshad's discretion. Per §20's Gate Verdicts table,
-WARN (zero FAIL, zero unresolved Critical) merges the same as PASS.
+WARN, which auto-upgrades to FAIL per this repo's rules). Both were fixed and
+verified before this report was first written. Everything else is WARN-level,
+non-blocking, and listed as a checklist below for Arshad's discretion. Per §20's
+Gate Verdicts table, WARN (zero FAIL, zero unresolved Critical) merges the same as
+PASS.
+
+**Merge-conflict note (added after the original gate, before this push):** `main`
+advanced past this branch's base with FEAT-158, an emergency `AUTH_ALLOWED_EMAILS`
+login-allowlist fix for a live production vulnerability. Reconciling the two
+required adding the same `is_email_allowed()` check to `password_login`
+(`backend/src/auth/routers.py`), mirroring `_handle_callback`'s placement exactly
+— after credentials are confirmed valid, before a token is issued — otherwise
+password login would have been a live bypass of FEAT-158's fix from the moment
+this merged. `get_current_user` already re-checks the allowlist on every
+authenticated request regardless of how the JWT was obtained, so this addition is
+defense-in-depth (matching the OAuth path's behavior) rather than the only thing
+standing between a disallowed account and a working session — but it closes the
+gap between "OAuth blocks unauthorized logins with a 403" and "password login
+would have silently issued a 200" that a naive conflict resolution could have left
+in place.
 
 ## What this feature is
 
@@ -44,6 +60,9 @@ tradeoff honestly: it's a CPU backstop, not an account guard; the per-email
 lockout is the real brute-force defense; OAuth is on a separate route/bucket and
 stays available whenever this one saturates. Commit `b258268e`.
 
+### 3. Merge conflict with FEAT-158's allowlist → fixed (this push)
+See the merge-conflict note above. Commit is this branch's merge commit.
+
 ## Agent-by-agent results
 
 | Agent | Verdict | Findings |
@@ -52,7 +71,7 @@ stays available whenever this one saturates. Commit `b258268e`.
 | security-auditor | WARN→fixed | SEC-001: **fixed above**. SEC-002–006: informational, no action needed — accepted tradeoffs already documented (self-DoS via targeted lockout, bcrypt cost/pre-hash design, `set_password.py` credential handling, JWT parity with OAuth, localStorage token storage). |
 | debugger | WARN | Malformed `password_hash` in the DB crashes `bcrypt.checkpw` with an unhandled 500 instead of the clean 401 every other branch returns (also breaks the timing-oracle invariant on that one branch). `set_password.py` commits the new hash *before* its own post-write verification check, so a failed check reports "not confirmed set" when the write already landed. Plus 4 lower-severity suggestions (soft check-then-act race in the lockout counter, `ctx` audit note, import-time `_DUMMY_HASH` cost, `set_password.py` connection-error handling). |
 | test-writer (coverage) | FAIL→fixed | **Fixed above.** |
-| refactorer | WARN | Dead `_envelope()` helper in `routers.py` duplicates `http_error()` from `api/errors.py` (pre-dates this feature, not introduced by it — the new password-login code already uses `http_error()` correctly). Two low-severity clarity suggestions (a `lockout.py` docstring gap, a redundant double-`instanceof` ternary in `Login.tsx`). |
+| refactorer | WARN | Dead `_envelope()` helper in `routers.py` — note: this exists independently on `main` too (still in active use by OAuth routes there), so it's genuinely pre-existing, not introduced by this feature; the new password-login code already uses `http_error()` correctly. Two low-severity clarity suggestions (a `lockout.py` docstring gap, a redundant double-`instanceof` ternary in `Login.tsx`). |
 | doc-writer | WARN | Missing typed Pydantic response model on `POST /password/login` (returns raw `dict`), missing OpenAPI `responses=` annotation for the three distinct error codes, two minor comment gaps. The substantive design docstrings (timing-oracle rationale, lockout fail-closed rationale, `set_password.py` runbook) were called out as done well. |
 | silent-failure-hunter | WARN | Redis-swallow points in `lockout.py` log a warning but emit no metric — sustained (not full-outage) Redis flakiness could erode the lockout guarantee without paging anyone; caught only by the manual post-deploy log check. One low-severity suggestion (unguarded `res.json()` on the frontend success path, inconsistent with the guarded error path next to it). |
 | pr-test-analyzer (test quality) | Gap→fixed | Same lockout coverage gap as test-writer, **fixed above**. Confirmed both historical anti-patterns (wall-clock timing test, false-green kill-switch test) are genuinely resolved, not just renamed away. |
@@ -63,9 +82,18 @@ stays available whenever this one saturates. Commit `b258268e`.
 - [ ] 422 handler in `main.py`: use `jsonable_encoder` on the scrubbed error list to avoid a latent crash if a future validator's `ctx` ever carries a non-JSON-serializable value.
 - [ ] `password.py`: guard `bcrypt.checkpw`'s `ValueError` (malformed stored hash) and treat it as verification failure, so it returns the same clean 401 as every other branch instead of an unhandled 500.
 - [ ] `set_password.py`: reorder so the post-write verification happens before `commit()`, or make the failure message accurate about the write already having landed.
-- [ ] `routers.py`: remove the dead `_envelope()` helper, replace its call sites with `http_error()` (pre-existing duplication, not introduced by this feature).
 - [ ] Add a typed `PasswordLoginResponse` model and `responses=` OpenAPI annotations to `POST /password/login`.
 - [ ] Consider a metric (not just a log line) on `lockout.py`'s Redis-swallow points for real-time observability of sustained Redis flakiness.
 - [ ] Guard `res.json()` on the frontend success path in `api/auth.ts` (currently only the error path is guarded).
 
 None of these block the merge. They're real, worth doing, and left for Arshad to prioritize alongside the rest of the backlog.
+
+## Post-merge verification required
+
+Password login is inert until `backend/scripts/set_password.py` is run against
+Render/Supabase (no password is set for any account yet — every account currently
+authenticates via OAuth only, so this ships dark by default). Per CLAUDE.md §23,
+verify after deploy: `Application startup complete`, then optionally run
+`set_password.py` and confirm a real password login succeeds and is still gated by
+the FEAT-158 allowlist (test with a disallowed email if possible, expect 403
+`email_not_allowed`).
