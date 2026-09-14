@@ -1,6 +1,6 @@
 .page {
   padding: 1.75rem 2rem 3rem;
-  color: var(--text);
+  color: var(--text-primary);
   max-width: 1200px;
   margin: 0 auto;
 }
@@ -27,8 +27,8 @@
 
 .refresh {
   background: var(--bg-elevated);
-  color: var(--text);
-  border: 1px solid var(--border);
+  color: var(--text-primary);
+  border: 1px solid var(--border-faint);
   padding: 0.45rem 0.9rem;
   border-radius: 6px;
   font-size: 0.85rem;
@@ -45,11 +45,11 @@
 }
 
 .banner {
-  background: rgba(248, 81, 73, 0.1);
-  border: 1px solid rgba(248, 81, 73, 0.4);
-  color: #f85149;
+  background: rgba(255, 77, 109, 0.1);
+  border: 1px solid var(--status-danger);
+  color: var(--status-danger);
   padding: 0.6rem 0.9rem;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   margin-bottom: 1rem;
   font-size: 0.85rem;
 }
@@ -74,8 +74,8 @@
 
 .card {
   background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  border: 1px solid var(--border-faint);
+  border-radius: var(--radius-lg);
   padding: 1rem;
   display: flex;
   flex-direction: column;
@@ -107,9 +107,9 @@
 .iconBox {
   width: 36px;
   height: 36px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--bg);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-faint);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -121,9 +121,9 @@
 .kind {
   font-size: 0.7rem;
   padding: 0.15rem 0.45rem;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: var(--bg);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-faint);
   color: var(--text-muted);
   white-space: nowrap;
 }
@@ -161,11 +161,11 @@
 
 .comingSoonReason {
   font-size: 0.72rem;
-  background: rgba(137, 87, 229, 0.1);
-  border: 1px solid rgba(137, 87, 229, 0.3);
-  color: #b78cf3;
+  background: var(--accent-faint);
+  border: 1px solid var(--accent-soft);
+  color: var(--accent);
   padding: 0.4rem 0.55rem;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   line-height: 1.4;
   overflow: hidden;
   display: -webkit-box;
@@ -175,11 +175,11 @@
 
 .errBanner {
   font-size: 0.75rem;
-  background: rgba(248, 81, 73, 0.08);
-  border: 1px solid rgba(248, 81, 73, 0.3);
-  color: #f85149;
+  background: rgba(255, 77, 109, 0.08);
+  border: 1px solid var(--status-danger);
+  color: var(--status-danger);
   padding: 0.4rem 0.55rem;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -194,12 +194,12 @@
 
 .actions button {
   padding: 0.4rem 0.85rem;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   font-size: 0.83rem;
   cursor: pointer;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-faint);
   background: var(--bg);
-  color: var(--text);
+  color: var(--text-primary);
 }
 
 .actions button:hover:not(:disabled) {
@@ -212,13 +212,14 @@
 }
 
 .primary {
-  background: #2da44e !important;
-  border-color: #2da44e !important;
-  color: white !important;
+  background: var(--status-ok) !important;
+  border-color: var(--status-ok) !important;
+  color: var(--bg-deep) !important;
 }
 
 .primary:hover:not(:disabled) {
-  background: #2c974b !important;
+  background: var(--status-ok) !important;
+  opacity: 0.85;
 }
 
 .secondary {
@@ -233,7 +234,7 @@
 }
 
 .docsLink:hover {
-  color: var(--text);
+  color: var(--text-primary);
 }
 
 .empty {
@@ -250,15 +251,35 @@
   align-items: center;
   justify-content: center;
   z-index: var(--z-modal);
+  animation: backdropIn 180ms;
+}
+
+@keyframes backdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modalBackdrop { animation: none; }
 }
 
 .modal {
   background: var(--bg-elevated);
   border: 1px solid var(--border-faint);
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   padding: 1.5rem;
   width: 420px;
   max-width: 90vw;
+  animation: modalIn 180ms;
+}
+
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal { animation: none; }
 }
 
 .modal h3 {
@@ -278,9 +299,9 @@
   padding: 0.55rem 0.7rem;
   font-size: 0.9rem;
   background: var(--bg);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-faint);
   border-radius: 6px;
-  color: var(--text);
+  color: var(--text-primary);
   font-family: var(--mono, ui-monospace, monospace);
   box-sizing: border-box;
 }
@@ -293,7 +314,7 @@
 .modalErr {
   margin-top: 0.5rem;
   font-size: 0.8rem;
-  color: #f85149;
+  color: var(--status-danger);
 }
 
 .modalActions {
@@ -305,12 +326,12 @@
 
 .modalActions button {
   padding: 0.5rem 1rem;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   font-size: 0.85rem;
   cursor: pointer;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-faint);
   background: var(--bg);
-  color: var(--text);
+  color: var(--text-primary);
 }
 
 .toast {
@@ -318,10 +339,20 @@
   bottom: 1.5rem;
   right: 1.5rem;
   background: var(--bg-elevated);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-faint);
   padding: 0.7rem 1rem;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   font-size: 0.85rem;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   z-index: var(--z-toast);
+  animation: toastIn 200ms;
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast { animation: none; }
 }

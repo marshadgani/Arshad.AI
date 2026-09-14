@@ -112,15 +112,21 @@
 .rowText { min-width: 0; overflow-wrap: anywhere; }
 
 .checkbox {
+  position: relative;
   width: 14px; height: 14px;
   border: 1.5px solid var(--border-strong);
   border-radius: 3px;
   cursor: pointer;
 }
+.checkbox::before {
+  content: '';
+  position: absolute;
+  inset: -15px;
+}
 
 .tag {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 10px;
   background: var(--bg-elevated);
   border: 1px solid var(--border-faint);
   color: var(--text-muted);
@@ -219,13 +225,14 @@
   gap: var(--s-2);
 }
 .searchBar:focus-within { border-color: var(--accent); box-shadow: var(--glow-cyan-soft); }
+.qa:focus-visible, .suggestion:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* Replaces an inline style prop on the glyph — the colour is static, so it
    belongs in the stylesheet (.claude/rules/frontend.md). */
 .searchIcon { color: var(--accent); }
 .searchInput { flex: 1; background: transparent; border: 0; outline: none; color: var(--text-primary); font-size: 13px; }
 .searchInput::placeholder { color: var(--text-muted); }
 .searchSuggest { display: flex; flex-direction: column; gap: var(--s-1); }
-.suggestion { font-size: 12px; color: var(--text-secondary); padding: var(--s-1) var(--s-3); border-radius: var(--radius-sm); }
+.suggestion { font-size: 12px; color: var(--text-secondary); padding: var(--s-2) var(--s-3); border-radius: var(--radius-sm); }
 .suggestion:hover { background: var(--accent-bg); color: var(--accent); cursor: pointer; }
 
 /* Decision queue */
@@ -258,4 +265,4 @@
   color: var(--accent);
 }
 .qaLabel { font-size: 12px; font-weight: 500; }
-.qaHint { font-size: 9px; color: var(--text-muted); font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 2px; }
+.qaHint { font-size: 10px; color: var(--text-muted); font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 2px; }
