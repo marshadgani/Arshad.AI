@@ -4,8 +4,8 @@ import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import { vi } from 'vitest';
 
 import Sidebar from './Sidebar';
-import { ACTIVITY_LOG_PATH, INTEGRATIONS_PATH, SETTINGS_PATH } from '../routes';
-import { setViewport } from '../setupTests';
+import { ACTIVITY_LOG_PATH, INTEGRATIONS_PATH, SETTINGS_PATH } from '../../routes';
+import { setViewport } from '../../setupTests';
 
 function mockNavFetch() {
   global.fetch = vi.fn().mockResolvedValue({
