@@ -31,6 +31,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..api.errors import http_error
+from ..auth.allowlist import is_email_allowed
 from ..auth.dependencies import get_current_user
 from ..models.database import get_db
 from ..models.integration import Integration
@@ -95,6 +96,25 @@ async def _find_user_integration(
     )
 
 
+def _require_owner(user: User) -> None:
+    """Gate mutation of a shared (project-scoped) integration to the owner.
+
+    Any authenticated user can otherwise read/sync/disconnect/overwrite a
+    project_apikey integration (Stripe, Cloudflare, Render, Vercel,
+    Supabase, the Anthropic admin key, ...) because those rows have
+    user_id IS NULL and are matched for every user by design (see
+    _find_user_integration above). This is defense-in-depth on top of the
+    AUTH_ALLOWED_EMAILS login gate (auth/allowlist.py) — it also protects
+    local dev, where that allowlist is empty and login is unrestricted.
+    """
+    if not is_email_allowed(user.email):
+        raise http_error(
+            status.HTTP_403_FORBIDDEN,
+            "not_integration_owner",
+            "Only the deployment owner may modify a shared integration.",
+        )
+
+
 @router.get("", summary="List integrations + per-user status")
 async def list_integrations(
     user: User = Depends(get_current_user),
@@ -147,6 +167,8 @@ async def connect_integration(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     provider = _require_provider(slug)
+    if provider.kind == "project_apikey":
+        _require_owner(user)
     try:
         result = await provider.connect(user=user, db=db, payload=payload or {})
     except IntegrationError as exc:
@@ -174,6 +196,8 @@ async def sync_integration(
             "not_connected",
             f"Integration '{slug}' is not connected. Connect it first.",
         )
+    if integration.user_id is None:
+        _require_owner(user)
     try:
         result = await provider.sync(integration=integration, db=db)
     except IntegrationError as exc:
@@ -197,6 +221,8 @@ async def disconnect_integration(
     integration = await _find_user_integration(slug, user, db)
     if integration is None:
         return {"data": {"status": "already_disconnected"}}
+    if integration.user_id is None:
+        _require_owner(user)
     await provider.disconnect(integration=integration, db=db)
     return {"data": {"status": "disconnected"}}
 

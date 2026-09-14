@@ -41,13 +41,19 @@ USER_ID = uuid.uuid4()
 
 class _FakeUser:
     id = USER_ID
+    email = "owner@example.com"
 
 
 class _FakeIntegration:
-    def __init__(self, slug: str = "test-provider", status: str = "connected"):
+    def __init__(
+        self,
+        slug: str = "test-provider",
+        status: str = "connected",
+        user_id: uuid.UUID | None = USER_ID,
+    ):
         self.id = uuid.uuid4()
         self.slug = slug
-        self.user_id = USER_ID
+        self.user_id = user_id
         self.status = status
         self.last_error = None
         self.config = {}
@@ -433,5 +439,119 @@ def test_sync_when_connected_returns_result(provider, monkeypatch):
     assert data["rows_written"] == 7
     assert data["summary"] == "7 rows synced"
     assert data["duration_ms"] == 250
+
+
+# ── FEAT-158: shared (project_apikey) integration ownership gate ──────────
+#
+# _FakeUser.email is "owner@example.com". AUTH_ALLOWED_EMAILS unset (the
+# default test env) means is_email_allowed() is permissive — these tests
+# set it explicitly per-case to exercise both sides of the gate.
+
+
+def test_connect_project_apikey_provider_denies_non_owner(provider, monkeypatch):
+    """_FakeProvider.kind == 'project_apikey' — connect must 403 for a user
+    not on AUTH_ALLOWED_EMAILS, before provider.connect() ever runs."""
+    monkeypatch.setenv("AUTH_ALLOWED_EMAILS", "someone-else@example.com")
+    db = _make_db()
+    tc = _client_with_db(provider, db, monkeypatch)
+
+    resp = tc.post("/api/v1/integrations/test-provider/connect", json={})
+
+    assert resp.status_code == 403
+    assert resp.json()["error"]["code"] == "not_integration_owner"
+    provider.connect.assert_not_awaited()
+
+    app.dependency_overrides.clear()
+
+
+def test_connect_project_apikey_provider_allows_owner(provider, monkeypatch):
+    monkeypatch.setenv("AUTH_ALLOWED_EMAILS", "owner@example.com")
+    db = _make_db()
+    tc = _client_with_db(provider, db, monkeypatch)
+
+    resp = tc.post("/api/v1/integrations/test-provider/connect", json={})
+
+    assert resp.status_code == 200
+    provider.connect.assert_awaited_once()
+
+    app.dependency_overrides.clear()
+
+
+def test_connect_project_apikey_provider_allows_everyone_when_allowlist_unset(
+    provider, monkeypatch
+):
+    """Empty AUTH_ALLOWED_EMAILS (local dev default) stays permissive."""
+    monkeypatch.delenv("AUTH_ALLOWED_EMAILS", raising=False)
+    db = _make_db()
+    tc = _client_with_db(provider, db, monkeypatch)
+
+    resp = tc.post("/api/v1/integrations/test-provider/connect", json={})
+
+    assert resp.status_code == 200
+    provider.connect.assert_awaited_once()
+
+    app.dependency_overrides.clear()
+
+
+def test_sync_shared_integration_denies_non_owner(provider, monkeypatch):
+    monkeypatch.setenv("AUTH_ALLOWED_EMAILS", "someone-else@example.com")
+    integration = _FakeIntegration(user_id=None)  # user_id IS NULL == shared row
+    db = _make_db(scalar_value=integration)
+    tc = _client_with_db(provider, db, monkeypatch)
+
+    resp = tc.post("/api/v1/integrations/test-provider/sync")
+
+    assert resp.status_code == 403
+    assert resp.json()["error"]["code"] == "not_integration_owner"
+    provider.sync.assert_not_awaited()
+
+    app.dependency_overrides.clear()
+
+
+def test_sync_personal_integration_ignores_owner_gate(provider, monkeypatch):
+    """A user-owned (user_id set) integration is never subject to the shared-
+    integration owner check, even when AUTH_ALLOWED_EMAILS excludes this user —
+    the login allowlist (auth/routers.py) is what gates account creation;
+    this gate only protects rows with user_id IS NULL."""
+    monkeypatch.setenv("AUTH_ALLOWED_EMAILS", "someone-else@example.com")
+    integration = _FakeIntegration(user_id=USER_ID)
+    db = _make_db(scalar_value=integration)
+    tc = _client_with_db(provider, db, monkeypatch)
+
+    resp = tc.post("/api/v1/integrations/test-provider/sync")
+
+    assert resp.status_code == 200
+    provider.sync.assert_awaited_once()
+
+    app.dependency_overrides.clear()
+
+
+def test_disconnect_shared_integration_denies_non_owner(provider, monkeypatch):
+    monkeypatch.setenv("AUTH_ALLOWED_EMAILS", "someone-else@example.com")
+    integration = _FakeIntegration(user_id=None)
+    db = _make_db(scalar_value=integration)
+    tc = _client_with_db(provider, db, monkeypatch)
+
+    resp = tc.post("/api/v1/integrations/test-provider/disconnect")
+
+    assert resp.status_code == 403
+    assert resp.json()["error"]["code"] == "not_integration_owner"
+    provider.disconnect.assert_not_awaited()
+
+    app.dependency_overrides.clear()
+
+
+def test_disconnect_shared_integration_allows_owner(provider, monkeypatch):
+    monkeypatch.setenv("AUTH_ALLOWED_EMAILS", "owner@example.com")
+    integration = _FakeIntegration(user_id=None)
+    db = _make_db(scalar_value=integration)
+    tc = _client_with_db(provider, db, monkeypatch)
+
+    resp = tc.post("/api/v1/integrations/test-provider/disconnect")
+
+    assert resp.status_code == 200
+    provider.disconnect.assert_awaited_once()
+
+    app.dependency_overrides.clear()
 
     app.dependency_overrides.clear()

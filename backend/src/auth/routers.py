@@ -51,6 +51,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..middleware.cache import get_redis
 from ..models.database import get_db
 from ..models.user import User
+from .allowlist import is_email_allowed
 from .dependencies import get_current_user
 from .jwt import encode_jwt
 from .providers import GitHubOAuthProvider, GoogleOAuthProvider, OAuthProvider
@@ -149,7 +150,9 @@ async def _start_login(provider_name: str) -> RedirectResponse:
     redis = await get_redis()
     await redis.set(_login_nonce_key(nonce), "1", ex=_STATE_TTL_SECONDS)
 
-    response = RedirectResponse(provider.authorization_url(signed_state), status_code=302)
+    response = RedirectResponse(
+        provider.authorization_url(signed_state), status_code=302
+    )
     response.set_cookie(
         _NONCE_COOKIE_NAME,
         nonce,
@@ -209,6 +212,13 @@ async def _handle_callback(
             status.HTTP_502_BAD_GATEWAY,
             "oauth_provider_unreachable",
             f"Could not reach {provider_name}: {type(exc).__name__}.",
+        )
+
+    if not is_email_allowed(info.email):
+        raise _envelope(
+            status.HTTP_403_FORBIDDEN,
+            "email_not_allowed",
+            "This deployment is restricted to its owner's account.",
         )
 
     user = await upsert_user_from_oauth(

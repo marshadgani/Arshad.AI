@@ -37,6 +37,21 @@ if not SECRET_KEY or SECRET_KEY == "change-me":
         "python -c 'import secrets; print(secrets.token_urlsafe(32))'"
     )
 
+
+def _is_production() -> bool:
+    return os.getenv("BACKEND_URL", "").startswith("https")
+
+
+if _is_production() and not os.getenv("AUTH_ALLOWED_EMAILS", "").strip():
+    raise RuntimeError(
+        "AUTH_ALLOWED_EMAILS must be set in production — without it, ANY "
+        "Google or GitHub account that completes OAuth can create a session "
+        "and reach shared project integrations (Stripe, Cloudflare, Render, "
+        "Vercel, Supabase, the Anthropic admin key, ...). Set "
+        "AUTH_ALLOWED_EMAILS to a comma-separated list of allowed emails "
+        "(e.g. your own) in the Render environment."
+    )
+
 CORS_ORIGINS = [
     origin.strip()
     for origin in os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
