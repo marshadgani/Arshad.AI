@@ -12,7 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...models.obsidian import IngestedObsidianNote
 from ...models.user import User
-from ...services import obsidian_client as gh
+from ...services.obsidian import client as gh_client
+from ...services.obsidian import config as vault_config
 from ..base import Tool, ToolError
 from ..registry import register
 
@@ -51,7 +52,7 @@ class ObsidianCreateNote(Tool):
     ) -> CreateNoteOutput:
         assert isinstance(payload, CreateNoteInput)
 
-        repo = gh.vault_repo()
+        repo = vault_config.vault_repo()
         path = payload.path if payload.path.endswith(".md") else payload.path + ".md"
 
         # Reject path traversal attempts.
@@ -62,7 +63,7 @@ class ObsidianCreateNote(Tool):
                 "Note path must not contain '..' components or be absolute.",
             )
 
-        result = await gh.write_file(
+        result = await gh_client.write_file(
             db=db,
             user=user,
             repo=repo,

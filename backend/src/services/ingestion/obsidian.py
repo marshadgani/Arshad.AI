@@ -7,6 +7,7 @@ changed/new files into ingested_obsidian_notes.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from datetime import datetime, timezone
@@ -19,12 +20,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...models.obsidian import IngestedObsidianNote
 from ...models.user import User
-from ...tools.base import ToolError
+from ...tools.base import ProviderReauthRequired, ToolError
 from .. import event_bus
-from ..obsidian_client import ProviderReauthRequired, fetch_blob, fetch_tree, vault_repo
+from ..obsidian.client import fetch_blob_with_client, fetch_tree, vault_client
+from ..obsidian.config import EXPORT_ROOT, vault_repo
 from .runner import IngestionError
 
 logger = logging.getLogger(__name__)
+
+# Matches batch_commit.py's outbound blob-upload concurrency: bounded
+# parallelism keeps a large first-run backfill fast without tripping
+# GitHub's secondary rate limits.
+_BLOB_FETCH_CONCURRENCY = 5
 
 # ── Frontmatter + metadata helpers ────────────────────────────────
 
@@ -103,43 +110,76 @@ async def ingest(
         existing[github_path] = blob_sha
 
     now = datetime.now(timezone.utc)
-    upserted: list[dict[str, Any]] = []
     skipped = 0
-    failed = 0
+    pending: list[tuple[str, str]] = []  # (path, tree_sha) still to fetch
 
     for item in tree:
-        path: str = item["path"]
-        sha: str = item.get("sha", "")
+        path = item["path"]
+        sha = item.get("sha", "")
+
+        # Machine-generated notes written by the outbound exporter must
+        # never re-enter this table — the two writers (inbound sync,
+        # outbound export) would otherwise clobber each other's rows on
+        # the same (user_id, github_path) key.
+        if path.startswith(EXPORT_ROOT):
+            continue
 
         if existing.get(path) == sha:
             skipped += 1
             continue
 
-        try:
-            content, blob_sha = await fetch_blob(db, user, repo, path)
-        except (ToolError, ProviderReauthRequired, Exception) as exc:
-            logger.warning("obsidian ingest: failed to fetch %s — %s", path, exc)
-            failed += 1
-            continue
+        pending.append((path, sha))
 
-        fm, body = _parse_frontmatter(content)
-        title = _extract_title(fm, body, path)
-        tags = _extract_tags(fm, body)
+    # Fetch every changed blob through one connection-pooled client and one
+    # token lookup, at most _BLOB_FETCH_CONCURRENCY in flight — a serial
+    # fetch_blob() per file here would open a fresh TLS connection and hit
+    # the DB for a fresh access token on every single note, turning an
+    # N-file sync into N sequential round trips.
+    upserted: list[dict[str, Any]] = []
+    failed = 0
+    if pending:
+        semaphore = asyncio.Semaphore(_BLOB_FETCH_CONCURRENCY)
 
-        upserted.append(
-            {
-                "user_id": user.id,
-                "github_path": path,
-                "title": title,
-                "content": content,
-                "frontmatter": fm,
-                "tags": tags,
-                "word_count": _word_count(body),
-                "blob_sha": blob_sha or sha,
-                "last_modified_at": now,
-                "ingested_at": now,
-            }
-        )
+        async def _fetch_one(
+            client: httpx.AsyncClient, path: str, sha: str
+        ) -> tuple[str, str, tuple[str, str] | None, BaseException | None]:
+            async with semaphore:
+                try:
+                    content, blob_sha = await fetch_blob_with_client(client, repo, path)
+                    return path, sha, (content, blob_sha), None
+                except (ToolError, ProviderReauthRequired, Exception) as exc:  # noqa: BLE001
+                    return path, sha, None, exc
+
+        async with vault_client(db, user) as client:
+            results = await asyncio.gather(
+                *(_fetch_one(client, path, sha) for path, sha in pending)
+            )
+
+        for path, sha, fetched, exc in results:
+            if exc is not None or fetched is None:
+                logger.warning("obsidian ingest: failed to fetch %s — %s", path, exc)
+                failed += 1
+                continue
+
+            content, blob_sha = fetched
+            fm, body = _parse_frontmatter(content)
+            title = _extract_title(fm, body, path)
+            tags = _extract_tags(fm, body)
+
+            upserted.append(
+                {
+                    "user_id": user.id,
+                    "github_path": path,
+                    "title": title,
+                    "content": content,
+                    "frontmatter": fm,
+                    "tags": tags,
+                    "word_count": _word_count(body),
+                    "blob_sha": blob_sha or sha,
+                    "last_modified_at": now,
+                    "ingested_at": now,
+                }
+            )
 
     if upserted:
         stmt = pg_insert(IngestedObsidianNote).values(upserted)

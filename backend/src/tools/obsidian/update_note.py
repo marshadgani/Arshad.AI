@@ -11,7 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...models.obsidian import IngestedObsidianNote
 from ...models.user import User
-from ...services import obsidian_client as gh
+from ...services.obsidian import client as gh_client
+from ...services.obsidian import config as vault_config
 from ..base import Tool, ToolError
 from ..registry import register
 
@@ -63,8 +64,8 @@ class ObsidianUpdateNote(Tool):
         if note is None:
             raise ToolError("note_not_found", f"No note with id '{payload.note_id}'.")
 
-        repo = gh.vault_repo()
-        result = await gh.write_file(
+        repo = vault_config.vault_repo()
+        result = await gh_client.write_file(
             db=db,
             user=user,
             repo=repo,
