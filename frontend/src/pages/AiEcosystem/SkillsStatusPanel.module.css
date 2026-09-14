@@ -1,0 +1,125 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  padding: 56px 24px;
+  margin: 0 auto;
+  max-width: 420px;
+  animation: rise 260ms ease-out;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+  border: 1px solid var(--border, #30363d);
+  background: var(--bg, #0d1117);
+  color: var(--text-muted, #8b949e);
+}
+
+.empty .glyph,
+.filtered .glyph {
+  color: var(--accent, #58a6ff);
+  border-color: var(--accent, #58a6ff);
+  box-shadow: 0 0 0 4px var(--accent-bg, rgba(88, 166, 255, 0.1));
+}
+
+.error .glyph {
+  color: #ff7b72;
+  border-color: #f85149;
+  box-shadow: 0 0 0 4px rgba(248, 81, 73, 0.12);
+}
+
+.eyebrow {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted, #8b949e);
+  margin: 0;
+}
+
+.error .eyebrow {
+  color: #ff7b72;
+}
+
+.title {
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: var(--text, #e6edf3);
+  margin: 2px 0 0;
+}
+
+.body {
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: var(--text-muted, #8b949e);
+  margin: 0;
+}
+
+.detail {
+  font-family: monospace;
+  font-size: 0.72rem;
+  color: #ff7b72;
+  background: rgba(248, 81, 73, 0.08);
+  border: 1px solid rgba(248, 81, 73, 0.25);
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin: 4px 0 0;
+  word-break: break-word;
+}
+
+.action {
+  margin-top: 14px;
+  padding: 7px 20px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: 1px solid var(--accent, #58a6ff);
+  color: var(--accent, #58a6ff);
+  background: var(--accent-bg, rgba(88, 166, 255, 0.1));
+  transition: background 120ms, transform 120ms;
+}
+
+.error .action {
+  border-color: #f85149;
+  color: #ff7b72;
+  background: rgba(248, 81, 73, 0.08);
+}
+
+.action:hover {
+  transform: translateY(-1px);
+}
+
+.action:focus-visible {
+  outline: 2px solid var(--accent, #58a6ff);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    animation: none;
+  }
+  .action:hover {
+    transform: none;
+  }
+}

@@ -17,6 +17,7 @@ import { useShopifyDashboard } from './useShopifyDashboard';
 vi.mock('./useFetch');
 
 import { useFetch } from './useFetch';
+import { fetchResult } from './useFetch.test-helpers';
 
 const mockUseFetch = vi.mocked(useFetch);
 
@@ -26,7 +27,7 @@ afterEach(() => {
 
 describe('useShopifyDashboard', () => {
   it('calls the shopify dashboard endpoint', () => {
-    mockUseFetch.mockReturnValue({ data: null, isLoading: true, error: null, refetch: vi.fn() });
+    mockUseFetch.mockReturnValue(fetchResult({ data: null, isLoading: true, error: null }));
 
     renderHook(() => useShopifyDashboard());
 
@@ -37,7 +38,7 @@ describe('useShopifyDashboard', () => {
   });
 
   it('passes a 120-second poll interval matching the backend cache TTL', () => {
-    mockUseFetch.mockReturnValue({ data: null, isLoading: true, error: null, refetch: vi.fn() });
+    mockUseFetch.mockReturnValue(fetchResult({ data: null, isLoading: true, error: null }));
 
     renderHook(() => useShopifyDashboard());
 
@@ -54,7 +55,7 @@ describe('useShopifyDashboard', () => {
       recent_orders: [],
       partial_failures: [],
     };
-    mockUseFetch.mockReturnValue({ data: fakeDashboard, isLoading: false, error: null, refetch: vi.fn() });
+    mockUseFetch.mockReturnValue(fetchResult({ data: fakeDashboard, isLoading: false, error: null }));
 
     const { result } = renderHook(() => useShopifyDashboard());
 
@@ -62,7 +63,7 @@ describe('useShopifyDashboard', () => {
   });
 
   it('reports null for dashboard before the first fetch resolves', () => {
-    mockUseFetch.mockReturnValue({ data: null, isLoading: true, error: null, refetch: vi.fn() });
+    mockUseFetch.mockReturnValue(fetchResult({ data: null, isLoading: true, error: null }));
 
     const { result } = renderHook(() => useShopifyDashboard());
 
@@ -72,7 +73,7 @@ describe('useShopifyDashboard', () => {
 
   it('propagates a fetch error', () => {
     const err = new Error('network failure');
-    mockUseFetch.mockReturnValue({ data: null, isLoading: false, error: err, refetch: vi.fn() });
+    mockUseFetch.mockReturnValue(fetchResult({ data: null, isLoading: false, error: err }));
 
     const { result } = renderHook(() => useShopifyDashboard());
 

@@ -2,10 +2,28 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { clearToken, getToken } from '../auth/tokenStorage';
 
+/**
+ * `data`/`isLoading`/`error` are kept as three independent fields (rather
+ * than a discriminated union) because that is the shape every existing
+ * caller across the app destructures — changing it would be a breaking
+ * API change to a hook used from many call sites. `status` is added
+ * alongside them, additively, as the single source of truth for "which
+ * state is this": it is derived from the same three fields the same way
+ * every time, instead of each caller re-deriving its own `isLoading &&
+ * !error` style condition (which is easy to get subtly wrong, e.g.
+ * forgetting a still-loading refetch can coexist with stale `data` from
+ * the previous successful fetch). Prefer switching on `status` in new
+ * code; `data`/`isLoading`/`error` remain for existing callers and for
+ * reading the payload/error value once `status` has narrowed which one
+ * is meaningful.
+ */
+export type UseFetchStatus = 'idle' | 'loading' | 'success' | 'error';
+
 export interface UseFetchResult<T> {
   data: T | null;
   isLoading: boolean;
   error: Error | null;
+  status: UseFetchStatus;
   /**
    * Re-run the request now, without waiting for refreshInterval. Stable
    * across renders, so it is safe as an effect dependency or an onClick.
@@ -18,6 +36,13 @@ export interface UseFetchResult<T> {
    * copies.
    */
   refetch: () => void;
+}
+
+function deriveStatus(isLoading: boolean, error: Error | null, data: unknown): UseFetchStatus {
+  if (isLoading) return 'loading';
+  if (error) return 'error';
+  if (data !== null) return 'success';
+  return 'idle';
 }
 
 export interface UseFetchOptions {
@@ -91,7 +116,14 @@ export function useFetch<T>(url: string, options?: UseFetchOptions): UseFetchRes
       })
       .catch((err: Error) => {
         if (err.name === 'AbortError') return;
-        if (!controller.signal.aborted) setError(err);
+        if (!controller.signal.aborted) {
+          // Surfaced to the UI via `error`, but that string is lost the
+          // moment the component unmounts or the message is truncated —
+          // log the full error here so it is still traceable (console in
+          // dev, captured by the browser's error reporting in prod).
+          console.error(`useFetch failed: GET ${url}`, err);
+          setError(err);
+        }
       })
       .finally(() => {
         if (!controller.signal.aborted) setIsLoading(false);
@@ -102,8 +134,8 @@ export function useFetch<T>(url: string, options?: UseFetchOptions): UseFetchRes
   }, [url, tick, skip]);
 
   if (skip) {
-    return { data: null, isLoading: false, error: null, refetch };
+    return { data: null, isLoading: false, error: null, status: 'idle', refetch };
   }
 
-  return { data, isLoading, error, refetch };
+  return { data, isLoading, error, status: deriveStatus(isLoading, error, data), refetch };
 }

@@ -39,30 +39,48 @@
   letter-spacing: 0.08em;
 }
 
-.legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-  margin-bottom: var(--s-4);
-  padding-bottom: var(--s-4);
-  border-bottom: 1px dashed var(--border-faint);
-}
-
-.legendItem {
-  display: flex;
+.sectionMetaGroup {
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-family: 'Space Mono', monospace;
-  font-size: 9px;
-  color: var(--text-muted);
+  gap: var(--s-2);
 }
 
-.legendDot {
-  width: 8px;
-  height: 8px;
+/* Sibling idiom to shopify/LiveBadge — that badge is commerce-token-bound
+   and hardcodes "Live" with a pulse; this is its static, non-animated
+   opposite. A third occurrence of this pill+dot pattern should be
+   extracted into a shared component. */
+.staticBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-faint);
+  border-radius: var(--radius-sm);
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--status-warn);
+}
+
+.staticBadgeDot {
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
+  background: var(--status-warn);
   flex-shrink: 0;
 }
+
+.staticCaption {
+  font-family: 'Space Mono', monospace;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0 0 var(--s-3);
+}
+
+/* Legend styles live in FundFlowLegend.module.css, beside the component
+   that owns them. */
 
 .canvasWrap {
   overflow-x: auto;

@@ -21,7 +21,7 @@ import { SRC_DIR, findCssFiles, findFiles, relPath } from './sourceFiles.test-he
 const LAYOUT_ROOT_SELECTORS: Record<string, string[]> = {
   'components/AppLayout.module.css': ['.app', '.main', '.content'],
   'dashboard/Dashboard.module.css': ['.page', '.row'],
-  'components/DomainPage.module.css': ['.page', '.section'],
+  'components/DomainPage/DomainPage.module.css': ['.page', '.section'],
   'chat/ChatPanel.module.css': ['.panel'],
 };
 
@@ -88,8 +88,12 @@ function findI2Violations(): string[] {
 // Per-selector block parse, not per-file. .row2 is intentionally absent —
 // it was deleted, not hardened.
 const MIN_WIDTH_ZERO_TARGETS: Record<string, string[]> = {
-  'dashboard/Dashboard.module.css': ['.rowText', '.tickMsg', '.notifBody', '.notifTitle', '.notifDetail', '.eventTitle'],
-  'components/DomainPage.module.css': ['.agentName', '.appName', '.appDesc', '.feedMsg'],
+  'dashboard/Dashboard.module.css': ['.rowText', '.tickMsg', '.eventTitle'],
+  'components/DomainPage/DomainPage.module.css': ['.agentName', '.appName', '.appDesc', '.feedMsg'],
+  // Notification row styling (pin/body/title/detail) was extracted to a
+  // shared component (FEAT-152) so NotificationsPanel and the dashboard
+  // widget can't drift apart — the min-width:0 guarantee moved with it.
+  'notifications/NotificationRow.module.css': ['.body', '.title', '.detail'],
 };
 
 function findI3Violations(): string[] {

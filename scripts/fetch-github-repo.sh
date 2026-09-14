@@ -275,12 +275,24 @@ PYEOF
   log "Registry updated: .claude/github-repos.json"
 fi
 
-# ── Sync skills to DB (best-effort — non-fatal if DB not reachable) ───────────
+# ── Regenerate skills manifest (must run AFTER the registry write above so new
+# skills map to the right source_repo) then sync to DB (best-effort — non-fatal) ──
 if [ "$CHANGED" -eq 1 ] && [ "$DRY_RUN" != "--dry-run" ]; then
+  GEN_MANIFEST="$REPO_ROOT/backend/scripts/generate_skills_manifest.py"
   REGISTER_SCRIPT="$REPO_ROOT/backend/scripts/register_skills.py"
+  if [ -f "$GEN_MANIFEST" ]; then
+    log "Regenerating skills manifest..."
+    (cd "$REPO_ROOT/backend" && python3 -m scripts.generate_skills_manifest \
+        --skills-dir "$REPO_ROOT/.claude/skills" \
+        --registry "$REPO_ROOT/.claude/github-repos.json" \
+        --out "$REPO_ROOT/backend/data/skills_manifest.json" 2>&1) \
+      && log "Manifest regenerated" \
+      || log "WARNING: manifest regeneration failed (non-fatal)"
+  fi
   if [ -f "$REGISTER_SCRIPT" ]; then
     log "Syncing skills to DB via register_skills.py..."
-    (cd "$REPO_ROOT/backend" && DATABASE_URL="${DATABASE_URL:-}" PYTHONPATH=. python3 "$REGISTER_SCRIPT" 2>&1) \
+    (cd "$REPO_ROOT/backend" && DATABASE_URL="${DATABASE_URL:-}" PYTHONPATH=. python3 "$REGISTER_SCRIPT" \
+        --skills-dir "$REPO_ROOT/.claude/skills" --registry "$REPO_ROOT/.claude/github-repos.json" 2>&1) \
       && log "Skills DB sync complete" \
       || log "WARNING: skills DB sync failed (non-fatal — skills will sync on next app start)"
   fi
@@ -289,7 +301,7 @@ fi
 # ── Commit if changed ──────────────────────────────────────────────────────────
 if [ "$CHANGED" -eq 1 ] && [ "$DRY_RUN" != "--dry-run" ]; then
   cd "$REPO_ROOT"
-  git add .claude/github-repos.json .claude/skills/ backend/src/agents/ backend/src/commands/ backend/src/hooks/ 2>/dev/null || true
+  git add .claude/github-repos.json .claude/skills/ backend/src/agents/ backend/src/commands/ backend/src/hooks/ backend/data/skills_manifest.json 2>/dev/null || true
   git diff --cached --quiet && log "Nothing new to commit" || {
     git commit -m "Integrated external repo: $REPO_NAME on $FETCH_DATE_SHORT
 

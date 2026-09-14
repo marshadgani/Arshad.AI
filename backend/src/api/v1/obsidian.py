@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -15,11 +14,16 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...auth.dependencies import get_current_user
-from ...models.dag_trigger import DagTriggerQueue
 from ...models.database import get_db
 from ...models.obsidian import IngestedObsidianNote
 from ...models.user import User
+from ...services.ingestion import sync_jobs
+from ...services.ingestion.enqueue import EnqueueRaceError, enqueue_dag_job
 from ...tools.base import ToolError
+
+# The vault's DAG id, named once so the enqueue below and the status poll
+# that must find its row can never drift apart.
+_OBSIDIAN_DAG_ID = "obsidian_ingestor"
 
 router = APIRouter(
     prefix="/api/v1/obsidian",
@@ -43,17 +47,22 @@ async def trigger_sync(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    job = DagTriggerQueue(
-        id=uuid.uuid4(),
-        dag_id="obsidian_ingestor",
-        user_id=user.id,
-        payload={},
-        status="pending",
-        requested_at=datetime.now(timezone.utc),
-    )
-    db.add(job)
-    await db.commit()
-    return {"data": {"job_id": str(job.id), "status": "pending"}}
+    # Goes through enqueue_dag_job rather than inserting directly: the
+    # uq_dag_trigger_queue_user_dag_inflight partial unique index (FEAT-144)
+    # makes a second INSERT while a vault sync is already pending/picked
+    # raise IntegrityError, which unhandled would be a 500 with a raw SQL
+    # message. Reusing the in-flight job is also the honest answer here.
+    try:
+        job = await enqueue_dag_job(
+            db, dag_id=_OBSIDIAN_DAG_ID, user_id=user.id, payload={}
+        )
+    except EnqueueRaceError as exc:
+        raise _err(
+            status.HTTP_409_CONFLICT,
+            "sync_race_retry",
+            "A vault sync conflicted with another in-flight sync; please retry.",
+        ) from exc
+    return {"data": {"job_id": job.job_id, "status": job.status}}
 
 
 @router.get("/sync/status", summary="Latest sync job status")
@@ -61,24 +70,15 @@ async def sync_status(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    row = await db.scalar(
-        select(DagTriggerQueue)
-        .where(
-            DagTriggerQueue.user_id == user.id,
-            DagTriggerQueue.dag_id == "obsidian_ingestor",
-        )
-        .order_by(DagTriggerQueue.requested_at.desc())
-        .limit(1)
-    )
-    if row is None:
+    view = await sync_jobs.job_status_view(db, user_id=user.id, dag_id=_OBSIDIAN_DAG_ID)
+    if view is None:
         return {"data": None}
     return {
         "data": {
-            "job_id": str(row.id),
-            "status": row.status,
-            "requested_at": row.requested_at.isoformat() if row.requested_at else None,
-            "completed_at": row.completed_at.isoformat() if row.completed_at else None,
-            "error": row.error_text,
+            **view,
+            # Legacy key kept verbatim (FEAT-144 H4) — this endpoint's
+            # existing frontend caller reads `error`, not `error_text`.
+            "error": view["error_text"],
         }
     }
 
@@ -148,7 +148,7 @@ async def list_notes(
 
     if tags:
         for tag in (t.strip() for t in tags.split(",") if t.strip()):
-            # json.dumps handles escaping; sa_cast gives Postgres the correct JSONB type.
+            # json.dumps escapes the tag; sa_cast gives Postgres a JSONB operand.
             stmt = stmt.where(
                 IngestedObsidianNote.tags.op("@>")(sa_cast(json.dumps([tag]), JSONB))
             )

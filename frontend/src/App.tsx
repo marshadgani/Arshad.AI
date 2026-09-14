@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-route
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import AppLayout from './components/AppLayout';
 import AuthCallback from './pages/AuthCallback';
+import ActivityLog from './pages/ActivityLog';
 import AiEcosystem from './pages/AiEcosystem';
 import Chat from './pages/Chat';
 import Obsidian from './pages/Obsidian';
@@ -10,9 +11,11 @@ import Dashboard from './dashboard/Dashboard';
 import HealthFitness from './pages/HealthFitness';
 import HomeIoT from './pages/HomeIoT';
 import Integrations from './pages/Integrations';
+import { ACTIVITY_LOG_PATH, INTEGRATIONS_PATH, SETTINGS_PATH } from './routes';
 import Learning from './pages/Learning';
 import Login from './pages/Login';
 import PersonalFinance from './pages/PersonalFinance';
+import Settings from './pages/Settings';
 import ShopifyStore from './pages/ShopifyStore';
 import StockMarket from './pages/StockMarket';
 import Travel from './pages/Travel';
@@ -52,7 +55,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
   }
 }
 
-function ProtectedRoutes() {
+export function ProtectedRoutes() {
   const { token, user, isLoading } = useAuth();
   const location = useLocation();
 
@@ -76,9 +79,11 @@ function ProtectedRoutes() {
         <Route path="/learning"           element={<Learning />} />
         <Route path="/home-iot"           element={<HomeIoT />} />
         <Route path="/travel"             element={<Travel />} />
-        <Route path="/integrations"       element={<Integrations />} />
+        <Route path={INTEGRATIONS_PATH}   element={<Integrations />} />
         <Route path="/ai-ecosystem"       element={<AiEcosystem />} />
         <Route path="/obsidian"           element={<Obsidian />} />
+        <Route path={SETTINGS_PATH}       element={<Settings />} />
+        <Route path={ACTIVITY_LOG_PATH}   element={<ActivityLog />} />
         <Route path="*"                   element={<Navigate to="/" replace />} />
       </Routes>
     </AppLayout>

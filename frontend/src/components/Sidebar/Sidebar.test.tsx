@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import { vi } from 'vitest';
 
 import Sidebar from './Sidebar';
+import { ACTIVITY_LOG_PATH, INTEGRATIONS_PATH, SETTINGS_PATH } from '../routes';
 import { setViewport } from '../setupTests';
 
 function mockNavFetch() {
@@ -35,6 +36,19 @@ function renderSidebar(
 describe('Sidebar', () => {
   beforeEach(() => {
     mockNavFetch();
+  });
+
+  // FEAT-153 regression guard: Settings and Activity log shipped for months as
+  // `href="#"` placeholders that looked clickable and went nowhere. Assert the
+  // rendered hrefs, not just the labels — a link reverted to "#" still renders
+  // its label and would slip past a text-only assertion.
+  it.each([
+    ['Integrations', INTEGRATIONS_PATH],
+    ['Settings', SETTINGS_PATH],
+    ['Activity log', ACTIVITY_LOG_PATH],
+  ])('points the %s account link at a real route', (label, path) => {
+    renderSidebar(true, false);
+    expect(screen.getByRole('link', { name: label })).toHaveAttribute('href', path);
   });
 
   it('renders nav items from mocked /api/v1/nav', async () => {

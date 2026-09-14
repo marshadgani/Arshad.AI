@@ -20,7 +20,7 @@
 ## What's next
 
 - **Merge audit fixes to main**: The 4 defect fixes need to flow to `claude/ai-personal-assistant-main`. Run "Merge to Main" trigger when ready (per CLAUDE.md §20 — full 6-agent gate panel, NOT skip).
-- **Configure prod env vars on Render**: confirm `ANTHROPIC_API_KEY`, set `ENABLE_INPROCESS_WORKER=true`.
+- **BLOCKING — Configure prod env vars on Render**: confirm `ANTHROPIC_API_KEY`, set `ENABLE_INPROCESS_WORKER=true`. Without this, google_calendar/gmail/github/obsidian "Sync now" enqueues a job and reports 200 but nothing ever processes it (FEAT-144). Verify via Render MCP: `list_logs` should show `queue worker started poll_interval=` and must NOT show the `ENABLE_INPROCESS_WORKER is not set or false` WARNING.
 - **Smoke-test live chat**: visit Vercel URL, send "what's on my calendar this week?", confirm SSE intent → tool-call → streaming text.
 - **Smoke-test ingestion**: `POST /api/v1/agents/data_pipeline/calendar_ingestor/run` → poll `/runs/{id}` → expect `completed`.
 - **Post-MVP backlog**: test infrastructure (real pytest + RTL coverage), RAG over `ingested_*` tables, multi-modal chat, per-session system prompts, cost-tracking dashboard.
@@ -31,6 +31,7 @@
 - **Squash-divergence cycle:** every "Merge to Main" run needs Step 0 (`git merge origin/main --strategy=ours`) before the auto-pr workflow squash-merges cleanly. Automated inside `/gate` per CLAUDE.md §20.
 - **6-agent gate panel, no exceptions** for any merge to main.
 - **Render Airflow**: Render doesn't host Airflow. Set `ENABLE_INPROCESS_WORKER=true` on Render. Don't enable both Airflow + in-process on the same DB — `SKIP LOCKED` makes it safe-but-wasteful.
+- **FEAT-144 (honest sync state)**: `POST /api/v1/integrations/{slug}/sync` now returns `mode: 'enqueued'|'completed'` + `job_id`; DAG-backed providers (google_calendar, gmail, github) poll `GET /api/v1/integrations/{slug}/sync/status?job_id=...`. The frontend Integrations page shows "Syncing…"/"Retrying…" and a persistent stalled banner instead of a false immediate "Synced" toast. `last_synced_at`/`last_error` are now written only by `services/ingestion/sync_completion.finalize_sync()` after real ingestion completes — not at enqueue time.
 
 ## Open questions
 

@@ -11,7 +11,9 @@ POST   /api/v1/integrations/{slug}/sync
        Triggers a sync. Returns {rows_written, summary, duration_ms}.
 
 POST   /api/v1/integrations/{slug}/disconnect
-       Marks integration disconnected; revokes upstream where possible.
+       Revokes the upstream credential where the provider supports it;
+       deletes local credential rows for every provider; marks the
+       integration disconnected (FEAT-145).
 
 GET    /api/v1/integrations/{slug}/status
        Returns the latest status snapshot.
@@ -20,7 +22,7 @@ GET    /api/v1/integrations/{slug}/status
 from __future__ import annotations
 
 import logging
-import os
+import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query, Request, status
@@ -32,17 +34,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..api.errors import http_error
 from ..auth.dependencies import get_current_user
+from ..config.urls import frontend_url
 from ..models.database import get_db
 from ..models.integration import Integration
 from ..models.user import User
+from ..services.ingestion import sync_jobs
+from .authz import project_disconnect_decision
 from .base import IntegrationError, IntegrationProvider
 from .registry import INTEGRATION_REGISTRY, get_provider
 
 _log = logging.getLogger(__name__)
-
-
-def _frontend_url_env() -> str:
-    return os.getenv("FRONTEND_URL", "http://localhost:3000").rstrip("/")
 
 
 router = APIRouter(prefix="/api/v1/integrations", tags=["integrations"])
@@ -60,6 +61,11 @@ def _provider_descriptor(p: IntegrationProvider) -> dict[str, Any]:
         "coming_soon": p.coming_soon,
         "coming_soon_reason": p.coming_soon_reason,
         "connect_prompt": p.connect_prompt,
+        # FEAT-145: lets the frontend pick the right pre-disconnect confirm
+        # copy ("will be revoked" vs "no revoke API" vs "your sign-in is
+        # unaffected") instead of one blanket promise that wasn't true for
+        # 24 of 25 providers.
+        "revocation_kind": p.revocation_kind,
     }
 
 
@@ -79,6 +85,25 @@ def _require_provider(slug: str) -> IntegrationProvider:
     return provider
 
 
+def _parse_job_id(raw: str | None) -> uuid.UUID | None:
+    """Validate the optional ?job_id= query param.
+
+    Request-shape validation stays in the HTTP layer; the queue service
+    takes a real UUID or nothing. An empty/absent value means "latest job
+    for this user+provider", not an error.
+    """
+    if not raw:
+        return None
+    try:
+        return uuid.UUID(raw)
+    except ValueError as exc:
+        raise http_error(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "invalid_job_id",
+            "job_id must be a UUID.",
+        ) from exc
+
+
 async def _find_user_integration(
     slug: str, user: User, db: AsyncSession
 ) -> Integration | None:
@@ -93,6 +118,35 @@ async def _find_user_integration(
             (Integration.user_id == user.id) | (Integration.user_id.is_(None)),
         )
     )
+
+
+async def _find_user_integration_for_disconnect(
+    slug: str, user: User, db: AsyncSession
+) -> Integration | None:
+    """FEAT-145: same lookup as _find_user_integration, plus the admin gate
+    on project-scoped rows — the one place the permissive `user_id IS NULL`
+    match became dangerous the moment disconnect() started actually
+    deleting credential rows (previously it only flipped a status flag, so
+    any authenticated user hitting a shared project_apikey integration was
+    cosmetic at worst).
+
+    Personal integrations: unchanged, user_id == user.id only. Project
+    integrations: the decision belongs to integrations/authz.py; this
+    function only translates a 'denied' decision into the HTTP contract.
+    """
+    integration = await _find_user_integration(slug, user, db)
+    if integration is None or integration.user_id is not None:
+        return integration
+
+    decision = project_disconnect_decision(slug=slug, user_id=user.id, email=user.email)
+    if decision == "denied":
+        raise http_error(
+            status.HTTP_403_FORBIDDEN,
+            "project_integration_admin_required",
+            f"Disconnecting '{slug}' requires admin access — it is shared "
+            "deployment infrastructure, not a personal credential.",
+        )
+    return integration
 
 
 @router.get("", summary="List integrations + per-user status")
@@ -120,13 +174,19 @@ async def list_integrations(
                 meta["last_synced_at"] = report.last_synced_at
                 meta["last_error"] = report.last_error
                 meta["extra"] = report.extra
-            except Exception as exc:  # noqa: BLE001 — one bad provider must not blank the list
+            except Exception:  # noqa: BLE001 — one bad provider must not blank the list
+                # Full exception (type, message, traceback) is logged
+                # server-side for debugging. The client only ever gets a
+                # generic message — provider.status() can raise SQLAlchemy/
+                # asyncpg errors that embed connection strings or other
+                # internals, and .claude/rules/api.md forbids exposing
+                # those to the client.
                 _log.exception(
                     "provider.status() raised for %s during list_integrations",
                     provider.slug,
                 )
                 meta["status"] = "error"
-                meta["last_error"] = f"{type(exc).__name__}: {exc}"
+                meta["last_error"] = "Status check failed. See server logs."
                 meta["extra"] = {}
         else:
             meta["status"] = "disconnected"
@@ -183,8 +243,55 @@ async def sync_integration(
             "rows_written": result.rows_written,
             "summary": result.summary,
             "duration_ms": result.duration_ms,
+            # FEAT-144: mode discriminates an honest "queued, not done yet"
+            # (DAG-backed providers) from "actually completed" (everything
+            # else) — see .claude/rules/api.md's documented-deviation note
+            # for why this project prefers an explicit discriminator field
+            # over inventing a new HTTP status for "accepted but pending".
+            "mode": result.mode,
+            "job_id": result.job_id,
         }
     }
+
+
+@router.get("/{slug}/sync/status", summary="Poll a DAG-backed sync job")
+async def sync_job_status(
+    slug: str,
+    job_id: str | None = Query(None),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Poll the status of a background sync job enqueued by POST /sync.
+
+    409 (not 401/404-for-capability) for "this provider doesn't work this
+    way" mirrors the documented Whoop/Shopify deviation in
+    .claude/rules/api.md: the resource's current state (a synchronous
+    provider has no job to poll) conflicts with the request, which is what
+    409 means.
+    """
+    provider = _require_provider(slug)
+    if provider.sync_dag_id is None:
+        raise http_error(
+            status.HTTP_409_CONFLICT,
+            "sync_not_pollable",
+            f"'{slug}' syncs synchronously and has no background job to poll.",
+        )
+
+    # sync_jobs owns the user_id+dag_id scoping (another user's job_id is a
+    # miss, not a leak); this handler only maps "no such job" onto 404.
+    view = await sync_jobs.job_status_view(
+        db,
+        user_id=user.id,
+        dag_id=provider.sync_dag_id,
+        job_id=_parse_job_id(job_id),
+    )
+    if view is None:
+        raise http_error(
+            status.HTTP_404_NOT_FOUND,
+            "sync_job_not_found",
+            f"No sync job found for '{slug}'.",
+        )
+    return {"data": view}
 
 
 @router.post("/{slug}/disconnect", summary="Disconnect integration")
@@ -194,11 +301,21 @@ async def disconnect_integration(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     provider = _require_provider(slug)
-    integration = await _find_user_integration(slug, user, db)
+    integration = await _find_user_integration_for_disconnect(slug, user, db)
     if integration is None:
-        return {"data": {"status": "already_disconnected"}}
-    await provider.disconnect(integration=integration, db=db)
-    return {"data": {"status": "disconnected"}}
+        return {
+            "data": {
+                "status": "already_disconnected",
+                "upstream_revocation": "unsupported",
+            }
+        }
+    outcome = await provider.disconnect(integration=integration, db=db)
+    return {
+        "data": {
+            "status": outcome.status,
+            "upstream_revocation": outcome.upstream_revocation,
+        }
+    }
 
 
 @router.get("/{slug}/status", summary="Get latest status")
@@ -265,7 +382,7 @@ async def oauth_callback(
         upsert_oauth_integration,
     )
 
-    frontend = _frontend_url_env()
+    frontend = frontend_url()
 
     if error:
         return RedirectResponse(

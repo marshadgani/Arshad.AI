@@ -1,23 +1,20 @@
 import { useRef } from 'react';
-import { NavLink } from 'react-router-dom';
 
-import Scrim from './Scrim';
-import type { NavItem } from '../data/mockData';
-import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
-import { useEscapeKey } from '../hooks/useEscapeKey';
-import { useFetch } from '../hooks/useFetch';
-import { useFocusReturn } from '../hooks/useFocusReturn';
-import { useOnRouteChange } from '../hooks/useOnRouteChange';
+import Scrim from '../Scrim';
+import SidebarNavList from './SidebarNavList';
+import { ACCOUNT_NAV_ITEMS } from './accountNav';
+import type { NavItem } from '../../data/mockData';
+import { useBodyScrollLock } from '../../hooks/useBodyScrollLock';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
+import { useFetch } from '../../hooks/useFetch';
+import { useFocusReturn } from '../../hooks/useFocusReturn';
+import { useOnRouteChange } from '../../hooks/useOnRouteChange';
 import styles from './Sidebar.module.css';
 
 export interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
   overlayMode: boolean;
-}
-
-function navItemClass({ isActive }: { isActive: boolean }): string {
-  return isActive ? `${styles.item} ${styles.itemActive}` : styles.item;
 }
 
 export default function Sidebar({ isOpen, onClose, overlayMode }: SidebarProps) {
@@ -78,22 +75,13 @@ export default function Sidebar({ isOpen, onClose, overlayMode }: SidebarProps) 
               Navigation failed to load.
             </div>
           ) : (
-            (navItems ?? []).map((n) => (
-              <NavLink key={n.to} to={n.to} end={n.to === '/'} className={navItemClass}>
-                <span className={styles.icon}>{n.icon}</span>
-                <span>{n.label}</span>
-              </NavLink>
-            ))
+            <SidebarNavList items={navItems ?? []} />
           )}
         </div>
 
         <div className={styles.section}>
           <div className={styles.label}>Account</div>
-          <a className={styles.item} href="#"><span className={styles.icon}>⚙</span>Settings</a>
-          <NavLink to="/integrations" className={navItemClass}>
-            <span className={styles.icon}>⌗</span>Integrations
-          </NavLink>
-          <a className={styles.item} href="#"><span className={styles.icon}>📜</span>Activity log</a>
+          <SidebarNavList items={ACCOUNT_NAV_ITEMS} />
         </div>
 
         <div className={styles.footer}>

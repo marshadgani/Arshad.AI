@@ -7,8 +7,8 @@ from typing import Any
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...models.dag_trigger import DagTriggerQueue
 from ...models.user import User
+from ...services.ingestion.enqueue import enqueue_dag_job
 from ..base import Agent
 from ..registry import register
 
@@ -45,25 +45,29 @@ class AnalyticsProcessorAgent(Agent):
         self, *, user: User, db: AsyncSession, payload: BaseModel
     ) -> AnalyticsProcessorOutput:
         assert isinstance(payload, AnalyticsProcessorInput)
-        row = DagTriggerQueue(
+        # enqueue_dag_job, not a bare INSERT: uq_dag_trigger_queue_user_
+        # dag_inflight (FEAT-144) makes a second row for the same
+        # (user_id, dag_id) while one is pending/picked raise
+        # IntegrityError. Reusing the in-flight run is the right answer
+        # here anyway — two identical ingestions would double-call the
+        # provider API.
+        job = await enqueue_dag_job(
+            db,
             dag_id="analytics_processor",
             user_id=user.id,
             payload=payload.model_dump(),
-            status="pending",
         )
-        db.add(row)
-        await db.commit()
         return AnalyticsProcessorOutput(
             data={
-                "run_id": str(row.id),
-                "status": row.status,
-                "dag_id": row.dag_id,
+                "run_id": job.job_id,
+                "status": job.status,
+                "dag_id": "analytics_processor",
                 "window_days": payload.window_days,
             },
             summary=AnalyticsProcessorSummary(
-                run_id=str(row.id),
-                status=row.status,
-                dag_id=row.dag_id,
+                run_id=job.job_id,
+                status=job.status,
+                dag_id="analytics_processor",
                 window_days=payload.window_days,
             ),
         )

@@ -19,12 +19,12 @@ import uuid
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from fastapi.testclient import TestClient
-
 import src.integrations.routers as routers_module
+from fastapi.testclient import TestClient
 from src.auth.dependencies import get_current_user
 from src.integrations.base import (
     ConnectResult,
+    DisconnectOutcome,
     IntegrationError,
     IntegrationProvider,
     StatusReport,
@@ -41,6 +41,7 @@ USER_ID = uuid.uuid4()
 
 class _FakeUser:
     id = USER_ID
+    email = "user@example.com"
 
 
 class _FakeIntegration:
@@ -92,7 +93,11 @@ class _FakeProvider(IntegrationProvider):
                 extra={},
             )
         )
-        self.disconnect = AsyncMock(return_value=None)
+        self.disconnect = AsyncMock(
+            return_value=DisconnectOutcome(
+                status="disconnected", upstream_revocation="unsupported"
+            )
+        )
 
 
 def _make_db(scalars_rows=None, scalar_value=None):
@@ -222,7 +227,10 @@ def test_list_integrations_provider_status_raises_sets_error_not_500(
     assert resp.status_code == 200
     item = resp.json()["data"][0]
     assert item["status"] == "error"
-    assert "RuntimeError" in item["last_error"]
+    # last_error is set, but generically: .claude/rules/api.md forbids leaking
+    # exception types or internals (DB errors can embed connection strings).
+    assert item["last_error"] == "Status check failed. See server logs."
+    assert "RuntimeError" not in item["last_error"]
     assert item["extra"] == {}
 
     app.dependency_overrides.clear()
@@ -316,6 +324,107 @@ def test_disconnect_when_connected_calls_provider_disconnect_and_returns_disconn
     provider, monkeypatch
 ):
     integration = _FakeIntegration()
+    db = _make_db(scalar_value=integration)
+    tc = _client_with_db(provider, db, monkeypatch)
+
+    resp = tc.post("/api/v1/integrations/test-provider/disconnect")
+
+    assert resp.status_code == 200
+    assert resp.json()["data"]["status"] == "disconnected"
+    provider.disconnect.assert_awaited_once()
+
+    app.dependency_overrides.clear()
+
+
+# ── POST /disconnect — project-scoped admin gate (FEAT-145) ───────────────
+#
+# _find_user_integration_for_disconnect() enforces integrations/authz.py's
+# project_disconnect_decision() for any integration row with user_id IS
+# NULL (shared deployment infra, not a personal credential) — now that
+# disconnect() genuinely deletes credential rows, not just flips a status
+# flag. These pin the router-level wiring of that gate; authz.py's own
+# decision matrix (allowed/unguarded/denied) is unit-tested directly in
+# test_integration_disconnect_authz.py.
+
+
+def test_disconnect_project_scoped_denied_returns_403_and_skips_provider(
+    provider, monkeypatch
+):
+    from src.integrations.authz import ADMIN_EMAILS_ENV, ADMIN_USER_IDS_ENV
+
+    monkeypatch.setenv(ADMIN_EMAILS_ENV, "admin@example.com")
+    monkeypatch.setenv(ADMIN_USER_IDS_ENV, "")
+
+    integration = _FakeIntegration()
+    integration.user_id = None  # project-scoped: shared infra, not personal
+    db = _make_db(scalar_value=integration)
+    tc = _client_with_db(provider, db, monkeypatch)
+
+    resp = tc.post("/api/v1/integrations/test-provider/disconnect")
+
+    assert resp.status_code == 403
+    assert resp.json()["error"]["code"] == "project_integration_admin_required"
+    provider.disconnect.assert_not_awaited()
+
+    app.dependency_overrides.clear()
+
+
+def test_disconnect_project_scoped_allowed_for_configured_admin(provider, monkeypatch):
+    from src.integrations.authz import ADMIN_EMAILS_ENV, ADMIN_USER_IDS_ENV
+
+    monkeypatch.setenv(ADMIN_EMAILS_ENV, "")
+    monkeypatch.setenv(ADMIN_USER_IDS_ENV, str(USER_ID))
+
+    integration = _FakeIntegration()
+    integration.user_id = None
+    db = _make_db(scalar_value=integration)
+    tc = _client_with_db(provider, db, monkeypatch)
+
+    resp = tc.post("/api/v1/integrations/test-provider/disconnect")
+
+    assert resp.status_code == 200
+    assert resp.json()["data"]["status"] == "disconnected"
+    provider.disconnect.assert_awaited_once()
+
+    app.dependency_overrides.clear()
+
+
+def test_disconnect_project_scoped_unguarded_still_succeeds_when_no_admins_configured(
+    provider, monkeypatch
+):
+    """Documents the fail-open default (DECISION.md §2): with neither env
+    var set, a project-scoped disconnect proceeds rather than 403ing every
+    caller — the WARNING-level audit trail for this is covered by
+    test_integration_disconnect_authz.py's unguarded test."""
+    from src.integrations.authz import ADMIN_EMAILS_ENV, ADMIN_USER_IDS_ENV
+
+    monkeypatch.setenv(ADMIN_EMAILS_ENV, "")
+    monkeypatch.setenv(ADMIN_USER_IDS_ENV, "")
+
+    integration = _FakeIntegration()
+    integration.user_id = None
+    db = _make_db(scalar_value=integration)
+    tc = _client_with_db(provider, db, monkeypatch)
+
+    resp = tc.post("/api/v1/integrations/test-provider/disconnect")
+
+    assert resp.status_code == 200
+    provider.disconnect.assert_awaited_once()
+
+    app.dependency_overrides.clear()
+
+
+def test_disconnect_personal_scoped_never_consults_authz_gate(provider, monkeypatch):
+    """A personal integration (user_id == the caller) must never be routed
+    through the admin gate, even when no admins are configured — asserting
+    this pins that _find_user_integration_for_disconnect only applies
+    project_disconnect_decision to user_id IS NULL rows."""
+    from src.integrations.authz import ADMIN_EMAILS_ENV, ADMIN_USER_IDS_ENV
+
+    monkeypatch.setenv(ADMIN_EMAILS_ENV, "someone-else@example.com")
+    monkeypatch.setenv(ADMIN_USER_IDS_ENV, "")
+
+    integration = _FakeIntegration()  # user_id == USER_ID (personal)
     db = _make_db(scalar_value=integration)
     tc = _client_with_db(provider, db, monkeypatch)
 

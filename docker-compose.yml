@@ -45,8 +45,10 @@ services:
       - ./backend/alembic:/app/alembic
       - ./backend/alembic.ini:/app/alembic.ini
       - ./backend/scripts:/app/scripts
+      - ./.claude/skills:/app/.claude/skills:ro
+      - ./.claude/github-repos.json:/app/.claude/github-repos.json:ro
     command: >
-      bash -c "alembic upgrade head && python -m scripts.seed_from_mock"
+      bash -c "alembic upgrade head && python -m scripts.seed_from_mock && python -m scripts.register_skills --skills-dir /app/.claude/skills --registry /app/.claude/github-repos.json"
     restart: "no"
 
   backend:

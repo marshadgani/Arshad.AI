@@ -1,0 +1,47 @@
+.capture {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-faint);
+  border-radius: var(--radius-md);
+  padding: var(--s-2) var(--s-3);
+  transition: border-color 120ms, box-shadow 120ms;
+  max-width: 720px;
+}
+.capture:focus-within {
+  border-color: var(--accent);
+  box-shadow: var(--glow-cyan-soft);
+}
+
+.captureIcon { color: var(--accent); font-family: var(--font-mono); }
+
+.captureInput {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+.captureInput::placeholder { color: var(--text-muted); }
+
+.kbd {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  background: var(--bg-deep);
+  border: 1px solid var(--border-faint);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+}
+
+/* breakpoints.ts: mobile — the capture bar is hidden on small screens;
+   the ChatLauncher is the mobile entry point to the same destination. */
+@media (max-width: 767.98px) {
+  .capture,
+  .kbd {
+    display: none;
+  }
+}

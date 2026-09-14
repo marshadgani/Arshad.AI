@@ -40,6 +40,9 @@ class YouTubeIntegration(IntegrationProvider):
     description = "Subscriptions, channel info, recent uploads."
     docs_url = "https://developers.google.com/youtube/v3"
     icon = "youtube"
+    # FEAT-145: no integration_oauth_tokens row — shares the login-time
+    # Google grant (see integrations/DECISION.md §1).
+    revocation_kind = "no_credential"
 
     async def connect(
         self, *, user: User | None, db: AsyncSession, payload: dict[str, Any]

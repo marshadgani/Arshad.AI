@@ -1,0 +1,206 @@
+.wrap {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-modal);
+}
+
+.dialog {
+  position: relative;
+  width: 440px;
+  max-width: 90vw;
+  background: linear-gradient(160deg, var(--bg-elevated) 0%, var(--bg-panel) 100%);
+  border: 1px solid var(--border-strong);
+  border-left-width: 4px;
+  border-radius: var(--radius-lg);
+  padding: var(--s-6);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+  animation: dialogIn 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes dialogIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 0.2rem var(--s-2);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--s-3);
+}
+
+.badge.danger {
+  color: var(--status-danger);
+  background: rgba(255, 77, 109, 0.12);
+  border: 1px solid var(--status-danger);
+}
+
+.badge.warn {
+  color: var(--status-warn);
+  background: rgba(245, 166, 35, 0.12);
+  border: 1px solid var(--status-warn);
+}
+
+.badge.neutral {
+  color: var(--status-neutral);
+  background: rgba(139, 156, 186, 0.12);
+  border: 1px solid var(--status-neutral);
+}
+
+.dialog.danger {
+  border-left-color: var(--status-danger);
+}
+
+.dialog.warn {
+  border-left-color: var(--status-warn);
+}
+
+.dialog.neutral {
+  border-left-color: var(--status-neutral);
+}
+
+.title {
+  margin: 0 0 var(--s-2);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.15rem;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.body {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.errorBanner {
+  margin-top: var(--s-4);
+  font-size: 0.8rem;
+  background: rgba(255, 77, 109, 0.1);
+  border: 1px solid var(--status-danger);
+  color: var(--status-danger);
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--radius-sm);
+  line-height: 1.45;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--s-2);
+  margin-top: var(--s-6);
+}
+
+.actions button {
+  appearance: none;
+  padding: var(--s-2) var(--s-4);
+  border-radius: var(--radius-md);
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--border-strong);
+  transition: border-color 150ms ease, box-shadow 150ms ease, transform 100ms ease;
+}
+
+.actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.actions button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.cancel {
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.cancel:hover:not(:disabled) {
+  border-color: var(--accent-soft);
+  color: var(--text-primary);
+}
+
+.confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  color: var(--bg-deep);
+}
+
+.confirm.danger {
+  background: var(--status-danger);
+  border-color: var(--status-danger);
+}
+
+.confirm.danger:hover:not(:disabled) {
+  box-shadow: 0 0 18px rgba(255, 77, 109, 0.4);
+  transform: translateY(-1px);
+}
+
+.confirm.warn {
+  background: var(--status-warn);
+  border-color: var(--status-warn);
+}
+
+.confirm.warn:hover:not(:disabled) {
+  box-shadow: 0 0 18px rgba(245, 166, 35, 0.4);
+  transform: translateY(-1px);
+}
+
+.confirm.neutral {
+  background: var(--status-neutral);
+  border-color: var(--status-neutral);
+}
+
+.confirm.neutral:hover:not(:disabled) {
+  box-shadow: 0 0 18px rgba(139, 156, 186, 0.4);
+  transform: translateY(-1px);
+}
+
+.spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid rgba(5, 8, 17, 0.35);
+  border-top-color: var(--bg-deep);
+  animation: spin 700ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dialog {
+    animation: none;
+  }
+  .spinner {
+    animation: none;
+  }
+  .confirm:hover:not(:disabled) {
+    transform: none;
+  }
+}

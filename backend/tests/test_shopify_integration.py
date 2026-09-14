@@ -11,7 +11,6 @@ import pytest
 from src.integrations.base import IntegrationError
 from src.integrations.personal.shopify import ShopifyIntegration, _shop_metadata_config
 
-
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
@@ -71,7 +70,9 @@ async def test_connect_raises_when_no_user():
     provider = ShopifyIntegration()
 
     with pytest.raises(IntegrationError) as exc_info:
-        await provider.connect(user=None, db=MagicMock(), payload={"shop": "test.myshopify.com"})
+        await provider.connect(
+            user=None, db=MagicMock(), payload={"shop": "test.myshopify.com"}
+        )
 
     assert exc_info.value.code == "auth_required"
 
@@ -87,7 +88,9 @@ async def test_connect_raises_integration_error_for_invalid_shop_domain(monkeypa
     monkeypatch.setenv("BACKEND_URL", "https://example.com")
 
     with pytest.raises((IntegrationError, Exception)):
-        await provider.connect(user=user, db=MagicMock(), payload={"shop": "not-a-shopify-domain"})
+        await provider.connect(
+            user=user, db=MagicMock(), payload={"shop": "not-a-shopify-domain"}
+        )
 
 
 @pytest.mark.asyncio
@@ -103,6 +106,7 @@ async def test_connect_returns_redirect_url_for_valid_shop(monkeypatch):
     # Patch where it is called (in the shopify module), not where defined.
     store_state = AsyncMock(return_value="random-state-token")
     import src.integrations.personal.shopify as shopify_mod
+
     monkeypatch.setattr(shopify_mod, "store_oauth_state", store_state)
 
     result = await provider.connect(
@@ -125,13 +129,15 @@ async def test_sync_updates_config_and_returns_zero_rows_written(monkeypatch):
 
     monkeypatch.setattr(provider, "get_access_token", AsyncMock(return_value="tok"))
 
-    import src.services.shopify.client as shopify_client_mod
     import src.services.shopify.cache as shopify_cache_mod
+    import src.services.shopify.client as shopify_client_mod
 
     monkeypatch.setattr(
         shopify_client_mod,
         "fetch_shop_metadata",
-        AsyncMock(return_value={"ianaTimezone": "UTC", "currencyCode": "USD", "name": "Test"}),
+        AsyncMock(
+            return_value={"ianaTimezone": "UTC", "currencyCode": "USD", "name": "Test"}
+        ),
     )
     monkeypatch.setattr(shopify_cache_mod, "del_dashboard_cache", AsyncMock())
 
@@ -151,8 +157,8 @@ async def test_sync_clears_dashboard_cache_after_metadata_update(monkeypatch):
 
     monkeypatch.setattr(provider, "get_access_token", AsyncMock(return_value="tok"))
 
-    import src.services.shopify.client as shopify_client_mod
     import src.services.shopify.cache as shopify_cache_mod
+    import src.services.shopify.client as shopify_client_mod
 
     monkeypatch.setattr(
         shopify_client_mod,
@@ -198,15 +204,13 @@ async def test_sync_metadata_fetch_failure_raises_integration_error_and_sets_err
 @pytest.mark.asyncio
 async def test_sync_summary_includes_shop_domain(monkeypatch):
     provider = ShopifyIntegration()
-    integration = _make_integration(
-        config={"shop_domain": "best-store.myshopify.com"}
-    )
+    integration = _make_integration(config={"shop_domain": "best-store.myshopify.com"})
     db = _make_db()
 
     monkeypatch.setattr(provider, "get_access_token", AsyncMock(return_value="tok"))
 
-    import src.services.shopify.client as shopify_client_mod
     import src.services.shopify.cache as shopify_cache_mod
+    import src.services.shopify.client as shopify_client_mod
 
     monkeypatch.setattr(
         shopify_client_mod,
@@ -217,6 +221,30 @@ async def test_sync_summary_includes_shop_domain(monkeypatch):
 
     result = await provider.sync(integration=integration, db=db)
 
+    assert "best-store.myshopify.com" in result.summary
+
+
+@pytest.mark.asyncio
+async def test_sync_summary_explains_live_read_model(monkeypatch):
+    provider = ShopifyIntegration()
+    integration = _make_integration(config={"shop_domain": "best-store.myshopify.com"})
+    db = _make_db()
+
+    monkeypatch.setattr(provider, "get_access_token", AsyncMock(return_value="tok"))
+
+    import src.services.shopify.cache as shopify_cache_mod
+    import src.services.shopify.client as shopify_client_mod
+
+    monkeypatch.setattr(
+        shopify_client_mod,
+        "fetch_shop_metadata",
+        AsyncMock(return_value={}),
+    )
+    monkeypatch.setattr(shopify_cache_mod, "del_dashboard_cache", AsyncMock())
+
+    result = await provider.sync(integration=integration, db=db)
+
+    assert "live" in result.summary.lower()
     assert "best-store.myshopify.com" in result.summary
 
 

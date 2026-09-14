@@ -25,6 +25,11 @@
   --status-danger: #ff4d6d;
   --status-info:   #4facfe;
   --status-neutral: #8b9cba;
+  /* "Coming soon" — deliberately off the ok/warn/danger axis so an
+     unavailable integration never reads as a health state. */
+  --status-soon:   #8957e5;
+  --status-soon-faint: rgba(137, 87, 229, 0.18);
+  --status-soon-bg:    rgba(137, 87, 229, 0.07);
 
   /* Health domain accent — distinct from the cyan system accent so the
      two live-biometric sources (Whoop vs. Apple Health) read as visually

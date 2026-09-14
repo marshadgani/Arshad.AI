@@ -32,6 +32,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...auth.crypto import decrypt, encrypt
+from ...config.urls import require_backend_url
 from ...middleware.cache import get_redis
 from ...models.integration import Integration, IntegrationOAuthToken
 from ...models.user import User
@@ -41,22 +42,21 @@ from ..base import (
     IntegrationProvider,
     StatusReport,
     SyncResult,
+    UpstreamRevocationResult,
 )
+from ..parse_guard import guarded_parse
 
 _STATE_TTL_SECONDS = 600  # 10 min — generous for slow consent flows
 
 # Every outbound provider call from this module (token grants, sync reads).
 _HTTP_TIMEOUT_SECONDS = 15.0
 
+# FEAT-145 revoke calls: short and single-attempt on purpose — disconnect()
+# must not hang the user's click on a slow/dead third party, and the local
+# credential scrub proceeds regardless of the outcome.
+_REVOKE_TIMEOUT_SECONDS = 5.0
+
 _log = logging.getLogger(__name__)
-
-
-def _backend_url() -> str:
-    return os.environ["BACKEND_URL"].rstrip("/")
-
-
-def _frontend_url() -> str:
-    return os.environ["FRONTEND_URL"].rstrip("/")
 
 
 def _state_key(state: str) -> str:
@@ -156,8 +156,25 @@ class OAuthIntegrationProvider(IntegrationProvider):
     scope_separator: ClassVar[str] = " "
     use_basic_auth_for_token: ClassVar[bool] = False
 
+    # FEAT-145: an RFC 7009 revocation endpoint. Leave unset when the
+    # provider has none, or when its URL hasn't been verified against this
+    # generic caller — disconnect() still deletes the local
+    # integration_oauth_tokens row, it just skips the network call. A wrong
+    # URL that silently 404s and reports 'failed' is worse UX than an
+    # honest 'no_revoke'.
+    revoke_url: ClassVar[str | None] = None
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        super().__init_subclass__(**kwargs)
+        # Derive revocation_kind from revoke_url so every OAuth provider
+        # doesn't have to redundantly declare both — unless a subclass
+        # explicitly set its own revocation_kind (e.g. to 'no_credential'
+        # for a provider with a non-standard credential story).
+        if "revocation_kind" not in cls.__dict__ and cls.__dict__.get("revoke_url"):
+            cls.revocation_kind = "revokes"
+
     def _redirect_uri(self) -> str:
-        return f"{_backend_url()}/api/v1/integrations/oauth/{self.slug}/callback"
+        return f"{require_backend_url()}/api/v1/integrations/oauth/{self.slug}/callback"
 
     def _client_id(self) -> str:
         val = os.getenv(self.client_id_env)
@@ -198,32 +215,134 @@ class OAuthIntegrationProvider(IntegrationProvider):
         url = f"{self.auth_url}?{urlencode(params)}"
         return ConnectResult(integration_id=None, redirect_url=url)
 
+    def _with_client_credentials(
+        self, data: dict[str, str]
+    ) -> tuple[dict[str, str], dict[str, Any]]:
+        """Attach this provider's client credentials the way it expects —
+        HTTP Basic, or in the form body — returning the (form, request
+        kwargs) pair.
+
+        One definition of "how does this provider authenticate a
+        client-credentialed POST", shared by the token grant, the refresh
+        grant, and the FEAT-145 revoke call. Keeping it in one place is
+        what guarantees a use_basic_auth_for_token=True provider doesn't
+        end up with an unauthenticated revoke request that just 401s.
+        """
+        if self.use_basic_auth_for_token:
+            return data, {"auth": (self._client_id(), self._client_secret())}
+        return (
+            {
+                **data,
+                "client_id": self._client_id(),
+                "client_secret": self._client_secret(),
+            },
+            {},
+        )
+
+    async def _post_client_credentialed(
+        self, url: str, data: dict[str, str], *, timeout: float
+    ) -> httpx.Response:
+        form, kwargs = self._with_client_credentials(data)
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            return await client.post(
+                url,
+                data=form,
+                headers={"Accept": "application/json"},
+                **kwargs,
+            )
+
     async def _post_token_request(self, data: dict[str, str]) -> httpx.Response:
-        """POST a grant to token_url with this provider's client credentials
-        attached the way it expects — HTTP Basic, or in the form body.
+        """POST a grant to token_url.
 
         Shared by the initial code exchange and the refresh grant, which
         differ only in their form fields and in what they report on failure,
         so the caller owns the error message for a non-2xx response.
         """
-        if self.use_basic_auth_for_token:
-            kwargs: dict[str, Any] = {
-                "auth": (self._client_id(), self._client_secret())
-            }
-        else:
-            data = {
-                **data,
-                "client_id": self._client_id(),
-                "client_secret": self._client_secret(),
-            }
-            kwargs = {}
-        async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT_SECONDS) as client:
-            return await client.post(
-                self.token_url,
-                data=data,
-                headers={"Accept": "application/json"},
-                **kwargs,
+        return await self._post_client_credentialed(
+            self.token_url, data, timeout=_HTTP_TIMEOUT_SECONDS
+        )
+
+    async def _post_revoke_request(self, data: dict[str, str]) -> httpx.Response:
+        """POST to revoke_url, on the shorter revoke timeout (a disconnect
+        click must not hang on a slow third party)."""
+        return await self._post_client_credentialed(
+            self.revoke_url,  # type: ignore[arg-type] — only called when revoke_url is set
+            data,
+            timeout=_REVOKE_TIMEOUT_SECONDS,
+        )
+
+    async def _prepare_revocation(
+        self, *, integration: Integration, db: AsyncSession
+    ) -> dict[str, str | None] | None:
+        """Load+decrypt the stored token(s) while the read transaction is
+        still open. Returns None (→ disconnect() reports 'unsupported')
+        when there's no revoke_url, no stored token row, or decryption
+        fails — a corrupted/foreign-key row must not block disconnecting.
+        """
+        if self.revoke_url is None:
+            return None
+        row = await db.scalar(
+            select(IntegrationOAuthToken).where(
+                IntegrationOAuthToken.integration_id == integration.id
             )
+        )
+        if row is None:
+            return None
+        try:
+            access_token = decrypt(row.encrypted_access_token)
+            refresh_token = (
+                decrypt(row.encrypted_refresh_token)
+                if row.encrypted_refresh_token
+                else None
+            )
+        except Exception:  # noqa: BLE001 — corrupt ciphertext must not block disconnect
+            _log.warning(
+                "Could not decrypt stored token for %s (integration_id=%s) "
+                "during disconnect — skipping upstream revoke.",
+                self.slug,
+                integration.id,
+                exc_info=True,
+            )
+            return None
+        return {"access_token": access_token, "refresh_token": refresh_token}
+
+    async def _revoke_upstream(
+        self, *, payload: dict[str, str | None]
+    ) -> UpstreamRevocationResult:
+        """Revoke the refresh token first when present (it's the longer-
+        lived grant — leaving it alone after revoking only the access
+        token would let the app mint fresh access tokens right after
+        'disconnecting'), then the access token. Any single 2xx response
+        counts as revoked; every attempt failing counts as failed.
+        """
+        any_success = False
+        for token_type, token in (
+            ("refresh_token", payload.get("refresh_token")),
+            ("access_token", payload.get("access_token")),
+        ):
+            if not token:
+                continue
+            try:
+                resp = await self._post_revoke_request(
+                    {"token": token, "token_type_hint": token_type}
+                )
+                if 200 <= resp.status_code < 300:
+                    any_success = True
+                else:
+                    _log.warning(
+                        "%s revoke (%s) returned %s",
+                        self.slug,
+                        token_type,
+                        resp.status_code,
+                    )
+            except Exception:  # noqa: BLE001 — network failure must not block disconnect
+                _log.warning(
+                    "%s revoke (%s) request failed",
+                    self.slug,
+                    token_type,
+                    exc_info=True,
+                )
+        return "revoked" if any_success else "failed"
 
     async def exchange_code(self, code: str) -> dict[str, Any]:
         """POST to token_url with code → returns the JSON token response."""
@@ -460,11 +579,31 @@ def make_oauth_sync_via_api(
             integration.status = "error"
             integration.last_error = f"{type(exc).__name__}: {exc}"[:500]
             await db.commit()
-            raise IntegrationError("sync_failed", f"{type(exc).__name__}: {exc}")
-        integration.config = {
-            **(integration.config or {}),
-            **(parse_sync(body) if parse_sync else {"ok": True}),
-        }
+            raise IntegrationError(
+                "sync_failed", f"{type(exc).__name__}: {exc}"
+            ) from exc
+
+        # Any parse failure — the provider's deliberate rejection just as
+        # much as an unshaped body — flips the row to 'error'; otherwise it
+        # stays 'connected' with a stale last_synced_at while sync is
+        # silently broken. The wrap-into-IntegrationError policy itself
+        # lives in integrations/parse_guard.py, shared with
+        # project/_factory.py so the two cannot drift apart.
+        async def _mark_errored(exc: Exception) -> None:
+            integration.status = "error"
+            integration.last_error = f"{type(exc).__name__}: {exc}"[:500]
+            await db.commit()
+
+        parsed = await guarded_parse(
+            parse_sync,
+            body,
+            provider_name=getattr(self, "display_name", type(self).__name__),
+            stage="sync",
+            error_code="sync_parse_failed",
+            on_error=_mark_errored,
+        )
+
+        integration.config = {**(integration.config or {}), **parsed}
         integration.last_synced_at = datetime.now(timezone.utc)
         integration.last_error = None
         integration.status = "connected"

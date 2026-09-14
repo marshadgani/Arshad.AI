@@ -1,0 +1,70 @@
+.page {
+  padding: var(--s-6) var(--s-8) var(--s-12);
+  color: var(--text-primary);
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.page h1 {
+  margin: 0 0 var(--s-5);
+  font-family: var(--font-display);
+  font-size: 1.7rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-shadow: var(--glow-cyan-soft);
+}
+
+.section {
+  margin-bottom: var(--s-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.section h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.field {
+  display: flex;
+  gap: var(--s-3);
+  align-items: baseline;
+}
+
+.fieldLabel {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  min-width: 6rem;
+}
+
+.fieldValue {
+  color: var(--text-primary);
+}
+
+.loadError {
+  color: var(--text-secondary);
+  max-width: 52ch;
+  margin: 0;
+}
+
+.signOut {
+  appearance: none;
+  align-self: flex-start;
+  background: var(--accent-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--accent);
+  padding: var(--s-2) var(--s-4);
+  border-radius: var(--radius-md);
+  font-family: var(--font-display);
+  cursor: pointer;
+}
+
+.signOut:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

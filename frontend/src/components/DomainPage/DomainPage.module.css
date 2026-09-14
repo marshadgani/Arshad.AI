@@ -32,7 +32,7 @@
 .headerTagline { color: var(--text-secondary); font-size: 13px; }
 
 .kpis {
-  composes: tiles4 from '../styles/grid.module.css';
+  composes: tiles4 from '../../styles/grid.module.css';
   grid-column: 1 / -1;
   gap: var(--s-3);
   margin-top: var(--s-4);
@@ -56,7 +56,7 @@
 .sectionMeta { font-size: 10px; color: var(--text-muted); font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.08em; }
 
 /* Applications grid */
-.appGrid { composes: cols4 from '../styles/grid.module.css'; gap: var(--s-4); }
+.appGrid { composes: cols4 from '../../styles/grid.module.css'; gap: var(--s-4); }
 .app {
   background: var(--bg-elevated);
   border: 1px solid var(--border-faint);
@@ -71,25 +71,13 @@
 .appName { font-size: 14px; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
 .appDesc { font-size: 12px; color: var(--text-secondary); flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .appFoot { display: flex; align-items: center; justify-content: space-between; margin-top: var(--s-2); }
-.appOpen {
-  background: var(--accent);
-  color: var(--bg-deep);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 600;
-  padding: 4px 10px;
-  border-radius: var(--radius-sm);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-.appOpen:hover { filter: brightness(1.1); }
 .statusTag { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; padding: 2px 6px; border-radius: 3px; }
 .live { color: var(--status-ok); background: rgba(0, 255, 156, 0.1); border: 1px solid rgba(0, 255, 156, 0.2); }
 .beta { color: var(--accent); background: var(--accent-faint); border: 1px solid var(--accent-faint); }
 .planned { color: var(--text-muted); background: var(--bg-deep); border: 1px solid var(--border-faint); }
 
 /* Agents */
-.agents { composes: cols3 from '../styles/grid.module.css'; gap: var(--s-4); }
+.agents { composes: cols3 from '../../styles/grid.module.css'; gap: var(--s-4); }
 .agent {
   background: var(--bg-elevated);
   border: 1px solid var(--border-faint);
@@ -123,7 +111,6 @@
 .agentLast { font-size: 11px; color: var(--text-muted); margin-top: var(--s-1); }
 .agentFoot { display: flex; align-items: center; justify-content: space-between; margin-top: var(--s-2); font-family: var(--font-mono); font-size: 10px; }
 .agentRun { color: var(--text-muted); }
-.agentConfig { color: var(--accent); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
 
 /* Only the header's own two-track layout collapses here. The grids' column
    counts come from styles/grid.module.css. */

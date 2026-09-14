@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 
-import { CHAT_PATH } from '../../routes/paths';
+import { CHAT_PATH } from '../../routes';
 import { useChatLauncherVisible } from '../../hooks/useChatLauncherVisible';
 import styles from './ChatLauncher.module.css';
 

@@ -72,6 +72,7 @@ class HackerNewsIntegration(IntegrationProvider):
     description = "Top stories. No auth required — just toggle on."
     docs_url = "https://github.com/HackerNews/API"
     icon = "hackernews"
+    revocation_kind = "no_credential"  # no credential is stored for this provider
 
     async def connect(
         self, *, user: User | None, db: AsyncSession, payload: dict[str, Any]
@@ -128,6 +129,7 @@ class OpenMeteoIntegration(IntegrationProvider):
     description = "Free weather API — no key. Provide lat/lon in config."
     docs_url = "https://open-meteo.com/en/docs"
     icon = "weather"
+    revocation_kind = "no_credential"  # no credential is stored for this provider
 
     async def connect(
         self, *, user: User | None, db: AsyncSession, payload: dict[str, Any]

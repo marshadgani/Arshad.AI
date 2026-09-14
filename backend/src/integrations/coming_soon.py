@@ -69,6 +69,9 @@ def _make_coming_soon(
     _Stub.icon = icon
     _Stub.coming_soon = True
     _Stub.coming_soon_reason = reason
+    # FEAT-145: connect() always raises, so no credential row can ever
+    # exist for a coming-soon stub.
+    _Stub.revocation_kind = "no_credential"
     _Stub.__name__ = f"{slug.replace('_', '').title()}Stub"
     return _Stub
 

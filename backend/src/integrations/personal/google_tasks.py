@@ -37,6 +37,9 @@ class GoogleTasksIntegration(IntegrationProvider):
     description = "Task lists and items synced from Google Tasks."
     docs_url = "https://developers.google.com/tasks"
     icon = "google-tasks"
+    # FEAT-145: no integration_oauth_tokens row — shares the login-time
+    # Google grant (see integrations/DECISION.md §1).
+    revocation_kind = "no_credential"
 
     async def connect(
         self, *, user: User | None, db: AsyncSession, payload: dict[str, Any]

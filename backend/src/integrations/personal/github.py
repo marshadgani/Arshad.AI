@@ -26,6 +26,11 @@ class GitHubIntegration(IntegrationProvider):
     description = "Track your repos, issues, and pull requests."
     docs_url = "https://docs.github.com/en/rest"
     icon = "github"
+    sync_dag_id = "github_ingestor"
+    # FEAT-145: no integration_oauth_tokens row — shares the login-time
+    # GitHub grant that also backs the user's session, so revoking it here
+    # would sign them out (see integrations/DECISION.md §1).
+    revocation_kind = "no_credential"
 
     async def connect(
         self, *, user: User | None, db: AsyncSession, payload: dict[str, Any]
@@ -37,9 +42,7 @@ class GitHubIntegration(IntegrationProvider):
         )
 
     async def sync(self, *, integration: Integration, db: AsyncSession) -> SyncResult:
-        return await make_sync_via_dag("github_ingestor")(
-            integration=integration, db=db
-        )
+        return await make_sync_via_dag(self.sync_dag_id)(integration=integration, db=db)
 
     async def status(
         self, *, integration: Integration, db: AsyncSession

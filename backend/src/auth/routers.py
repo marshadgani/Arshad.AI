@@ -33,6 +33,33 @@ integrations/personal/_oauth_base.py (store_oauth_state /
 consume_oauth_state) for connecting third-party integrations.
 
 Logout is a stateless 204 — the frontend wipes its localStorage JWT.
+
+Attach flow (FEAT-143): the SAME two callback routes below also serve a
+third flow — attaching a provider to an ALREADY-authenticated user (e.g.
+clicking "Connect" on GitHub/Google Calendar/Drive/etc. on the
+Integrations page). GitHub OAuth Apps allow only one registered callback
+URI, so a distinct `/attach/callback` endpoint isn't viable without
+re-registering the app; instead, the attach flow's state parameter is
+minted with an unmistakable `att.` prefix (auth/attach_state.py) that no
+login state can ever produce (`_make_signed_state` nonces never contain a
+literal '.' before the timestamp segment). Both callbacks check for that
+prefix FIRST and, if present, hand off to
+integrations/personal/attach_callback.handle_attach_callback — bypassing
+the cookie-nonce check entirely for that branch.
+
+This is a deliberate, narrower CSRF posture than the login flow, not an
+oversight: the attach state is unguessable (256-bit), single-use (Redis
+GETDEL), and — critically — has the target user_id bound into it at MINT
+time, inside an authenticated POST (`/integrations/{slug}/connect`, behind
+`get_current_user`). An attacker cannot graft their own authorization code
+onto a victim's attach state; the identity that ends up receiving the
+provider grant comes from Redis, never from anything the callback request
+itself carries. A cookie nonce isn't an option here: the flow begins as a
+cross-site XHR POST from the Vercel frontend to the Render backend, which
+would require `SameSite=None` on the nonce cookie — blocked by Safari and
+Chrome's third-party-cookie policies. This matches the accepted posture of
+every Phase-H integration provider (integrations/personal/_oauth_base.py),
+which has never carried a cookie nonce either.
 """
 
 from __future__ import annotations
@@ -48,12 +75,14 @@ from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..config.urls import frontend_url
 from ..middleware.cache import get_redis
 from ..models.database import get_db
 from ..models.user import User
+from .attach_state import ATTACH_STATE_PREFIX
 from .dependencies import get_current_user
 from .jwt import encode_jwt
-from .providers import GitHubOAuthProvider, GoogleOAuthProvider, OAuthProvider
+from .providers import OAuthProvider, get_login_provider
 from .providers.base import OAuthError
 from .service import upsert_user_from_oauth
 
@@ -80,25 +109,22 @@ def _secret_key() -> str:
     return key
 
 
-def _frontend_url() -> str:
-    return os.getenv("FRONTEND_URL", "http://localhost:3000").rstrip("/")
-
-
 def _provider(name: str) -> OAuthProvider:
-    if name == "google":
-        return GoogleOAuthProvider()
-    if name == "github":
-        return GitHubOAuthProvider()
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail={
-            "error": {
-                "code": "unknown_provider",
-                "message": f"OAuth provider '{name}' is not configured.",
-                "details": {},
-            }
-        },
-    )
+    """Resolve a login provider, or 404. The *set* of providers lives in
+    `providers/registry.py`; only the 404 envelope is this layer's business."""
+    provider = get_login_provider(name)
+    if provider is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "error": {
+                    "code": "unknown_provider",
+                    "message": f"OAuth provider '{name}' is not configured.",
+                    "details": {},
+                }
+            },
+        )
+    return provider
 
 
 def _envelope(status_code: int, code: str, message: str) -> HTTPException:
@@ -149,7 +175,9 @@ async def _start_login(provider_name: str) -> RedirectResponse:
     redis = await get_redis()
     await redis.set(_login_nonce_key(nonce), "1", ex=_STATE_TTL_SECONDS)
 
-    response = RedirectResponse(provider.authorization_url(signed_state), status_code=302)
+    response = RedirectResponse(
+        provider.authorization_url(signed_state), status_code=302
+    )
     response.set_cookie(
         _NONCE_COOKIE_NAME,
         nonce,
@@ -161,14 +189,57 @@ async def _start_login(provider_name: str) -> RedirectResponse:
     return response
 
 
+async def _delegate_to_attach_flow(
+    *,
+    provider_name: str,
+    code: str | None,
+    error: str | None,
+    state: str,
+    db: AsyncSession,
+) -> RedirectResponse:
+    """The one place `auth` reaches upward into `integrations`.
+
+    Import is function-local on purpose: `integrations.personal` imports
+    `auth.providers`, `auth.attach_state` and `auth.service`, so a
+    module-level import here would close an import cycle at boot. The
+    alternative — a registration hook that `integrations` populates at
+    import time — trades a cycle for a startup-ordering dependency, where
+    forgetting to import the integrations package turns the attach flow
+    into a silent 400 instead of a loud ImportError. Isolating the reach
+    in one named function keeps the exception visible and greppable.
+    """
+    from ..integrations.personal.attach_callback import handle_attach_callback
+
+    return await handle_attach_callback(
+        provider_name=provider_name,
+        code=code,
+        error=error,
+        state=state,
+        db=db,
+    )
+
+
 async def _handle_callback(
     provider_name: str,
-    code: str,
-    signed_state: str,
+    code: str | None,
+    signed_state: str | None,
+    error: str | None,
     cookie_nonce: str | None,
     db: AsyncSession,
 ) -> RedirectResponse:
-    if not _verify_signed_state(signed_state):
+    # FEAT-143 attach flow: recognise the att.-prefixed state before doing
+    # anything login-specific (cookie check, signature check — a login
+    # state can never start with this prefix, see module docstring).
+    if signed_state and signed_state.startswith(ATTACH_STATE_PREFIX):
+        return await _delegate_to_attach_flow(
+            provider_name=provider_name,
+            code=code,
+            error=error,
+            state=signed_state,
+            db=db,
+        )
+
+    if not signed_state or not _verify_signed_state(signed_state):
         raise _envelope(
             status.HTTP_400_BAD_REQUEST,
             "invalid_state",
@@ -190,6 +261,13 @@ async def _handle_callback(
             status.HTTP_400_BAD_REQUEST,
             "invalid_state",
             "OAuth state was already used or has expired.",
+        )
+
+    if not code:
+        raise _envelope(
+            status.HTTP_400_BAD_REQUEST,
+            "invalid_request",
+            "OAuth callback is missing the authorization code.",
         )
 
     provider = _provider(provider_name)
@@ -216,7 +294,7 @@ async def _handle_callback(
     )
     token = encode_jwt(user.id)
     response = RedirectResponse(
-        f"{_frontend_url()}/auth/callback#token={token}", status_code=302
+        f"{frontend_url()}/auth/callback#token={token}", status_code=302
     )
     response.delete_cookie(_NONCE_COOKIE_NAME)
     return response
@@ -229,12 +307,13 @@ async def google_login() -> RedirectResponse:
 
 @router.get("/google/callback", summary="Google OAuth callback")
 async def google_callback(
-    code: str = Query(...),
-    state: str = Query(...),
+    code: str | None = Query(None),
+    state: str | None = Query(None),
+    error: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
     oauth_login_nonce: str | None = Cookie(default=None, alias=_NONCE_COOKIE_NAME),
 ) -> RedirectResponse:
-    return await _handle_callback("google", code, state, oauth_login_nonce, db)
+    return await _handle_callback("google", code, state, error, oauth_login_nonce, db)
 
 
 @router.get("/github/login", summary="Start GitHub OAuth")
@@ -244,12 +323,13 @@ async def github_login() -> RedirectResponse:
 
 @router.get("/github/callback", summary="GitHub OAuth callback")
 async def github_callback(
-    code: str = Query(...),
-    state: str = Query(...),
+    code: str | None = Query(None),
+    state: str | None = Query(None),
+    error: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
     oauth_login_nonce: str | None = Cookie(default=None, alias=_NONCE_COOKIE_NAME),
 ) -> RedirectResponse:
-    return await _handle_callback("github", code, state, oauth_login_nonce, db)
+    return await _handle_callback("github", code, state, error, oauth_login_nonce, db)
 
 
 @router.get("/me", summary="Current authenticated user")

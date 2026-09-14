@@ -1,0 +1,55 @@
+name: Skills Manifest Guard
+
+# Guards backend/data/skills_manifest.json against drift from the live
+# .claude/skills/ tree. This is the production data source for
+# register_skills.py (see FEAT-154) — if it goes stale, the AI Ecosystem
+# Skills tab silently stops reflecting reality.
+#
+# Deliberately a standalone workflow, not a job inside auto-pr.yml:
+# auto-pr.yml's single job gates the merge-to-main auto-merge, and a
+# manifest drift (e.g. a one-word SKILL.md description edit) should never
+# block that. This check is independent and only runs when relevant paths
+# change.
+
+on:
+  pull_request:
+    paths:
+      - ".claude/skills/**"
+      - "backend/data/skills_manifest.json"
+      - "backend/scripts/_skills_scan.py"
+      - "backend/scripts/generate_skills_manifest.py"
+  push:
+    branches-ignore:
+      - claude/ai-personal-assistant-main
+      - main
+    paths:
+      - ".claude/skills/**"
+      - "backend/data/skills_manifest.json"
+      - "backend/scripts/_skills_scan.py"
+      - "backend/scripts/generate_skills_manifest.py"
+
+permissions:
+  contents: read
+
+jobs:
+  check-manifest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # No pip install — generate_skills_manifest.py and _skills_scan.py
+      # are stdlib-only by design, so this is a pure file comparison.
+      - name: Check manifest freshness
+        working-directory: backend
+        run: |
+          python -m scripts.generate_skills_manifest \
+            --skills-dir ../.claude/skills \
+            --registry ../.claude/github-repos.json \
+            --out data/skills_manifest.json \
+            --check

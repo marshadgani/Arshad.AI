@@ -18,6 +18,7 @@ from ..base import (
     IntegrationError,
     IntegrationProvider,
 )
+from ..parse_guard import decode_json, guarded_parse
 from ._shared import (
     mark_error,
     mark_synced,
@@ -64,20 +65,30 @@ def make_provider(spec: ProviderSpec) -> type[IntegrationProvider]:
                     "invalid_key", f"{spec.display_name} rejected the key."
                 )
             resp.raise_for_status()
-            body = resp.json()
-            return spec.parse_probe(body) if spec.parse_probe else {"ok": True}
+            body = decode_json(resp, provider_name=spec.display_name)
+            # No on_error hook: connect() has not created an Integration row
+            # yet at this point, so there is nothing to mark as errored.
+            return await guarded_parse(
+                spec.parse_probe,
+                body,
+                provider_name=spec.display_name,
+                stage="probe",
+                error_code="probe_parse_failed",
+                message=lambda exc: (
+                    f"Could not read {spec.display_name}'s response: "
+                    f"{type(exc).__name__}: {exc}"
+                ),
+            )
 
         async def connect(self, *, user, db, payload):  # type: ignore[override]
             api_key = require_api_key(payload)
             try:
                 probe = await self._probe(api_key)
-            except IntegrationError:
-                raise
             except httpx.HTTPError as exc:
                 raise IntegrationError(
                     "probe_failed",
                     f"Could not reach {spec.display_name}: {type(exc).__name__}",
-                )
+                ) from exc
             if spec.per_user and user is None:
                 raise IntegrationError("auth_required", "User context required.")
             return await store_api_key(
@@ -87,7 +98,7 @@ def make_provider(spec: ProviderSpec) -> type[IntegrationProvider]:
                 extra=probe,
                 scopes=spec.scopes,
                 user_id=(user.id if spec.per_user and user else None),
-                kind=("personal_apikey" if spec.per_user else "project_apikey"),
+                kind=self.kind,
             )
 
         async def sync(self, *, integration, db):  # type: ignore[override]
@@ -110,11 +121,30 @@ def make_provider(spec: ProviderSpec) -> type[IntegrationProvider]:
                     body = resp.json()
             except Exception as exc:  # noqa: BLE001
                 await mark_error(integration=integration, db=db, err=exc)
-                raise IntegrationError("sync_failed", f"{type(exc).__name__}: {exc}")
-            integration.config = {
-                **(integration.config or {}),
-                **(spec.parse_sync(body) if spec.parse_sync else {"ok": True}),
-            }
+                raise IntegrationError(
+                    "sync_failed", f"{type(exc).__name__}: {exc}"
+                ) from exc
+
+            # Any parse failure — a provider's deliberate rejection (e.g. a
+            # revoked Slack token) just as much as an unshaped body — must
+            # flip the integration to 'error'; otherwise the row stays
+            # 'connected' with a stale last_synced_at while sync is
+            # silently broken.
+            async def _mark_errored(exc: Exception) -> None:
+                await mark_error(integration=integration, db=db, err=exc)
+
+            parsed: dict[str, Any] = await guarded_parse(
+                spec.parse_sync,
+                body,
+                provider_name=spec.display_name,
+                stage="sync",
+                error_code="sync_parse_failed",
+                on_error=_mark_errored,
+            )
+
+            # Only merge into config after a successful parse — never
+            # persist a partial merge from a half-parsed body.
+            integration.config = {**(integration.config or {}), **parsed}
             return await mark_synced(
                 integration=integration,
                 db=db,

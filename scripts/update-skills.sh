@@ -179,10 +179,34 @@ done
 date +%s > "$TIMESTAMP_FILE"
 log "Timestamp updated"
 
+# ── Regenerate skills manifest + sync to DB (best-effort — non-fatal) ─────────
+# Runs even when CHANGED=0 so backend/data/skills_manifest.json stays byte-identical
+# to a fresh scan (the manifest-guard CI job enforces this on every push).
+GEN_MANIFEST="$REPO_ROOT/backend/scripts/generate_skills_manifest.py"
+REGISTER_SCRIPT="$REPO_ROOT/backend/scripts/register_skills.py"
+if [ -f "$GEN_MANIFEST" ]; then
+  log "Regenerating skills manifest..."
+  if (cd "$REPO_ROOT/backend" && python3 -m scripts.generate_skills_manifest \
+        --skills-dir "$SKILLS_DIR" \
+        --registry "$REPO_ROOT/.claude/github-repos.json" \
+        --out "$REPO_ROOT/backend/data/skills_manifest.json" 2>&1); then
+    log "Manifest regenerated"
+  else
+    log "WARNING: manifest regeneration failed (non-fatal)"
+  fi
+fi
+if [ -f "$REGISTER_SCRIPT" ]; then
+  log "Syncing skills to DB via register_skills.py..."
+  (cd "$REPO_ROOT/backend" && DATABASE_URL="${DATABASE_URL:-}" PYTHONPATH=. python3 "$REGISTER_SCRIPT" \
+      --skills-dir "$SKILLS_DIR" --registry "$REPO_ROOT/.claude/github-repos.json" 2>&1) \
+    && log "Skills DB sync complete" \
+    || log "WARNING: skills DB sync failed (non-fatal — skills will sync on next app start)"
+fi
+
 # ── Commit if anything changed ─────────────────────────────────────────────────
 if [ "$CHANGED" -eq 1 ]; then
   cd "$REPO_ROOT"
-  git add .claude/skills/ .claude/agents/ .claude/commands/ 2>/dev/null || true
+  git add .claude/skills/ .claude/agents/ .claude/commands/ backend/data/skills_manifest.json 2>/dev/null || true
   git diff --cached --quiet && log "Nothing to commit" || {
     git commit -m "chore: weekly skill/agent/command update [$(date '+%Y-%m-%d')]
 

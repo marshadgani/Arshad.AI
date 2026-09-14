@@ -15,7 +15,7 @@ services:
     dockerContext: ./backend
     healthCheckPath: /health
     autoDeploy: true
-    preDeployCommand: "alembic upgrade head && python -m scripts.seed_from_mock"
+    preDeployCommand: "alembic upgrade head && python -m scripts.seed_from_mock && (python -m scripts.register_skills || echo '[startup] WARN: skill sync failed — non-fatal' >&2)"
     envVars:
       - key: DATABASE_URL
         sync: false

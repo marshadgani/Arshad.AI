@@ -21,7 +21,8 @@ from src.api.v1.whoop import router as whoop_router
 from src.auth.routers import router as auth_router
 from src.middleware.cache import close_redis
 from src.models.database import AsyncSessionLocal
-from src.services import queue_worker
+from src.services.queue import drainer as queue_drainer
+from src.services.queue import worker as queue_worker
 from src.services.whoop.client import aclose_client as close_whoop_client
 from src.tools.routers import router as tools_router
 
@@ -74,10 +75,23 @@ async def lifespan(app: FastAPI):
     # operation safe-but-wasteful even if both are accidentally enabled.
     worker_task: asyncio.Task | None = None
     stop_event: asyncio.Event | None = None
-    if queue_worker.is_enabled():
+    if queue_drainer.is_enabled():
         stop_event = asyncio.Event()
         worker_task = asyncio.create_task(queue_worker.run_worker(stop_event))
         _log.info("ENABLE_INPROCESS_WORKER=true; queue worker started")
+    elif not queue_drainer.is_drained():
+        # FEAT-144: without a worker AND without Airflow set as the
+        # declared drainer, dag_trigger_queue rows for google_calendar,
+        # gmail, github, and Obsidian syncs will be enqueued and sit
+        # 'pending' forever — "Sync now" looks like it worked but nothing
+        # is ever processed. Surface this on every deploy log so it can't
+        # go unnoticed (see CLAUDE.md §23 known recurring issues).
+        _log.warning(
+            "ENABLE_INPROCESS_WORKER is not set or false — DAG-backed syncs "
+            "(google_calendar, gmail, github, obsidian) will be enqueued "
+            "but NEVER processed. Set ENABLE_INPROCESS_WORKER=true on "
+            "Render (srv-d7m9kub7uimc73cq9afg)."
+        )
 
     try:
         yield

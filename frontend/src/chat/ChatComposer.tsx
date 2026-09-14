@@ -5,12 +5,14 @@ import styles from './ChatComposer.module.css';
 export interface ChatComposerProps {
   disabled: boolean;
   onSubmit: (text: string) => void;
+  /** Seeds the draft once on mount (e.g. from Quick Capture). */
+  initialValue?: string;
 }
 
 // Owns the draft only. It does not know about sessions, streaming or
 // history — it hands a non-empty string upward and clears itself.
-export function ChatComposer({ disabled, onSubmit }: ChatComposerProps) {
-  const [draft, setDraft] = useState('');
+export function ChatComposer({ disabled, onSubmit, initialValue }: ChatComposerProps) {
+  const [draft, setDraft] = useState(initialValue ?? '');
   const canSend = !disabled && draft.trim().length > 0;
 
   const handleSubmit = (e: FormEvent) => {

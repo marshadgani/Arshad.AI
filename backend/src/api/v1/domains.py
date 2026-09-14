@@ -15,6 +15,11 @@ router = APIRouter(
     dependencies=[Depends(get_current_user)],
 )
 
+# domain_feed_rows grows without bound over the app's lifetime; the panel
+# only ever displays "last 24 h" activity, so cap what's fetched rather
+# than pulling the domain's entire history on every page load.
+FEED_ROW_LIMIT = 20
+
 
 @router.get("/domains", summary="List all domains (summary)")
 async def list_domains(db: AsyncSession = Depends(get_db)):
@@ -36,7 +41,6 @@ async def get_domain(slug: str, db: AsyncSession = Depends(get_db)):
             selectinload(m.Domain.kpis),
             selectinload(m.Domain.applications),
             selectinload(m.Domain.agents),
-            selectinload(m.Domain.feed),
         )
     )
     obj = (await db.execute(stmt)).scalar_one_or_none()
@@ -51,9 +55,37 @@ async def get_domain(slug: str, db: AsyncSession = Depends(get_db)):
                 }
             },
         )
-    return {
-        "data": s.DomainConfigResponse.model_validate(obj).model_dump(by_alias=True)
-    }
+
+    # Fetched separately (bounded + ordered) instead of via selectinload,
+    # which would pull every feed row the domain has ever accumulated —
+    # see FEED_ROW_LIMIT comment above. Deliberately NOT assigned onto
+    # obj.feed: that relationship cascades "all, delete-orphan", so
+    # replacing its collection would first lazy-load the domain's full
+    # (unbounded) existing feed to diff against, then mark every row
+    # outside this bounded page as an orphan to be deleted on the next
+    # flush — silently destroying older feed history. Building the
+    # response schema field-by-field avoids ever touching that attribute.
+    feed_stmt = (
+        select(m.DomainFeedRow)
+        .where(m.DomainFeedRow.domain_slug == slug)
+        .order_by(m.DomainFeedRow.created_at.desc())
+        .limit(FEED_ROW_LIMIT)
+    )
+    feed_rows = (await db.execute(feed_stmt)).scalars().all()
+
+    config = s.DomainConfigResponse(
+        slug=obj.slug,
+        title=obj.title,
+        emoji=obj.emoji,
+        tagline=obj.tagline,
+        kpis=[s.DomainKPIResponse.model_validate(k) for k in obj.kpis],
+        applications=[
+            s.DomainApplicationResponse.model_validate(a) for a in obj.applications
+        ],
+        agents=[s.DomainAgentResponse.model_validate(a) for a in obj.agents],
+        feed=[s.DomainFeedRowResponse.model_validate(f) for f in feed_rows],
+    )
+    return {"data": config.model_dump(by_alias=True)}
 
 
 @router.get("/nav", summary="Sidebar nav items")

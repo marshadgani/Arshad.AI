@@ -61,27 +61,47 @@ async def register_skill(
     body: RegisterSkillRequest,
     db: AsyncSession = Depends(get_db),
 ) -> SkillRegisterResponse:
-    """Upsert a skill into the registry. Called automatically after every skill installation."""
-    existing = await db.scalar(
-        select(SkillRegistry).where(SkillRegistry.skill_name == body.skill_name)
+    """Upsert a skill into the registry. Called automatically after every skill installation.
+
+    Uses a single atomic INSERT .. ON CONFLICT DO UPDATE rather than a
+    read-then-write (SELECT to check existence, then INSERT or UPDATE):
+    the read-then-write form has a TOCTOU race under concurrent calls for
+    the same skill_name (e.g. two skill-install hooks firing back to back)
+    — both requests can see "no existing row", both attempt INSERT, and
+    the second fails with an unhandled IntegrityError on the skill_name
+    unique constraint instead of upserting. ON CONFLICT makes the whole
+    operation a single statement the database resolves atomically.
+    """
+    existed = await db.scalar(
+        select(SkillRegistry.id).where(SkillRegistry.skill_name == body.skill_name)
     )
-    if existing:
-        existing.display_name = body.display_name
-        existing.description = body.description
-        existing.source_repo = body.source_repo
-        existing.category = body.category
-        action = "updated"
-    else:
-        db.add(
-            SkillRegistry(
-                id=uuid.uuid4(),
-                skill_name=body.skill_name,
-                display_name=body.display_name,
-                description=body.description,
-                source_repo=body.source_repo,
-                category=body.category,
-            )
+    stmt = (
+        pg_insert(SkillRegistry)
+        .values(
+            id=uuid.uuid4(),
+            skill_name=body.skill_name,
+            display_name=body.display_name,
+            description=body.description,
+            source_repo=body.source_repo,
+            category=body.category,
         )
-        action = "registered"
+        .on_conflict_do_update(
+            index_elements=[SkillRegistry.skill_name],
+            set_={
+                "display_name": body.display_name,
+                "description": body.description,
+                "source_repo": body.source_repo,
+                "category": body.category,
+                # onupdate= does not fire for Core INSERT..ON CONFLICT —
+                # must be set explicitly. created_at is deliberately
+                # absent so it survives every subsequent upsert.
+                "updated_at": func.now(),
+            },
+        )
+    )
+    await db.execute(stmt)
     await db.commit()
-    return SkillRegisterResponse(skill_name=body.skill_name, action=action)
+    return SkillRegisterResponse(
+        skill_name=body.skill_name,
+        action="updated" if existed else "registered",
+    )

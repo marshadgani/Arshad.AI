@@ -37,27 +37,51 @@ async def run(
     if user is None:
         raise IngestionError(f"user_not_found: {user_id}")
 
-    # Lazy imports avoid pulling Phase D / Phase F clients into modules
-    # that only need the runner contract.
-    if dag_id == "calendar_ingestor":
-        from . import calendar as calendar_runner
+    async def _dispatch() -> dict[str, Any]:
+        # Lazy imports avoid pulling Phase D / Phase F clients into modules
+        # that only need the runner contract.
+        if dag_id == "calendar_ingestor":
+            from . import calendar as calendar_runner
 
-        return await calendar_runner.ingest(user=user, db=db, payload=payload)
-    if dag_id == "email_ingestor":
-        from . import email as email_runner
+            return await calendar_runner.ingest(user=user, db=db, payload=payload)
+        if dag_id == "email_ingestor":
+            from . import email as email_runner
 
-        return await email_runner.ingest(user=user, db=db, payload=payload)
-    if dag_id == "github_ingestor":
-        from . import github as github_runner
+            return await email_runner.ingest(user=user, db=db, payload=payload)
+        if dag_id == "github_ingestor":
+            from . import github as github_runner
 
-        return await github_runner.ingest(user=user, db=db, payload=payload)
-    if dag_id == "analytics_processor":
-        from . import analytics as analytics_runner
+            return await github_runner.ingest(user=user, db=db, payload=payload)
+        if dag_id == "analytics_processor":
+            from . import analytics as analytics_runner
 
-        return await analytics_runner.compute(user=user, db=db, payload=payload)
-    if dag_id == "obsidian_ingestor":
-        from . import obsidian as obsidian_runner
+            return await analytics_runner.compute(user=user, db=db, payload=payload)
+        if dag_id == "obsidian_ingestor":
+            from . import obsidian as obsidian_runner
 
-        return await obsidian_runner.ingest(user=user, db=db, payload=payload)
+            return await obsidian_runner.ingest(user=user, db=db, payload=payload)
 
-    raise IngestionError(f"unknown_dag_id: {dag_id}")
+        raise IngestionError(f"unknown_dag_id: {dag_id}")
+
+    # FEAT-144: this is the single dispatch point shared by both drainers
+    # (Render's in-process queue worker and docker-compose's Airflow), so
+    # it is the one place a completion hook can cover both — see
+    # sync_completion.finalize_sync's docstring for why neither drainer
+    # touches Integration directly.
+    from .sync_completion import finalize_sync
+
+    try:
+        result = await _dispatch()
+    except Exception as exc:
+        await finalize_sync(
+            dag_id=dag_id,
+            user_id=user_id,
+            success=False,
+            error_text=f"{type(exc).__name__}: {exc}",
+        )
+        raise
+    else:
+        await finalize_sync(
+            dag_id=dag_id, user_id=user_id, success=True, error_text=None
+        )
+        return result

@@ -6,6 +6,10 @@ provider = adding a ProviderSpec block.
 
 from __future__ import annotations
 
+from typing import Any
+
+from ..base import IntegrationError
+from ..parse_guard import safe_reason
 from ..registry import register
 from ._factory import ProviderSpec, make_provider
 
@@ -22,8 +26,20 @@ def _bearer_v2022(api_key: str) -> dict[str, str]:
     }
 
 
-def _slack_bearer(api_key: str) -> dict[str, str]:
-    return {"Authorization": f"Bearer {api_key}"}
+def _slack_ok(body: Any) -> dict[str, Any]:
+    """Slack signals auth failure with HTTP 200 + {'ok': false, 'error':
+    ...}, so the factory's 401/403 check never fires. Raise IntegrationError
+    so the router maps it to 400 instead of letting it escape as a 500.
+    Reused for both parse_probe and parse_sync — auth.test returns the
+    same shape on both calls, so there is no reason to duplicate this.
+    """
+    data = body or {}
+    if not data.get("ok"):
+        raise IntegrationError(
+            "invalid_key",
+            f"Slack rejected the token. ({safe_reason(data.get('error'))})",
+        )
+    return {"team": data.get("team"), "user": data.get("user")}
 
 
 def _api_key_header(name: str):
@@ -226,18 +242,9 @@ class _SlackProvider(
             docs_url="https://api.slack.com/web",
             icon="slack",
             probe_url="https://slack.com/api/auth.test",
-            auth_header=_slack_bearer,
-            parse_probe=lambda body: (
-                {"team": (body or {}).get("team"), "user": (body or {}).get("user")}
-                if (body or {}).get("ok")
-                else (_ for _ in ()).throw(
-                    Exception((body or {}).get("error", "slack_auth_failed"))
-                )
-            ),
-            parse_sync=lambda body: {
-                "team": (body or {}).get("team"),
-                "user": (body or {}).get("user"),
-            },
+            auth_header=_bearer,
+            parse_probe=_slack_ok,
+            parse_sync=_slack_ok,
             scopes=["channels:read"],
             per_user=True,
         )

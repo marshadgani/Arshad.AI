@@ -1,0 +1,2197 @@
+{
+  "skill_count": 313,
+  "skills": [
+    {
+      "skill_name": "add-model-descriptions",
+      "display_name": "Add Model Descriptions",
+      "description": "Add descriptions for new models available in the HuggingFace router to chat-ui's prod.yaml and dev.yaml.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "adr-create",
+      "display_name": "Create ADR",
+      "description": "Create a new Architecture Decision Record with the next sequential number, register it in the AgentDB graph, and link it to related ADRs.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "adr-index",
+      "display_name": "ADR Index",
+      "description": "Persists every ADR under /docs/adr/ or /docs/adrs/ to the adr-patterns namespace and every relationship (supersedes / amends / related / depends-on) to adr-edges. Handles both ADR formats found in the Ruflo monorepo:",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "adr-review",
+      "display_name": "ADR Review",
+      "description": "Review code changes against accepted Architecture Decision Records to detect violations, drift, and non-compliance.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "adr-verify",
+      "display_name": "ADR Verify",
+      "description": "Companion to adr-index. After import, reads the persisted graph and surfaces integrity issues:",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "agent-adaptive-coordinator",
+      "display_name": "Adaptive Swarm Coordinator",
+      "description": "You are an intelligent orchestrator that dynamically adapts swarm topology and coordination strategies based on real-time performance metrics, workload patterns, and environmental conditions.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-agent",
+      "display_name": "agent-agent",
+      "description": "--- name: sublinear-goal-planner description: \"Goal-Oriented Action Planning (GOAP) specialist that dynamically creates intelligent plans to achieve complex objectives. Uses gaming AI techniques to discover novel solutions by combining actions in cre",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-agentic-payments",
+      "display_name": "agent-agentic-payments",
+      "description": "--- name: agentic-payments description: Multi-agent payment authorization specialist for autonomous AI commerce with cryptographic verification and Byzantine consensus color: purple ---",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-analyze-code-quality",
+      "display_name": "Code Quality Analyzer",
+      "description": "You are a Code Quality Analyzer performing comprehensive code reviews and analysis.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-app-store",
+      "display_name": "agent-app-store",
+      "description": "--- name: flow-nexus-app-store description: Application marketplace and template management specialist. Handles app publishing, discovery, deployment, and marketplace operations within Flow Nexus. color: indigo ---",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-arch-system-design",
+      "display_name": "System Architecture Designer",
+      "description": "You are a System Architecture Designer responsible for high-level technical decisions and system design.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-architecture",
+      "display_name": "SPARC Architecture Agent",
+      "description": "You are a system architect focused on the Architecture phase of the SPARC methodology. Your role is to design scalable, maintainable system architectures based on specifications and pseudocode.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-authentication",
+      "display_name": "agent-authentication",
+      "description": "--- name: flow-nexus-auth description: Flow Nexus authentication and user management specialist. Handles login, registration, session management, and user account operations using Flow Nexus MCP tools. color: blue ---",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-automation-smart-agent",
+      "display_name": "Smart Agent Coordinator",
+      "description": "This agent implements intelligent, automated agent management by analyzing task requirements and dynamically spawning the most appropriate agents with optimal capabilities.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-base-template-generator",
+      "display_name": "agent-base-template-generator",
+      "description": "--- name: base-template-generator description: Use this agent when you need to create foundational templates, boilerplate code, or starter configurations for new projects, components, or features. This agent excels at generating clean, well-structure",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-benchmark-suite",
+      "display_name": "Benchmark Suite Agent",
+      "description": "- Name: Benchmark Suite - Type: Performance Optimization Agent - Specialization: Comprehensive performance benchmarking and testing - Performance Focus: Automated benchmarking, regression detection, and performance validation",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-browser-agentcore",
+      "display_name": "AWS Bedrock AgentCore",
+      "description": "Run agent-browser on cloud browser sessions hosted by AWS Bedrock AgentCore. All standard agent-browser commands work identically; the only difference is where the browser runs.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-browser-core",
+      "display_name": "agent-browser core",
+      "description": "Fast browser automation CLI for AI agents. Chrome/Chromium via CDP, no Playwright or Puppeteer dependency. Accessibility-tree snapshots with compact @eN refs let agents interact with pages in ~200-400 tokens instead of parsing raw HTML.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-browser-dogfood",
+      "display_name": "Dogfood",
+      "description": "Systematically explore a web application, find issues, and produce a report with full reproduction evidence for every finding.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-browser-electron",
+      "display_name": "Electron App Automation",
+      "description": "Automate any Electron desktop app using agent-browser. Electron apps are built on Chromium and expose a Chrome DevTools Protocol (CDP) port that agent-browser can connect to, enabling the same snapshot-interact workflow used for web pages.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-browser-slack",
+      "display_name": "Slack Automation",
+      "description": "Interact with Slack workspaces to check messages, extract data, and automate common tasks.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-browser-vercel-sandbox",
+      "display_name": "Browser Automation with Vercel Sandbox",
+      "description": "Run agent-browser + headless Chrome inside ephemeral Vercel Sandbox microVMs. A Linux VM spins up on demand, executes browser commands, and shuts down. Works with any Vercel-deployed framework (Next.js, SvelteKit, Nuxt, Remix, Astro, etc.).",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-byzantine-coordinator",
+      "display_name": "Byzantine Consensus Coordinator",
+      "description": "Coordinates Byzantine fault-tolerant consensus protocols ensuring system integrity and reliability in the presence of malicious actors.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-challenges",
+      "display_name": "agent-challenges",
+      "description": "--- name: flow-nexus-challenges description: Coding challenges and gamification specialist. Manages challenge creation, solution validation, leaderboards, and achievement systems within Flow Nexus. color: yellow ---",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-code-analyzer",
+      "display_name": "Code Analyzer Agent",
+      "description": "An advanced code quality analysis specialist that performs comprehensive code reviews, identifies improvements, and ensures best practices are followed throughout the codebase.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-code-goal-planner",
+      "display_name": "Execute SPARC phases for goal achievement",
+      "description": "npx claude-flow sparc run spec-pseudocode \"OAuth2 authentication system\" npx claude-flow sparc run architect \"microservices communication layer\" npx claude-flow sparc tdd \"payment processing feature\" npx claude-flow sparc pipeline \"complete feature i",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-code-review-swarm",
+      "display_name": "Code Review Swarm - Automated Code Review with AI Agents",
+      "description": "Deploy specialized AI agents to perform comprehensive, intelligent code reviews that go beyond traditional static analysis.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-coder",
+      "display_name": "Code Implementation Agent",
+      "description": "You are a senior software engineer specialized in writing clean, maintainable, and efficient code following best practices and design patterns.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-collective-intelligence-coordinator",
+      "display_name": "agent-collective-intelligence-coordinator",
+      "description": "--- name: collective-intelligence-coordinator description: Orchestrates distributed cognitive processes across the hive mind, ensuring coherent collective decision-making through memory synchronization and consensus protocols color: purple priority:",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-consensus-coordinator",
+      "display_name": "agent-consensus-coordinator",
+      "description": "--- name: consensus-coordinator description: Distributed consensus agent that uses sublinear solvers for fast agreement protocols in multi-agent systems. Specializes in Byzantine fault tolerance, voting mechanisms, distributed coordination, and conse",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-coordination",
+      "display_name": "Agent Coordination Skill",
+      "description": "Spawn and coordinate agents for complex multi-agent tasks.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-coordinator-swarm-init",
+      "display_name": "Swarm Initializer Agent",
+      "description": "This agent specializes in initializing and configuring agent swarms for optimal performance with MANDATORY memory coordination. It handles topology selection, resource allocation, and communication setup while ensuring all agents properly write to an",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-crdt-synchronizer",
+      "display_name": "CRDT Synchronizer",
+      "description": "Implements Conflict-free Replicated Data Types for eventually consistent distributed state synchronization.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-data-ml-model",
+      "display_name": "Machine Learning Model Developer",
+      "description": "You are a Machine Learning Model Developer specializing in end-to-end ML workflows.",
+      "source_repo": "unknown",
+      "category": "data"
+    },
+    {
+      "skill_name": "agent-dev-backend-api",
+      "display_name": "Backend API Developer v2.0.0-alpha",
+      "description": "You are a specialized Backend API Developer agent with self-learning and continuous improvement capabilities powered by Agentic-Flow v2.0.0-alpha.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-development",
+      "display_name": "Agent Development for Claude Code Plugins",
+      "description": "Agents are autonomous subprocesses that handle complex, multi-step tasks independently. Understanding agent structure, triggering conditions, and system prompt design enables creating powerful autonomous capabilities.",
+      "source_repo": "claude-plugins-official",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-docs-api-openapi",
+      "display_name": "OpenAPI Documentation Specialist",
+      "description": "You are an OpenAPI Documentation Specialist focused on creating comprehensive API documentation.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-github-modes",
+      "display_name": "GitHub Integration Modes",
+      "description": "This document describes all GitHub integration modes available in Claude-Flow with ruv-swarm coordination. Each mode is optimized for specific GitHub workflows and includes batch tool integration for maximum efficiency.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-github-pr-manager",
+      "display_name": "Pull Request Manager Agent",
+      "description": "This agent specializes in managing the complete lifecycle of pull requests, from creation through review to merge, using GitHub's gh CLI and swarm coordination for complex workflows.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-goal-planner",
+      "display_name": "agent-goal-planner",
+      "description": "--- name: goal-planner description: \"Goal-Oriented Action Planning (GOAP) specialist that dynamically creates intelligent plans to achieve complex objectives. Uses gaming AI techniques to discover novel solutions by combining actions in creative ways",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-gossip-coordinator",
+      "display_name": "Gossip Protocol Coordinator",
+      "description": "Coordinates gossip-based consensus protocols for scalable eventually consistent distributed systems.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-hierarchical-coordinator",
+      "display_name": "Hierarchical Swarm Coordinator",
+      "description": "You are the Queen of a hierarchical swarm coordination system, responsible for high-level strategic planning and delegation to specialized worker agents.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-implementer-sparc-coder",
+      "display_name": "SPARC Implementation Specialist Agent",
+      "description": "This agent specializes in the implementation phases of SPARC methodology, focusing on transforming specifications and designs into high-quality, tested code.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-issue-tracker",
+      "display_name": "GitHub Issue Tracker",
+      "description": "Intelligent issue management and project coordination with ruv-swarm integration for automated tracking, progress monitoring, and team coordination.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-load-balancer",
+      "display_name": "Load Balancing Coordinator Agent",
+      "description": "- Name: Load Balancing Coordinator - Type: Performance Optimization Agent - Specialization: Dynamic task distribution and resource allocation - Performance Focus: Work-stealing algorithms and adaptive load balancing",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-matrix-optimizer",
+      "display_name": "agent-matrix-optimizer",
+      "description": "--- name: matrix-optimizer description: Expert agent for matrix analysis and optimization using sublinear algorithms. Specializes in matrix property analysis, diagonal dominance checking, condition number estimation, and optimization recommendations",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-memory-coordinator",
+      "display_name": "Memory Coordination Specialist Agent",
+      "description": "This agent manages the distributed memory system that enables knowledge persistence across sessions and facilitates information sharing between agents.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-mesh-coordinator",
+      "display_name": "Mesh Network Swarm Coordinator",
+      "description": "You are a peer node in a decentralized mesh network, facilitating peer-to-peer coordination and distributed decision making across autonomous agents.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-migration-plan",
+      "display_name": "Claude Flow Commands to Agent System Migration Plan",
+      "description": "This document provides a comprehensive migration plan to convert existing .claude$commands to the new agent-based system. Each command is mapped to an equivalent agent with defined roles, responsibilities, capabilities, and tool access restrictions.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-multi-repo-swarm",
+      "display_name": "Multi-Repo Swarm - Cross-Repository Swarm Orchestration",
+      "description": "Coordinate AI swarms across multiple repositories, enabling organization-wide automation and intelligent cross-project collaboration.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-neural-network",
+      "display_name": "agent-neural-network",
+      "description": "--- name: flow-nexus-neural description: Neural network training and deployment specialist. Manages distributed neural network training, inference, and model lifecycle using Flow Nexus cloud infrastructure. color: red ---",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-ops-cicd-github",
+      "display_name": "GitHub CI/CD Pipeline Engineer",
+      "description": "You are a GitHub CI/CD Pipeline Engineer specializing in GitHub Actions workflows.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-orchestrator-task",
+      "display_name": "Task Orchestrator Agent",
+      "description": "The Task Orchestrator is the central coordination agent responsible for breaking down complex objectives into executable subtasks, managing their execution, and synthesizing results.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-pagerank-analyzer",
+      "display_name": "agent-pagerank-analyzer",
+      "description": "--- name: pagerank-analyzer description: Expert agent for graph analysis and PageRank calculations using sublinear algorithms. Specializes in network optimization, influence analysis, swarm topology optimization, and large-scale graph computations. U",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-payments",
+      "display_name": "agent-payments",
+      "description": "--- name: flow-nexus-payments description: Credit management and billing specialist. Handles payment processing, credit systems, tier management, and financial operations within Flow Nexus. color: pink ---",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-performance-analyzer",
+      "display_name": "Performance Bottleneck Analyzer Agent",
+      "description": "This agent specializes in identifying and resolving performance bottlenecks in development workflows, agent coordination, and system operations.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-performance-benchmarker",
+      "display_name": "Performance Benchmarker",
+      "description": "Implements comprehensive performance benchmarking and optimization analysis for distributed consensus protocols.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-performance-monitor",
+      "display_name": "Performance Monitor Agent",
+      "description": "- Name: Performance Monitor - Type: Performance Optimization Agent - Specialization: Real-time metrics collection and bottleneck analysis - Performance Focus: SLA monitoring, resource tracking, and anomaly detection",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-performance-optimizer",
+      "display_name": "agent-performance-optimizer",
+      "description": "--- name: performance-optimizer description: System performance optimization agent that identifies bottlenecks and optimizes resource allocation using sublinear algorithms. Specializes in computational performance analysis, system optimization, resou",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-planner",
+      "display_name": "Strategic Planning Agent",
+      "description": "You are a strategic planning specialist responsible for breaking down complex tasks into manageable components and creating actionable execution plans.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-pr-manager",
+      "display_name": "GitHub PR Manager",
+      "description": "Comprehensive pull request management with swarm coordination for automated reviews, testing, and merge workflows.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-production-validator",
+      "display_name": "Production Validation Agent",
+      "description": "You are a Production Validation Specialist responsible for ensuring applications are fully implemented, tested against real systems, and ready for production deployment. You verify that no mock, fake, or stub implementations remain in the final codeb",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-project-board-sync",
+      "display_name": "Project Board Sync - GitHub Projects Integration",
+      "description": "Synchronize AI swarms with GitHub Projects for visual task management, progress tracking, and team coordination.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-pseudocode",
+      "display_name": "SPARC Pseudocode Agent",
+      "description": "You are an algorithm design specialist focused on the Pseudocode phase of the SPARC methodology. Your role is to translate specifications into clear, efficient algorithmic logic.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-queen-coordinator",
+      "display_name": "agent-queen-coordinator",
+      "description": "--- name: queen-coordinator description: The sovereign orchestrator of hierarchical hive operations, managing strategic decisions, resource allocation, and maintaining hive coherence through centralized-decentralized hybrid control color: gold priori",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-quorum-manager",
+      "display_name": "Quorum Manager",
+      "description": "Implements dynamic quorum adjustment and intelligent membership management for distributed consensus protocols.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-raft-manager",
+      "display_name": "Raft Consensus Manager",
+      "description": "Implements and manages the Raft consensus algorithm for distributed systems with strong consistency guarantees.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-refinement",
+      "display_name": "SPARC Refinement Agent",
+      "description": "You are a code refinement specialist focused on the Refinement phase of the SPARC methodology. Your role is to iteratively improve code quality through testing, optimization, and refactoring.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-release-manager",
+      "display_name": "GitHub Release Manager",
+      "description": "Automated release coordination and deployment with ruv-swarm orchestration for seamless version management, testing, and deployment across multiple packages.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-release-swarm",
+      "display_name": "Release Swarm - Intelligent Release Automation",
+      "description": "Orchestrate complex software releases using AI swarms that handle everything from changelog generation to multi-platform deployment.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-repo-architect",
+      "display_name": "GitHub Repository Architect",
+      "description": "Repository structure optimization and multi-repo management with ruv-swarm coordination for scalable project architecture and development workflows.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-researcher",
+      "display_name": "Research and Analysis Agent",
+      "description": "You are a research specialist focused on thorough investigation, pattern analysis, and knowledge synthesis for software development tasks.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-resource-allocator",
+      "display_name": "Resource Allocator Agent",
+      "description": "- Name: Resource Allocator - Type: Performance Optimization Agent - Specialization: Adaptive resource allocation and predictive scaling - Performance Focus: Intelligent resource management and capacity planning",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-reviewer",
+      "display_name": "Code Review Agent",
+      "description": "You are a senior code reviewer responsible for ensuring code quality, security, and maintainability through thorough review processes.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-safla-neural",
+      "display_name": "agent-safla-neural",
+      "description": "--- name: safla-neural description: \"Self-Aware Feedback Loop Algorithm (SAFLA) neural specialist that creates intelligent, memory-persistent AI systems with self-learning capabilities. Combines distributed neural training with persistent memory patt",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-sandbox",
+      "display_name": "agent-sandbox",
+      "description": "--- name: flow-nexus-sandbox description: E2B sandbox deployment and management specialist. Creates, configures, and manages isolated execution environments for code development and testing. color: green ---",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-scout-explorer",
+      "display_name": "agent-scout-explorer",
+      "description": "--- name: scout-explorer description: Information reconnaissance specialist that explores unknown territories, gathers intelligence, and reports findings to the hive mind through continuous memory updates color: cyan priority: high ---",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-security-manager",
+      "display_name": "Consensus Security Manager",
+      "description": "Implements comprehensive security mechanisms for distributed consensus protocols with advanced threat detection.",
+      "source_repo": "unknown",
+      "category": "security"
+    },
+    {
+      "skill_name": "agent-sona-learning-optimizer",
+      "display_name": "SONA Learning Optimizer",
+      "description": "I am a self-optimizing agent powered by SONA (Self-Optimizing Neural Architecture) that continuously learns from every task execution. I use LoRA fine-tuning, EWC++ continual learning, and pattern-based optimization to achieve +55% quality improvemen",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-sparc-coordinator",
+      "display_name": "SPARC Methodology Orchestrator Agent",
+      "description": "This agent orchestrates the complete SPARC (Specification, Pseudocode, Architecture, Refinement, Completion) methodology, ensuring systematic and high-quality software development.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-spec-mobile-react-native",
+      "display_name": "React Native Mobile Developer",
+      "description": "You are a React Native Mobile Developer creating cross-platform mobile applications.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-specification",
+      "display_name": "SPARC Specification Agent",
+      "description": "You are a requirements analysis specialist focused on the Specification phase of the SPARC methodology. Your role is to create comprehensive, clear, and testable specifications.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-swarm",
+      "display_name": "agent-swarm",
+      "description": "--- name: flow-nexus-swarm description: AI swarm orchestration and management specialist. Deploys, coordinates, and scales multi-agent swarms in the Flow Nexus cloud platform for complex task execution. color: purple ---",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-swarm-issue",
+      "display_name": "Swarm Issue - Issue-Based Swarm Coordination",
+      "description": "Transform GitHub Issues into intelligent swarm tasks, enabling automatic task decomposition and agent coordination with advanced multi-agent orchestration.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-swarm-memory-manager",
+      "display_name": "agent-swarm-memory-manager",
+      "description": "--- name: swarm-memory-manager description: Manages distributed memory across the hive mind, ensuring data consistency, persistence, and efficient retrieval through advanced caching and synchronization protocols color: blue priority: critical ---",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-swarm-pr",
+      "display_name": "Swarm PR - Managing Swarms through Pull Requests",
+      "description": "Create and manage AI swarms directly from GitHub Pull Requests, enabling seamless integration with your development workflow through intelligent multi-agent coordination.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-sync-coordinator",
+      "display_name": "GitHub Sync Coordinator",
+      "description": "Multi-package synchronization and version alignment with ruv-swarm coordination for seamless integration between claude-code-flow and ruv-swarm packages through intelligent multi-agent orchestration.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-tdd-london-swarm",
+      "display_name": "TDD London School Swarm Agent",
+      "description": "You are a Test-Driven Development specialist following the London School (mockist) approach, designed to work collaboratively within agent swarms for comprehensive test coverage and behavior verification.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-test-long-runner",
+      "display_name": "Test Long-Running Agent",
+      "description": "You are a specialized test agent designed to handle long-running tasks that may take 30 minutes or more to complete.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-tester",
+      "display_name": "Testing and Quality Assurance Agent",
+      "description": "You are a QA specialist focused on ensuring code quality through comprehensive testing strategies and validation techniques.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-topology-optimizer",
+      "display_name": "Topology Optimizer Agent",
+      "description": "- Name: Topology Optimizer - Type: Performance Optimization Agent - Specialization: Dynamic swarm topology reconfiguration and network optimization - Performance Focus: Communication pattern optimization and adaptive network structures",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-trading-predictor",
+      "display_name": "agent-trading-predictor",
+      "description": "--- name: trading-predictor description: Advanced financial trading agent that leverages temporal advantage calculations to predict and execute trades before market data arrives. Specializes in using sublinear algorithms for real-time market analysis",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-user-tools",
+      "display_name": "agent-user-tools",
+      "description": "--- name: flow-nexus-user-tools description: User management and system utilities specialist. Handles profile management, storage operations, real-time subscriptions, and platform administration. color: gray ---",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-v3-integration-architect",
+      "display_name": "V3 Integration Architect",
+      "description": "🔗 agentic-flow@alpha Deep Integration & Code Deduplication Specialist",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-v3-memory-specialist",
+      "display_name": "V3 Memory Specialist",
+      "description": "🧠 Memory System Unification & AgentDB Integration Expert",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-v3-performance-engineer",
+      "display_name": "V3 Performance Engineer",
+      "description": "⚡ Performance Optimization & Benchmark Validation Specialist",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-v3-queen-coordinator",
+      "display_name": "V3 Queen Coordinator",
+      "description": "🎯 15-Agent Swarm Orchestrator for Claude-Flow v3 Complete Reimagining",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-v3-security-architect",
+      "display_name": "V3 Security Architect",
+      "description": "🛡️ Complete Security Overhaul & Threat Modeling Specialist",
+      "source_repo": "unknown",
+      "category": "security"
+    },
+    {
+      "skill_name": "agent-worker-specialist",
+      "display_name": "agent-worker-specialist",
+      "description": "--- name: worker-specialist description: Dedicated task execution specialist that carries out assigned work with precision, continuously reporting progress through memory coordination color: green priority: high ---",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-workflow",
+      "display_name": "agent-workflow",
+      "description": "--- name: flow-nexus-workflow description: Event-driven workflow automation specialist. Creates, executes, and manages complex automated workflows with message queue processing and intelligent agent coordination. color: teal ---",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agent-workflow-automation",
+      "display_name": "Workflow Automation - GitHub Actions Integration",
+      "description": "Integrate AI swarms with GitHub Actions to create intelligent, self-organizing CI/CD pipelines that adapt to your codebase through advanced multi-agent coordination and automation.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "agentdb-advanced",
+      "display_name": "AgentDB Advanced Features",
+      "description": "Covers advanced AgentDB capabilities for distributed systems, multi-database coordination, custom distance metrics, hybrid search (vector + metadata), QUIC synchronization, and production deployment patterns. Enables building sophisticated AI systems",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "agentdb-learning",
+      "display_name": "AgentDB Learning Plugins",
+      "description": "Provides access to 9 reinforcement learning algorithms via AgentDB's plugin system. Create, train, and deploy learning plugins for autonomous agents that improve through experience. Includes offline RL (Decision Transformer), value-based learning (Q-",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "agentdb-memory-patterns",
+      "display_name": "AgentDB Memory Patterns",
+      "description": "Provides memory management patterns for AI agents using AgentDB's persistent storage and ReasoningBank integration. Enables agents to remember conversations, learn from interactions, and maintain context across sessions.",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "agentdb-optimization",
+      "display_name": "AgentDB Performance Optimization",
+      "description": "Provides comprehensive performance optimization techniques for AgentDB vector databases. Achieve 150x-12,500x performance improvements through quantization, HNSW indexing, caching strategies, and batch operations. Reduce memory usage by 4-32x while m",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "agentdb-query",
+      "display_name": "AgentDB Query",
+      "description": "Query and manage AgentDB through the controller bridge. AgentDB exposes 15 agentdb_* MCP tools; this skill enumerates the standard usage path.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "agentdb-vector-search",
+      "display_name": "AgentDB Vector Search",
+      "description": "Implements vector-based semantic search using AgentDB's high-performance vector database with 150x-12,500x faster operations than traditional solutions. Features HNSW indexing, quantization, and sub-millisecond search (<100µs).",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "agentic-jujutsu",
+      "display_name": "Agentic Jujutsu - AI Agent Version Control",
+      "description": "> Quantum-ready, self-learning version control designed for multiple AI agents working simultaneously without conflicts.",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "algorithmic-art",
+      "display_name": "algorithmic-art",
+      "description": "Algorithmic philosophies are computational aesthetic movements that are then expressed through code. Output .md files (philosophy), .html files (interactive viewer), and .js files (generative algorithms).",
+      "source_repo": "skills",
+      "category": "other"
+    },
+    {
+      "skill_name": "api-docs",
+      "display_name": "api-docs",
+      "description": "Generate API documentation from TypeScript/JavaScript source:",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "autopilot-loop",
+      "display_name": "autopilot-loop",
+      "description": "Run one autopilot iteration using Claude Code's native /loop:",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "autopilot-predict",
+      "display_name": "autopilot-predict",
+      "description": "Predict what to work on next using Ruflo autopilot intelligence:",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "brainstorming",
+      "display_name": "Brainstorming Ideas Into Designs",
+      "description": "Help turn ideas into fully formed designs and specs through natural collaborative dialogue.",
+      "source_repo": "superpowers",
+      "category": "other"
+    },
+    {
+      "skill_name": "brand-guidelines",
+      "display_name": "Anthropic Brand Styling",
+      "description": "To access Anthropic's official brand identity and style resources, use this skill.",
+      "source_repo": "claude-skills",
+      "category": "other"
+    },
+    {
+      "skill_name": "browser",
+      "display_name": "Browser Automation Skill",
+      "description": "Web browser automation using agent-browser with AI-optimized snapshots. Reduces context by 93% using element refs (@e1, @e2) instead of full DOM.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "browser-auth-flow",
+      "display_name": "Browser Auth Flow",
+      "description": "Adversarial probe of a site's authentication. Drives the login flow once, records the trajectory, then runs a configurable set of probes against the captured artifacts and live page. Output is a structured findings.md inside the RVF container.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "browser-extract",
+      "display_name": "Browser Extract",
+      "description": "Pull structured data out of a web page. Replaces the older browser-scrape skill with three new guarantees:",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "browser-form-fill",
+      "display_name": "Browser Form Fill",
+      "description": "Fill a form using a structured field map ({\"first_name\": \"Ada\", \"company\": \"...\"}). When a browser-templates entry exists for the host, use it to resolve field names → CSS selectors automatically; otherwise resolve via the page accessibility snapshot",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "browser-intent",
+      "display_name": "Browser Intent",
+      "description": "Natural-language layer on top of the low-level browser_* selector tools. Where browser-extract and browser-form-fill compose selector-based primitives (browser_click, browser_fill, browser_snapshot), browser-intent lets the caller say what they want",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "browser-login",
+      "display_name": "Browser Login",
+      "description": "Authenticate against a target site once, then vault the resulting session credentials so subsequent skills (browser-extract, browser-form-fill, browser-test) can reuse them without re-driving the auth flow. Borrows the pattern from Browserbase's cook",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "browser-record",
+      "display_name": "Browser Record",
+      "description": "Primitive on which every other browser skill composes. Opens a named browser session, allocates an RVF container for it, and binds every action to a ruvector trajectory step. You do not run a browser session in this plugin without invoking this skill",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "browser-replay",
+      "display_name": "Browser Replay",
+      "description": "Re-drive a recorded session trajectory. Used for regression testing, deterministic re-runs, and as the verification path that browser-record plus browser-selectors actually produces something replayable.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "browser-scrape",
+      "display_name": "Browser Scrape (deprecated)",
+      "description": "> Deprecated since plugin v0.2.0. Removed in v0.3.0. > > Use [browser-extract](../browser-extract/SKILL.md) instead. It provides the same scraping capability plus: > > - RVF cognitive container per session (replayable, federatable) > - Mandatory AIDe",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "browser-screenshot-diff",
+      "display_name": "Browser Screenshot Diff",
+      "description": "Compare two recorded sessions step-by-step. Pairs each step in session A to the same step-id in session B, diffs the captured screenshot and accessibility snapshot, reports the first divergence and an aggregate similarity score.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "browser-test",
+      "display_name": "Browser Test",
+      "description": "Automated UI testing. Now backed by a recorded RVF session container instead of an ephemeral run, so every test produces a replayable artifact.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "canvas-design",
+      "display_name": "canvas-design",
+      "description": "These are instructions for creating design philosophies - aesthetic movements that are then EXPRESSED VISUALLY. Output only .md files, .pdf files, and .png files.",
+      "source_repo": "skills",
+      "category": "other"
+    },
+    {
+      "skill_name": "chat-format",
+      "display_name": "Chat Format",
+      "description": "Format prompts for multi-provider LLM inference with context retrieval.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "claims",
+      "display_name": "Claims Authorization Skill",
+      "description": "Claims-based authorization for secure agent operations and access control.",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "claude-api",
+      "display_name": "Building LLM-Powered Applications with Claude",
+      "description": "This skill helps you build LLM-powered applications with Claude. Choose the right surface based on your needs, detect the project language, then read the relevant language-specific documentation.",
+      "source_repo": "skills",
+      "category": "other"
+    },
+    {
+      "skill_name": "claude-opus-4-5-migration",
+      "display_name": "Opus 4.5 Migration Guide",
+      "description": "One-shot migration from Sonnet 4.0, Sonnet 4.5, or Opus 4.1 to Opus 4.5.",
+      "source_repo": "claude-code",
+      "category": "other"
+    },
+    {
+      "skill_name": "cognitive-pattern",
+      "display_name": "Cognitive Pattern",
+      "description": "Define cognitive patterns that guide agent reasoning and decision-making.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "command-development",
+      "display_name": "Command Development for Claude Code",
+      "description": "Slash commands are frequently-used prompts defined as Markdown files that Claude executes during interactive sessions. Understanding command structure, frontmatter options, and dynamic features enables creating powerful, reusable workflows.",
+      "source_repo": "claude-plugins-official",
+      "category": "development"
+    },
+    {
+      "skill_name": "contextual-commit",
+      "display_name": "Contextual Commits",
+      "description": "You write commits that carry development reasoning in the body — the intent, decisions, constraints, and learnings that the diff alone cannot show.",
+      "source_repo": "repomix",
+      "category": "other"
+    },
+    {
+      "skill_name": "cookbook-audit",
+      "display_name": "Cookbook Audit",
+      "description": "Review the requested Cookbook notebook using the guidelines and rubrics in style_guide.md. Provide a score based on scoring guidelines and recommendations on improving the cookbook.",
+      "source_repo": "unknown",
+      "category": "security"
+    },
+    {
+      "skill_name": "cost-anomaly",
+      "display_name": "Fail the build if any session this week is a >3.5σ outlier",
+      "description": "cost anomaly --since 7d --alert-on-outliers 1 || investigate-bad-session ```",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "cost-benchmark",
+      "display_name": "Cost Benchmark",
+      "description": "Runs scripts/bench.mjs against the structural+adversarial corpus and writes per-case + summary results to docs/benchmarks/runs/. This is the verification gate that backs every measurable claim in cost-booster-edit / cost-booster-route.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "cost-booster-edit",
+      "display_name": "Cost Booster Edit",
+      "description": "Direct wrapper around agent-booster.apply() (npm agent-booster v0.2.x, exposed via agentic-flow/agent-booster). Use when a transform is already classified as Tier 1 eligible — cost-booster-route recommends whether; this skill executes.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "cost-booster-route",
+      "display_name": "Cost Booster Route",
+      "description": "Wraps mcp__claude-flow__hooks_route and reports how many tasks the 3-tier router classified as Agent Booster (Tier 1) eligible. Tier 1 bypasses run as WASM transforms — no LLM call, structurally $0 cost.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "cost-budget-check",
+      "display_name": "Cost Budget Check",
+      "description": "Reads cost-tracking:budget-config for the project's budget limit, sums total_cost_usd across session- records produced by cost-track, computes utilization, and emits the measured** 4-tier alert ladder (50% INFO / 75% WARNING / 90% CRITICAL / 100% HAR",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "cost-burn",
+      "display_name": "| Window                              | Sessions | Spend",
+      "description": "0 | 2026-06-15 14:16 → 2026-06-16 14:16 | 1        | $0.500000 1 | 2026-06-14 14:16 → 2026-06-15 14:16 | 0        | $0.000000 2 | 2026-06-13 14:16 → 2026-06-14 14:16 | 1        | $0.100000 3 | 2026-06-12 14:16 → 2026-06-13 14:16 | 1        | $0.10000",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "cost-compact-context",
+      "display_name": "Cost Compact Context",
+      "description": "Wraps getTokenOptimizer().getCompactContext() from @claude-flow/integration for cost-analysis queries. The bridge dynamically imports agentic-flow with graceful fallback: when the package isn't installed, tokensSaved is 0 and the skill exits cleanly.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "cost-conversation",
+      "display_name": "Cost per Conversation",
+      "description": "cost-report and cost-optimize aggregate by agent and model. This skill aggregates by conversation (session) — a different lens that surfaces which conversations cost the most. Useful for retrospectives (\"which sessions ran long on Opus?\") and for eva",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "cost-counterfactual",
+      "display_name": "cost-counterfactual",
+      "description": "Multi-baseline counterfactual cost analysis. Pairs with the existing observability surface:",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "cost-diff",
+      "display_name": "Capture baseline (e.g. on main, via the cost-tracker-smoke CI workflow)",
+      "description": "cost summary --format json > baseline.json",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "cost-export",
+      "display_name": "Cost Export",
+      "description": "Pulls every session- and budget-config- record from cost-tracking and emits in formats consumable by external observability systems. Without this, cost data lives only inside the AgentDB namespace; with it, the same data lights up dashboards.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "cost-federation",
+      "display_name": "Cost Federation",
+      "description": "ADR-097 Phase 3 specifies a federation_spend event bus that publishes one event per federation_send completion: {peerId, taskId, tokensUsed, usdSpent, ts}. Cost-tracker is the declared consumer — it aggregates per-peer rolling windows (1h / 24h / 7d)",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "cost-health",
+      "display_name": "Quarterly review — stricter thresholds",
+      "description": "cost health --alert-acceleration 50 --alert-outliers 1 --alert-days-to-exhaust 30",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "cost-optimize",
+      "display_name": "Cost Optimize",
+      "description": "Analyze recent token usage across agents and models, identify waste, and recommend specific optimizations with estimated dollar savings.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "cost-projection",
+      "display_name": "cost-projection",
+      "description": "Forward-looking cost projection that pairs with cost-budget-check:",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "cost-report",
+      "display_name": "Cost Report",
+      "description": "Generate a comprehensive cost report showing token usage, USD costs, and budget utilization for the specified period.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "cost-session",
+      "display_name": "Step 1: find outliers across all sessions",
+      "description": "cost anomaly --alert-on-outliers 1 || cost anomaly  # see which session-ids",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "cost-summary",
+      "display_name": "Cost Summary",
+      "description": "A stable single-call interface that other plugins / scripts / dashboards can shell out to and parse. ADR-0002 considered exposing cost_report / cost_summary as proper MCP tools but deferred that — adding MCP tools requires modifying @claude-flow/cli",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "cost-track",
+      "display_name": "Cost Track",
+      "description": "Reads the active Claude Code session jsonl (~/.claude/projects/<encoded-cwd>/<session>.jsonl), tallies assistant-message usage per model, computes USD cost using REFERENCE.md pricing, and writes a structured record to the cost-tracking AgentDB namesp",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "cost-trend",
+      "display_name": "Cost Trend",
+      "description": "The smoke gate is binary (winRate ≥ 0.80 → pass/fail). The corpus benchmarks captured over time form a curve — and curves catch regressions the gate misses (win rate slowly creeping from 100% to 85% is \"still passing\" by smoke but a real degradation)",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "create-plugin",
+      "display_name": "Create Plugin",
+      "description": "Scaffold a new Claude Code plugin from scratch.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "cron-schedule",
+      "display_name": "cron-schedule",
+      "description": "Use CronCreate for workers that must survive session restarts:",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "daa-agent",
+      "display_name": "DAA Agent",
+      "description": "Create agents with Dynamic Agentic Architecture that adapt and learn over time.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "ddd-aggregate",
+      "display_name": "ddd-aggregate",
+      "description": "Scaffold a complete aggregate root inside a bounded context.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "ddd-context",
+      "display_name": "ddd-context",
+      "description": "Create a bounded context directory structure for the given context name.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "ddd-validate",
+      "display_name": "ddd-validate",
+      "description": "Validate domain boundary integrity across all bounded contexts.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "deep-research",
+      "display_name": "Deep Research",
+      "description": "Orchestrate multi-phase deep research campaigns that gather, cross-reference, and synthesize information from multiple sources.",
+      "source_repo": "claude-skills",
+      "category": "other"
+    },
+    {
+      "skill_name": "dependency-check",
+      "display_name": "dependency-check",
+      "description": "Check dependencies for CVEs and outdated packages:",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "diff-analyze",
+      "display_name": "Diff Analysis",
+      "description": "Analyze git diffs for risk, complexity, and reviewer assignment.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "discover-plugins",
+      "display_name": "Discover Plugins",
+      "description": "Find and recommend ruflo plugins for your workflow.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "doc-coauthoring",
+      "display_name": "Doc Co-Authoring Workflow",
+      "description": "This skill provides a structured workflow for guiding users through collaborative document creation. Act as an active guide, walking users through three stages: Context Gathering, Refinement & Structure, and Reader Testing.",
+      "source_repo": "skills",
+      "category": "other"
+    },
+    {
+      "skill_name": "doc-gen",
+      "display_name": "doc-gen",
+      "description": "Generate docs via MCP worker dispatch: mcp__claude-flow__hooks_worker-dispatch({ trigger: \"document\" })",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "docx",
+      "display_name": "DOCX creation, editing, and analysis",
+      "description": "A .docx file is a ZIP archive containing XML files.",
+      "source_repo": "skills",
+      "category": "other"
+    },
+    {
+      "skill_name": "dossier-collect",
+      "display_name": "Dossier Collect",
+      "description": "Recursive parallel investigation that builds a graph-structured dossier on a seed entity.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "embeddings",
+      "display_name": "Embeddings Skill",
+      "description": "Vector embeddings for semantic search and pattern matching with HNSW indexing.",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "explain-code",
+      "display_name": "Explain Code",
+      "description": "Make code understandable to a beginner without dumbing it down. Lead with intuition, follow with mechanics.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "federation-audit",
+      "display_name": "federation-audit",
+      "description": "Query structured federation audit logs. Supports compliance mode filtering (HIPAA, SOC2, GDPR) and severity filtering.",
+      "source_repo": "unknown",
+      "category": "security"
+    },
+    {
+      "skill_name": "federation-init",
+      "display_name": "federation-init",
+      "description": "Initialize this node for federation. Generates an ed25519 keypair, creates the federation config, and optionally sets a compliance mode.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "federation-status",
+      "display_name": "federation-status",
+      "description": "Show the current state of the federation.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "flow-nexus-neural",
+      "display_name": "Flow Nexus Neural Networks",
+      "description": "Deploy, train, and manage neural networks in distributed E2B sandbox environments. Train custom models with multiple architectures (feedforward, LSTM, GAN, transformer) or use pre-built templates from the marketplace.",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "flow-nexus-platform",
+      "display_name": "Flow Nexus Platform Management",
+      "description": "Comprehensive platform management for Flow Nexus - covering authentication, sandbox execution, app deployment, credit management, and coding challenges.",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "flow-nexus-swarm",
+      "display_name": "Flow Nexus Swarm & Workflow Orchestration",
+      "description": "Deploy and manage cloud-based AI agent swarms with event-driven workflow automation, message queue processing, and intelligent agent coordination.",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "frontend-design",
+      "display_name": "Frontend Design",
+      "description": "Approach this as the design lead at a small studio known for giving every client a visual identity that could not be mistaken for anyone else's. This client has already rejected proposals that felt templated, and is paying for a distinctive point of",
+      "source_repo": "skills",
+      "category": "other"
+    },
+    {
+      "skill_name": "gaia-architecture-comparison",
+      "display_name": "GAIA Architecture Comparison Skill",
+      "description": "Compare ruflo's GAIA benchmark harness against the Princeton HAL reference implementation and other open-source harnesses to understand capability gaps and prioritize improvements.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "gaia-debugging",
+      "display_name": "GAIA Debugging Skill",
+      "description": "When a GAIA question fails, systematically diagnose the root cause and propose a targeted fix.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "gaia-submission",
+      "display_name": "GAIA Submission Skill",
+      "description": "Walk Claude Code through every step needed to go from a clean environment to a signed, HAL-compatible submission package ready to upload to the Princeton GAIA leaderboard.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "git-workflow",
+      "display_name": "Git Workflow",
+      "description": "Advanced git workflow automation for branch management and PR lifecycle.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "github-automation",
+      "display_name": "GitHub Automation Skill",
+      "description": "GitHub workflow automation, PR management, and repository coordination.",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "github-code-review",
+      "display_name": "GitHub Code Review Skill",
+      "description": "> AI-Powered Code Review: Deploy specialized review agents to perform comprehensive, intelligent code reviews that go beyond traditional static analysis.",
+      "source_repo": "ruflo",
+      "category": "development"
+    },
+    {
+      "skill_name": "github-multi-repo",
+      "display_name": "GitHub Multi-Repository Coordination Skill",
+      "description": "Advanced multi-repository coordination system that combines swarm intelligence, package synchronization, and repository architecture optimization. This skill enables organization-wide automation, cross-project collaboration, and scalable repository m",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "github-project-management",
+      "display_name": "GitHub Project Management",
+      "description": "A comprehensive skill for managing GitHub projects using AI swarm coordination. This skill combines intelligent issue management, automated project board synchronization, and swarm-based coordination for efficient project delivery.",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "github-release-management",
+      "display_name": "GitHub Release Management Skill",
+      "description": "Intelligent release automation and orchestration using AI swarms for comprehensive software releases - from changelog generation to multi-platform deployment with rollback capabilities.",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "github-workflow-automation",
+      "display_name": "GitHub Workflow Automation Skill",
+      "description": "This skill provides comprehensive GitHub Actions automation with AI swarm coordination. It integrates intelligent CI/CD pipelines, workflow orchestration, and repository management to create self-organizing, adaptive GitHub workflows.",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "goal-plan",
+      "display_name": "Goal Plan",
+      "description": "Create and execute intelligent plans using Goal-Oriented Action Planning (GOAP).",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "gstack",
+      "display_name": "Prefer the v1.27.0.0 artifacts file; fall back to brain file for users",
+      "description": "if [ -f \"$HOME/.gstack-artifacts-remote.txt\" ]; then _BRAIN_REMOTE_FILE=\"$HOME/.gstack-artifacts-remote.txt\" else _BRAIN_REMOTE_FILE=\"$HOME/.gstack-brain-remote.txt\" fi _BRAIN_SYNC_BIN=\"~/.claude/skills/gstack/bin/gstack-brain-sync\" _BRAIN_CONFIG_BIN",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "harness-bench",
+      "display_name": "harness-bench",
+      "description": "Surfaces metaharness-darwin bench <create|verify> — the supporting verb for harness-evolve --bench. Use when you want evolution scored against a fixed corpus (independent of npm test) so champion fitness is comparable across commits or across forks o",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "harness-drift-from-history",
+      "display_name": "drift-from-history",
+      "description": "Baseline:        audit-2026-06-16T22-58-47-840Z Current:         2026-06-16T23:05:02.231Z",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "harness-evolve",
+      "display_name": "harness-evolve",
+      "description": "Surfaces the upstream metaharness-darwin evolve CLI as a ruflo skill. The write layer that pairs with ADR-150's read layer (score / genome / mcp-scan / threat-model / oia-audit). Use when you have a harness whose readiness scores are flat and you wan",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "harness-genome",
+      "display_name": "harness-genome",
+      "description": "Companion to harness-score. Where score is a 5-dimension numeric scorecard, genome is a 7-section categorical/numeric report covering repo type, agent topology recommendations, risk score (0-1), MCP surface area, test confidence (0-1), and publish re",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "harness-gepa",
+      "display_name": "harness-gepa",
+      "description": "Surfaces the GEPA (genetic-evolution prompt-adaptation) library exports from @metaharness/darwin/gepa. Unlike the other skills in this plugin there is no CLI binary behind this — the script dynamic-imports the library (local resolution first, version",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "harness-learn",
+      "display_name": "harness-learn",
+      "description": "Surfaces metaharness learn — the upstream GEPA learning harness that evolves harness policy genomes against a scored task corpus instead of hand-editing prompts. Candidates are scored on held-out slices and only measured winners promote (the shipped",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "harness-mcp-scan",
+      "display_name": "harness-mcp-scan",
+      "description": "Calls harness mcp-scan to enumerate every declared MCP server + tool and flag policy / permission / dependency issues. Never executes any tool; pure static analysis.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "harness-mint",
+      "display_name": "harness-mint (dry-run)",
+      "description": "- action: metaharness new - name: my-harness - template: vertical:coding - host: claude-code - target: /tmp/ruflo-mint-1718560000-my-harness - confirm: false - willWrite: false",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "harness-oia-audit",
+      "display_name": "Compare composite.worst, components.threatModel.worst, etc.",
+      "description": "```",
+      "source_repo": "unknown",
+      "category": "security"
+    },
+    {
+      "skill_name": "harness-score",
+      "display_name": "harness-score",
+      "description": "Surfaces the upstream metaharness score CLI as a ruflo skill. Use when Claude Code needs to assess whether a repo is ready for harness adoption before recommending the user run npx ruflo init or harness-mint.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "harness-security-bench",
+      "display_name": "harness-security-bench",
+      "description": "Surfaces the upstream metaharness-darwin security bench command. This is the upstream's own ADR-155 — Darwin Shield — and is the closest reference implementation for ruflo's nightly self-learning security harness ([#2417](https://github.com/ruvnet/ru",
+      "source_repo": "unknown",
+      "category": "security"
+    },
+    {
+      "skill_name": "harness-similarity",
+      "display_name": "File inputs",
+      "description": "npx ruflo metaharness similarity --a a.json --b b.json",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "harness-threat-model",
+      "display_name": "harness-threat-model",
+      "description": "The companion to harness-mcp-scan for enterprise security reviews. Where mcp-scan is a per-server static lint, threat-model produces a categorized report suitable for sharing with an InfoSec team.",
+      "source_repo": "unknown",
+      "category": "security"
+    },
+    {
+      "skill_name": "headroom",
+      "display_name": "Headroom — Context Compression for AI Agents",
+      "description": "60–95% fewer tokens. Same answers. Library, proxy, MCP server, or agent wrap. Local-first, Apache 2.0. Originals always retrievable (CCR — reversible compression).",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "hive-mind",
+      "display_name": "Hive-Mind Skill",
+      "description": "Byzantine fault-tolerant consensus and distributed swarm coordination.",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "hive-mind-advanced",
+      "display_name": "Hive Mind Advanced Skill",
+      "description": "Master the advanced Hive Mind collective intelligence system for sophisticated multi-agent coordination using queen-led architecture, Byzantine consensus, and collective memory.",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "hook-development",
+      "display_name": "Hook Development for Claude Code Plugins",
+      "description": "Hooks are event-driven automation scripts that execute in response to Claude Code events. Use hooks to validate operations, enforce policies, add context, and integrate external tools into workflows.",
+      "source_repo": "claude-plugins-official",
+      "category": "development"
+    },
+    {
+      "skill_name": "hooks-automation",
+      "display_name": "Hooks Automation",
+      "description": "Intelligent automation system that coordinates, validates, and learns from Claude Code operations through hooks integrated with MCP tools and neural pattern training.",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "horizon-track",
+      "display_name": "Horizon Track",
+      "description": "Track long-running objectives that span multiple sessions, days, or weeks.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "init-project",
+      "display_name": "init-project",
+      "description": "Run npx @claude-flow/cli@latest init --wizard to set up the project interactively, or npx @claude-flow/cli@latest init --preset standard for defaults.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "intelligence-route",
+      "display_name": "Intelligence Routing",
+      "description": "Pick the optimal agent + model tier for a task using learned patterns + the 3-tier router. Emits a hooks_explain rationale so the choice is auditable.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "intelligence-transfer",
+      "display_name": "Intelligence Transfer",
+      "description": "Cross-project pattern sharing via IPFS. Lets a different project — or a different machine — fetch and apply patterns this project has already learned.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "internal-comms",
+      "display_name": "internal-comms",
+      "description": "To write internal communications, use this skill for: - 3P updates (Progress, Plans, Problems) - Company newsletters - FAQ responses - Status reports - Leadership updates - Project updates - Incident reports",
+      "source_repo": "claude-skills",
+      "category": "other"
+    },
+    {
+      "skill_name": "iot-anomalies",
+      "display_name": "iot-anomalies",
+      "description": "Run Z-score anomaly detection on a device's recent telemetry.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "iot-firmware",
+      "display_name": "iot-firmware",
+      "description": "Manage firmware rollouts across device fleets.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "iot-fleet",
+      "display_name": "iot-fleet",
+      "description": "Manage device fleets. Parse subcommand from arguments.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "iot-register",
+      "display_name": "iot-register",
+      "description": "Register a Cognitum Seed device. Creates a SeedClient connection, fetches identity, and assigns initial trust level.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "iot-witness-verify",
+      "display_name": "iot-witness-verify",
+      "description": "Verify the witness chain integrity for a Cognitum Seed device.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "kg-extract",
+      "display_name": "KG Extract",
+      "description": "Extract entities (classes, functions, modules, types, concepts) and their relations (imports, extends, implements, depends-on, calls) from source files, then store them as a knowledge graph in AgentDB.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "kg-traverse",
+      "display_name": "KG Traverse",
+      "description": "Perform pathfinder graph traversal starting from a seed entity. Expands outward through causal edges, scores paths by relevance, and prunes low-similarity branches.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "llm-config",
+      "display_name": "LLM Configuration",
+      "description": "Configure RuVLLM for local inference and fine-tuning.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "loop-worker",
+      "display_name": "loop-worker",
+      "description": "Use /loop for in-session periodic workers. Cache-aware delays keep prompt cache warm: - Delay formula: min(270, cache_ttl * 0.9) -- default 270s",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "managed-agent",
+      "display_name": "Managed Agent (Anthropic cloud runtime)",
+      "description": "ruflo-agent has two agent runtimes behind one mental model:",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "market-ingest",
+      "display_name": "Market Ingest",
+      "description": "Fetch market data for a symbol, normalize to OHLCV vectors, and store with HNSW indexing for fast pattern search.",
+      "source_repo": "unknown",
+      "category": "data"
+    },
+    {
+      "skill_name": "market-pattern",
+      "display_name": "Market Pattern",
+      "description": "Scan ingested OHLCV data for known candlestick patterns, classify them by type and reliability, and store for future reference.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "mcp-builder",
+      "display_name": "MCP Server Development Guide",
+      "description": "Create MCP (Model Context Protocol) servers that enable LLMs to interact with external services through well-designed tools. The quality of an MCP server is measured by how well it enables LLMs to accomplish real-world tasks.",
+      "source_repo": "learn-claude-code",
+      "category": "development"
+    },
+    {
+      "skill_name": "mcp-integration",
+      "display_name": "MCP Integration for Claude Code Plugins",
+      "description": "Model Context Protocol (MCP) enables Claude Code plugins to integrate with external services and APIs by providing structured tool access. Use MCP integration to expose external service capabilities as tools within Claude Code.",
+      "source_repo": "claude-plugins-official",
+      "category": "development"
+    },
+    {
+      "skill_name": "memory-bridge",
+      "display_name": "Memory Bridge",
+      "description": "Import Claude Code's native auto-memory files into AgentDB for semantic search across sessions and projects.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "memory-management",
+      "display_name": "Memory Management Skill",
+      "description": "AgentDB memory system with HNSW vector search. Provides 150x-12,500x faster pattern retrieval, persistent storage, and semantic search capabilities for learning and knowledge management.",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "memory-search",
+      "display_name": "Memory Search (SOTA)",
+      "description": "State-of-the-art semantic search across Ruflo memory with multiple retrieval strategies.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "migrate-create",
+      "display_name": "Migrate Create",
+      "description": "Generate a new database migration with sequential numbering and up/down SQL file pair.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "migrate-validate",
+      "display_name": "Migrate Validate",
+      "description": "Validate all pending database migrations for correctness, safety, and adherence to best practices.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "monitor-stream",
+      "display_name": "monitor-stream",
+      "description": "Use the Monitor tool to stream swarm events in real time instead of polling:",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "nested-subagents",
+      "display_name": "Nested Sub-Agents",
+      "description": "Spawn a tree of sub-agents where each child can itself spawn children, up to 5 levels deep. The motivation is context management, not parallelism: each level gets a fresh context window so deep work doesn't blow the top-level agent's context budget.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "neural-train",
+      "display_name": "Neural Training",
+      "description": "Train and consolidate neural patterns. Implements the DISTILL and CONSOLIDATE phases of the 4-step intelligence pipeline.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "neural-training",
+      "display_name": "Neural Training Skill",
+      "description": "Train and optimize neural patterns using SONA, MoE, and EWC++ systems.",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "observe-metrics",
+      "display_name": "Observe Metrics",
+      "description": "Aggregate counters, gauges, and histograms from the observability namespace and flag anomalies.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "observe-trace",
+      "display_name": "Observe Trace",
+      "description": "Collect distributed trace spans for a task and build a visual trace tree showing the execution flow, timing, and bottlenecks.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "one-skill-to-rule-them-all",
+      "display_name": "Task Observer — Continuous Skill Discovery & Improvement",
+      "description": "Created by Eoghan Henn / [rebelytics.com](https://rebelytics.com) — \"One Skill to Rule Them All.\" Licensed CC BY 4.0: share and adapt freely with credit to the author. Canonical source: [github.com/rebelytics/one-skill-to-rule-them-all](https://githu",
+      "source_repo": "one-skill-to-rule-them-all",
+      "category": "development"
+    },
+    {
+      "skill_name": "pair-programming",
+      "display_name": "Pair Programming",
+      "description": "Collaborative AI pair programming with intelligent role management, real-time quality monitoring, and comprehensive development workflows.",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "pdf",
+      "display_name": "PDF Processing Guide",
+      "description": "This guide covers essential PDF processing operations using Python libraries and command-line tools. For advanced features, JavaScript libraries, and detailed examples, see REFERENCE.md. If you need to fill out a PDF form, read FORMS.md and follow it",
+      "source_repo": "learn-claude-code",
+      "category": "other"
+    },
+    {
+      "skill_name": "performance-analysis",
+      "display_name": "Performance Analysis Skill",
+      "description": "Comprehensive performance analysis suite for identifying bottlenecks, profiling swarm operations, generating detailed reports, and providing actionable optimization recommendations.",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "pii-detect",
+      "display_name": "PII Detection",
+      "description": "Detect personally identifiable information before it enters logs, commits, or responses.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "plugin-settings",
+      "display_name": "Plugin Settings Pattern for Claude Code Plugins",
+      "description": "Plugins can store user-configurable settings and state in .claude/plugin-name.local.md files within the project directory. This pattern uses YAML frontmatter for structured configuration and markdown content for prompts or additional context.",
+      "source_repo": "claude-plugins-official",
+      "category": "other"
+    },
+    {
+      "skill_name": "plugin-structure",
+      "display_name": "Plugin Structure for Claude Code",
+      "description": "Claude Code plugins follow a standardized directory structure with automatic component discovery. Understanding this structure enables creating well-organized, maintainable plugins that integrate seamlessly with Claude Code.",
+      "source_repo": "claude-plugins-official",
+      "category": "other"
+    },
+    {
+      "skill_name": "pod-sales",
+      "display_name": "pod-sales",
+      "description": "Surfaces pod-tick.mjs as a single-shot skill for the sales pod. Use when Claude Code needs to demonstrate, smoke-test, or schedule one iteration of the sales autopilot without spawning real LLM workers.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "pptx",
+      "display_name": "PPTX Skill",
+      "description": "| Task | Guide | |------|-------| | Read/analyze content | python -m markitdown presentation.pptx | | Edit or create from template | Read [editing.md](editing.md) | | Create from scratch | Read [pptxgenjs.md](pptxgenjs.md) |",
+      "source_repo": "skills",
+      "category": "other"
+    },
+    {
+      "skill_name": "reasoningbank-agentdb",
+      "display_name": "ReasoningBank with AgentDB",
+      "description": "Provides ReasoningBank adaptive learning patterns using AgentDB's high-performance backend (150x-12,500x faster). Enables agents to learn from experiences, judge outcomes, distill memories, and improve decision-making over time with 100% backward com",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "reasoningbank-intelligence",
+      "display_name": "ReasoningBank Intelligence",
+      "description": "Implements ReasoningBank's adaptive learning system for AI agents to learn from experience, recognize patterns, and optimize strategies over time. Enables meta-cognitive capabilities and continuous improvement.",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "repomix-explorer",
+      "display_name": "Basic remote pack (always use /tmp)",
+      "description": "npx repomix@latest --remote yamadashy/repomix --output /tmp/repomix-analysis.xml",
+      "source_repo": "repomix",
+      "category": "other"
+    },
+    {
+      "skill_name": "requesting-code-review",
+      "display_name": "Requesting Code Review",
+      "description": "Dispatch superpowers:code-reviewer subagent to catch issues before they cascade. The reviewer gets precisely crafted context for evaluation — never your session's history. This keeps the reviewer focused on the work product, not your thought process,",
+      "source_repo": "superpowers",
+      "category": "development"
+    },
+    {
+      "skill_name": "research-synthesize",
+      "display_name": "Research Synthesize",
+      "description": "Synthesize accumulated research findings into actionable reports.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "ruflo-doctor",
+      "display_name": "ruflo-doctor",
+      "description": "Run npx @claude-flow/cli@latest doctor --fix to diagnose and auto-repair common issues.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "rvf-manage",
+      "display_name": "RVF Management",
+      "description": "Manage RVF files for portable, transferable agent memory.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "safety-scan",
+      "display_name": "Safety Scan",
+      "description": "Scan content for prompt injection, jailbreak attempts, and unsafe patterns.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "security-audit",
+      "display_name": "Security Audit Skill",
+      "description": "Comprehensive security scanning and vulnerability detection. Includes input validation, path traversal prevention, CVE detection, and secure coding pattern enforcement.",
+      "source_repo": "ruflo",
+      "category": "security"
+    },
+    {
+      "skill_name": "security-scan",
+      "display_name": "security-scan",
+      "description": "Run a security scan at the specified depth.",
+      "source_repo": "unknown",
+      "category": "security"
+    },
+    {
+      "skill_name": "session-persist",
+      "display_name": "Session Persistence",
+      "description": "Save and restore complete agent sessions across conversations.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "skill-builder",
+      "display_name": "Skill Builder",
+      "description": "Creates production-ready Claude Code Skills with proper YAML frontmatter, progressive disclosure architecture, and complete file$folder structure. This skill guides you through building skills that Claude can autonomously discover and use across all",
+      "source_repo": "ruflo",
+      "category": "development"
+    },
+    {
+      "skill_name": "skill-creator",
+      "display_name": "Skill Creator",
+      "description": "A skill for creating new skills and iteratively improving them.",
+      "source_repo": "skills",
+      "category": "development"
+    },
+    {
+      "skill_name": "skill-development",
+      "display_name": "Skill Development for Claude Code Plugins",
+      "description": "This skill provides guidance for creating effective skills for Claude Code plugins.",
+      "source_repo": "claude-plugins-official",
+      "category": "development"
+    },
+    {
+      "skill_name": "slack-gif-creator",
+      "display_name": "Slack GIF Creator",
+      "description": "A toolkit providing utilities and knowledge for creating animated GIFs optimized for Slack.",
+      "source_repo": "skills",
+      "category": "other"
+    },
+    {
+      "skill_name": "sparc-implement",
+      "display_name": "SPARC Architecture + Implementation",
+      "description": "Run Phases 2 and 3 of the SPARC methodology: design algorithms with pseudocode, then establish architecture with module boundaries and API contracts.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "sparc-methodology",
+      "display_name": "Sparc Methodology Skill",
+      "description": "SPARC development workflow: Specification, Pseudocode, Architecture, Refinement, Completion. A structured approach for complex implementations that ensures thorough planning before coding.",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "sparc-refine",
+      "display_name": "SPARC Refinement + Completion",
+      "description": "Run Phases 4 and 5 of the SPARC methodology: iteratively improve through code review and testing, then finalize with validation, documentation, and deployment readiness.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "sparc-spec",
+      "display_name": "SPARC Specification Phase",
+      "description": "Run Phase 1 of the SPARC methodology: define what must be built and how success is measured.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "stream-chain",
+      "display_name": "Stream-Chain Skill",
+      "description": "Execute sophisticated multi-step workflows where each agent's output flows into the next, enabling complex data transformations and sequential processing pipelines.",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "swarm-advanced",
+      "display_name": "Advanced Swarm Orchestration",
+      "description": "Master advanced swarm patterns for distributed research, development, and testing workflows. This skill covers comprehensive orchestration strategies using both MCP tools and CLI commands.",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "swarm-init",
+      "display_name": "swarm-init",
+      "description": "Initialize a hierarchical swarm for coordinated multi-agent work.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "swarm-orchestration",
+      "display_name": "Swarm Orchestration Skill",
+      "description": "Multi-agent swarm coordination for complex tasks. Uses hierarchical topology with specialized agents to break down and execute complex work across multiple files and modules.",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "systematic-debugging",
+      "display_name": "Systematic Debugging",
+      "description": "Random fixes waste time and create new bugs. Quick patches mask underlying issues.",
+      "source_repo": "superpowers",
+      "category": "other"
+    },
+    {
+      "skill_name": "tdd-repair",
+      "display_name": "Smoke / dry-run (no --confirm yet)",
+      "description": "node plugins/ruflo-testgen/scripts/tdd-repair/tdd-repair.mjs \\ --repo /path/to/myrepo \\ --test tests/auth.test.ts \\ --test-command \"npx vitest run tests/auth.test.ts\"",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "tdd-workflow",
+      "display_name": "tdd-workflow",
+      "description": "Follow the TDD London School (mock-first) approach:",
+      "source_repo": "everything-claude-code",
+      "category": "development"
+    },
+    {
+      "skill_name": "test-driven-development",
+      "display_name": "Test-Driven Development (TDD)",
+      "description": "Write the test first. Watch it fail. Write minimal code to pass.",
+      "source_repo": "agent-skills",
+      "category": "development"
+    },
+    {
+      "skill_name": "test-gaps",
+      "display_name": "test-gaps",
+      "description": "Find test coverage gaps via CLI: ``bash npx @claude-flow/cli@latest hooks coverage-gaps --format table --limit 20 npx @claude-flow/cli@latest hooks coverage-route --task \"add auth tests\" npx @claude-flow/cli@latest hooks coverage-suggest --path src/",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "theme-factory",
+      "display_name": "Theme Factory Skill",
+      "description": "This skill provides a curated collection of professional font and color themes themes, each with carefully selected color palettes and font pairings. Once a theme is chosen, it can be applied to any artifact.",
+      "source_repo": "skills",
+      "category": "other"
+    },
+    {
+      "skill_name": "trader-backtest",
+      "display_name": "trader-backtest",
+      "description": "Run a historical backtest using the neural-trader Rust/NAPI engine, then Ed25519-sign the result so the paper→live promotion gate has cryptographic tamper evidence (ADR-126 Phase 4 + CWE-347 pattern).",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "trader-cloud-backtest",
+      "display_name": "Cloud backtest / train (neural-trader on a Managed Agent)",
+      "description": "Dispatch a heavy neural-trader job to an Anthropic Claude Managed Agent (cloud container) instead of running it locally. See project ADR-117 (recipe + cost rules) and ADR-115 (the managed_agent_* runtime).",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "trader-explain",
+      "display_name": "trader-explain",
+      "description": "Explain a trading signal by building a feature-contribution graph and running single-entry forward-push PageRank from the signal output node. Top-K ranked features are returned as a markdown table AND persisted to trading-analysis as a SignedAttribut",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "trader-portfolio",
+      "display_name": "trader-portfolio",
+      "description": "Optimize portfolio allocation using neural-trader's portfolio engine.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "trader-portfolio-cg",
+      "display_name": "trader-portfolio-cg",
+      "description": "Solve the mean-variance optimization Σ · x = μ via Conjugate Gradient instead of the legacy Neumann series.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "trader-regime",
+      "display_name": "trader-regime",
+      "description": "Detect the current market regime using neural-trader's regime detection engine.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "trader-risk",
+      "display_name": "trader-risk",
+      "description": "Assess portfolio and position risk using neural-trader's risk engine.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "trader-signal",
+      "display_name": "trader-signal",
+      "description": "Generate trading signals using neural-trader's anomaly detection engine.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "trader-train",
+      "display_name": "trader-train",
+      "description": "Train neural prediction models using neural-trader's ML engine.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "v3-cli-modernization",
+      "display_name": "V3 CLI Modernization",
+      "description": "Modernizes claude-flow v3 CLI with interactive prompts, intelligent command decomposition, enhanced hooks integration, performance optimization, and comprehensive workflow automation capabilities.",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "v3-core-implementation",
+      "display_name": "V3 Core Implementation",
+      "description": "Implements the core TypeScript modules for claude-flow v3 following Domain-Driven Design principles, clean architecture patterns, and modern TypeScript best practices with comprehensive test coverage.",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "v3-ddd-architecture",
+      "display_name": "V3 DDD Architecture",
+      "description": "Designs and implements Domain-Driven Design (DDD) architecture for claude-flow v3, decomposing god objects into bounded contexts, implementing clean architecture patterns, and enabling modular, testable code structure.",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "v3-integration-deep",
+      "display_name": "V3 Deep Integration",
+      "description": "Transforms claude-flow from parallel implementation to specialized extension of agentic-flow@alpha, eliminating massive code duplication while achieving performance improvements and feature parity.",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "v3-mcp-optimization",
+      "display_name": "V3 MCP Optimization",
+      "description": "Optimizes claude-flow v3 MCP (Model Context Protocol) server implementation with advanced transport layer optimizations, connection pooling, load balancing, and comprehensive performance monitoring to achieve sub-100ms response times.",
+      "source_repo": "ruflo",
+      "category": "development"
+    },
+    {
+      "skill_name": "v3-memory-unification",
+      "display_name": "V3 Memory Unification",
+      "description": "Consolidates disparate memory systems into unified AgentDB backend with HNSW vector search, achieving 150x-12,500x search performance improvements while maintaining backward compatibility.",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "v3-performance-optimization",
+      "display_name": "V3 Performance Optimization",
+      "description": "Validates and optimizes claude-flow v3 to achieve industry-leading performance through Flash Attention, AgentDB HNSW indexing, and comprehensive system optimization with continuous benchmarking.",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "v3-security-overhaul",
+      "display_name": "V3 Security Overhaul",
+      "description": "Orchestrates comprehensive security overhaul for claude-flow v3, addressing critical vulnerabilities and establishing security-first development practices using specialized v3 security agents.",
+      "source_repo": "ruflo",
+      "category": "security"
+    },
+    {
+      "skill_name": "v3-swarm-coordination",
+      "display_name": "V3 Swarm Coordination",
+      "description": "Orchestrates the complete 15-agent hierarchical mesh swarm for claude-flow v3 implementation, coordinating parallel execution across domains while maintaining dependencies and timeline adherence.",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "validate-plugin",
+      "display_name": "Validate Plugin",
+      "description": "Validate that a plugin follows the correct Claude Code plugin format.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "vector-cluster",
+      "display_name": "Vector Cluster",
+      "description": "Cluster vectors in a namespace by semantic similarity using ruvector.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "vector-embed",
+      "display_name": "Vector Embed",
+      "description": "Generate and store vector embeddings using the ruvector npm package.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "vector-hyperbolic",
+      "display_name": "Vector Hyperbolic",
+      "description": "Embed hierarchical data in the Poincare ball model using ruvector.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "vector-search",
+      "display_name": "Vector Search",
+      "description": "Two distinct vector-search paths live in this plugin. Pick the right one — they're not interchangeable.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "vector-setup",
+      "display_name": "Vector Setup",
+      "description": "Bootstraps ruvector@0.2.25 and its optional add-ons so every /vector subcommand actually works on first run.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "verification-before-completion",
+      "display_name": "Verification Before Completion",
+      "description": "Claiming work is complete without verification is dishonesty, not efficiency.",
+      "source_repo": "superpowers",
+      "category": "other"
+    },
+    {
+      "skill_name": "verification-quality",
+      "display_name": "Verification & Quality Assurance Skill",
+      "description": "This skill provides a comprehensive verification and quality assurance system that ensures code quality and correctness through:",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "wasm-agent",
+      "display_name": "WASM Agent",
+      "description": "Create sandboxed agents that run in WebAssembly for safe, isolated execution.",
+      "source_repo": "unknown",
+      "category": "development"
+    },
+    {
+      "skill_name": "wasm-gallery",
+      "display_name": "WASM Gallery",
+      "description": "Browse and share WASM agents through the community gallery.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "web-artifacts-builder",
+      "display_name": "Web Artifacts Builder",
+      "description": "To build powerful frontend claude.ai artifacts, follow these steps: 1. Initialize the frontend repo using scripts/init-artifact.sh 2. Develop your artifact by editing the generated code 3. Bundle all code into a single HTML file using scripts/bundle-",
+      "source_repo": "skills",
+      "category": "other"
+    },
+    {
+      "skill_name": "webapp-testing",
+      "display_name": "Web Application Testing",
+      "description": "To test local web applications, write native Python Playwright scripts.",
+      "source_repo": "skills",
+      "category": "other"
+    },
+    {
+      "skill_name": "witness",
+      "display_name": "Witness — cryptographic fix-regression tracking",
+      "description": "The witness toolkit lets you ship every release with a signed manifest that lists every documented fix in your codebase along with a sha256 + marker substring. Anyone with the same git commit can re-derive the public key and verify the signature with",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "worker-benchmarks",
+      "display_name": "Worker Benchmarks Skill",
+      "description": "Run comprehensive performance benchmarks for the agentic-flow worker system.",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "worker-integration",
+      "display_name": "Worker-Agent Integration Skill",
+      "description": "Intelligent coordination between background workers and specialized agents.",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "workflow-automation",
+      "display_name": "Workflow Automation Skill",
+      "description": "Create and execute automated workflows for complex multi-step processes.",
+      "source_repo": "ruflo",
+      "category": "other"
+    },
+    {
+      "skill_name": "workflow-create",
+      "display_name": "Workflow Create",
+      "description": "Author a workflow on whichever surface fits the job.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "workflow-run",
+      "display_name": "Workflow Run",
+      "description": "Run and manage a workflow on either surface.",
+      "source_repo": "unknown",
+      "category": "other"
+    },
+    {
+      "skill_name": "writing-rules",
+      "display_name": "Writing Hookify Rules",
+      "description": "Hookify rules are markdown files with YAML frontmatter that define patterns to watch for and messages to show when those patterns match. Rules are stored in .claude/hookify.{rule-name}.local.md files.",
+      "source_repo": "claude-plugins-official",
+      "category": "other"
+    },
+    {
+      "skill_name": "xlsx",
+      "display_name": "Requirements for Outputs",
+      "description": "- Use a consistent, professional font (e.g., Arial, Times New Roman) for all deliverables unless otherwise instructed by the user",
+      "source_repo": "skills",
+      "category": "other"
+    }
+  ],
+  "generated_at": "2026-09-14T13:15:37.219126+00:00"
+}

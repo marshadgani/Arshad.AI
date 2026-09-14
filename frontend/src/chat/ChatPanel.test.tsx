@@ -78,4 +78,12 @@ describe('ChatPanel — four states', () => {
     render(<ChatPanel sessionId="s1" />);
     expect(await screen.findByLabelText(/message/i)).toBeInTheDocument();
   });
+
+  it('prefills the composer from initialDraft without auto-sending', async () => {
+    global.fetch = mockFetchOnce({ ok: true, json: () => Promise.resolve({ data: [] }) });
+    render(<ChatPanel sessionId="s1" initialDraft="log expense 420" />);
+    const input = await screen.findByLabelText(/message/i);
+    expect(input).toHaveValue('log expense 420');
+    expect(mockStream.send).not.toHaveBeenCalled();
+  });
 });

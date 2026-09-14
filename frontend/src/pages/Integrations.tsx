@@ -1,8 +1,29 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { ConnectError, connectIntegration } from '../api/integrations';
 import { getToken } from '../auth/tokenStorage';
+import { ConnectResultBanner } from '../components/ConnectResultBanner';
+import { DisconnectDialog } from '../components/DisconnectDialog';
+import { SyncJobWatcher } from '../components/SyncJobWatcher';
+import type { SyncJobView } from '../hooks/useSyncJob';
 import styles from './Integrations.module.css';
+
+const SKELETON_CARD_COUNT = 6;
+
+// The three providers whose sync() enqueues a background DAG job instead
+// of syncing synchronously (backend IntegrationProvider.sync_dag_id).
+// Mirrors the backend declaration rather than deriving it, since the list
+// endpoint doesn't currently expose sync_dag_id to the frontend — kept
+// narrow and named so a future provider addition is a one-line change
+// here, not a silent gap.
+const DAG_BACKED_SLUGS = new Set(['google_calendar', 'gmail', 'github']);
+
+const STALLED_REASON_COPY: Record<string, string> = {
+  no_worker_running:
+    'Sync queued but no worker is processing it — ENABLE_INPROCESS_WORKER is not set on the server.',
+  worker_not_responding: 'Sync queued but the background worker stopped responding.',
+  worker_timeout: 'Sync started but did not finish in time — it may need attention.',
+};
 
 type IntegrationKind =
   | 'personal_oauth'
@@ -27,14 +48,25 @@ interface IntegrationItem {
   coming_soon: boolean;
   coming_soon_reason: string | null;
   connect_prompt?: { label: string; placeholder: string } | null;
+  // FEAT-145: which disconnect confirm/outcome copy to show. 'revokes' —
+  // the backend will attempt an upstream token revoke. 'no_revoke' — a
+  // real credential is stored locally and will be deleted, but the
+  // provider has no revoke API (or the URL isn't wired up yet) so the
+  // grant itself stays live until removed from the provider's own
+  // dashboard. 'no_credential' — nothing is stored for this slug at all
+  // (e.g. Gmail/Calendar share the Google sign-in grant).
+  revocation_kind: 'revokes' | 'no_revoke' | 'no_credential';
 }
 
+// Status → design token. The value is genuinely dynamic (it depends on
+// the row's status), so it rides an inline `style`; the colour itself
+// stays in tokens.css per .claude/rules/frontend.md — no hardcoded hex.
 const STATUS_DOT: Record<IntegrationStatus, string> = {
-  connected: '#3fb950',
-  disconnected: '#6e7681',
-  error: '#f85149',
-  expired: '#d29922',
-  coming_soon: '#8957e5',
+  connected: 'var(--status-ok)',
+  disconnected: 'var(--status-neutral)',
+  error: 'var(--status-danger)',
+  expired: 'var(--status-warn)',
+  coming_soon: 'var(--status-soon)',
 };
 
 const STATUS_LABEL: Record<IntegrationStatus, string> = {
@@ -44,6 +76,35 @@ const STATUS_LABEL: Record<IntegrationStatus, string> = {
   expired: 'Re-auth required',
   coming_soon: 'Coming soon',
 };
+
+// Machine-readable ?error=<code> values the backend's attach-OAuth flow
+// (backend/src/integrations/personal/attach_callback.py) and the legacy
+// Phase-H generic callback (backend/src/integrations/routers.py) can
+// redirect back with. Kept as an as-const map per .claude/rules/
+// frontend.md's enum-alternative guidance, with a default fallback for
+// any code not enumerated here.
+const ERROR_CODE_LABELS = {
+  invalid_state: 'the connect link expired — try again',
+  provider_mismatch: 'the connect link did not match that provider',
+  access_denied: 'you cancelled the provider consent screen',
+  scope_not_granted: 'required permission was not granted — try again and leave every box ticked',
+  account_owned_by_another_user: 'that provider account is already linked to a different user',
+  provider_already_linked: 'a different account for this provider is already linked',
+  user_missing: 'your session user could not be found — sign in again',
+  unknown_provider: 'unsupported provider',
+  missing_client_id: 'the backend is not configured for this provider yet',
+  missing_client_secret: 'the backend is not configured for this provider yet',
+  oauth_provider_http_error: 'the provider returned an error',
+  oauth_provider_unreachable: 'could not reach the provider',
+  callback_crashed: 'something went wrong completing the connection',
+} as const;
+
+function errorLabel(code: string | null): string {
+  if (code && code in ERROR_CODE_LABELS) {
+    return ERROR_CODE_LABELS[code as keyof typeof ERROR_CODE_LABELS];
+  }
+  return 'unexpected error';
+}
 
 function timeAgo(iso: string | null): string {
   if (!iso) return 'Never';
@@ -79,6 +140,14 @@ export default function Integrations() {
     token: string;
   } | null>(null);
   const [tokenCopied, setTokenCopied] = useState(false);
+  // slug -> job_id for DAG-backed syncs currently being polled.
+  const [syncJobIds, setSyncJobIds] = useState<Record<string, string>>({});
+  // slug -> latest polled view, kept for rendering (spinner / stalled banner).
+  const [syncJobViews, setSyncJobViews] = useState<Record<string, SyncJobView>>({});
+  // Item currently targeted by the disconnect confirmation dialog (FEAT-145).
+  // null renders nothing — the dialog's "empty" state.
+  const [disconnectTarget, setDisconnectTarget] = useState<IntegrationItem | null>(null);
+  const [disconnectError, setDisconnectError] = useState<string | null>(null);
 
   const fetchAll = async () => {
     const token = getToken();
@@ -102,6 +171,150 @@ export default function Integrations() {
   useEffect(() => {
     fetchAll();
   }, []);
+
+  // Surfaces the result of the OAuth "attach provider to current user"
+  // flow (backend/src/integrations/personal/attach_callback.py) once the
+  // browser lands back here. Reads the query string exactly once on
+  // mount, then strips it via replaceState so a page refresh can't
+  // re-trigger the toast — same pattern as AuthCallback.tsx's fragment
+  // handling.
+  const [pendingFlash, setPendingFlash] = useState<
+    { kind: 'connected'; slug: string } | { kind: 'error'; slug: string | null; code: string | null } | null
+  >(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const connected = params.get('connected');
+    const err = params.get('error');
+    if (connected) {
+      setPendingFlash({ kind: 'connected', slug: connected });
+      window.history.replaceState({}, '', '/integrations');
+    } else if (err) {
+      setPendingFlash({ kind: 'error', slug: params.get('slug'), code: err });
+      window.history.replaceState({}, '', '/integrations');
+    }
+  }, []);
+
+  // Surfaced as a persistent banner (not just a toast) because the browser
+  // just completed a full-page OAuth redirect round trip — there's no
+  // on-screen continuity for the user to anchor a transient toast to. See
+  // components/ConnectResultBanner for why.
+  const [connectResult, setConnectResult] = useState<
+    { kind: 'success' | 'error'; title: string; message?: string } | null
+  >(null);
+
+  // Deferred until `items` is populated so the banner can use the
+  // provider's display_name instead of its raw slug — items is []
+  // on first mount, before fetchAll's response lands.
+  useEffect(() => {
+    if (!pendingFlash || items.length === 0) return;
+    if (pendingFlash.kind === 'connected') {
+      const match = items.find((it) => it.slug === pendingFlash.slug);
+      setConnectResult({
+        kind: 'success',
+        title: `${match?.display_name ?? pendingFlash.slug} connected`,
+      });
+      fetchAll();
+    } else {
+      setConnectResult({
+        kind: 'error',
+        title: 'Connect failed',
+        message: errorLabel(pendingFlash.code),
+      });
+      fetchAll();
+    }
+    setPendingFlash(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingFlash, items]);
+
+  // Page-reload resilience: rehydrate any in-flight DAG-backed sync job so
+  // a refresh mid-sync doesn't lose the "Syncing…" state. One job_id-less
+  // status call per DAG-backed, connected integration.
+  useEffect(() => {
+    if (items.length === 0) return;
+    const token = getToken();
+    if (!token) return;
+    for (const it of items) {
+      if (!DAG_BACKED_SLUGS.has(it.slug) || it.status !== 'connected') continue;
+      if (syncJobIds[it.slug]) continue;
+      fetch(`/api/v1/integrations/${it.slug}/sync/status`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then(async (res) => {
+          if (!res.ok) return; // 404 (no job yet), 401, 409 — nothing to rehydrate
+          const body = (await res.json()) as { data: SyncJobView | null };
+          const view = body.data;
+          if (view && (view.progress === 'processing' || view.progress === 'stalled')) {
+            setSyncJobIds((prev) => ({ ...prev, [it.slug]: view.job_id }));
+            setSyncJobViews((prev) => ({ ...prev, [it.slug]: view }));
+          }
+        })
+        .catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items]);
+
+  const handleSyncJobUpdate = useCallback((slug: string, view: SyncJobView) => {
+    setSyncJobViews((prev) => ({ ...prev, [slug]: view }));
+  }, []);
+
+  // Polling gave up (job row gone, backend unreachable). Stop tracking and
+  // say so — leaving the card on "Syncing…" forever would be the same kind
+  // of dishonest state FEAT-144 exists to remove.
+  const handleSyncJobError = (slug: string, err: Error) => {
+    flashToast(`Sync status unavailable: ${err.message}`);
+    setSyncJobIds((prev) => {
+      const next = { ...prev };
+      delete next[slug];
+      return next;
+    });
+    setSyncJobViews((prev) => {
+      const next = { ...prev };
+      delete next[slug];
+      return next;
+    });
+  };
+
+  // Reacts to terminal progress values reported by SyncJobWatcher: toast +
+  // refresh on success, toast + refresh (to pick up last_error) on
+  // failure, stop tracking either way. 'stalled' is left in place so the
+  // persistent card banner keeps showing until the user syncs again.
+  useEffect(() => {
+    for (const [slug, view] of Object.entries(syncJobViews)) {
+      if (!syncJobIds[slug]) continue;
+      if (view.progress === 'completed') {
+        flashToast('Synced');
+        fetchAll();
+        setSyncJobIds((prev) => {
+          const next = { ...prev };
+          delete next[slug];
+          return next;
+        });
+        setSyncJobViews((prev) => {
+          const next = { ...prev };
+          delete next[slug];
+          return next;
+        });
+      } else if (view.progress === 'failed') {
+        flashToast(`Sync failed: ${view.error_text ?? 'unknown error'}`);
+        fetchAll();
+        // Both maps are cleared, same as the completed branch: a view left
+        // behind with no matching job id is state nothing reads and the
+        // next sync has to overwrite.
+        setSyncJobIds((prev) => {
+          const next = { ...prev };
+          delete next[slug];
+          return next;
+        });
+        setSyncJobViews((prev) => {
+          const next = { ...prev };
+          delete next[slug];
+          return next;
+        });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [syncJobViews]);
 
   const grouped = useMemo(() => {
     const sections: Record<string, IntegrationItem[]> = {};
@@ -230,8 +443,21 @@ export default function Integrations() {
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body?.error?.message ?? `HTTP ${res.status}`);
-      flashToast(body?.data?.summary ?? 'Synced');
-      await fetchAll();
+      const data = body?.data ?? {};
+      if (data.mode === 'enqueued' && data.job_id) {
+        // Honest state: the sync is queued, not done. A poll (via
+        // SyncJobWatcher below) reports completion/failure/stall.
+        setSyncJobIds((prev) => ({ ...prev, [item.slug]: data.job_id as string }));
+        setSyncJobViews((prev) => {
+          const next = { ...prev };
+          delete next[item.slug];
+          return next;
+        });
+        flashToast(data.summary ?? 'Sync queued');
+      } else {
+        flashToast(data.summary ?? 'Synced');
+        await fetchAll();
+      }
     } catch (e: unknown) {
       flashToast(`Sync failed: ${(e as Error).message}`);
     } finally {
@@ -239,20 +465,47 @@ export default function Integrations() {
     }
   };
 
-  const onDisconnect = async (item: IntegrationItem) => {
-    if (!confirm(`Disconnect ${item.display_name}? Stored credentials will be removed.`)) return;
+  const openDisconnectDialog = (item: IntegrationItem) => {
+    setDisconnectTarget(item);
+    setDisconnectError(null);
+  };
+
+  const closeDisconnectDialog = () => {
+    if (disconnectTarget && actioning === disconnectTarget.slug) return; // ignore close while submitting
+    setDisconnectTarget(null);
+    setDisconnectError(null);
+  };
+
+  const confirmDisconnect = async () => {
+    const item = disconnectTarget;
+    if (!item) return;
     setActioning(item.slug);
+    setDisconnectError(null);
     try {
       const token = getToken();
       const res = await fetch(`/api/v1/integrations/${item.slug}/disconnect`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      flashToast(`${item.display_name} disconnected`);
+      const body = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(body?.error?.message ?? `HTTP ${res.status}`);
+      // A 'failed' upstream revoke must never read as clean success — the
+      // local credential is gone either way, but the third-party grant
+      // may still be live until the user revokes it manually.
+      if (body?.data?.upstream_revocation === 'failed') {
+        flashToast(
+          `${item.display_name} disconnected here, but revoking with ${item.display_name} failed — remove access in its dashboard too.`,
+        );
+      } else {
+        flashToast(`${item.display_name} disconnected`);
+      }
+      setDisconnectTarget(null);
       await fetchAll();
     } catch (e: unknown) {
-      flashToast(`Disconnect failed: ${(e as Error).message}`);
+      // Stays open in a retry state — .claude/skills/frontend-design error
+      // state, not a toast, since the user needs to decide whether to
+      // retry or cancel from within the dialog.
+      setDisconnectError((e as Error).message);
     } finally {
       setActioning(null);
     }
@@ -277,14 +530,49 @@ export default function Integrations() {
         </button>
       </header>
 
-      {error && <div className={styles.banner}>Failed to load integrations: {error}</div>}
+      {connectResult && (
+        <ConnectResultBanner
+          kind={connectResult.kind}
+          title={connectResult.title}
+          message={connectResult.message}
+          onDismiss={() => setConnectResult(null)}
+        />
+      )}
 
-      {grouped.map(([category, list]) => (
+      {error && (
+        <div className={styles.banner} role="alert">
+          Failed to load integrations: {error}
+        </div>
+      )}
+
+      {loading && items.length === 0 && !error && (
+        <div className={styles.grid} aria-hidden="true">
+          {Array.from({ length: SKELETON_CARD_COUNT }).map((_, i) => (
+            <div key={i} className={styles.skeletonCard}>
+              <div className={styles.skeletonHead}>
+                <span className={`${styles.skeletonBar} ${styles.skeletonIcon}`} />
+                <span className={`${styles.skeletonBar} ${styles.skeletonBarMid}`} />
+              </div>
+              <span className={`${styles.skeletonBar} ${styles.skeletonBarFull}`} />
+              <span className={`${styles.skeletonBar} ${styles.skeletonBarWide}`} />
+              <span className={`${styles.skeletonBar} ${styles.skeletonBarNarrow}`} />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!loading &&
+        !error &&
+        grouped.map(([category, list]) => (
         <section key={category} className={styles.section}>
           <h2 className={styles.sectionTitle}>{category}</h2>
           <div className={styles.grid}>
             {list.map((it) => (
-              <article key={it.slug} className={styles.card}>
+              <article
+                key={it.slug}
+                className={styles.card}
+                aria-busy={syncJobViews[it.slug]?.progress === 'processing'}
+              >
                 <div className={styles.cardHead}>
                   <div className={styles.cardTitle}>
                     <span className={styles.iconBox}>{it.display_name[0]}</span>
@@ -328,6 +616,25 @@ export default function Integrations() {
                   </div>
                 )}
 
+                {syncJobIds[it.slug] && (
+                  <SyncJobWatcher
+                    slug={it.slug}
+                    jobId={syncJobIds[it.slug]}
+                    onUpdate={(view) => handleSyncJobUpdate(it.slug, view)}
+                    onError={(err) => handleSyncJobError(it.slug, err)}
+                  />
+                )}
+
+                {syncJobViews[it.slug]?.progress === 'stalled' && (
+                  <div className={styles.stalledBanner} role="status" aria-live="polite">
+                    <span className={styles.stalledIcon} aria-hidden="true">
+                      ⚠
+                    </span>
+                    {STALLED_REASON_COPY[syncJobViews[it.slug].stalled_reason ?? ''] ??
+                      'Sync queued but did not complete.'}
+                  </div>
+                )}
+
                 {it.coming_soon && it.coming_soon_reason && (
                   <div className={styles.comingSoonReason} title={it.coming_soon_reason}>
                     {it.coming_soon_reason}
@@ -353,16 +660,39 @@ export default function Integrations() {
                       ) : (
                         <button
                           type="button"
+                          className={
+                            syncJobViews[it.slug]?.progress === 'processing'
+                              ? styles.syncingBtn
+                              : undefined
+                          }
                           onClick={() => onSync(it)}
-                          disabled={actioning === it.slug}
+                          disabled={
+                            actioning === it.slug ||
+                            syncJobViews[it.slug]?.progress === 'processing'
+                          }
+                          aria-busy={syncJobViews[it.slug]?.progress === 'processing'}
                         >
-                          {actioning === it.slug ? '…' : 'Sync now'}
+                          {syncJobViews[it.slug]?.progress === 'processing' && (
+                            <span
+                              className={`${styles.syncDot} ${
+                                syncJobViews[it.slug]?.retrying ? styles.retrying : ''
+                              }`}
+                              aria-hidden="true"
+                            />
+                          )}
+                          {syncJobViews[it.slug]?.progress === 'processing'
+                            ? syncJobViews[it.slug]?.retrying
+                              ? `Retrying (attempt ${syncJobViews[it.slug].attempt})…`
+                              : 'Syncing…'
+                            : actioning === it.slug
+                              ? '…'
+                              : 'Sync now'}
                         </button>
                       )}
                       <button
                         type="button"
                         className={styles.secondary}
-                        onClick={() => onDisconnect(it)}
+                        onClick={() => openDisconnectDialog(it)}
                         disabled={actioning === it.slug}
                       >
                         Disconnect
@@ -395,9 +725,15 @@ export default function Integrations() {
         </section>
       ))}
 
-      {!loading && items.length === 0 && (
+      {!loading && !error && items.length === 0 && (
         <div className={styles.empty}>
-          No integrations registered. Backend may not have loaded providers.
+          <span className={styles.emptyIcon} aria-hidden="true">
+            ⌁
+          </span>
+          <p className={styles.emptyTitle}>No integrations registered</p>
+          <p className={styles.emptyDesc}>
+            The backend may not have loaded any providers yet. Try refreshing.
+          </p>
         </div>
       )}
 
@@ -507,7 +843,22 @@ export default function Integrations() {
         </div>
       )}
 
-      {toast && <div className={styles.toast}>{toast}</div>}
+      {toast && (
+        <div className={styles.toast} role="status" aria-live="polite">
+          {toast}
+        </div>
+      )}
+
+      {disconnectTarget && (
+        <DisconnectDialog
+          displayName={disconnectTarget.display_name}
+          revocationKind={disconnectTarget.revocation_kind}
+          isSubmitting={actioning === disconnectTarget.slug}
+          error={disconnectError}
+          onConfirm={confirmDisconnect}
+          onCancel={closeDisconnectDialog}
+        />
+      )}
     </div>
   );
 }

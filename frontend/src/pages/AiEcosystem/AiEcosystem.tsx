@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useFetch } from '../../hooks/useFetch';
 import AgentCard, { AgentData, AgentMetric } from './AgentCard';
 import SkillCard, { SkillData } from './SkillCard';
+import SkillsLoadingState from './SkillsLoadingState';
+import SkillsStatusPanel from './SkillsStatusPanel';
 import styles from './AiEcosystem.module.css';
 import TimePeriodFilter, { Period } from './TimePeriodFilter';
 
@@ -65,7 +67,12 @@ export default function AiEcosystem() {
   });
   const { data: metricsData } = useFetch<MetricsInner>(`/api/v1/ai-ecosystem/metrics?period=${period}`);
   const { data: summaryData } = useFetch<SummaryInner>(`/api/v1/ai-ecosystem/summary?period=${period}`);
-  const { data: skillsData, isLoading: skillsLoading, error: skillsError } = useFetch<SkillData[]>('/api/v1/ai-ecosystem/skills', {
+  const {
+    data: skillsData,
+    isLoading: skillsLoading,
+    error: skillsError,
+    refetch: refetchSkills,
+  } = useFetch<SkillData[]>('/api/v1/ai-ecosystem/skills', {
     refreshInterval: 30_000,
   });
 
@@ -144,9 +151,13 @@ export default function AiEcosystem() {
       </div>
 
       {/* View switcher */}
-      <div className={styles.viewSwitcher}>
+      <div className={styles.viewSwitcher} role="tablist" aria-label="AI Ecosystem view">
         <button
           type="button"
+          role="tab"
+          id="ai-ecosystem-tab-agents"
+          aria-selected={activeView === 'agents'}
+          aria-controls="ai-ecosystem-panel-agents"
           className={`${styles.viewBtn} ${activeView === 'agents' ? styles.viewBtnActive : ''}`}
           onClick={() => setActiveView('agents')}
         >
@@ -155,6 +166,10 @@ export default function AiEcosystem() {
         </button>
         <button
           type="button"
+          role="tab"
+          id="ai-ecosystem-tab-skills"
+          aria-selected={activeView === 'skills'}
+          aria-controls="ai-ecosystem-panel-skills"
           className={`${styles.viewBtn} ${activeView === 'skills' ? styles.viewBtnActive : ''}`}
           onClick={() => setActiveView('skills')}
         >
@@ -164,13 +179,18 @@ export default function AiEcosystem() {
       </div>
 
       {activeView === 'agents' ? (
-        <>
+        <div
+          role="tabpanel"
+          id="ai-ecosystem-panel-agents"
+          aria-labelledby="ai-ecosystem-tab-agents"
+        >
           <div className={styles.controls}>
             <div className={styles.filterBar}>
               {AGENT_FILTERS.map(({ key, label }) => (
                 <button
                   key={key}
                   type="button"
+                  aria-pressed={activeAgentFilters.has(key)}
                   className={`${styles.filterBtn} ${activeAgentFilters.has(key) ? styles.filterBtnActive : ''}`}
                   onClick={() => toggleAgentFilter(key)}
                 >
@@ -199,15 +219,20 @@ export default function AiEcosystem() {
               {agents.length === 0 ? 'Loading agents…' : 'No agents match the selected filters.'}
             </div>
           )}
-        </>
+        </div>
       ) : (
-        <>
+        <div
+          role="tabpanel"
+          id="ai-ecosystem-panel-skills"
+          aria-labelledby="ai-ecosystem-tab-skills"
+        >
           <div className={styles.controls}>
             <div className={styles.filterBar}>
               {SKILL_FILTERS.map(({ key, label }) => (
                 <button
                   key={key}
                   type="button"
+                  aria-pressed={activeSkillFilters.has(key)}
                   className={`${styles.filterBtn} ${activeSkillFilters.has(key) ? styles.filterBtnActive : ''}`}
                   onClick={() => toggleSkillFilter(key)}
                 >
@@ -220,20 +245,31 @@ export default function AiEcosystem() {
             </div>
           </div>
 
-          {skillsError ? (
-            <div className={styles.empty}>Failed to load skills — {skillsError.message}</div>
+          {skillsLoading && skills.length === 0 ? (
+            <SkillsLoadingState />
+          ) : skillsError ? (
+            <SkillsStatusPanel
+              variant="error"
+              detail={skillsError.message}
+              onRetry={refetchSkills}
+            />
           ) : visibleSkills.length > 0 ? (
             <div className={styles.grid}>
               {visibleSkills.map((skill) => (
                 <SkillCard key={skill.skill_name} skill={skill} />
               ))}
             </div>
+          ) : skills.length === 0 ? (
+            <SkillsStatusPanel variant="empty" />
           ) : (
-            <div className={styles.empty}>
-              {skillsLoading ? 'Loading skills…' : skills.length === 0 ? 'No skills registered yet.' : 'No skills match the selected filters.'}
-            </div>
+            <SkillsStatusPanel
+              variant="filtered"
+              onClearFilters={() =>
+                setActiveSkillFilters(new Set(SKILL_FILTERS.map((f) => f.key)))
+              }
+            />
           )}
-        </>
+        </div>
       )}
     </div>
   );

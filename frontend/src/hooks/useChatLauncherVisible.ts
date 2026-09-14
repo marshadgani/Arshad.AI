@@ -1,6 +1,6 @@
 import { useLocation } from 'react-router-dom';
 
-import { isChatPath } from '../routes/paths';
+import { isChatPath } from '../routes';
 
 // Single source of truth for whether the chat FAB is on screen.
 //

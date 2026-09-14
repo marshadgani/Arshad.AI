@@ -1,0 +1,78 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
+  gap: 14px;
+}
+
+.skeletonCard {
+  background: var(--surface, #161b22);
+  border: 1px solid var(--border, #30363d);
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 148px;
+  overflow: hidden;
+  position: relative;
+}
+
+.skeletonHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.skeletonLine,
+.skeletonPill,
+.skeletonBadge {
+  display: block;
+  border-radius: 6px;
+  background: linear-gradient(
+    100deg,
+    var(--border, #30363d) 30%,
+    var(--surface-hover, #21262d) 50%,
+    var(--border, #30363d) 70%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+.skeletonLine {
+  height: 9px;
+}
+
+.skeletonPill {
+  width: 46px;
+  height: 16px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.skeletonFooter {
+  margin-top: auto;
+}
+
+.skeletonBadge {
+  width: 88px;
+  height: 14px;
+  border-radius: 6px;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonLine,
+  .skeletonPill,
+  .skeletonBadge {
+    animation: none;
+  }
+}

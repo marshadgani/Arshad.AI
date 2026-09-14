@@ -26,6 +26,7 @@ describe('useFetch skip option', () => {
       data: null,
       isLoading: false,
       error: null,
+      status: 'idle',
       refetch: expect.any(Function),
     });
     expect(fetchMock).not.toHaveBeenCalled();
@@ -51,6 +52,7 @@ describe('useFetch skip option', () => {
       data: null,
       isLoading: false,
       error: null,
+      status: 'idle',
       refetch: expect.any(Function),
     });
 
@@ -83,6 +85,7 @@ describe('useFetch skip option', () => {
       data: null,
       isLoading: false,
       error: null,
+      status: 'idle',
       refetch: expect.any(Function),
     });
 
@@ -97,6 +100,7 @@ describe('useFetch skip option', () => {
       data: null,
       isLoading: false,
       error: null,
+      status: 'idle',
       refetch: expect.any(Function),
     });
   });

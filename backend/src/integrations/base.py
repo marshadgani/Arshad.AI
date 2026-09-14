@@ -3,14 +3,28 @@
 Every provider (personal/* or project/*) subclasses IntegrationProvider and
 registers via @register. Two kinds of providers:
 
-- personal_oauth — per-user Google / GitHub / Notion / Slack / etc.
+- personal_oauth — per-user Google / GitHub / Spotify / Strava / etc.
   connect() kicks off OAuth (returns a redirect URL); the provider's
-  existing OAuth callback handler does the rest. State is stored in the
-  existing oauth_accounts + oauth_tokens tables.
+  callback handler does the rest. Credential storage is NOT uniform across
+  this kind: the six Google/GitHub providers built on personal/_shared.py
+  (gmail, google_calendar, google_drive, google_tasks, youtube, github)
+  reuse the login-time grant in oauth_accounts + oauth_tokens and never
+  create an integration_oauth_tokens row; every other personal_oauth
+  provider (Spotify, Strava, Whoop, ...) is built on
+  personal/_oauth_base.OAuthIntegrationProvider and stores its own row in
+  integration_oauth_tokens, keyed by integration_id.
 
-- project_apikey — Render / Vercel / Supabase / Upstash / etc.
-  connect() takes an API key in the payload, validates it via a probe
+- project_apikey / personal_apikey — Render / Vercel / Supabase / Plaid /
+  etc. connect() takes an API key in the payload, validates it via a probe
   request, encrypts and stores via api_key_credentials.
+
+disconnect() unconditionally scrubs whichever of those tables actually
+holds this integration's credential and, where the provider declares
+support, best-effort revokes the credential with the third party too. The
+workflow itself lives in integrations/disconnect.py (FEAT-145) — this
+module only declares the contract providers implement; the types it
+defines are re-exported here so `from .base import DisconnectOutcome`
+keeps working for the ~44 provider modules and the router.
 """
 
 from __future__ import annotations
@@ -23,6 +37,25 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.integration import Integration
 from ..models.user import User
+from .disconnect import (
+    DisconnectOutcome,
+    RevocationKind,
+    UpstreamRevocationResult,
+    run_disconnect,
+)
+
+__all__ = [
+    "ConnectResult",
+    "DisconnectOutcome",
+    "IntegrationError",
+    "IntegrationKind",
+    "IntegrationProvider",
+    "IntegrationStatus",
+    "RevocationKind",
+    "StatusReport",
+    "SyncResult",
+    "UpstreamRevocationResult",
+]
 
 IntegrationKind = Literal[
     "personal_oauth", "personal_apikey", "project_apikey", "static", "personal_push"
@@ -87,9 +120,18 @@ class ConnectResult:
 
 @dataclass
 class SyncResult:
+    """mode/job_id (FEAT-144): DAG-backed providers (google_calendar, gmail,
+    github) only enqueue a background job — they never do the real
+    ingestion synchronously. mode='enqueued' + job_id lets the router and
+    frontend tell that apart from a provider that actually did the work
+    before returning (mode='completed', the default). Both fields default
+    safely so every pre-existing synchronous provider is unaffected."""
+
     rows_written: int
     summary: str
     duration_ms: int
+    mode: Literal["completed", "enqueued"] = "completed"
+    job_id: str | None = None
 
 
 @dataclass
@@ -116,6 +158,19 @@ class IntegrationProvider(ABC):
     # emitted unconditionally by _provider_descriptor() so it reaches the
     # frontend even for a provider the user has never connected.
     connect_prompt: ClassVar[dict[str, str] | None] = None
+    # DAG-id this provider's sync() enqueues via make_sync_via_dag(), or
+    # None for every synchronously-syncing provider. This is the single
+    # declaration of the slug<->dag_id relationship (FEAT-144): the
+    # router's is-pollable check, the status query's dag_id filter, and
+    # registry.slug_for_dag_id()'s reverse lookup all derive from it —
+    # nothing else declares or re-derives this mapping.
+    sync_dag_id: ClassVar[str | None] = None
+    # FEAT-145: declares what disconnect() should attempt upstream. The
+    # safe default is deliberate — making this a required declaration would
+    # crash the whole app on boot the moment one of the 44 providers forgot
+    # it. Completeness is enforced instead by the registry walk in
+    # backend/tests/test_integration_disconnect.py, which fails CI.
+    revocation_kind: ClassVar[RevocationKind] = "no_revoke"
 
     @abstractmethod
     async def connect(
@@ -135,9 +190,34 @@ class IntegrationProvider(ABC):
     ) -> StatusReport:
         """Health check + most recent sync metadata."""
 
-    async def disconnect(self, *, integration: Integration, db: AsyncSession) -> None:
-        """Default: mark integration disconnected. Subclasses can override
-        to revoke tokens upstream when the provider supports it."""
-        integration.status = "disconnected"
-        integration.last_error = None
-        await db.commit()
+    async def _prepare_revocation(
+        self, *, integration: Integration, db: AsyncSession
+    ) -> Any | None:
+        """Load+decrypt whatever the upstream revoke call needs, while the
+        read transaction opened by that lookup is still open. Returns an
+        opaque payload for _revoke_upstream(), or None when there is
+        nothing to revoke (no credential row, provider doesn't support
+        revocation, or decryption failed). Default: nothing to revoke.
+        """
+        return None
+
+    async def _revoke_upstream(self, *, payload: Any) -> UpstreamRevocationResult:
+        """Pure network call — deliberately takes no db handle, so a
+        subclass cannot re-open a transaction mid-network-call (the bug
+        class that motivated splitting this from _prepare_revocation).
+        Default: nothing to revoke.
+        """
+        return "unsupported"
+
+    async def disconnect(
+        self, *, integration: Integration, db: AsyncSession
+    ) -> DisconnectOutcome:
+        """Revoke the upstream credential where the provider supports it,
+        then scrub every locally stored credential row and mark the
+        integration disconnected — keeping the frontend's disconnect-dialog
+        promise for every provider, not just the ones that override this.
+
+        Providers customise the two hooks above rather than this method;
+        the sequencing lives in integrations/disconnect.run_disconnect.
+        """
+        return await run_disconnect(self, integration=integration, db=db)

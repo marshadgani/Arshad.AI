@@ -31,6 +31,10 @@ class GoogleCalendarIntegration(IntegrationProvider):
     description = "Sync your Google Calendar events into Arshad.AI."
     docs_url = "https://developers.google.com/calendar"
     icon = "google-calendar"
+    sync_dag_id = "calendar_ingestor"
+    # FEAT-145: no integration_oauth_tokens row — shares the login-time
+    # Google grant (see integrations/DECISION.md §1).
+    revocation_kind = "no_credential"
 
     async def connect(
         self, *, user: User | None, db: AsyncSession, payload: dict[str, Any]
@@ -42,9 +46,7 @@ class GoogleCalendarIntegration(IntegrationProvider):
         )
 
     async def sync(self, *, integration: Integration, db: AsyncSession) -> SyncResult:
-        return await make_sync_via_dag("calendar_ingestor")(
-            integration=integration, db=db
-        )
+        return await make_sync_via_dag(self.sync_dag_id)(integration=integration, db=db)
 
     async def status(
         self, *, integration: Integration, db: AsyncSession

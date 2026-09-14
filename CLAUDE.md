@@ -21,6 +21,7 @@
 3. Read and diagnose every error/warning line
 4. If any ERROR or CRITICAL found → fix the root cause, commit, push
 5. Confirm health by checking for "Application startup complete" and "GET /health HTTP/1.1" 200 lines
+6. Verify `ENABLE_INPROCESS_WORKER=true` is set if google_calendar/gmail/github integrations are in use — grep the startup logs for `queue worker started poll_interval=`; its absence (and/or the `ENABLE_INPROCESS_WORKER is not set or false` WARNING) means DAG-backed syncs are enqueuing but never processing (see known recurring issues below)
 ```
 
 ### Service IDs (permanent — do not change)
@@ -36,6 +37,7 @@
 |---|---|---|
 | `Can't locate revision 'k1h2i3j4a5b6'` | `DATABASE_URL_DIRECT` not set on Render — Alembic using Supabase pooler | Set `DATABASE_URL_DIRECT` to direct Supabase connection (port 5432) on Render |
 | `seed skipped/failed — non-fatal` | Was `NameError: Path not defined` — fixed in `15f83a2`, needs merge to main | Merge dev branch to main |
+| `ENABLE_INPROCESS_WORKER not set` (or `false`) | DAG-backed syncs (google_calendar, gmail, github, obsidian) enqueue a `dag_trigger_queue` row and report 200, but nothing ever drains it — Render doesn't run Airflow. Startup log carries an explicit `_log.warning(...)` for this (FEAT-144). | Set `ENABLE_INPROCESS_WORKER=true` on Render (`srv-d7m9kub7uimc73cq9afg`), redeploy, confirm `queue worker started poll_interval=` appears in logs |
 
 ### Additional Render MCP tools available
 

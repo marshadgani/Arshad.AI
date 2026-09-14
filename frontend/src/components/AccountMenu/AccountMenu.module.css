@@ -1,0 +1,39 @@
+.menu {
+  position: absolute;
+  top: calc(100% + var(--s-2));
+  right: 0;
+  min-width: 200px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-faint);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+  padding: var(--s-3);
+  z-index: var(--z-topbar);
+}
+
+.identity {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--s-1) var(--s-2) var(--s-3);
+  border-bottom: 1px solid var(--border-faint);
+  margin-bottom: var(--s-2);
+}
+
+.name { font-size: 13px; color: var(--text-primary); font-weight: 600; }
+.email {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+.signOut {
+  width: 100%;
+  text-align: left;
+  padding: var(--s-2);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.signOut:hover { background: var(--accent-bg); color: var(--accent); }

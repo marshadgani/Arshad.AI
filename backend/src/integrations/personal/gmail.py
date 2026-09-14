@@ -26,6 +26,13 @@ class GmailIntegration(IntegrationProvider):
     description = "Search threads, draft replies, and label your Gmail."
     docs_url = "https://developers.google.com/gmail/api"
     icon = "gmail"
+    sync_dag_id = "email_ingestor"
+    # FEAT-145: no integration_oauth_tokens row — the credential is the
+    # login-time Google grant in oauth_accounts/oauth_tokens, shared with
+    # Calendar/Drive/Tasks/YouTube and the user's own session. Revoking it
+    # here would break all of those, so disconnect() only stops the sync
+    # (see integrations/DECISION.md §1).
+    revocation_kind = "no_credential"
 
     async def connect(
         self, *, user: User | None, db: AsyncSession, payload: dict[str, Any]
@@ -37,7 +44,7 @@ class GmailIntegration(IntegrationProvider):
         )
 
     async def sync(self, *, integration: Integration, db: AsyncSession) -> SyncResult:
-        return await make_sync_via_dag("email_ingestor")(integration=integration, db=db)
+        return await make_sync_via_dag(self.sync_dag_id)(integration=integration, db=db)
 
     async def status(
         self, *, integration: Integration, db: AsyncSession

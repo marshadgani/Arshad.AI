@@ -2,42 +2,39 @@
 
 Polls dag_trigger_queue for pending rows, claims one with SELECT ...
 FOR UPDATE SKIP LOCKED LIMIT 1, calls the ingestion runner, marks
-completed/failed/retry. Started via FastAPI lifespan if
-ENABLE_INPROCESS_WORKER=true.
+completed/failed/retry. Started via FastAPI lifespan when
+drainer.is_enabled() (ENABLE_INPROCESS_WORKER=true).
 
 In docker-compose dev, leave the env var false — Airflow handles the
 queue. The SKIP LOCKED clause means it's safe to run both simultaneously
 (though wasteful), so a misconfiguration won't double-process.
+
+Deployment policy and the liveness heartbeat live in `drainer.py`; this
+module is only the loop. See that module's docstring for why.
 """
 
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
-import os
+import uuid
 from datetime import datetime, timezone
+from typing import Any
 
 from sqlalchemy import select
 
-from ..models.dag_trigger import DagTriggerQueue
-from ..models.database import AsyncSessionLocal
-from .ingestion import runner as ingestion_runner
+from ...models.dag_trigger import DagTriggerQueue
+from ...models.database import AsyncSessionLocal
+from ..ingestion import runner as ingestion_runner
+from . import drainer
 
 _log = logging.getLogger(__name__)
 
-_DEFAULT_POLL_INTERVAL = 5.0
 _MAX_ATTEMPTS = 3
 
-
-def _poll_interval() -> float:
-    try:
-        return max(0.5, float(os.getenv("QUEUE_POLL_INTERVAL_SECONDS", "5")))
-    except ValueError:
-        return _DEFAULT_POLL_INTERVAL
-
-
-def is_enabled() -> bool:
-    return os.getenv("ENABLE_INPROCESS_WORKER", "false").lower() == "true"
+# Grow the backoff no further than this when the DB itself is sick.
+_MAX_BACKOFF_SECONDS = 300
 
 
 async def _claim_one() -> DagTriggerQueue | None:
@@ -65,28 +62,50 @@ async def _claim_one() -> DagTriggerQueue | None:
         return row
 
 
-async def _process(row_id, dag_id: str, user_id, payload: dict, attempt: int) -> None:
-    """Run the ingestion in a fresh session, then update the queue row."""
-    async with AsyncSessionLocal() as runner_db:
+async def _run_ingestion(
+    *, dag_id: str, user_id: uuid.UUID, payload: dict[str, Any]
+) -> str | None:
+    """Run one ingestion. Returns None on success, or the error text.
+
+    Errors become a value rather than an exception because the caller's
+    job is bookkeeping, not error handling: every failure mode — expected
+    IngestionError or not — lands in dag_trigger_queue.error_text the same
+    way.
+    """
+    async with AsyncSessionLocal() as db:
         try:
             await ingestion_runner.run(
-                dag_id=dag_id, user_id=user_id, payload=payload, db=runner_db
+                dag_id=dag_id, user_id=user_id, payload=payload, db=db
             )
-            success = True
-            error_text = None
         except Exception as exc:  # noqa: BLE001 — surface ALL errors as failed
             _log.warning("queue worker run failed dag=%s err=%r", dag_id, exc)
-            success = False
-            error_text = f"{type(exc).__name__}: {exc}"
+            return f"{type(exc).__name__}: {exc}"
+    return None
 
-    async with AsyncSessionLocal() as status_db:
-        async with status_db.begin():
-            row = await status_db.scalar(
+
+async def _record_outcome(
+    *, row_id: uuid.UUID, error_text: str | None, attempt: int
+) -> None:
+    """Write the terminal (or retryable) state back onto the queue row."""
+    async with AsyncSessionLocal() as db:
+        async with db.begin():
+            row = await db.scalar(
                 select(DagTriggerQueue).where(DagTriggerQueue.id == row_id)
             )
             if row is None:
+                # The row we claimed and ran vanished before its outcome
+                # could be written back. Returning silently would drop the
+                # ingestion result — error_text included — with zero trace,
+                # which is exactly the dishonesty FEAT-144 exists to end.
+                _log.warning(
+                    "queue worker: dag_trigger_queue row %s vanished before "
+                    "outcome could be recorded (error_text=%r, attempt=%s)",
+                    row_id,
+                    error_text,
+                    attempt,
+                )
                 return
-            if success:
+            if error_text is None:
                 row.status = "completed"
                 row.completed_at = datetime.now(timezone.utc)
                 row.error_text = None
@@ -95,15 +114,24 @@ async def _process(row_id, dag_id: str, user_id, payload: dict, attempt: int) ->
                 if attempt >= _MAX_ATTEMPTS:
                     row.status = "failed"
                     row.completed_at = datetime.now(timezone.utc)
+                    _log.warning(
+                        "queue worker: job %s (dag=%s) permanently failed "
+                        "after %s attempts: %s",
+                        row_id,
+                        row.dag_id,
+                        attempt,
+                        error_text,
+                    )
                 else:
                     row.status = "pending"  # next poll picks it up again
 
 
 async def run_worker(stop_event: asyncio.Event) -> None:
-    base_interval = _poll_interval()
+    base_interval = drainer.poll_interval()
     backoff = base_interval
     _log.info("queue worker started poll_interval=%s", base_interval)
     while not stop_event.is_set():
+        await drainer.publish_heartbeat(base_interval)
         claim_failed = False
         try:
             row = await _claim_one()
@@ -114,20 +142,22 @@ async def run_worker(stop_event: asyncio.Event) -> None:
 
         if row is not None:
             backoff = base_interval  # successful claim resets backoff
-            await _process(row.id, row.dag_id, row.user_id, row.payload, row.attempt)
+            row_id, attempt = row.id, row.attempt
+            error_text = await _run_ingestion(
+                dag_id=row.dag_id, user_id=row.user_id, payload=row.payload
+            )
+            await _record_outcome(row_id=row_id, error_text=error_text, attempt=attempt)
             continue  # loop hot — there may be more work
 
         # If the claim itself failed (DB connection drop, etc.), grow backoff
         # exponentially up to 5 minutes so a sick DB doesn't get hammered.
         # Successful empty-queue polls keep base_interval.
         if claim_failed:
-            backoff = min(backoff * 2, 300)
+            backoff = min(backoff * 2, _MAX_BACKOFF_SECONDS)
             wait_for = backoff
         else:
             wait_for = base_interval
 
-        try:
+        with contextlib.suppress(asyncio.TimeoutError):
             await asyncio.wait_for(stop_event.wait(), timeout=wait_for)
-        except asyncio.TimeoutError:
-            pass
     _log.info("queue worker stopped")

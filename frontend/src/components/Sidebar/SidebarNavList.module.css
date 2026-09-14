@@ -1,0 +1,33 @@
+/* Styles for a single nav row. Moved out of Sidebar.module.css so the list
+   component owns its own presentation — Sidebar.module.css now only styles
+   the shell (brand, sections, footer) it actually renders. */
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  user-select: none;
+  transition: background 100ms, color 100ms, box-shadow 100ms;
+}
+.item:hover {
+  background: var(--accent-bg);
+  color: var(--text-primary);
+}
+.itemActive {
+  background: var(--accent-bg);
+  color: var(--accent);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.itemActive:hover { color: var(--accent); }
+
+.icon {
+  width: 18px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 14px;
+}

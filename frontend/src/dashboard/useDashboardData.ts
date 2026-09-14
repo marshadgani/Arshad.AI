@@ -7,6 +7,7 @@ import {
   type Task,
 } from '../data/mockData';
 import { useFetch } from '../hooks/useFetch';
+import { NOTIFICATIONS_ENDPOINT } from '../notifications';
 
 // Server response shapes for the endpoints only this page consumes. They
 // declare the fields the dashboard actually reads, not the full row — the
@@ -51,7 +52,7 @@ export function useDashboardData(): DashboardData {
     events: useFetch<Event[]>('/api/v1/dashboard/events').data,
     agentActivity: useFetch<AgentTick[]>('/api/v1/dashboard/agent-activity').data,
     healthHabits: useFetch<HabitRes[]>('/api/v1/dashboard/health-habits').data,
-    notifications: useFetch<Notification[]>('/api/v1/dashboard/notifications').data,
+    notifications: useFetch<Notification[]>(NOTIFICATIONS_ENDPOINT).data,
     news: useFetch<NewsRes[]>('/api/v1/dashboard/news').data,
     knowledgeSuggestions: useFetch<string[]>('/api/v1/dashboard/knowledge-suggestions').data,
     quickActions: useFetch<QuickAction[]>('/api/v1/dashboard/quick-actions').data,

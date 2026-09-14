@@ -49,6 +49,10 @@ class SpotifyIntegration(OAuthIntegrationProvider):
     client_id_env = "SPOTIFY_CLIENT_ID"
     client_secret_env = "SPOTIFY_CLIENT_SECRET"
     use_basic_auth_for_token = True
+    # Spotify exposes no public token-revocation endpoint for third-party
+    # apps — revoke_url stays unset (revocation_kind defaults to
+    # 'no_revoke'). disconnect() still deletes the local
+    # integration_oauth_tokens row; only the upstream call is skipped.
 
     async def fetch_profile(self, access_token: str) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -192,6 +196,11 @@ class FitbitIntegration(OAuthIntegrationProvider):
     client_id_env = "FITBIT_CLIENT_ID"
     client_secret_env = "FITBIT_CLIENT_SECRET"
     use_basic_auth_for_token = True
+    # https://dev.fitbit.com/build/reference/web-api/authorization/revoke-token/
+    # Standard RFC 7009 revoke, HTTP Basic client auth — matches
+    # use_basic_auth_for_token above, so _post_revoke_request needs no
+    # per-provider override.
+    revoke_url = "https://api.fitbit.com/oauth2/revoke"
 
     async def fetch_profile(self, access_token: str) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -233,6 +242,9 @@ class CoinbaseIntegration(OAuthIntegrationProvider):
     scopes = ["wallet:user:read", "wallet:accounts:read"]
     client_id_env = "COINBASE_CLIENT_ID"
     client_secret_env = "COINBASE_CLIENT_SECRET"
+    # https://docs.cdp.coinbase.com/coinbase-app/docs/api-token-authentication
+    # POST /oauth/revoke, standard form body with client_id/client_secret.
+    revoke_url = "https://api.coinbase.com/oauth/revoke"
 
     async def fetch_profile(self, access_token: str) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -281,6 +293,9 @@ class DiscordIntegration(OAuthIntegrationProvider):
     scopes = ["identify", "email", "guilds"]
     client_id_env = "DISCORD_CLIENT_ID"
     client_secret_env = "DISCORD_CLIENT_SECRET"
+    # https://discord.com/developers/docs/topics/oauth2#token-revocation
+    # Standard RFC 7009 revoke, client_id/client_secret in the form body.
+    revoke_url = "https://discord.com/api/oauth2/token/revoke"
 
     async def fetch_profile(self, access_token: str) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -326,6 +341,9 @@ class RedditIntegration(OAuthIntegrationProvider):
     client_secret_env = "REDDIT_CLIENT_SECRET"
     use_basic_auth_for_token = True
     additional_auth_params = {"duration": "permanent"}
+    # https://www.reddit.com/dev/api/oauth#POST_api_v1_revoke_token — textbook
+    # RFC 7009, HTTP Basic client auth (matches use_basic_auth_for_token).
+    revoke_url = "https://www.reddit.com/api/v1/revoke_token"
 
     async def fetch_profile(self, access_token: str) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=10.0) as client:

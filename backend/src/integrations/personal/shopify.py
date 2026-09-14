@@ -23,12 +23,17 @@ OAuthIntegrationProvider.get_access_token() falls straight through to
 decrypt() without entering the refresh branch.
 
 Shopify has no public token-revocation endpoint — revocation happens only
-when the merchant uninstalls the app from the Shopify admin. disconnect()
-therefore uses the base class default (marks the row disconnected locally)
-and deliberately does not touch the dashboard cache: the read path checks
-find_integration() before ever consulting cache, so a disconnected
-integration's cache entry is unreachable and expires within 120s on its own
-— touching Redis from this layer would be an unnecessary L3->L2 dependency.
+when the merchant uninstalls the app from the Shopify admin. This module
+declares no disconnect() override and no revoke_url, so
+revocation_kind stays the OAuthIntegrationProvider default ('no_revoke'):
+the base class's disconnect() (FEAT-145) still deletes the local
+integration_oauth_tokens row — the frontend's "stored credentials will be
+removed" promise is kept — it just skips a network call that Shopify has
+no endpoint for. disconnect() deliberately does not touch the dashboard
+cache either: the read path checks find_integration() before ever
+consulting cache, so a disconnected integration's cache entry is
+unreachable and expires within 120s on its own — touching Redis from this
+layer would be an unnecessary L3->L2 dependency.
 
 read_orders exposes only the last 60 days of history for non-Plus apps —
 this module is a live read model, not an ingestion pipeline, and historical
@@ -54,6 +59,10 @@ from datetime import datetime, timezone
 from typing import Any, NoReturn
 from urllib.parse import urlencode
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ...models.integration import Integration
+from ...models.user import User
 from ..base import ConnectResult, IntegrationError, StatusReport, SyncResult
 from ..registry import register
 from . import shopify_oauth
@@ -112,7 +121,9 @@ class ShopifyIntegration(OAuthIntegrationProvider):
     client_id_env = "SHOPIFY_CLIENT_ID"
     client_secret_env = "SHOPIFY_CLIENT_SECRET"
 
-    async def connect(self, *, user, db, payload):  # type: ignore[override]
+    async def connect(
+        self, *, user: User | None, db: AsyncSession, payload: dict[str, Any]
+    ) -> ConnectResult:
         if user is None:
             raise IntegrationError("auth_required", "User context required.")
         shop = shopify_oauth.validate_shop_domain((payload or {}).get("shop"))
@@ -186,7 +197,17 @@ class ShopifyIntegration(OAuthIntegrationProvider):
         # No-op: all shop metadata is fetched inside complete_callback().
         return {}
 
-    async def sync(self, *, integration, db):  # type: ignore[override]
+    async def sync(self, *, integration: Integration, db: AsyncSession) -> SyncResult:
+        """Refresh the shop PROFILE only (name / currency / timezone).
+
+        Orders, revenue, and inventory are never written here — they are
+        read live, per-request, by GET /api/v1/shopify/dashboard via
+        services/shopify/client.execute_dashboard_query, per the live-read
+        model documented in this module's docstring. rows_written is always
+        0 by design. Note _record_sync_failure is NoReturn (see its
+        docstring below), so `meta` is definitely-assigned past the except
+        block — do not restructure this without preserving that contract.
+        """
         from ...services.shopify import cache as shopify_cache
         from ...services.shopify import client as shopify_client
         from ...services.shopify import state as shopify_state
@@ -213,12 +234,17 @@ class ShopifyIntegration(OAuthIntegrationProvider):
 
         return SyncResult(
             rows_written=0,
-            summary=f"Refreshed shop metadata for {shop}",
+            summary=(
+                f"Shop profile refreshed for {shop} — "
+                "orders, revenue and inventory are read live."
+            ),
             duration_ms=int((time.perf_counter() - started) * 1000),
         )
 
     @staticmethod
-    async def _record_sync_failure(integration, exc: Exception, db) -> NoReturn:  # type: ignore[no-untyped-def]
+    async def _record_sync_failure(
+        integration: Integration, exc: Exception, db: AsyncSession
+    ) -> NoReturn:
         """Persist the failed-sync status, then re-raise as sync_failed.
 
         NoReturn is load-bearing: sync() relies on this never falling
@@ -240,7 +266,9 @@ class ShopifyIntegration(OAuthIntegrationProvider):
         await db.commit()
         raise IntegrationError("sync_failed", f"{type(exc).__name__}: {exc}")
 
-    async def status(self, *, integration, db) -> StatusReport:  # type: ignore[override]
+    async def status(
+        self, *, integration: Integration, db: AsyncSession
+    ) -> StatusReport:
         report = await super().status(integration=integration, db=db)
         config = integration.config or {}
         report.extra.update(

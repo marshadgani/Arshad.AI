@@ -11,13 +11,12 @@ for both groups.
 
 import uuid
 
-from sqlalchemy import Enum, ForeignKey, Index, Integer, String
+from sqlalchemy import Enum, ForeignKey, Index, Integer, String, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from .dashboard import AgentHealthEnum  # reuse the enum across model files
 from .base import Base, TimestampedMixin
-
+from .dashboard import AgentHealthEnum  # reuse the enum across model files
 
 APPLICATION_STATUS_VALUES = ("live", "beta", "planned")
 ApplicationStatusEnum = Enum(*APPLICATION_STATUS_VALUES, name="application_status_enum")
@@ -36,13 +35,19 @@ class Domain(TimestampedMixin, Base):
         back_populates="domain", cascade="all, delete-orphan", order_by="DomainKPI.ord"
     )
     applications: Mapped[list["DomainApplication"]] = relationship(
-        back_populates="domain", cascade="all, delete-orphan"
+        back_populates="domain",
+        cascade="all, delete-orphan",
+        order_by="DomainApplication.name",
     )
     agents: Mapped[list["DomainAgent"]] = relationship(
-        back_populates="domain", cascade="all, delete-orphan"
+        back_populates="domain",
+        cascade="all, delete-orphan",
+        order_by="DomainAgent.name",
     )
     feed: Mapped[list["DomainFeedRow"]] = relationship(
-        back_populates="domain", cascade="all, delete-orphan"
+        back_populates="domain",
+        cascade="all, delete-orphan",
+        order_by="DomainFeedRow.created_at.desc()",
     )
 
 
@@ -51,7 +56,9 @@ class DomainKPI(TimestampedMixin, Base):
     __tablename__ = "domain_kpis"
     __table_args__ = (Index("ix_domain_kpis_domain_slug", "domain_slug"),)
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     domain_slug: Mapped[str] = mapped_column(
         String(32), ForeignKey("domains.slug", ondelete="CASCADE")
     )
@@ -87,10 +94,13 @@ class DomainAgent(TimestampedMixin, Base):
     the Dashboard's Agent Activity widget). Per-domain agents power
     the Agents panel of each ``DomainPage``.
     """
+
     __tablename__ = "domain_agents"
     __table_args__ = (Index("ix_domain_agents_domain_slug", "domain_slug"),)
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
     domain_slug: Mapped[str] = mapped_column(
         String(32), ForeignKey("domains.slug", ondelete="CASCADE")
     )
@@ -108,7 +118,17 @@ class DomainAgent(TimestampedMixin, Base):
 # ── Domain feed rows ───────────────────────────────────────────────
 class DomainFeedRow(TimestampedMixin, Base):
     __tablename__ = "domain_feed_rows"
-    __table_args__ = (Index("ix_domain_feed_rows_domain_slug", "domain_slug"),)
+    __table_args__ = (
+        # Composite: equality (domain_slug) then sort (created_at desc) —
+        # matches the WHERE + ORDER BY in GET /api/v1/domains/{slug}'s
+        # bounded feed query (see migration o1l2m3n4a5b6). Supersedes a
+        # plain domain_slug-only index, which can't also satisfy the sort.
+        Index(
+            "ix_domain_feed_rows_domain_slug_created_at",
+            "domain_slug",
+            text("created_at DESC"),
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     domain_slug: Mapped[str] = mapped_column(

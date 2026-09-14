@@ -13,6 +13,7 @@ COPY --chown=app:app src/ ./src/
 COPY --chown=app:app alembic/ ./alembic/
 COPY --chown=app:app alembic.ini ./alembic.ini
 COPY --chown=app:app scripts/ ./scripts/
+COPY --chown=app:app data/ ./data/
 
 USER app
 EXPOSE 8000
@@ -22,4 +23,6 @@ EXPOSE 8000
 # alembic here is a fallback only — non-fatal so uvicorn starts even if it fails
 # (e.g. DATABASE_URL points to the Supabase transaction pooler which rejects DDL).
 # Set DATABASE_URL_DIRECT on Render to the direct db.*.supabase.co:5432 URL.
-CMD ["sh", "-c", "(alembic upgrade head || echo '[startup] WARN: alembic failed — set DATABASE_URL_DIRECT on Render; preDeployCommand should have run migrations') && (python -m scripts.seed_from_mock || echo '[startup] seed skipped/failed — non-fatal') && exec uvicorn src.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# register_skills falls back to the committed data/skills_manifest.json baked
+# into this image (no --skills-dir passed) — see FEAT-154.
+CMD ["sh", "-c", "(alembic upgrade head || echo '[startup] WARN: alembic failed — set DATABASE_URL_DIRECT on Render; preDeployCommand should have run migrations') && (python -m scripts.seed_from_mock || echo '[startup] seed skipped/failed — non-fatal') && (python -m scripts.register_skills || echo '[startup] WARN: skill sync skipped/failed — non-fatal' >&2) && exec uvicorn src.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

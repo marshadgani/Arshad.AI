@@ -23,10 +23,12 @@ export default function SkillCard({ skill }: SkillCardProps) {
   const categoryLabel = CATEGORY_LABELS[skill.category] ?? skill.category;
 
   return (
-    <div className={styles.card}>
+    <article className={styles.card} tabIndex={0} aria-label={`${skill.display_name} skill`}>
       <div className={styles.header}>
         <span className={styles.name}>{skill.display_name}</span>
-        <span className={`${styles.categoryPill} ${styles[`cat${skill.category}`]}`}>
+        <span
+          className={`${styles.categoryPill} ${styles[`cat${skill.category}`] ?? styles.catother}`}
+        >
           {categoryLabel}
         </span>
       </div>
@@ -37,6 +39,6 @@ export default function SkillCard({ skill }: SkillCardProps) {
         <span className={styles.repoLabel}>from</span>
         <span className={styles.repoBadge}>{skill.source_repo}</span>
       </div>
-    </div>
+    </article>
   );
 }

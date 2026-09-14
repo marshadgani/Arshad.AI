@@ -1,0 +1,27 @@
+/* Moved verbatim from FundFlowMap.module.css when the legend became its own
+   component — the separator below the key belongs to the key, not to the
+   section that happens to render it above the diagram. */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: var(--s-4);
+  padding-bottom: var(--s-4);
+  border-bottom: 1px dashed var(--border-faint);
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  color: var(--text-muted);
+}
+
+.legendDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
