@@ -17,7 +17,7 @@
 .title {
   font-size: 1.5rem;
   font-weight: 700;
-  color: var(--text, #e6edf3);
+  color: var(--text-primary);
   margin: 0 0 4px;
 }
 
@@ -43,7 +43,7 @@
 .statValue {
   font-size: 1.1rem;
   font-weight: 700;
-  color: var(--text, #e6edf3);
+  color: var(--text-primary);
   font-variant-numeric: tabular-nums;
 }
 
@@ -59,8 +59,8 @@
 .viewSwitcher {
   display: flex;
   gap: 4px;
-  background: var(--bg, #0d1117);
-  border: 1px solid var(--border, #30363d);
+  background: var(--bg-deep);
+  border: 1px solid var(--border-faint);
   border-radius: 999px;
   padding: 3px;
   width: fit-content;
@@ -70,7 +70,8 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 16px;
+  min-height: 44px;
+  padding: 10px 16px;
   border-radius: 999px;
   border: none;
   background: transparent;
@@ -82,12 +83,12 @@
 }
 
 .viewBtn:hover {
-  color: var(--text, #e6edf3);
+  color: var(--text-primary);
 }
 
 .viewBtnActive {
-  background: var(--surface, #161b22);
-  color: var(--text, #e6edf3);
+  background: var(--bg-panel);
+  color: var(--text-primary);
   font-weight: 600;
 }
 
@@ -111,9 +112,10 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 14px;
+  min-height: 44px;
+  padding: 10px 14px;
   border-radius: 999px;
-  border: 1px solid var(--border, #30363d);
+  border: 1px solid var(--border-faint);
   background: transparent;
   color: var(--text-muted, #8b949e);
   font-size: 0.8rem;
@@ -124,7 +126,7 @@
 
 .filterBtn:hover {
   border-color: var(--accent, #58a6ff);
-  color: var(--text, #e6edf3);
+  color: var(--text-primary);
 }
 
 .filterBtnActive {
@@ -144,7 +146,7 @@
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
-  gap: 14px;
+  gap: var(--s-4);
 }
 
 .empty {

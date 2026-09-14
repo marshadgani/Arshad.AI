@@ -1,4 +1,10 @@
 .statusMessage {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
   padding: var(--s-8);
   color: var(--text-secondary);
 }
