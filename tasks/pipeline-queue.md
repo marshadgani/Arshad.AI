@@ -34,7 +34,7 @@
 
 | Field | Value |
 |---|---|
-| active_run_id | none — settled 2026-09-13 |
+| active_run_id | `wf_f057305c-e52` — launched 2026-09-14, batch FEAT-143..149+151..155 (12 tickets, FEAT-150 held back pending FEAT-147) |
 | session | session_01S3fJzZzJykfHRA9jhMycuk |
 | started | 2026-09-13 (this run) |
 | FEAT-142 (OAuth invalid_state bug) | Settled 2026-09-13, second pass, 30/30 stages, EA SHIP, security PASS. Committed to `dev-team/feat-142-oauth-cookie-scope-fix`. Blocked only on a Vercel env var (`VITE_API_BASE_URL`) that Arshad needs to set manually — no MCP tool available to do it. |
