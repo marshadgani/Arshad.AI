@@ -55,3 +55,19 @@ The 6-agent panel reads files in isolation — it cannot detect import errors th
 
 **Secondary rule — when adding an import + its first usage:** do both in a single `Edit` tool call, OR use `Write` to replace the whole file. Otherwise the post-edit-format hook may strip the "unused" import between calls.
 
+
+---
+
+## 2026-09-16 — Gate report needs the literal string "GATE PASSED", not just a WARN/PASS verdict
+
+**Mistake:** Wrote `tasks/last-gate-report.md` for FEAT-157 with `**Verdict: ⚠️ WARN — mergeable.**` at the top — technically correct per CLAUDE.md §20's gate-verdict table (WARN = mergeable). Pushed it, and PR #93 sat open, unmerged, for ~34 hours with no error surfaced anywhere I could see.
+
+**Root cause:** `.github/workflows/auto-pr.yml`'s "Decide whether to auto-merge" step does `grep -qE "GATE PASSED"` against the report file — a literal substring match, not a semantic parse of CLAUDE.md's WARN/PASS/BLOCKED taxonomy. My wording never contained that substring, so the script's own `verdict` variable landed on `"UNKNOWN"`, and `merge` stayed `false`. The workflow run itself reported `Status: Success` throughout — there's no failure signal, just a silent no-op. I only found this by reading `.github/workflows/auto-pr.yml` directly and grepping a previously-merged report for comparison.
+
+**Rule:** Every gate report's verdict heading — WARN tier included — MUST contain the literal phrase `GATE PASSED`. The established, actually-working convention in this repo is:
+```
+### ⚠️ GATE PASSED WITH WARNINGS — Ready for merge
+```
+for WARN, and presumably a BLOCKED report must contain `GATE BLOCKED` (the script's other branch). Do not write a bespoke verdict line ("WARN — mergeable", "PASS", etc.) no matter how clear it reads to a human — grep for `"GATE PASSED"` (or `"GATE BLOCKED"`) in a report that previously merged successfully and copy that exact phrasing before pushing a gate report for the first time in a new session.
+
+**Diagnosis path that worked when GitHub's own MCP tool was down:** `WebFetch` on the PR URL, then on `.../actions/runs/<id>`, then reading the workflow YAML locally — got far enough to find the exact grep pattern without needing authenticated API access. Full job step logs need auth and aren't fetchable this way; the workflow YAML itself (checked into the repo) is the ground truth for what it's actually matching.
