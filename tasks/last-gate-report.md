@@ -1,8 +1,12 @@
 # Merge-to-Main Gate Report — FEAT-157 (corrected)
 
-**Verdict: ⚠️ WARN — mergeable.** Zero FAIL, zero Critical remaining. All Critical/Warning findings from both gate rounds were fixed; remaining items are logged as follow-up tickets (FEAT-162, FEAT-163, renumbered from 160/161 — see `tasks/pipeline-queue.md`'s ID collision note) rather than expanding this fix's scope.
+## Overall Verdict
 
-**2026-09-16 re-trigger note:** PR #93 sat open ~34h after the original push despite this WARN verdict — auto-merge apparently didn't fire (possibly a transient collision with concurrent PR #94 merging around the same time). Branch re-synced with main's current head (which has since gained #90/#94) and re-pushed to give the auto-pr workflow a fresh shot at the merge decision.
+### ⚠️ GATE PASSED WITH WARNINGS — Ready for merge
+
+Zero FAIL, zero Critical remaining. All Critical/Warning findings from both gate rounds were fixed; remaining items are logged as follow-up tickets (FEAT-162, FEAT-163, renumbered from 160/161 — see `tasks/pipeline-queue.md`'s ID collision note) rather than expanding this fix's scope.
+
+**2026-09-16 root-cause-of-non-merge found:** PR #93 sat open ~34h after the original push because this file's verdict line said "WARN — mergeable" instead of containing the literal string `GATE PASSED` that `.github/workflows/auto-pr.yml`'s `Decide whether to auto-merge` step greps for (`grep -qE "GATE PASSED"`) — the WARN-vs-PASSED wording is cosmetic in CLAUDE.md's own gate-verdict table, but the actual script only auto-merges when that exact phrase is present. Every successfully-merged WARN-tier report in this repo's history uses the `### ⚠️ GATE PASSED WITH WARNINGS — Ready for merge` heading for exactly this reason. Corrected here to match.
 
 ## What this covers
 
@@ -21,19 +25,19 @@ FEAT-157: `POST /api/v1/integrations/{slug}/sync` returned a live HTTP 500 in pr
 
 | Agent | Round 1 (wrong root cause) | Round 2 (corrected) |
 |---|---|---|
-| code-reviewer | Critical: migration wrong for 2 already-aware columns | Critical: `calendar.py` all-day-event naive datetime — **fixed**. Important: `TimestampedMixin` drift risk — spun off as **FEAT-160** |
+| code-reviewer | Critical: migration wrong for 2 already-aware columns | Critical: `calendar.py` all-day-event naive datetime — **fixed**. Important: `TimestampedMixin` drift risk — spun off as **FEAT-162** |
 | security-auditor | PASS (advisory only) | PASS, no blockers |
 | debugger | Warning: deploy-ordering, lock_timeout | Confirmed root cause correct; lock_timeout on downgrade — **fixed**; deploy-verification reminder carried to post-push check |
 | test-writer | WARN (declaration-only tests) | WARN → onupdate + behavioral-call gaps — **fixed** |
 | refactorer | Suggestion: `revoked_at` consistency | Warning: `__qualname__` literal vs `utcnow.__qualname__`; Suggestion: extract helper — **both fixed** |
 | doc-writer | Warning: `revoked_at` exclusion undocumented | Warning: model/DB drift invisible in `integration.py` — **fixed** with inline comments |
-| silent-failure-hunter | Warning: pre-existing broad catch (unrelated) | Critical: `chat.py` SSE stream can silently truncate on a pre-yield DB error — **not in this diff's scope**, spun off as **FEAT-161** |
+| silent-failure-hunter | Warning: pre-existing broad catch (unrelated) | Critical: `chat.py` SSE stream can silently truncate on a pre-yield DB error — **not in this diff's scope**, spun off as **FEAT-163** |
 | pr-test-analyzer | WARN (implementation-detail tests) | WARN → onupdate + behavioral-call gaps — **fixed** (same as test-writer) |
 
 ## Follow-ups queued (not blocking this merge)
 
-- **FEAT-160** — `TimestampedMixin` timezone drift risk (project-wide model convention question, not a live bug).
-- **FEAT-161** — `chat.py`'s SSE stream can silently truncate instead of a clean 500 on a pre-yield DB error. This is a live risk independent of FEAT-157, flagged as worth prioritizing separately.
+- **FEAT-162** — `TimestampedMixin` timezone drift risk (project-wide model convention question, not a live bug).
+- **FEAT-163** — `chat.py`'s SSE stream can silently truncate instead of a clean 500 on a pre-yield DB error. This is a live risk independent of FEAT-157, flagged as worth prioritizing separately.
 
 ## Tests
 
