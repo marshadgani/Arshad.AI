@@ -1,6 +1,8 @@
 # Merge-to-Main Gate Report — FEAT-157 (corrected)
 
-**Verdict: ⚠️ WARN — mergeable.** Zero FAIL, zero Critical remaining. All Critical/Warning findings from both gate rounds were fixed; remaining items are logged as follow-up tickets (FEAT-160, FEAT-161) rather than expanding this fix's scope.
+**Verdict: ⚠️ WARN — mergeable.** Zero FAIL, zero Critical remaining. All Critical/Warning findings from both gate rounds were fixed; remaining items are logged as follow-up tickets (FEAT-162, FEAT-163, renumbered from 160/161 — see `tasks/pipeline-queue.md`'s ID collision note) rather than expanding this fix's scope.
+
+**2026-09-16 re-trigger note:** PR #93 sat open ~34h after the original push despite this WARN verdict — auto-merge apparently didn't fire (possibly a transient collision with concurrent PR #94 merging around the same time). Branch re-synced with main's current head (which has since gained #90/#94) and re-pushed to give the auto-pr workflow a fresh shot at the merge decision.
 
 ## What this covers
 
