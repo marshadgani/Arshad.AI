@@ -71,3 +71,15 @@ The 6-agent panel reads files in isolation — it cannot detect import errors th
 for WARN, and presumably a BLOCKED report must contain `GATE BLOCKED` (the script's other branch). Do not write a bespoke verdict line ("WARN — mergeable", "PASS", etc.) no matter how clear it reads to a human — grep for `"GATE PASSED"` (or `"GATE BLOCKED"`) in a report that previously merged successfully and copy that exact phrasing before pushing a gate report for the first time in a new session.
 
 **Diagnosis path that worked when GitHub's own MCP tool was down:** `WebFetch` on the PR URL, then on `.../actions/runs/<id>`, then reading the workflow YAML locally — got far enough to find the exact grep pattern without needing authenticated API access. Full job step logs need auth and aren't fetchable this way; the workflow YAML itself (checked into the repo) is the ground truth for what it's actually matching.
+
+---
+
+## 2026-09-16 — Workflow({name: ...}) resolves a cached/registered script copy, not the live repo file
+
+**Mistake:** Fixed a bug in `.claude/workflows/dev-team-pipeline.js` (the `f.featId` normalization), committed and pushed it, then launched the next run with `Workflow({ name: "dev-team-pipeline", args: {...} })`. Assumed the fix would apply since I'd just edited the actual repo file moments earlier.
+
+**What happened:** The launched run copied its executable script to a session-scoped path (`.../workflows/scripts/dev-team-pipeline-<run_id>.js`) — and that copy was snapshotted BEFORE my fix, not after. Caught it by grepping the copied script for my fix's marker text and finding it absent, plus noticing every journal entry's label read "Feature undefined —" (the exact symptom of `f.featId` being unset again). Had to `TaskStop` the run, patch the copied script file directly, and resume via `scriptPath` + `resumeFromRunId` (completed agent calls replay from cache, so nothing already-paid-for was wasted).
+
+**Rule:** After editing a workflow script file and wanting the fix to apply to a NEW run, don't assume `Workflow({ name: "..." })` picks up the live repo file. Immediately after launch, grep the run's actual copied script (`Script file:` path in the launch result) for the fix — don't wait for a crash to notice. If the fix is missing, `TaskStop` immediately, patch the copy in place, and resume with `scriptPath` + `resumeFromRunId` rather than re-launching by name again (which would just re-copy the stale version a second time).
+
+**Corollary caught in the same incident:** a `Workflow(..., resumeFromRunId: ...)` resume call does NOT automatically remember the original `args` — omit `args` on a resume and the script runs with `args` undefined (here, `(args && args.features) || []` silently evaluated to `[]`, producing a "successful" run that dispatched zero agents and returned an empty result). Always pass the full `args` again on every resume call, identical to the original launch (or updated per the queue-file's resume protocol), never assume it persists.
