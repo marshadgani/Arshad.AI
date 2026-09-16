@@ -1,54 +1,49 @@
-# Merge-to-Main Gate Report — FEAT-157 (corrected)
+# Merge-to-Main Gate Report — tooling/tracking fixes (2026-09-16)
 
 ## Overall Verdict
 
 ### ⚠️ GATE PASSED WITH WARNINGS — Ready for merge
 
-Zero FAIL, zero Critical remaining. All Critical/Warning findings from both gate rounds were fixed; remaining items are logged as follow-up tickets (FEAT-162, FEAT-163, renumbered from 160/161 — see `tasks/pipeline-queue.md`'s ID collision note) rather than expanding this fix's scope.
-
-**2026-09-16 root-cause-of-non-merge found:** PR #93 sat open ~34h after the original push because this file's verdict line said "WARN — mergeable" instead of containing the literal string `GATE PASSED` that `.github/workflows/auto-pr.yml`'s `Decide whether to auto-merge` step greps for (`grep -qE "GATE PASSED"`) — the WARN-vs-PASSED wording is cosmetic in CLAUDE.md's own gate-verdict table, but the actual script only auto-merges when that exact phrase is present. Every successfully-merged WARN-tier report in this repo's history uses the `### ⚠️ GATE PASSED WITH WARNINGS — Ready for merge` heading for exactly this reason. Corrected here to match.
+Zero FAIL, zero Critical remaining. One Critical and one Important finding were raised by the panel and fixed live during this gate; everything else is WARN/Suggestion-tier and non-blocking.
 
 ## What this covers
 
-FEAT-157: `POST /api/v1/integrations/{slug}/sync` returned a live HTTP 500 in production (`asyncpg.exceptions.DataError: can't subtract offset-naive and offset-aware datetimes`), confirmed via an end-to-end browser test logged in as the real user.
+Diff between `claude/ai-personal-assistant-CcA11` and `claude/ai-personal-assistant-main`, 4 files:
 
-**Root cause (corrected mid-review):** the first gate round reviewed a fix based on a wrong hypothesis — that `Integration.last_synced_at` / `IntegrationOAuthToken.expires_at` were tz-naive Postgres columns. The code-reviewer agent traced the actual migration history and a direct `information_schema.columns` query against production confirmed both were already `TIMESTAMP WITH TIME ZONE`; only the SQLAlchemy model declaration had drifted. The real root cause: `DagTriggerQueue.requested_at` (written by every integration sync via `make_sync_via_dag()`) declares `TIMESTAMP(timezone=True)` but defaulted via the naive `datetime.utcnow`. The same pattern was found in `obsidian.py`, `conversation.py`, and `ingested.py` (11 occurrences total).
+- `.claude/workflows/dev-team-pipeline.js` — fixes the `f.featId.toLowerCase()` crash that took down the entire 13-feature dev-team pipeline batch (`wf_03f9b5b9-9d2`): launch calls pass `{id: "FEAT-N", ...}` per CLAUDE.md's own examples, but every internal reference expected `.featId`. Normalizes both key names at the single feature-array consumption point, with a fail-fast guard for malformed entries (added live during this gate — see below).
+- `tasks/alternate-features.md` — logs the rate-limited 13-feature batch's preserved WIP branch per §24.
+- `tasks/pipeline-queue.md` — records the batch settlement and relaunch.
+- `tasks/lessons.md` — three new lessons (GATE PASSED phrase requirement, `Workflow({name})` stale-script-copy gotcha, resume-args-not-persisted gotcha) — **excluded from this diff's gate scope**: `tasks/lessons.md` is on the pipeline's own `DENY_PREFIXES` denylist and was committed separately (not part of this Merge-to-Main diff), consistent with that policy.
 
-## Fix
+## Gate agent results (8-agent panel)
 
-- New `utcnow()` helper (`backend/src/models/base.py`) — aware UTC now, used everywhere the naive `datetime.utcnow` default/onupdate pattern appeared.
-- `integration.py`: corrected model/DB drift on `last_synced_at`/`expires_at` (no migration needed, DB already matched); migration `n1k2l3m4a5b6` narrowed to the two columns confirmed genuinely naive in production (`integration_ingest_tokens.last_used_at`/`.revoked_at`), with a `lock_timeout` guard on both `upgrade()` and `downgrade()`.
-- `calendar.py`/`github.py` ingestion date parsers: an all-day Google Calendar event's `start.date` (no offset) parsed to the same class of naive datetime, feeding straight into `occurred_at` — fixed to treat an offset-less parsed value as UTC.
-- Test coverage: `test_integration_model_timestamp_columns.py` now calls each default/onupdate callable and asserts the produced value is tz-aware (not just a name match), including the previously-untested `ConversationSession.updated_at` onupdate path. New `test_ingestion_datetime_parsing.py` covers the parser fix.
-
-## Gate agent results (8-agent panel, re-run after root-cause correction)
-
-| Agent | Round 1 (wrong root cause) | Round 2 (corrected) |
+| Agent | Verdict | Findings |
 |---|---|---|
-| code-reviewer | Critical: migration wrong for 2 already-aware columns | Critical: `calendar.py` all-day-event naive datetime — **fixed**. Important: `TimestampedMixin` drift risk — spun off as **FEAT-162** |
-| security-auditor | PASS (advisory only) | PASS, no blockers |
-| debugger | Warning: deploy-ordering, lock_timeout | Confirmed root cause correct; lock_timeout on downgrade — **fixed**; deploy-verification reminder carried to post-push check |
-| test-writer | WARN (declaration-only tests) | WARN → onupdate + behavioral-call gaps — **fixed** |
-| refactorer | Suggestion: `revoked_at` consistency | Warning: `__qualname__` literal vs `utcnow.__qualname__`; Suggestion: extract helper — **both fixed** |
-| doc-writer | Warning: `revoked_at` exclusion undocumented | Warning: model/DB drift invisible in `integration.py` — **fixed** with inline comments |
-| silent-failure-hunter | Warning: pre-existing broad catch (unrelated) | Critical: `chat.py` SSE stream can silently truncate on a pre-yield DB error — **not in this diff's scope**, spun off as **FEAT-163** |
-| pr-test-analyzer | WARN (implementation-detail tests) | WARN → onupdate + behavioral-call gaps — **fixed** (same as test-writer) |
+| code-reviewer | PASS after fix | Important: missing-key case silently completed a full run under `featId: undefined` — **fixed** (fail-fast guard). Suggestions: `String()` coercion, cosmetic doc wording — **fixed**. |
+| security-auditor | PASS | No secrets exposure (confirmed the test-session password was never written to any tracked file). One pre-existing, non-blocking informational item (unsanitized featId reaching shell-instruction text) — not introduced by this diff, logged as a future backlog item, not merge-blocking. |
+| debugger | PASS | Propagation of the normalized `f` into `runFeaturePipeline` and its `.catch()` verified correct (per-iteration `const` binding, no loop-variable-capture bug). One pre-existing Warning (same missing-key gap as code-reviewer's finding) — fixed by the same guard. |
+| test-writer | WARN (not blocking) | No test harness exists for `.claude/workflows/*.js` anywhere in the repo; correctly scoped out of the "coverage < 70% = FAIL" rule, which targets shipped application code. Validated instead by `node --check` plus a live pipeline re-run exercising the exact fix path. |
+| refactorer | PASS | No Critical/Warning. One low-priority suggestion (the `{id}`/`{featId}` dual-key contract is now permanent — documented). |
+| doc-writer | PASS after fix | Warning: `pipeline-queue.md`'s `started` field was ambiguous with two `active_run_id` rows — **fixed**. Suggestions: reworded "historically" → "currently" (permanent contract, not transitional) — **fixed**. |
+| silent-failure-hunter | PASS after fix | **Critical**: the normalization's `rawF.featId` read was unguarded against `rawF` being `null`/`undefined` — a synchronous throw outside any catch, aborting the whole batch and losing every feature queued after the bad entry (a real regression in error isolation, not pre-existing). **Fixed**: guard `!rawF` before any property access; malformed entries now produce an explicit per-item `{status:'error'}` result instead of crashing the loop. |
+| pr-test-analyzer | PASS | Same no-test-harness reasoning as test-writer; recommends accepting the merge and logging a backlog item for a future Node test harness — not required for this diff. |
 
-## Follow-ups queued (not blocking this merge)
+## Fixes applied live during this gate
 
-- **FEAT-162** — `TimestampedMixin` timezone drift risk (project-wide model convention question, not a live bug).
-- **FEAT-163** — `chat.py`'s SSE stream can silently truncate instead of a clean 500 on a pre-yield DB error. This is a live risk independent of FEAT-157, flagged as worth prioritizing separately.
+1. **(Critical, silent-failure-hunter)** Guard `!rawF` before any property access in the feature-array loop; malformed entries produce an explicit error result instead of throwing synchronously outside any catch boundary.
+2. **(Important, code-reviewer)** Fail fast with a named error when a feature entry has neither `.featId` nor `.id`, instead of silently running a full 30-stage pipeline under `featId: undefined`.
+3. **(Suggestion, code-reviewer)** `String()` coercion on the normalized `featId` so a numeric id doesn't crash the same `.toLowerCase()` call later.
+4. **(Warning, doc-writer)** Reworded "historically" to reflect that the `{id}`/`{featId}` dual-key contract is permanent per CLAUDE.md, not transitional.
+5. **(Warning, doc-writer + code-reviewer)** Fixed `pipeline-queue.md`'s ambiguous `started` field and `alternate-features.md`'s stale pre-relaunch checklist item.
 
-## Tests
+## Verification
 
-`backend/tests/test_integration_model_timestamp_columns.py` (11 tests) and `backend/tests/test_ingestion_datetime_parsing.py` (6 tests) — all passing. Full backend suite: 704 passed, 7 pre-existing failures unrelated to this change (sandbox DB-connectivity limitations on OAuth-redirect tests, documented in prior sessions).
+- `node --check .claude/workflows/dev-team-pipeline.js` — clean.
+- Fix validated live: run `wf_cc6ac57f-b37` relaunched twice with the pre-hardening version of the fix and correctly produced `Feature FEAT-125 — Code Explorer ...` labels (no more `undefined`) before being stopped to prioritize this gate.
+- No application code (backend/frontend) touched — this diff is entirely internal tooling + tracking docs.
 
-## Commits
+## Follow-ups (not blocking this merge)
 
-- `8e24d27` — root-cause correction (utcnow helper, narrowed migration, model drift fix)
-- `82bdb5a` — gate-feedback hardening (behavioral tests, downgrade lock_timeout, drift comments)
-- `fa34cc7` — calendar/github ingestion parser fix (code-reviewer Critical finding)
-
-## Next step after merge
-
-Deployment Verification Protocol (CLAUDE.md §23): confirm `alembic upgrade head` actually ran on Render (watch for the `DATABASE_URL_DIRECT`/pooler issue), then confirm a live `POST /api/v1/integrations/google_calendar/sync` returns 200, not 500.
+- SEC-informational: sanitize `featId` to `[A-Za-z0-9_-]` before it reaches shell-instruction text in `dev-team-pipeline.js` (pre-existing, low severity, not introduced by this diff).
+- Consider a lightweight Node test harness for `.claude/workflows/*.js` scripts (test-writer/pr-test-analyzer suggestion — no such harness exists in the repo today).
+- The 13-feature dev-team pipeline batch itself remains stopped mid-run (per Arshad's explicit instruction, to prioritize this merge) — resume later per `tasks/pipeline-queue.md`'s active_run_id row.
