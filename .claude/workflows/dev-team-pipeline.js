@@ -394,7 +394,13 @@ async function runFeaturePipeline(f) {
 }
 
 const outcomes = []
-for (const f of (args && args.features) || []) {
+for (const rawF of (args && args.features) || []) {
+  // Callers have historically passed {id: "FEAT-N", ...} (per CLAUDE.md's own
+  // launch examples) while every internal reference in this script expects
+  // .featId — silently producing `undefined` everywhere and crashing at the
+  // one spot that calls a method on it (branch-name construction below).
+  // Normalize once here so either key works.
+  const f = { ...rawF, featId: rawF.featId || rawF.id }
   outcomes.push(runFeaturePipeline(f).catch(e => ({ featId: f.featId, status: 'error', error: String((e && e.message) || e) })))
 }
 const results = await Promise.all(outcomes)
