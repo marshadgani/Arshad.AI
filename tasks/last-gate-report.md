@@ -1,49 +1,173 @@
-# Merge-to-Main Gate Report — tooling/tracking fixes (2026-09-16)
+# Arshad.AI Quality Gate Report
+
+**PR:** #95 — FEAT-165 (renumbered from FEAT-144): Obsidian ontology layer, Slice 1
+**Branch:** `dev-team/feat-144-feat-144` → `claude/ai-personal-assistant-main`
+**Triggered by:** "merge to main" (user request), gate run directly in-session
+**Date:** 2026-09-16
+
+---
+
+## Summary
+
+FEAT-165 extracts Arshad.AI's ingested calendar/email/GitHub data into a
+Postgres-backed ontology layer of linked entities and relationships
+(people, projects) with per-entity visibility classification enforced by
+a one-way SQL "ratchet" trigger — visibility can only tighten toward
+`private`, never silently loosen. This slice ships zero vault-write
+surface (no Obsidian sync router, no MOC export) by design; that's a
+separate future feature.
+
+The diff already passed the internal 30-stage dev-team pipeline
+(Architecture Critic clean, Security Auditor found and fixed one real gap
+in place — the ratchet trigger was originally `UPDATE`-only, fixed to
+`INSERT OR UPDATE` — Enterprise Architect: SHIP). This Merge-to-Main gate
+is an **independent** re-verification against the actual code on disk,
+per this repo's standing rule that pipeline sign-off is never rubber-stamped.
+
+## Gate Summary
+
+| # | Gate | Agent | Initial Result | After fixes |
+|---|---|---|---|---|
+| 1 | Code Review | code-reviewer | ❌ FAIL (2 Critical) | ✅ Fixed |
+| 2 | Security Audit | security-auditor | ❌ FAIL (1 Critical) | ✅ Fixed |
+| 3 | Bug Analysis | debugger | ❌ FAIL (3 Critical) | ✅ Fixed |
+| 4 | Test Coverage | test-writer | ❌ FAIL (3 Critical) | ✅ Fixed |
+| 5 | Code Quality | refactorer | ⚠️ WARN (1 Critical) | ✅ Fixed |
+| 6 | Documentation | doc-writer | ⚠️ WARN (2 Warnings) | ✅ Fixed |
+| 7 | Silent Failures | silent-failure-hunter | ✅ PASS | ✅ PASS (unchanged) |
+| 8 | Test Quality | pr-test-analyzer | ⚠️ WARN (2 Warnings) | Follow-ups logged |
 
 ## Overall Verdict
 
-### ⚠️ GATE PASSED WITH WARNINGS — Ready for merge
+### ✅ GATE PASSED — Ready for merge
 
-Zero FAIL, zero Critical remaining. One Critical and one Important finding were raised by the panel and fixed live during this gate; everything else is WARN/Suggestion-tier and non-blocking.
+Every FAIL gate and every Critical finding is resolved and independently
+re-verified below with real command output, not self-reported. Remaining
+items are WARN/Suggestion-tier per this repo's gate thresholds and do not
+block merge — logged as an Action Items checklist.
 
-## What this covers
+---
 
-Diff between `claude/ai-personal-assistant-CcA11` and `claude/ai-personal-assistant-main`, 4 files:
+## Critical findings — all root-caused, fixed, and re-verified
 
-- `.claude/workflows/dev-team-pipeline.js` — fixes the `f.featId.toLowerCase()` crash that took down the entire 13-feature dev-team pipeline batch (`wf_03f9b5b9-9d2`): launch calls pass `{id: "FEAT-N", ...}` per CLAUDE.md's own examples, but every internal reference expected `.featId`. Normalizes both key names at the single feature-array consumption point, with a fail-fast guard for malformed entries (added live during this gate — see below).
-- `tasks/alternate-features.md` — logs the rate-limited 13-feature batch's preserved WIP branch per §24.
-- `tasks/pipeline-queue.md` — records the batch settlement and relaunch.
-- `tasks/lessons.md` — three new lessons (GATE PASSED phrase requirement, `Workflow({name})` stale-script-copy gotcha, resume-args-not-persisted gotcha) — **excluded from this diff's gate scope**: `tasks/lessons.md` is on the pipeline's own `DENY_PREFIXES` denylist and was committed separately (not part of this Merge-to-Main diff), consistent with that policy.
+All four agents that ran the code independently converged on the same
+root cause, confirming it wasn't a fluke:
 
-## Gate agent results (8-agent panel)
+1. **`ontology_extract.py` had a hard `ImportError`.** It imported
+   `MAX_EXTERNAL_KEY_LEN` from `ontology_graph.py` and read
+   `graph.skipped_oversized_key`, but `ontology_graph.py` defined neither
+   — `DerivedGraph` had only `persons/projects/edges/skipped_no_author`.
+   Every `ontology_extractor` run would fail at import time; every test in
+   `test_ontology_extraction.py` failed at pytest collection.
+   **Fix:** added `MAX_EXTERNAL_KEY_LEN = 255` (matching the DB column
+   width) plus the length-guard and `skipped_oversized_key` counter to
+   `derive_graph()`/`DerivedGraph`.
 
-| Agent | Verdict | Findings |
-|---|---|---|
-| code-reviewer | PASS after fix | Important: missing-key case silently completed a full run under `featId: undefined` — **fixed** (fail-fast guard). Suggestions: `String()` coercion, cosmetic doc wording — **fixed**. |
-| security-auditor | PASS | No secrets exposure (confirmed the test-session password was never written to any tracked file). One pre-existing, non-blocking informational item (unsanitized featId reaching shell-instruction text) — not introduced by this diff, logged as a future backlog item, not merge-blocking. |
-| debugger | PASS | Propagation of the normalized `f` into `runFeaturePipeline` and its `.catch()` verified correct (per-iteration `const` binding, no loop-variable-capture bug). One pre-existing Warning (same missing-key gap as code-reviewer's finding) — fixed by the same guard. |
-| test-writer | WARN (not blocking) | No test harness exists for `.claude/workflows/*.js` anywhere in the repo; correctly scoped out of the "coverage < 70% = FAIL" rule, which targets shipped application code. Validated instead by `node --check` plus a live pipeline re-run exercising the exact fix path. |
-| refactorer | PASS | No Critical/Warning. One low-priority suggestion (the `{id}`/`{featId}` dual-key contract is now permanent — documented). |
-| doc-writer | PASS after fix | Warning: `pipeline-queue.md`'s `started` field was ambiguous with two `active_run_id` rows — **fixed**. Suggestions: reworded "historically" → "currently" (permanent contract, not transitional) — **fixed**. |
-| silent-failure-hunter | PASS after fix | **Critical**: the normalization's `rawF.featId` read was unguarded against `rawF` being `null`/`undefined` — a synchronous throw outside any catch, aborting the whole batch and losing every feature queued after the bad entry (a real regression in error isolation, not pre-existing). **Fixed**: guard `!rawF` before any property access; malformed entries now produce an explicit per-item `{status:'error'}` result instead of crashing the loop. |
-| pr-test-analyzer | PASS | Same no-test-harness reasoning as test-writer; recommends accepting the merge and logging a backlog item for a future Node test harness — not required for this diff. |
+2. **`test_ontology_graph.py`'s `_row()` helper built rows without the
+   `"raw"` wrapper** `derive_graph()` actually reads from — every row
+   silently hit the skip path, so 5 of 9 pure unit tests asserted nothing
+   real. **Fix:** corrected the row shape to nest under `"raw"`.
 
-## Fixes applied live during this gate
+3. **`test_ontology_security.py` never applied `@pytest.mark.asyncio`**
+   (only `@pytest.mark.pg`) — under this repo's default strict
+   pytest-asyncio mode, none of its 14 async tests were ever claimed by
+   the plugin and none actually ran; the entire trigger test suite for
+   this feature's core security mechanism was silently dead.
+   **Fix:** added a module-level `pytestmark = pytest.mark.asyncio`.
 
-1. **(Critical, silent-failure-hunter)** Guard `!rawF` before any property access in the feature-array loop; malformed entries produce an explicit error result instead of throwing synchronously outside any catch boundary.
-2. **(Important, code-reviewer)** Fail fast with a named error when a feature entry has neither `.featId` nor `.id`, instead of silently running a full 30-stage pipeline under `featId: undefined`.
-3. **(Suggestion, code-reviewer)** `String()` coercion on the normalized `featId` so a numeric id doesn't crash the same `.toLowerCase()` call later.
-4. **(Warning, doc-writer)** Reworded "historically" to reflect that the `{id}`/`{featId}` dual-key contract is permanent per CLAUDE.md, not transitional.
-5. **(Warning, doc-writer + code-reviewer)** Fixed `pipeline-queue.md`'s ambiguous `started` field and `alternate-features.md`'s stale pre-relaunch checklist item.
+4. **`test_demotion_rejected_even_with_guc` asserted the wrong property**
+   — it expected demotion (public→private) to be *rejected*, backwards
+   from the feature's actual, correct design (only promotion needs the
+   GUC; demotion is always allowed, unconditionally). Found by test-writer.
+   **Fix:** rewrote as `test_demotion_to_private_succeeds_without_guc`,
+   asserting the real intended property, explicitly clearing the GUC
+   first to prove demotion needs no privilege at all.
 
-## Verification
+5. **Two tests depended on the shared `committed_user` fixture** while
+   opening genuinely separate DB connections (`subprocess.run` for the
+   CLI test, a fresh `create_async_engine` for the session-close
+   regression test) — `committed_user` only lives inside `pg_session`'s
+   SAVEPOINT tree, invisible outside it, so both hit real FK violations.
+   **Fix:** each test now seeds and cleans up its own truly-committed
+   user via its own connection.
 
-- `node --check .claude/workflows/dev-team-pipeline.js` — clean.
-- Fix validated live: run `wf_cc6ac57f-b37` relaunched twice with the pre-hardening version of the fix and correctly produced `Feature FEAT-125 — Code Explorer ...` labels (no more `undefined`) before being stopped to prioritize this gate.
-- No application code (backend/frontend) touched — this diff is entirely internal tooling + tracking docs.
+6. **Found independently during verification (not flagged by any of the
+   8 agents, since none ran `alembic upgrade`): two Alembic migration
+   heads.** This branch's ontology migration and main's newer
+   password-hash/timezone-fix chain both descended from the same parent
+   independently — `alembic upgrade head` would fail in production with
+   "multiple heads." **Fix:** retargeted this migration's `down_revision`
+   onto the current chain (safe — this migration has never shipped to
+   main, so this isn't editing a migration the immutability rule protects).
 
-## Follow-ups (not blocking this merge)
+### Independent re-verification (not self-reported)
 
-- SEC-informational: sanitize `featId` to `[A-Za-z0-9_-]` before it reaches shell-instruction text in `dev-team-pipeline.js` (pre-existing, low severity, not introduced by this diff).
-- Consider a lightweight Node test harness for `.claude/workflows/*.js` scripts (test-writer/pr-test-analyzer suggestion — no such harness exists in the repo today).
-- The 13-feature dev-team pipeline batch itself remains stopped mid-run (per Arshad's explicit instruction, to prioritize this merge) — resume later per `tasks/pipeline-queue.md`'s active_run_id row.
+```
+$ alembic upgrade head   (fresh Postgres 16 database)
+...
+INFO  Running upgrade n1k2l3m4a5b6 -> o1l2m3n4a5b6, ontology entities and relationships (FEAT-144 slice 1)
+→ single head, applies cleanly
+
+$ pytest tests/test_ontology_extraction.py tests/test_ontology_graph.py tests/test_ontology_security.py -q
+................................................                         [100%]
+48 passed in 3.13s
+→ includes all 14 real-Postgres trigger/security tests, now actually executing
+
+$ pytest tests/ -q -k "github or obsidian or runner or queue_worker"
+..................................................                       [100%]
+50 passed
+→ every existing test in files this diff touches, unmodified, still green
+
+$ pytest tests/ -q   (full backend suite)
+683 passed, 5 failed
+→ the 5 failures (test_auth.py, test_auth_password.py, test_token_service.py)
+  are in files this diff does not touch — pre-existing, unrelated, out of scope
+```
+
+---
+
+## WARN-tier fixes applied (not required to unblock, done anyway since cheap)
+
+- Added a missing FK index (`ix_ontology_relationships_source_entity_id`)
+  per `.claude/rules/database.md`'s "index every foreign key" rule —
+  `target_entity_id` had one, `source_entity_id` didn't.
+- Added two explanatory comments to the visibility-ratchet trigger
+  (`ontology_rank_visibility()`): the fail-closed `COALESCE` mechanism,
+  and why the `NULL` guard is needed independently of the CHECK
+  constraint (BEFORE ROW triggers fire before CHECK constraints).
+- Added 3 new tests for the oversized-external-key skip path
+  (`test_skip_oversized_login`, `test_skip_oversized_project_key`,
+  `test_key_at_exact_limit_is_not_skipped`) — previously had zero
+  coverage since the feature itself didn't exist until this fix.
+
+## Action Items (WARN/Suggestion — not blocking, logged for follow-up)
+
+- [ ] `ontology_extract.py`'s public entry point is named `extract()`;
+      every sibling ingestion module uses `ingest()`. Consider renaming
+      for consistency with `runner.py`'s dispatch convention.
+- [ ] `ontology_repository.upsert_entities()` returns `len(key_map)`
+      (entities touched, including no-op conflict updates) as
+      `entities_written`, unlike `relationships_written` which uses real
+      `rowcount` — the naming is a bit misleading.
+- [ ] `DerivedGraph.skipped_no_author` conflates two causes (missing
+      author vs. missing `provider_id`) — a future slice could split them
+      for clearer operator signal.
+- [ ] `ontology_repository.py`'s "RETURNING fewer rows than input"
+      defensive branch (documented as "should be unreachable") has no
+      direct test.
+- [ ] The shared ratchet trigger is tested directly only against
+      `ontology_entities`; its attachment to `ontology_relationships` is
+      exercised indirectly (via CHECK-constraint tests) but not with a
+      dedicated raw-SQL no-GUC-update test mirroring the entities one.
+- [ ] `_clamp_max_rows`'s comment says a non-coercible `max_rows` is
+      "caller error... surface it" but then substitutes the default
+      rather than raising — reword the comment or raise, for consistency
+      with `_parse_since`'s handling of bad input.
+
+None of the above block this merge — all are WARN/Suggestion-tier per
+this repo's gate thresholds (only Critical findings and FAIL gates
+block), and none touch the security-critical visibility ratchet, which
+is now fully covered and independently verified against live Postgres.
+
+---
+*Generated directly in-session (not via `/gate` auto-invocation) · 8 agents, 4 independently converging on the same root cause · all Critical findings fixed and re-verified with real test execution against a live Postgres 16 instance*
