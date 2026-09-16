@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import Float, cast, func, select
+from sqlalchemy import Integer, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.auth.dependencies import get_current_user
 from src.models.ai_ecosystem import AgentRegistry, AgentUsageLog
@@ -107,7 +107,9 @@ async def get_metrics(
                 func.coalesce(func.avg(AgentUsageLog.tokens_used), 0).label(
                     "avg_tokens"
                 ),
-                func.avg(cast(AgentUsageLog.success, Float)).label("success_rate"),
+                # Postgres/asyncpg refuses a direct bool->double cast
+                # (CannotCoerceError); int->double is the standard detour.
+                func.avg(cast(AgentUsageLog.success, Integer)).label("success_rate"),
             )
             .where(AgentUsageLog.invoked_at >= since)
             .group_by(AgentUsageLog.agent_name)
@@ -121,7 +123,12 @@ async def get_metrics(
             "usage_count": r.usage_count,
             "total_tokens": int(r.total_tokens),
             "avg_tokens_per_use": int(r.avg_tokens),
-            "success_rate": float(r.success_rate or 1.0),
+            # `or 1.0` would be wrong here: avg() over an all-failed group
+            # is a genuine 0, and 0 is falsy, so `or` silently reported a
+            # 100%-failure agent as 100% success. GROUP BY only emits groups
+            # with >=1 row and `success` is a non-null int cast, so the only
+            # real case to guard is "no rows at all" (r.success_rate is None).
+            "success_rate": float(r.success_rate) if r.success_rate is not None else 1.0,
         }
         for r in rows
     ]
