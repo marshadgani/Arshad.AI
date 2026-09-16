@@ -26,10 +26,6 @@
 }
 
 .heroGreeting { font-size: 28px; margin-top: var(--s-2); }
-/* Shared wrapper for a loading skeleton inside a hero-style card (spacing
-   matches the real content it stands in for) — used by both BriefingHero
-   and FocusCard, hence the generic name rather than "hero"-specific. */
-.cardSkeletonWrap { margin-top: var(--s-4); max-width: 500px; }
 .heroDate { color: var(--text-muted); font-family: var(--font-mono); font-size: 12px; margin-top: var(--s-1); }
 .heroSummary { color: var(--text-secondary); margin-top: var(--s-4); max-width: 800px; line-height: 1.6; }
 
@@ -264,38 +260,3 @@
 }
 .qaLabel { font-size: 12px; font-weight: 500; }
 .qaHint { font-size: 10px; color: var(--text-muted); font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 2px; }
-
-/* Loading skeleton — distinguishes "still fetching" from "genuinely empty"
-   across every widget, which use `null` for the former and `[]` for the
-   latter. Before this, both rendered the exact same "0 waiting" / "—" text,
-   so a slow-loading dashboard looked identical to a broken one for the
-   several seconds each of the 13 independent endpoints can take to answer. */
-.skeletonLine {
-  height: 12px;
-  border-radius: var(--radius-sm);
-  background: linear-gradient(
-    90deg,
-    var(--bg-elevated) 25%,
-    var(--border-faint) 37%,
-    var(--bg-elevated) 63%
-  );
-  background-size: 400% 100%;
-  animation: skeletonShimmer 1.6s ease-in-out infinite;
-}
-.skeletonLine + .skeletonLine { margin-top: var(--s-2); }
-
-@keyframes skeletonShimmer {
-  0% { background-position: 100% 50%; }
-  100% { background-position: 0 50%; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .skeletonLine { animation: none; }
-}
-
-.emptyState {
-  color: var(--text-muted);
-  font-size: 12px;
-  padding: var(--s-4) var(--s-2);
-  text-align: center;
-}

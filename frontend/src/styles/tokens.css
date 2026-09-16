@@ -26,13 +26,6 @@
   --status-info:   #4facfe;
   --status-neutral: #8b9cba;
 
-  /* status-warn alpha variants, mirroring the accent and accent-health
-     token families' faint/bg pattern, for pending or caution UI such as
-     the ComingSoonPage status chip that needs a soft background and
-     border without a whole new colour lane. */
-  --status-warn-faint: rgba(245, 166, 35, 0.18);
-  --status-warn-bg:    rgba(245, 166, 35, 0.07);
-
   /* Health domain accent — distinct from the cyan system accent so the
      two live-biometric sources (Whoop vs. Apple Health) read as visually
      separate lanes on the same dashboard rather than competing for the

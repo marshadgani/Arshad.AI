@@ -12,7 +12,7 @@ from datetime import datetime
 from typing import Any
 
 from sqlalchemy import ForeignKey, String, Text, UniqueConstraint
-from sqlalchemy.dialects.postgresql import ARRAY, BYTEA, JSONB, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, BYTEA, JSONB, TIMESTAMP, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .base import Base, TimestampedMixin
@@ -38,7 +38,12 @@ class Integration(Base, TimestampedMixin):
     status: Mapped[str] = mapped_column(
         String(32), nullable=False, default="disconnected"
     )
-    last_synced_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    # Already TIMESTAMP WITH TIME ZONE in Postgres (confirmed directly
+    # against production 2026-09-14, see migration n1k2l3m4a5b6) — this
+    # declaration only fixes a model/DB drift, no migration needed.
+    last_synced_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     config: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
 
@@ -65,7 +70,11 @@ class IntegrationOAuthToken(Base, TimestampedMixin):
     )
     encrypted_access_token: Mapped[bytes] = mapped_column(BYTEA, nullable=False)
     encrypted_refresh_token: Mapped[bytes | None] = mapped_column(BYTEA, nullable=True)
-    expires_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    # Same model/DB drift fix as Integration.last_synced_at above — already
+    # TIMESTAMP WITH TIME ZONE in Postgres, no migration needed.
+    expires_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
     scopes: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, default=list)
     extra: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
 
@@ -109,8 +118,12 @@ class IntegrationIngestToken(Base, TimestampedMixin):
     token_hash: Mapped[str] = mapped_column(
         String(64), nullable=False, unique=True, index=True
     )
-    last_used_at: Mapped[datetime | None] = mapped_column(nullable=True)
-    revoked_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    last_used_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
 
 
 class ApiKeyCredential(Base, TimestampedMixin):

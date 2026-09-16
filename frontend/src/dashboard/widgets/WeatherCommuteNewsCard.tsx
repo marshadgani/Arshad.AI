@@ -1,7 +1,5 @@
 import { type CommuteRes, type NewsRes, type WeatherRes } from '../useDashboardData';
 import { CardHeader } from '../CardHeader';
-import { CardSkeleton } from '../CardSkeleton';
-import { EmptyState } from '../EmptyState';
 import styles from '../Dashboard.module.css';
 
 export interface WeatherCommuteNewsCardProps {
@@ -17,32 +15,20 @@ export function WeatherCommuteNewsCard({ weather, commute, news }: WeatherCommut
   return (
     <section className={styles.card}>
       <CardHeader title="Weather · commute · news" meta={weather?.city ?? ''} />
-      {weather ? (
-        <div className={styles.wxBig}>
-          <div className={styles.wxTemp}>{weather.temp}</div>
-          <div className={styles.wxDetail}>{weather.condition}</div>
-        </div>
-      ) : (
-        <CardSkeleton rows={2} />
-      )}
+      <div className={styles.wxBig}>
+        <div className={styles.wxTemp}>{weather?.temp ?? '—'}</div>
+        <div className={styles.wxDetail}>{weather?.condition ?? ''}</div>
+      </div>
       <div className={styles.wxRow}>
         <span className={styles.wxLabel}>Commute</span>
-        <span className={styles.wxValue}>
-          {commute ? `${commute.eta} · ${commute.dest}` : '···'}
-        </span>
+        <span className={styles.wxValue}>{commute ? `${commute.eta} · ${commute.dest}` : '—'}</span>
       </div>
-      {news === null ? (
-        <CardSkeleton rows={2} />
-      ) : news.length === 0 ? (
-        <EmptyState message="No headlines right now." />
-      ) : (
-        news.map((n) => (
-          <div key={n.id} className={styles.wxRow}>
-            <span className={styles.wxLabel}>{n.source}</span>
-            <span className={styles.wxValue}>{n.title}</span>
-          </div>
-        ))
-      )}
+      {(news ?? []).map((n) => (
+        <div key={n.id} className={styles.wxRow}>
+          <span className={styles.wxLabel}>{n.source}</span>
+          <span className={styles.wxValue}>{n.title}</span>
+        </div>
+      ))}
     </section>
   );
 }

@@ -1,7 +1,5 @@
 import { type CalendarTag, type Event } from '../../data/mockData';
 import { CardHeader } from '../CardHeader';
-import { CardSkeleton } from '../CardSkeleton';
-import { EmptyState } from '../EmptyState';
 import styles from '../Dashboard.module.css';
 
 export interface EventsCardProps {
@@ -20,22 +18,16 @@ export function EventsCard({ events }: EventsCardProps) {
     <section className={styles.card}>
       <CardHeader title="My events" meta="today · 3 calendars" />
       <div className={styles.list}>
-        {events === null ? (
-          <CardSkeleton />
-        ) : events.length === 0 ? (
-          <EmptyState message="No events today — your calendar is clear." />
-        ) : (
-          events.map((e) => (
-            <div key={e.id} className={styles.eventRow}>
-              <div className={styles.eventTime}>{e.start}</div>
-              <div className={`${styles.eventBar} ${calClass[e.calendar]}`} />
-              <div>
-                <div className={styles.eventTitle}>{e.title}</div>
-                <div className={styles.eventMeta}>{e.calendar} · {e.source} · {e.duration}</div>
-              </div>
+        {(events ?? []).map((e) => (
+          <div key={e.id} className={styles.eventRow}>
+            <div className={styles.eventTime}>{e.start}</div>
+            <div className={`${styles.eventBar} ${calClass[e.calendar]}`} />
+            <div>
+              <div className={styles.eventTitle}>{e.title}</div>
+              <div className={styles.eventMeta}>{e.calendar} · {e.source} · {e.duration}</div>
             </div>
-          ))
-        )}
+          </div>
+        ))}
       </div>
     </section>
   );
