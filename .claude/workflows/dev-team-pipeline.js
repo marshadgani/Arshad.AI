@@ -395,12 +395,19 @@ async function runFeaturePipeline(f) {
 
 const outcomes = []
 for (const rawF of (args && args.features) || []) {
-  // Callers have historically passed {id: "FEAT-N", ...} (per CLAUDE.md's own
-  // launch examples) while every internal reference in this script expects
-  // .featId — silently producing `undefined` everywhere and crashing at the
-  // one spot that calls a method on it (branch-name construction below).
-  // Normalize once here so either key works.
-  const f = { ...rawF, featId: rawF.featId || rawF.id }
+  // Callers currently pass {id: "FEAT-N", ...} (per CLAUDE.md's own launch
+  // examples — a permanent dual-key contract, not a transitional shim) while
+  // every internal reference in this script expects .featId — silently
+  // producing `undefined` everywhere and crashing at the one spot that calls
+  // a method on it (branch-name construction below). Normalize once here so
+  // either key works, and fail loud immediately (not 30 stages later, and
+  // not silently under a `feat(undefined): ...` commit) if a caller supplies
+  // neither.
+  if (!rawF || !(rawF.featId || rawF.id)) {
+    outcomes.push(Promise.resolve({ featId: undefined, status: 'error', error: `Feature entry missing id/featId: ${JSON.stringify(rawF)}` }))
+    continue
+  }
+  const f = { ...rawF, featId: String(rawF.featId || rawF.id) }
   outcomes.push(runFeaturePipeline(f).catch(e => ({ featId: f.featId, status: 'error', error: String((e && e.message) || e) })))
 }
 const results = await Promise.all(outcomes)
