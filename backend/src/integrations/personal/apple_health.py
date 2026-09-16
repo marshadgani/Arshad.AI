@@ -49,7 +49,6 @@ from __future__ import annotations
 import logging
 import secrets
 import time
-from datetime import datetime, timezone
 from typing import Any
 
 import redis.exceptions
@@ -85,6 +84,12 @@ class AppleHealthIntegration(IntegrationProvider):
     )
     docs_url = "https://developer.apple.com/documentation/healthkit"
     icon = "apple-health"
+    # HealthKit is push-only — nothing upstream to revoke. The ingest
+    # token itself is soft-revoked generically by
+    # services/integration_credentials.scrub_credentials() on disconnect
+    # (base.IntegrationProvider.disconnect() calls it for every provider),
+    # which replaces the bespoke override this provider used to carry.
+    revocation_kind = "no_revoke"
 
     async def connect(
         self, *, user: User | None, db: AsyncSession, payload: dict[str, Any]
@@ -204,19 +209,3 @@ class AppleHealthIntegration(IntegrationProvider):
             last_error=integration.last_error,
             extra={"has_recent_push": has_cached_snapshot},
         )
-
-    async def disconnect(self, *, integration: Integration, db: AsyncSession) -> None:
-        """Revoke the ingest token too — the default base implementation
-        only flips integration.status, which would leave a still-valid
-        bearer token able to keep authenticating POSTs after 'disconnect'.
-        """
-        token_row = await db.scalar(
-            select(IntegrationIngestToken).where(
-                IntegrationIngestToken.integration_id == integration.id
-            )
-        )
-        if token_row is not None:
-            token_row.revoked_at = datetime.now(timezone.utc)
-        integration.status = "disconnected"
-        integration.last_error = None
-        await db.commit()

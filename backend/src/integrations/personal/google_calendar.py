@@ -31,6 +31,9 @@ class GoogleCalendarIntegration(IntegrationProvider):
     description = "Sync your Google Calendar events into Arshad.AI."
     docs_url = "https://developers.google.com/calendar"
     icon = "google-calendar"
+    # Thin view over the shared Google login grant — see gmail.py's
+    # revocation_kind comment for the full rationale.
+    revocation_kind = "no_credential"
 
     async def connect(
         self, *, user: User | None, db: AsyncSession, payload: dict[str, Any]

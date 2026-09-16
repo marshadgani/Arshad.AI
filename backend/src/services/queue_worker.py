@@ -21,6 +21,7 @@ from sqlalchemy import select
 
 from ..models.dag_trigger import DagTriggerQueue
 from ..models.database import AsyncSessionLocal
+from ..utils.errors import log_detail, safe_detail
 from .ingestion import runner as ingestion_runner
 
 _log = logging.getLogger(__name__)
@@ -75,9 +76,11 @@ async def _process(row_id, dag_id: str, user_id, payload: dict, attempt: int) ->
             success = True
             error_text = None
         except Exception as exc:  # noqa: BLE001 — surface ALL errors as failed
-            _log.warning("queue worker run failed dag=%s err=%r", dag_id, exc)
+            _log.warning(
+                "queue worker run failed dag=%s err=%s", dag_id, log_detail(exc)
+            )
             success = False
-            error_text = f"{type(exc).__name__}: {exc}"
+            error_text = safe_detail(exc)
 
     async with AsyncSessionLocal() as status_db:
         async with status_db.begin():

@@ -38,3 +38,49 @@ class ShopifyDashboard(BaseModel):
     low_stock_threshold: int = 5
     recent_orders: list[ShopifyOrder] = []
     partial_failures: list[str] = []
+
+
+TrendDirection = Literal["up", "down", "flat", "unknown"]
+
+
+class ShopifyInsightPoint(BaseModel):
+    """One shop-local calendar day in a revenue/order trend.
+
+    revenue_amount and order_count are None ONLY for a date at or past
+    the fetch's covered_through boundary on a truncated window — a
+    no-data gap, never a fabricated zero. See parsers.parse_insights.
+    """
+
+    date: str
+    revenue_amount: Optional[str] = None
+    order_count: Optional[int] = None
+    is_partial_day: bool = False
+
+
+class ShopifyInsightSummary(BaseModel):
+    """Aggregate stats over the window's completed (non-partial, non-gap)
+    days only. Present only when the fetch was not truncated.
+    """
+
+    window_revenue: str
+    window_order_count: int
+    average_order_value: Optional[str] = None
+    best_day: Optional[str] = None
+    worst_day: Optional[str] = None
+    completed_day_count: int
+    prior_period_change_pct: Optional[float] = None
+    direction: TrendDirection = "unknown"
+
+
+class ShopifyInsights(BaseModel):
+    days: int
+    currency_code: str
+    timezone: str
+    start_date: str
+    end_date: str
+    points: list[ShopifyInsightPoint] = []
+    summary: Optional[ShopifyInsightSummary] = None
+    truncated: bool = False
+    covered_through: Optional[str] = None
+    cached_at: Optional[str] = None
+    partial_failures: list[str] = []

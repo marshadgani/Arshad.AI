@@ -19,13 +19,15 @@ the router taking a constructor or a DI container.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime, timezone
 
 import httpx
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from src.api.errors import http_error
 from src.auth.dependencies import get_current_user
 from src.integrations.base import IntegrationError
 from src.middleware.rate_limit import enforce_rate_limit
@@ -35,6 +37,7 @@ from src.models.user import User
 from src.schemas.shopify import ShopifyDashboard
 from src.services.shopify import cache, client, parsers, state, tokens
 from src.services.shopify import dashboard as dashboards
+from src.services.shopify import insights as insights_service
 
 router = APIRouter(prefix="/api/v1/shopify", tags=["shopify"])
 
@@ -46,6 +49,28 @@ _RATE_WINDOW_SECONDS = 60
 # returning a malformed/non-JSON body must not crash this endpoint into an
 # uncaught 500 (see module docstring: this always returns 200).
 _FETCH_ERRORS = (httpx.HTTPError, IntegrationError, ValueError)
+
+# /insights is NOT the always-200 dashboard tile — it uses the same
+# 404/409/503 semantics as /api/v1/whoop/hrv-trend, so a failure here never
+# masquerades as "0 revenue" the way the dashboard's degraded 200 does.
+# asyncio.TimeoutError is included because the route wraps the fetch in
+# asyncio.wait_for as a hard ceiling on top of the client's own cooperative
+# time budget.
+_INSIGHTS_FETCH_ERRORS = (
+    httpx.HTTPError,
+    IntegrationError,
+    ValueError,
+    asyncio.TimeoutError,
+)
+
+# Real upper bound on the whole insights fetch, independent of
+# client.INSIGHTS_TIME_BUDGET_SECONDS (which is only a cooperative,
+# checked-between-pages deadline).
+_INSIGHTS_HARD_TIMEOUT_SECONDS = 25.0
+
+# The only `days` values /insights accepts — matches cache.INSIGHTS_DAY_VARIANTS
+# and the frontend's 7/14/30 segmented control.
+_INSIGHTS_DAY_OPTIONS = (7, 14, 30)
 
 _log = logging.getLogger(__name__)
 
@@ -95,6 +120,20 @@ async def _apply_error_status(
 
 async def _mark_healthy(integration: Integration, db: AsyncSession) -> None:
     await state.mark_healthy(integration, db)
+
+
+async def _get_cached_insights(integration_id: str, days: int) -> dict | None:
+    return await cache.get_cached_insights(integration_id, days)
+
+
+async def _set_cached_insights(integration_id: str, days: int, data: dict) -> None:
+    await cache.set_cached_insights(integration_id, days, data)
+
+
+async def _execute_insights_query(
+    shop: str, token: str, window_start: str, window_end: str
+) -> dict:
+    return await client.execute_insights_query(shop, token, window_start, window_end)
 
 
 # ── Response helpers ─────────────────────────────────────────────────────
@@ -170,3 +209,101 @@ async def get_dashboard(
     await _mark_healthy(integration, db)
     await _set_cached(str(integration.id), {**payload, "cached_at": now.isoformat()})
     return JSONResponse({"data": payload})
+
+
+@router.get("/insights")
+async def get_insights(
+    days: int = Query(default=14),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """N-day revenue/order trend for the connected store.
+
+    NOT the always-200 dashboard tile: answers honest 404/409/503, same
+    semantics as /api/v1/whoop/hrv-trend. Never returns 401 — see module
+    docstring on why a third-party token issue must never look like an
+    Arshad.AI session expiry to frontend/src/hooks/useFetch.ts.
+
+    `days` is checked against _INSIGHTS_DAY_OPTIONS rather than typed as
+    Literal[7, 14, 30]: pydantic v2's Literal validator does not coerce a
+    query string ("14") into the matching int member, so every valid
+    request would 422. Bounding to exactly {7, 14, 30} here instead keeps
+    Redis key cardinality at 3/integration (matching cache.INSIGHTS_DAY_VARIANTS)
+    and matches the three options the frontend's segmented control offers.
+    """
+    if days not in _INSIGHTS_DAY_OPTIONS:
+        raise http_error(
+            422,
+            "validation_error",
+            "days must be one of 7, 14, or 30.",
+            details={"allowed": list(_INSIGHTS_DAY_OPTIONS)},
+        )
+
+    await _check_rate_limit(str(current_user.id))
+
+    integration = await _find_integration(str(current_user.id), db)
+    if not integration:
+        raise http_error(
+            404,
+            "shopify_not_connected",
+            "No Shopify integration found for this account.",
+        )
+
+    if integration.status == "expired":
+        raise http_error(
+            409,
+            "shopify_reauth_required",
+            "Shopify access has expired. Reconnect your store.",
+        )
+
+    now = datetime.now(timezone.utc)
+
+    cached = await _get_cached_insights(str(integration.id), days)
+    if cached is not None:
+        return JSONResponse({"data": cached})
+
+    try:
+        # Inside the guard: shop_context raises IntegrationError
+        # ("shopify_shop_missing") on a record whose shop domain never
+        # persisted, and state.REAUTH_CODES classifies that as reauth —
+        # so it must reach the 409 branch below, not escape as a generic
+        # 500 from main.py's catch-all handler.
+        ctx = state.shop_context(integration)
+        bounds = parsers.window_bounds(ctx.timezone, now, days)
+
+        token = await _get_token(integration, db)
+        # Release the implicit read transaction opened by the integration
+        # lookup/token fetch above before the upstream network call — see
+        # .claude/rules/database.md: never hold a transaction open across a
+        # network call. SQLAlchemy lazily starts a fresh one for the
+        # mark_healthy/apply_error_status write below.
+        await db.rollback()
+
+        raw = await asyncio.wait_for(
+            _execute_insights_query(ctx.shop, token, bounds.start_iso, bounds.end_iso),
+            timeout=_INSIGHTS_HARD_TIMEOUT_SECONDS,
+        )
+        # Parsing runs inside the same guard as the fetch: a malformed wire
+        # payload must become a 503, never an uncaught 500.
+        payload = insights_service.build_insights(raw, ctx, bounds, days).model_dump()
+    except _INSIGHTS_FETCH_ERRORS as exc:
+        needs_reauth, _fallback_status = _classify_error(exc)
+        await _apply_error_status(integration, exc, needs_reauth, db)
+        if needs_reauth:
+            raise http_error(
+                409,
+                "shopify_reauth_required",
+                "Shopify access has expired. Reconnect your store.",
+            ) from exc
+        _log.warning("Shopify insights fetch failed: %s", exc)
+        raise http_error(
+            503,
+            "shopify_upstream_unavailable",
+            "Shopify API is temporarily unavailable. Retry shortly.",
+        ) from exc
+
+    await _mark_healthy(integration, db)
+    await _set_cached_insights(
+        str(integration.id), days, {**payload, "cached_at": now.isoformat()}
+    )
+    return JSONResponse({"data": {**payload, "cached_at": now.isoformat()}})

@@ -13,6 +13,7 @@ import Integrations from './pages/Integrations';
 import Learning from './pages/Learning';
 import Login from './pages/Login';
 import PersonalFinance from './pages/PersonalFinance';
+import Settings from './pages/Settings';
 import ShopifyStore from './pages/ShopifyStore';
 import StockMarket from './pages/StockMarket';
 import Travel from './pages/Travel';
@@ -79,6 +80,7 @@ function ProtectedRoutes() {
         <Route path="/integrations"       element={<Integrations />} />
         <Route path="/ai-ecosystem"       element={<AiEcosystem />} />
         <Route path="/obsidian"           element={<Obsidian />} />
+        <Route path="/settings"           element={<Settings />} />
         <Route path="*"                   element={<Navigate to="/" replace />} />
       </Routes>
     </AppLayout>

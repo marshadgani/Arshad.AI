@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { ConnectError, connectIntegration } from '../api/integrations';
 import { getToken } from '../auth/tokenStorage';
+import DisconnectDialog, { type RevocationKind } from '../components/DisconnectDialog';
 import styles from './Integrations.module.css';
 
 type IntegrationKind =
@@ -27,6 +28,7 @@ interface IntegrationItem {
   coming_soon: boolean;
   coming_soon_reason: string | null;
   connect_prompt?: { label: string; placeholder: string } | null;
+  revocation_kind: RevocationKind;
 }
 
 const STATUS_DOT: Record<IntegrationStatus, string> = {
@@ -79,6 +81,7 @@ export default function Integrations() {
     token: string;
   } | null>(null);
   const [tokenCopied, setTokenCopied] = useState(false);
+  const [disconnectTarget, setDisconnectTarget] = useState<IntegrationItem | null>(null);
 
   const fetchAll = async () => {
     const token = getToken();
@@ -239,8 +242,13 @@ export default function Integrations() {
     }
   };
 
-  const onDisconnect = async (item: IntegrationItem) => {
-    if (!confirm(`Disconnect ${item.display_name}? Stored credentials will be removed.`)) return;
+  const onDisconnect = (item: IntegrationItem) => {
+    setDisconnectTarget(item);
+  };
+
+  const confirmDisconnect = async () => {
+    const item = disconnectTarget;
+    if (!item) return;
     setActioning(item.slug);
     try {
       const token = getToken();
@@ -248,8 +256,16 @@ export default function Integrations() {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      flashToast(`${item.display_name} disconnected`);
+      const body = await res.json();
+      if (!res.ok) throw new Error(body?.error?.message ?? `HTTP ${res.status}`);
+      setDisconnectTarget(null);
+      if (body?.data?.upstream_revocation === 'failed') {
+        flashToast(
+          `Disconnected. We couldn't confirm revocation with ${item.display_name} — revoke access in your ${item.display_name} account settings.`,
+        );
+      } else {
+        flashToast(`${item.display_name} disconnected`);
+      }
       await fetchAll();
     } catch (e: unknown) {
       flashToast(`Disconnect failed: ${(e as Error).message}`);
@@ -505,6 +521,18 @@ export default function Integrations() {
             </div>
           </div>
         </div>
+      )}
+
+      {disconnectTarget && (
+        <DisconnectDialog
+          provider={{
+            display_name: disconnectTarget.display_name,
+            revocation_kind: disconnectTarget.revocation_kind,
+          }}
+          onConfirm={confirmDisconnect}
+          onCancel={() => setDisconnectTarget(null)}
+          isLoading={actioning === disconnectTarget.slug}
+        />
       )}
 
       {toast && <div className={styles.toast}>{toast}</div>}

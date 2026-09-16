@@ -22,7 +22,10 @@ class IngestionError(Exception):
 
     The queue worker treats this as a 'failed' status (after retry cap);
     the Airflow DAG fails the task. The error_text on dag_trigger_queue
-    is set to ``f"{type(exc).__name__}: {exc}"``.
+    is set via ``utils.errors.safe_detail(exc)`` — the exception's type
+    name (plus HTTP status for httpx.HTTPStatusError), never str(exc) —
+    so a credential embedded in an upstream request URL is never
+    persisted or returned to a client. See services/queue_worker.py.
     """
 
 

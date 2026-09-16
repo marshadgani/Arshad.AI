@@ -45,6 +45,12 @@ class ZerodhaKiteIntegration(OAuthIntegrationProvider):
     scopes: list[str] = []
     client_id_env = "ZERODHA_KITE_CLIENT_ID"
     client_secret_env = "ZERODHA_KITE_CLIENT_SECRET"
+    revocation_kind = "revokes"
+    # https://kite.trade/docs/connect/v3/user/#logout — DELETE, not POST,
+    # and api_key/access_token go as QUERY PARAMETERS, not a body. Custom
+    # _revoke_upstream below; the RFC 7009 machinery in _oauth_base does
+    # not apply here.
+    revoke_url = "https://api.kite.trade/session/token"
 
     async def connect(self, *, user, db, payload):  # type: ignore[override]
         """Kite uses 'api_key' not 'client_id' in the auth URL."""
@@ -124,12 +130,29 @@ class ZerodhaKiteIntegration(OAuthIntegrationProvider):
             "broker": data.get("broker"),
         }
 
+    async def _revoke_upstream(self, *, payload):  # type: ignore[override]
+        if payload is None:
+            return "unsupported"
+        access_token = payload.get("access_token")
+        if not access_token:
+            return "unsupported"
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.delete(
+                    self.revoke_url,
+                    params={"api_key": self._client_id(), "access_token": access_token},
+                    headers={"X-Kite-Version": "3"},
+                )
+        except httpx.HTTPError:
+            return "failed"
+        return "revoked" if resp.status_code in (200, 401) else "failed"
+
     async def sync(self, *, integration, db):  # type: ignore[override]
         import time
         from datetime import datetime, timezone
 
         from ..base import IntegrationError as _IE
-        from ..base import SyncResult
+        from ..base import SyncResult, error_summary, safe_detail
 
         started = time.perf_counter()
         access_token = await self.get_access_token(integration=integration, db=db)
@@ -147,9 +170,9 @@ class ZerodhaKiteIntegration(OAuthIntegrationProvider):
                 body = resp.json() or {}
         except Exception as exc:  # noqa: BLE001
             integration.status = "error"
-            integration.last_error = f"{type(exc).__name__}: {exc}"[:500]
+            integration.last_error = error_summary(exc)
             await db.commit()
-            raise _IE("sync_failed", f"{type(exc).__name__}: {exc}")
+            raise _IE("sync_failed", f"Kite sync failed: {safe_detail(exc)}") from exc
         holdings = body.get("data") or []
         integration.config = {
             **(integration.config or {}),

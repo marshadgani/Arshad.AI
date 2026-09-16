@@ -35,6 +35,7 @@ from ..base import (
     IntegrationProvider,
     StatusReport,
     SyncResult,
+    safe_detail,
 )
 from ..project._shared import (
     mark_error,
@@ -74,6 +75,50 @@ class PlaidIntegration(IntegrationProvider):
     description = "US bank accounts, balances, transactions via Plaid Link."
     docs_url = "https://plaid.com/docs/"
     icon = "plaid"
+    revocation_kind = "revokes"
+
+    async def _prepare_revocation(self, *, integration, db):  # type: ignore[override]
+        creds = await db.scalar(
+            select(ApiKeyCredential).where(
+                ApiKeyCredential.integration_id == integration.id
+            )
+        )
+        if creds is None:
+            return None
+        access_token = decrypt(creds.encrypted_key)
+        extra = creds.extra or {}
+        item_id = extra.get("item_id")
+        return {
+            "access_token": access_token,
+            "env": extra.get("env") or _plaid_env(),
+            # Merged into integration.config['last_disconnect'] by
+            # base.disconnect(). If POST /item/remove fails below, the
+            # Item is still removable manually from the Plaid dashboard
+            # using this id — losing it here would orphan a live,
+            # per-Item-billed grant with no recoverable handle.
+            "_preserve": {"plaid_item_id": item_id} if item_id else {},
+        }
+
+    async def _revoke_upstream(self, *, payload):  # type: ignore[override]
+        if payload is None:
+            return "unsupported"
+        access_token = payload.get("access_token")
+        if not access_token:
+            return "unsupported"
+        try:
+            creds = _plaid_creds()
+        except IntegrationError:
+            return "unsupported"
+        base_url = f"https://{payload.get('env') or _plaid_env()}.plaid.com"
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.post(
+                    f"{base_url}/item/remove",
+                    json={**creds, "access_token": access_token},
+                )
+        except httpx.HTTPError:
+            return "failed"
+        return "revoked" if resp.status_code == 200 else "failed"
 
     async def connect(
         self, *, user: User | None, db: AsyncSession, payload: dict[str, Any]
@@ -162,7 +207,9 @@ class PlaidIntegration(IntegrationProvider):
                 body = resp.json() or {}
         except Exception as exc:  # noqa: BLE001
             await mark_error(integration=integration, db=db, err=exc)
-            raise IntegrationError("sync_failed", f"{type(exc).__name__}: {exc}")
+            raise IntegrationError(
+                "sync_failed", f"Plaid sync failed: {safe_detail(exc)}"
+            ) from exc
         accounts = body.get("accounts") or []
         integration.config = {
             **(integration.config or {}),

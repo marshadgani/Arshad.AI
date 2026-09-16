@@ -25,6 +25,7 @@ from ..base import (
     IntegrationProvider,
     StatusReport,
     SyncResult,
+    safe_detail,
 )
 from ..registry import register
 from ._shared import (
@@ -60,6 +61,8 @@ class SupabaseIntegration(IntegrationProvider):
     description = "Project list, table sizes, recent migrations."
     docs_url = "https://supabase.com/docs/reference/api"
     icon = "supabase"
+    # Stateless API key, no revoke API.
+    revocation_kind = "no_revoke"
 
     async def connect(
         self, *, user: User | None, db: AsyncSession, payload: dict[str, Any]
@@ -101,7 +104,9 @@ class SupabaseIntegration(IntegrationProvider):
                 projects = resp.json() or []
         except Exception as exc:  # noqa: BLE001
             await mark_error(integration=integration, db=db, err=exc)
-            raise IntegrationError("sync_failed", f"{type(exc).__name__}: {exc}")
+            raise IntegrationError(
+                "sync_failed", f"Supabase sync failed: {safe_detail(exc)}"
+            ) from exc
         integration.config = {
             "project_count": len(projects),
             "projects": [

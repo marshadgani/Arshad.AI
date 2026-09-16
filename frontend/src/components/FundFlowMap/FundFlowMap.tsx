@@ -1,3 +1,5 @@
+import StatusChip from '../StatusChip';
+
 import styles from './FundFlowMap.module.css';
 
 const LEGEND = [
@@ -18,7 +20,11 @@ const LEGEND = [
 /* The SVG is authored in raw SVG and embedded via dangerouslySetInnerHTML.
    It uses Space Mono + Syne fonts (loaded in index.html) and hardcodes
    pixel coordinates — converting to JSX camelCase would be error-prone
-   for a 200-element diagram. The content is static and fully trusted. */
+   for a 200-element diagram. The content is static and fully trusted.
+   This string is a compile-time literal with zero interpolation; if the
+   diagram ever becomes data-driven it must be rebuilt as native JSX SVG
+   elements (FEAT-150) rather than by concatenating backend data into
+   this string. */
 const MAP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="1820" height="1580" viewBox="0 0 1820 1580">
 <defs>
   <marker id="a-vnd"  markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#fb923c"/></marker>
@@ -518,7 +524,12 @@ export default function FundFlowMap() {
     <section className={styles.section}>
       <div className={styles.sectionHead}>
         <div className={styles.sectionTitle}>Fund Flow</div>
-        <div className={styles.sectionMeta}>Full money map · v13</div>
+        <div className={styles.headMeta}>
+          <StatusChip label="Static map · not live data" />
+          <p className={styles.staticMapSubtext}>
+            Hand-drawn from your real accounts · balances and transfers are not connected · v13
+          </p>
+        </div>
       </div>
 
       <div className={styles.legend}>
@@ -532,6 +543,9 @@ export default function FundFlowMap() {
 
       <div
         className={styles.canvasWrap}
+        role="group"
+        aria-label="Fund flow diagram — static hand-drawn map of your real accounts"
+        tabIndex={0}
         dangerouslySetInnerHTML={{ __html: MAP_SVG }}
       />
     </section>

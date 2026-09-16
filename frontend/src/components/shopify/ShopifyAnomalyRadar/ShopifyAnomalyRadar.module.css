@@ -1,0 +1,209 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  padding: var(--s-5);
+  margin-top: var(--s-4);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-faint);
+  border-radius: var(--radius-xl);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+}
+
+.cardTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+/* A live-scanning pulse, distinct from the static "Live" dot elsewhere on
+   the page — this card is actively re-evaluating the window, not just
+   reporting a connection state. */
+.radarDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-commerce);
+  box-shadow: 0 0 0 0 var(--accent-commerce-faint);
+  animation: radarPulse 2.4s ease-out infinite;
+}
+
+@keyframes radarPulse {
+  0% {
+    box-shadow: 0 0 0 0 var(--accent-commerce-faint);
+  }
+  70% {
+    box-shadow: 0 0 0 8px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+.countBadge {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--bg-deep);
+  background: var(--accent-commerce-gold);
+  border-radius: var(--radius-sm);
+  padding: 2px var(--s-2);
+  min-width: 20px;
+  text-align: center;
+}
+
+.skeleton {
+  height: 72px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(90deg, var(--bg-panel), var(--bg-glass), var(--bg-panel));
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.errorBanner {
+  color: var(--status-danger);
+  margin: 0;
+}
+
+.empty {
+  color: var(--text-muted);
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.allClear {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.allClearIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--accent-commerce-faint);
+  color: var(--accent-commerce);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-3);
+  padding: var(--s-3);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--border-strong);
+  background: var(--bg-panel);
+}
+
+.item.spike {
+  border-left-color: var(--accent-commerce-gold);
+}
+
+.item.dip {
+  border-left-color: var(--status-danger);
+}
+
+.item.silent {
+  border-left-color: var(--status-warn);
+}
+
+.itemIcon {
+  font-size: 0.75rem;
+  line-height: 1.6;
+  flex-shrink: 0;
+}
+
+.item.spike .itemIcon {
+  color: var(--accent-commerce-gold);
+}
+
+.item.dip .itemIcon {
+  color: var(--status-danger);
+}
+
+.item.silent .itemIcon {
+  color: var(--status-warn);
+}
+
+.itemBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.itemHeadline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s-2);
+}
+
+.itemBadge {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+
+.itemDate {
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.itemAmount {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-left: auto;
+}
+
+.itemDetail {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .radarDot,
+  .skeleton {
+    animation: none;
+  }
+}

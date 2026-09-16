@@ -54,7 +54,14 @@ from datetime import datetime, timezone
 from typing import Any, NoReturn
 from urllib.parse import urlencode
 
-from ..base import ConnectResult, IntegrationError, StatusReport, SyncResult
+from ..base import (
+    ConnectResult,
+    IntegrationError,
+    StatusReport,
+    SyncResult,
+    error_summary,
+    log_detail,
+)
 from ..registry import register
 from . import shopify_oauth
 from ._oauth_base import (
@@ -63,8 +70,6 @@ from ._oauth_base import (
     OAuthIntegrationProvider,
     store_oauth_state,
 )
-
-_LAST_ERROR_MAX_CHARS = 500
 
 _log = logging.getLogger(__name__)
 
@@ -97,6 +102,10 @@ class ShopifyIntegration(OAuthIntegrationProvider):
         "label": "Shopify Store Domain",
         "placeholder": "my-store.myshopify.com",
     }
+    # Shopify access tokens cannot be revoked via a public API — the
+    # merchant must uninstall the app from the Shopify admin. The local
+    # credential is still deleted on disconnect (see module docstring).
+    revocation_kind = "no_revoke"
 
     # OAuthIntegrationProvider ClassVars — auth_url/token_url are built
     # per-shop below, so these are placeholders that are never dereferenced.
@@ -169,10 +178,9 @@ class ShopifyIntegration(OAuthIntegrationProvider):
             # why — undebuggable per the project's deployment verification
             # protocol, which greps app logs for warning/error lines.
             _log.warning(
-                "Shopify shop-metadata probe failed during connect for shop=%s: %s: %s",
+                "Shopify shop-metadata probe failed during connect for shop=%s: %s",
                 stored_shop,
-                type(exc).__name__,
-                exc,
+                log_detail(exc),
             )
             meta = {}
 
@@ -210,6 +218,9 @@ class ShopifyIntegration(OAuthIntegrationProvider):
         # Metadata the dashboard renders (name/currency/timezone) just
         # changed, so the cached payload built from the old values is stale.
         await shopify_cache.del_dashboard_cache(str(integration.id))
+        # Timezone/currency changes also invalidate any cached insights
+        # trend — it was bucketed against the old shop-local calendar days.
+        await shopify_cache.del_insights_cache(str(integration.id))
 
         return SyncResult(
             rows_written=0,
@@ -230,15 +241,16 @@ class ShopifyIntegration(OAuthIntegrationProvider):
         # — a failure recorded only in integration.last_error is invisible
         # to that workflow.
         _log.warning(
-            "Shopify sync failed for integration_id=%s: %s: %s",
+            "Shopify sync failed for integration_id=%s: %s",
             integration.id,
-            type(exc).__name__,
-            exc,
+            log_detail(exc),
         )
         integration.status = "error"
-        integration.last_error = f"{type(exc).__name__}: {exc}"[:_LAST_ERROR_MAX_CHARS]
+        integration.last_error = error_summary(exc)
         await db.commit()
-        raise IntegrationError("sync_failed", f"{type(exc).__name__}: {exc}")
+        raise IntegrationError(
+            "sync_failed", f"Shopify sync failed: {error_summary(exc)}"
+        ) from exc
 
     async def status(self, *, integration, db) -> StatusReport:  # type: ignore[override]
         report = await super().status(integration=integration, db=db)

@@ -1,3 +1,5 @@
+import type { TrendDirection } from '../types/shopify';
+
 export function formatMoney(amount: string | null | undefined, currency: string | null | undefined): string {
   if (amount == null) return '—';
   const value = Number(amount);
@@ -39,4 +41,23 @@ export function shopSubtitle(
   const today = timezone ? `Today (${timezone})` : null;
   if (!shopName) return today;
   return today ? `${shopName} · ${today}` : shopName;
+}
+
+export function formatPercentChange(pct: number | null | undefined): string {
+  if (pct == null || Number.isNaN(pct)) return '—';
+  const sign = pct > 0 ? '+' : '';
+  return `${sign}${pct.toFixed(1)}%`;
+}
+
+export function formatTrendDirection(direction: TrendDirection): string {
+  switch (direction) {
+    case 'up':
+      return '↑ Up';
+    case 'down':
+      return '↓ Down';
+    case 'flat':
+      return '→ Flat';
+    default:
+      return '—';
+  }
 }

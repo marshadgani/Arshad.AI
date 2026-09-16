@@ -23,6 +23,7 @@ from ..base import (
     IntegrationError,
     StatusReport,
     SyncResult,
+    error_summary,
 )
 
 
@@ -136,7 +137,7 @@ async def mark_error(
     *, integration: Integration, db: AsyncSession, err: Exception
 ) -> None:
     integration.status = "error"
-    integration.last_error = f"{type(err).__name__}: {err}"[:500]
+    integration.last_error = error_summary(err)
     await db.commit()
 
 

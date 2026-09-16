@@ -1,0 +1,46 @@
+.menu {
+  position: absolute;
+  top: calc(100% + var(--s-2));
+  right: 0;
+  width: 220px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-faint);
+  border-radius: var(--radius-md);
+  box-shadow: var(--glow-cyan-soft);
+  z-index: var(--z-drawer);
+  padding: var(--s-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.identity {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.email {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.signOut {
+  align-self: flex-start;
+  padding: var(--s-1) var(--s-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-faint);
+  color: var(--text-secondary);
+  background: transparent;
+  font-size: 13px;
+}
+.signOut:hover {
+  background: var(--accent-bg);
+  color: var(--accent);
+}

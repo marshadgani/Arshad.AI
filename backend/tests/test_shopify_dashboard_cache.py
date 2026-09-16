@@ -11,22 +11,24 @@ injected to verify the degrade-gracefully contract.
 from __future__ import annotations
 
 import json
-from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import redis.exceptions
-
 from src.services.shopify.cache import (
     DASHBOARD_TTL_SECONDS,
+    INSIGHTS_TTL_SECONDS,
     dashboard_cache_key,
     del_dashboard_cache,
+    del_insights_cache,
     get_cached_dashboard,
+    get_cached_insights,
+    insights_cache_key,
     set_cached_dashboard,
+    set_cached_insights,
 )
 from src.services.shopify.dashboard import build_dashboard, shell_dashboard
 from src.services.shopify.state import ShopContext
-
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -308,3 +310,65 @@ async def test_del_dashboard_cache_does_not_raise_on_redis_error():
     with patch("src.services.shopify.cache.get_redis", return_value=mock_redis):
         # Must not raise
         await del_dashboard_cache("id-99")
+
+
+# ── Insights caching (FEAT-159) ────────────────────────────────────────────
+
+
+def test_insights_cache_key_includes_days():
+    assert insights_cache_key("abc", 14) == "shopify:insights:abc:14"
+    assert insights_cache_key("abc", 30) == "shopify:insights:abc:30"
+    assert insights_cache_key("abc", 14) != insights_cache_key("abc", 30)
+
+
+@pytest.mark.asyncio
+async def test_get_cached_insights_uses_days_specific_key():
+    mock_redis = AsyncMock()
+    mock_redis.get.return_value = None
+
+    with patch("src.services.shopify.cache.get_redis", return_value=mock_redis):
+        await get_cached_insights("id-1", 14)
+
+    mock_redis.get.assert_called_once_with("shopify:insights:id-1:14")
+
+
+@pytest.mark.asyncio
+async def test_set_cached_insights_writes_with_insights_ttl():
+    mock_redis = AsyncMock()
+
+    with patch("src.services.shopify.cache.get_redis", return_value=mock_redis):
+        await set_cached_insights("id-1", 30, {"days": 30})
+
+    mock_redis.set.assert_called_once_with(
+        "shopify:insights:id-1:30",
+        json.dumps({"days": 30}),
+        ex=INSIGHTS_TTL_SECONDS,
+    )
+
+
+@pytest.mark.asyncio
+async def test_del_insights_cache_removes_all_day_variants():
+    mock_redis = AsyncMock()
+
+    with patch("src.services.shopify.cache.get_redis", return_value=mock_redis):
+        await del_insights_cache("id-1")
+
+    mock_redis.delete.assert_called_once_with(
+        "shopify:insights:id-1:7",
+        "shopify:insights:id-1:14",
+        "shopify:insights:id-1:30",
+    )
+
+
+@pytest.mark.asyncio
+async def test_dashboard_cache_unaffected_by_cache_helper_refactor():
+    """Behaviour-identical after extracting the shared _cache_get/_cache_set
+    helpers — same fail-open property on both read and write paths.
+    """
+    mock_redis = AsyncMock()
+    mock_redis.get.side_effect = redis.exceptions.RedisError("down")
+    mock_redis.set.side_effect = redis.exceptions.RedisError("down")
+
+    with patch("src.services.shopify.cache.get_redis", return_value=mock_redis):
+        assert await get_cached_dashboard("x") is None
+        await set_cached_dashboard("x", {"a": 1})  # must not raise

@@ -40,8 +40,7 @@
     min-width: 44px;
     min-height: 44px;
   }
-  .capture,
-  .kbd {
+  .capture {
     display: none;
   }
   .iconBtn {
@@ -67,8 +66,6 @@
   box-shadow: var(--glow-cyan-soft);
 }
 
-.captureIcon { color: var(--accent); font-family: var(--font-mono); }
-
 .captureInput {
   flex: 1;
   background: transparent;
@@ -79,17 +76,7 @@
 }
 .captureInput::placeholder { color: var(--text-muted); }
 
-.kbd {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--text-muted);
-  background: var(--bg-deep);
-  border: 1px solid var(--border-faint);
-  border-radius: var(--radius-sm);
-  padding: 2px 6px;
-}
-
-.actions { display: flex; align-items: center; gap: var(--s-2); }
+.actions { display: flex; align-items: center; gap: var(--s-2); position: relative; }
 
 .iconBtn {
   width: 36px;
@@ -102,14 +89,3 @@
   position: relative;
 }
 .iconBtn:hover { background: var(--accent-bg); color: var(--accent); }
-
-.dot {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 6px var(--accent);
-}

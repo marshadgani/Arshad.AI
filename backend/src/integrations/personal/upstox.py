@@ -33,6 +33,9 @@ class UpstoxIntegration(OAuthIntegrationProvider):
     scopes: list[str] = []  # Upstox doesn't use scope query param
     client_id_env = "UPSTOX_CLIENT_ID"
     client_secret_env = "UPSTOX_CLIENT_SECRET"
+    # Session invalidation requires TOTP/login re-auth, not a
+    # programmatic token revoke.
+    revocation_kind = "no_revoke"
 
     async def fetch_profile(self, access_token: str) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=10.0) as client:

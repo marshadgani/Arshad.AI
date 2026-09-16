@@ -8,6 +8,7 @@ import { useChatStream } from './useChatStream';
 
 export interface ChatPanelProps {
   sessionId: string;
+  initialDraft?: string;
 }
 
 // Composition root for the chat surface: it joins persisted history
@@ -15,7 +16,7 @@ export interface ChatPanelProps {
 // to presentational children. Transport lives in the hooks, message markup
 // in ChatTranscript, draft state in ChatComposer — this file only wires
 // them together and announces stream status.
-export function ChatPanel({ sessionId }: ChatPanelProps) {
+export function ChatPanel({ sessionId, initialDraft }: ChatPanelProps) {
   const stream = useChatStream(sessionId);
   const history = useChatHistory(sessionId);
 
@@ -58,7 +59,11 @@ export function ChatPanel({ sessionId }: ChatPanelProps) {
         streamError={stream.error}
       />
 
-      <ChatComposer disabled={stream.isStreaming} onSubmit={handleSend} />
+      <ChatComposer
+        disabled={stream.isStreaming}
+        onSubmit={handleSend}
+        initialDraft={initialDraft}
+      />
     </section>
   );
 }

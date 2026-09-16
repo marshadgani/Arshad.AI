@@ -6,8 +6,33 @@ provider = adding a ProviderSpec block.
 
 from __future__ import annotations
 
+from ..base import IntegrationError
 from ..registry import register
 from ._factory import ProviderSpec, make_provider
+
+
+def _require_slack_ok(body: dict | None) -> dict:
+    """Raise IntegrationError (not a bare Exception) when Slack's
+    auth.test response has ok=false, so the factory's connect()/sync()
+    exception handling — which only ever matched IntegrationError and
+    httpx.HTTPError — actually catches it instead of propagating as an
+    unhandled 500.
+
+    Slack's own error reason (e.g. 'invalid_auth') is not a secret and is
+    kept in the human-readable message; the error `code` stays fixed at
+    'slack_auth_failed' so callers get a stable, snake_case machine code
+    per .claude/rules/api.md rather than whatever string Slack returns.
+
+    Success path returns exactly {'team', 'user'} — unchanged from before
+    — so api_key_credentials.extra is not widened with fields (url,
+    team_id, user_id, bot_id) Slack's auth.test response also carries.
+    """
+    if not (body or {}).get("ok"):
+        reason = (body or {}).get("error", "unknown")
+        raise IntegrationError(
+            "slack_auth_failed", f"Slack rejected the token ({reason})."
+        )
+    return {"team": (body or {}).get("team"), "user": (body or {}).get("user")}
 
 
 def _bearer(api_key: str) -> dict[str, str]:
@@ -227,17 +252,8 @@ class _SlackProvider(
             icon="slack",
             probe_url="https://slack.com/api/auth.test",
             auth_header=_slack_bearer,
-            parse_probe=lambda body: (
-                {"team": (body or {}).get("team"), "user": (body or {}).get("user")}
-                if (body or {}).get("ok")
-                else (_ for _ in ()).throw(
-                    Exception((body or {}).get("error", "slack_auth_failed"))
-                )
-            ),
-            parse_sync=lambda body: {
-                "team": (body or {}).get("team"),
-                "user": (body or {}).get("user"),
-            },
+            parse_probe=_require_slack_ok,
+            parse_sync=_require_slack_ok,
             scopes=["channels:read"],
             per_user=True,
         )

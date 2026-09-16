@@ -1,11 +1,15 @@
 export { KpiCard } from './KpiCard';
 export type { KpiCardProps } from './KpiCard';
+export { ShopifyAnomalyRadar } from './ShopifyAnomalyRadar';
+export type { ShopifyAnomalyRadarProps } from './ShopifyAnomalyRadar';
 export { LiveBadge } from './LiveBadge';
 export type { LiveBadgeProps } from './LiveBadge';
 export { RecentOrdersCard } from './RecentOrdersCard';
 export type { RecentOrdersCardProps } from './RecentOrdersCard';
 export { ShopifyErrorPanel } from './ShopifyErrorPanel';
 export type { ShopifyErrorPanelProps } from './ShopifyErrorPanel';
+export { ShopifyInsightsCard } from './ShopifyInsightsCard';
+export type { ShopifyInsightsCardProps } from './ShopifyInsightsCard';
 export { ShopifyKpiGrid, ShopifyKpiGridSkeleton } from './ShopifyKpiGrid';
 export type { ShopifyKpiGridProps } from './ShopifyKpiGrid';
 export { ShopifyNoticePanel } from './ShopifyNoticePanel';

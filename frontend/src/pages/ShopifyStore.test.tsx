@@ -14,20 +14,36 @@
  */
 
 import { render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ShopifyDashboard } from '../types/shopify';
 import ShopifyStore from './ShopifyStore';
 
 vi.mock('../hooks/useShopifyDashboard');
+vi.mock('../hooks/useShopifyInsights');
 vi.mock('../utils/shopifyFormat', async (importOriginal) => {
   const real = await importOriginal<typeof import('../utils/shopifyFormat')>();
   return real;
 });
 
 import { useShopifyDashboard } from '../hooks/useShopifyDashboard';
+import { useShopifyInsights } from '../hooks/useShopifyInsights';
 
 const mockUseShopifyDashboard = vi.mocked(useShopifyDashboard);
+const mockUseShopifyInsights = vi.mocked(useShopifyInsights);
+
+// Deterministic default so tests focused on the dashboard's own five states
+// are not incidentally affected by the independent insights card — its own
+// behaviour is covered by ShopifyInsightsCard.test.tsx and
+// useShopifyInsights.test.ts.
+beforeEach(() => {
+  mockUseShopifyInsights.mockReturnValue({
+    insights: null,
+    isLoading: false,
+    error: null,
+    refetch: vi.fn(),
+  });
+});
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -193,6 +209,71 @@ describe('ShopifyStore', () => {
     render(<ShopifyStore />);
 
     expect(screen.getByRole('status')).toHaveTextContent(/updated 5m ago/i);
+  });
+
+  it('renders the insights card below the KPI grid when connected', () => {
+    mockUseShopifyDashboard.mockReturnValue({
+      dashboard: connectedDashboard(),
+      isLoading: false,
+      error: null,
+    });
+
+    render(<ShopifyStore />);
+
+    expect(screen.getByLabelText(/shopify revenue trend/i)).toBeInTheDocument();
+    expect(screen.getByLabelText('Shopify anomaly radar')).toBeInTheDocument();
+  });
+
+  it('an insights fetch failure does not blank the KPI grid — independent state', () => {
+    mockUseShopifyDashboard.mockReturnValue({
+      dashboard: connectedDashboard(),
+      isLoading: false,
+      error: null,
+    });
+    mockUseShopifyInsights.mockReturnValue({
+      insights: null,
+      isLoading: false,
+      error: new Error('insights fetch failed'),
+      refetch: vi.fn(),
+    });
+
+    render(<ShopifyStore />);
+
+    expect(screen.getByRole('group', { name: "Today's Revenue" })).toBeInTheDocument();
+    // Both the insights card and the anomaly radar derive from the same
+    // insights fetch, so a shared failure surfaces as two independent
+    // alerts, not one — each names its own concern.
+    const alerts = screen.getAllByRole('alert');
+    expect(alerts.some((a) => /could not load trend/i.test(a.textContent ?? ''))).toBe(true);
+    expect(alerts.some((a) => /could not scan for anomalies/i.test(a.textContent ?? ''))).toBe(true);
+  });
+
+  it('skips the insights fetch when the store is not connected', () => {
+    mockUseShopifyDashboard.mockReturnValue({
+      dashboard: { connected: false, needs_reauth: false, recent_orders: [], partial_failures: [] },
+      isLoading: false,
+      error: null,
+    });
+
+    render(<ShopifyStore />);
+
+    expect(mockUseShopifyInsights).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: true }),
+    );
+  });
+
+  it('skips the insights fetch when the store needs reauth', () => {
+    mockUseShopifyDashboard.mockReturnValue({
+      dashboard: connectedDashboard({ needs_reauth: true }),
+      isLoading: false,
+      error: null,
+    });
+
+    render(<ShopifyStore />);
+
+    expect(mockUseShopifyInsights).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: true }),
+    );
   });
 
   it('shows the shop subtitle in the page header when connected', () => {

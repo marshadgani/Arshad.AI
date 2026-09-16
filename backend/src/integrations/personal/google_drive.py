@@ -25,6 +25,8 @@ from ..base import (
     IntegrationProvider,
     StatusReport,
     SyncResult,
+    error_summary,
+    safe_detail,
 )
 from ..registry import register
 from ._shared import (
@@ -42,6 +44,9 @@ class GoogleDriveIntegration(IntegrationProvider):
     description = "Files, folders, search across your Drive."
     docs_url = "https://developers.google.com/drive"
     icon = "google-drive"
+    # Thin view over the shared Google login grant — see gmail.py's
+    # revocation_kind comment for the full rationale.
+    revocation_kind = "no_credential"
 
     async def connect(
         self, *, user: User | None, db: AsyncSession, payload: dict[str, Any]
@@ -96,9 +101,11 @@ class GoogleDriveIntegration(IntegrationProvider):
             raise
         except Exception as exc:  # noqa: BLE001
             integration.status = "error"
-            integration.last_error = f"{type(exc).__name__}: {exc}"[:500]
+            integration.last_error = error_summary(exc)
             await db.commit()
-            raise IntegrationError("sync_failed", f"{type(exc).__name__}: {exc}")
+            raise IntegrationError(
+                "sync_failed", f"Google Drive sync failed: {safe_detail(exc)}"
+            ) from exc
         integration.config = {
             "file_count": len(files),
             "files": [

@@ -1,0 +1,78 @@
+.dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-faint);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  width: 420px;
+  max-width: 90vw;
+  z-index: var(--z-modal);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dialog {
+    animation: dialogIn 180ms;
+  }
+}
+
+@keyframes dialogIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+.dialog h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+}
+
+.desc {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+}
+
+.actions button {
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  cursor: pointer;
+  border: 1px solid var(--border-faint);
+  background: var(--bg-deep);
+  color: var(--text-primary);
+}
+
+.actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.secondary {
+  color: var(--text-muted) !important;
+}
+
+.danger {
+  background: var(--status-danger) !important;
+  border-color: var(--status-danger) !important;
+  color: #fff !important;
+}
+
+.danger:hover:not(:disabled) {
+  opacity: 0.85;
+}

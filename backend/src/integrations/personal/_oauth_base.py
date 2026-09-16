@@ -31,7 +31,7 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...auth.crypto import decrypt, encrypt
+from ...auth.crypto import TokenDecryptError, decrypt, encrypt
 from ...middleware.cache import get_redis
 from ...models.integration import Integration, IntegrationOAuthToken
 from ...models.user import User
@@ -41,12 +41,19 @@ from ..base import (
     IntegrationProvider,
     StatusReport,
     SyncResult,
+    UpstreamRevocationResult,
+    error_summary,
+    safe_detail,
 )
 
 _STATE_TTL_SECONDS = 600  # 10 min — generous for slow consent flows
 
 # Every outbound provider call from this module (token grants, sync reads).
 _HTTP_TIMEOUT_SECONDS = 15.0
+
+# Revoke is best-effort and must never stall a user-facing disconnect —
+# shorter than _HTTP_TIMEOUT_SECONDS on purpose.
+_REVOKE_TIMEOUT_SECONDS = 5.0
 
 _log = logging.getLogger(__name__)
 
@@ -155,6 +162,11 @@ class OAuthIntegrationProvider(IntegrationProvider):
     additional_auth_params: ClassVar[dict[str, str]] = {}
     scope_separator: ClassVar[str] = " "
     use_basic_auth_for_token: ClassVar[bool] = False
+    # None (default) means no documented revoke endpoint — subclasses that
+    # have one set this AND declare revocation_kind = "revokes" explicitly
+    # (kept as two separate declarations rather than one deriving the
+    # other, so a provider's revocation behaviour is never implicit).
+    revoke_url: ClassVar[str | None] = None
 
     def _redirect_uri(self) -> str:
         return f"{_backend_url()}/api/v1/integrations/oauth/{self.slug}/callback"
@@ -349,6 +361,89 @@ class OAuthIntegrationProvider(IntegrationProvider):
             )
         await db.commit()
 
+    async def _prepare_revocation(
+        self, *, integration: Integration, db: AsyncSession
+    ) -> dict[str, str] | None:
+        """Decrypt the stored access/refresh token while the read
+        transaction is still open. Returns None (-> _revoke_upstream will
+        report 'unsupported') when there is no row, or the row's
+        ciphertext can't be decrypted (corrupt / rotated encryption key) —
+        either way there is nothing to revoke."""
+        row = await db.scalar(
+            select(IntegrationOAuthToken).where(
+                IntegrationOAuthToken.integration_id == integration.id
+            )
+        )
+        if row is None:
+            return None
+        try:
+            access_token = decrypt(row.encrypted_access_token)
+            refresh_token = (
+                decrypt(row.encrypted_refresh_token)
+                if row.encrypted_refresh_token
+                else None
+            )
+        except TokenDecryptError:
+            return None
+        return {"access_token": access_token, "refresh_token": refresh_token or ""}
+
+    async def _revoke_upstream(
+        self, *, payload: dict[str, str] | None
+    ) -> UpstreamRevocationResult:
+        """RFC 7009 revoke: refresh token first (revoking it also revokes
+        the whole grant per spec), then access token. use_basic_auth_for_token
+        selects HTTP Basic vs client credentials in the body, mirroring
+        _post_token_request's auth-shape switch. 401 is treated as
+        'revoked' — RFC 7009 says an unrecognised token is already
+        revoked, not an error. Single attempt, no retry: revoke is
+        best-effort and must not stall a user-facing disconnect."""
+        if self.revoke_url is None or payload is None:
+            return "unsupported"
+        tokens = [
+            t for t in (payload.get("refresh_token"), payload.get("access_token")) if t
+        ]
+        if not tokens:
+            return "unsupported"
+        outcomes: list[UpstreamRevocationResult] = []
+        async with httpx.AsyncClient(timeout=_REVOKE_TIMEOUT_SECONDS) as client:
+            for token in tokens:
+                outcomes.append(await self._post_revoke(client, token))
+        if any(o == "revoked" for o in outcomes):
+            return "revoked"
+        return "failed"
+
+    async def _post_revoke(
+        self, client: httpx.AsyncClient, token: str
+    ) -> UpstreamRevocationResult:
+        data: dict[str, str] = {"token": token}
+        kwargs: dict[str, Any] = {}
+        if self.use_basic_auth_for_token:
+            kwargs["auth"] = (self._client_id(), self._client_secret())
+        else:
+            data = {
+                **data,
+                "client_id": self._client_id(),
+                "client_secret": self._client_secret(),
+            }
+        try:
+            resp = await client.post(
+                self.revoke_url,  # type: ignore[arg-type]
+                data=data,
+                headers={"Accept": "application/json"},
+                **kwargs,
+            )
+        except httpx.HTTPError:
+            return "failed"
+        if resp.status_code in (200, 204, 401):
+            return "revoked"
+        _log.warning(
+            "%s revoke returned %s: %s",
+            self.slug,
+            resp.status_code,
+            resp.text[:200],
+        )
+        return "failed"
+
 
 async def upsert_oauth_integration(
     *,
@@ -458,9 +553,11 @@ def make_oauth_sync_via_api(
                 body = resp.json()
         except Exception as exc:  # noqa: BLE001
             integration.status = "error"
-            integration.last_error = f"{type(exc).__name__}: {exc}"[:500]
+            integration.last_error = error_summary(exc)
             await db.commit()
-            raise IntegrationError("sync_failed", f"{type(exc).__name__}: {exc}")
+            raise IntegrationError(
+                "sync_failed", f"{self.display_name} sync failed: {safe_detail(exc)}"
+            ) from exc
         integration.config = {
             **(integration.config or {}),
             **(parse_sync(body) if parse_sync else {"ok": True}),

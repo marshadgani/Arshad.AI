@@ -339,7 +339,11 @@ class TestDispatchTool:
             )
         assert is_error is True
         assert output["error"] == "RuntimeError"
-        assert output["message"] == "boom"
+        # message is safe_detail(exc), not str(exc) — FEAT-069: a tool
+        # exception's message must never carry request/credential details
+        # (e.g. an HTTPStatusError's query-string API key) back through
+        # Claude's context into a chat response the user sees.
+        assert output["message"] == "RuntimeError"
 
     async def test_agent_success(self):
         from src.services.chat import _dispatch_tool
@@ -374,7 +378,9 @@ class TestDispatchTool:
             )
         assert is_error is True
         assert output["error"] == "ValueError"
-        assert output["message"] == "agent failed"
+        # message is safe_detail(exc), not str(exc) — see comment in
+        # test_tool_exception_returns_error_envelope above.
+        assert output["message"] == "ValueError"
 
 
 # ---------------------------------------------------------------------------

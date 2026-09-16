@@ -36,7 +36,7 @@ from ..auth.dependencies import get_current_user
 from ..models.database import get_db
 from ..models.integration import Integration
 from ..models.user import User
-from .base import IntegrationError, IntegrationProvider
+from .base import IntegrationError, IntegrationProvider, log_detail, safe_detail
 from .registry import INTEGRATION_REGISTRY, get_provider
 
 _log = logging.getLogger(__name__)
@@ -61,6 +61,7 @@ def _provider_descriptor(p: IntegrationProvider) -> dict[str, Any]:
         "coming_soon": p.coming_soon,
         "coming_soon_reason": p.coming_soon_reason,
         "connect_prompt": p.connect_prompt,
+        "revocation_kind": p.revocation_kind,
     }
 
 
@@ -151,12 +152,13 @@ async def list_integrations(
                 meta["last_error"] = report.last_error
                 meta["extra"] = report.extra
             except Exception as exc:  # noqa: BLE001 — one bad provider must not blank the list
-                _log.exception(
-                    "provider.status() raised for %s during list_integrations",
+                _log.warning(
+                    "provider.status() raised for %s during list_integrations: %s",
                     provider.slug,
+                    log_detail(exc),
                 )
                 meta["status"] = "error"
-                meta["last_error"] = f"{type(exc).__name__}: {exc}"
+                meta["last_error"] = safe_detail(exc)
                 meta["extra"] = {}
         else:
             meta["status"] = "disconnected"
@@ -234,11 +236,23 @@ async def disconnect_integration(
     provider = _require_provider(slug)
     integration = await _find_user_integration(slug, user, db)
     if integration is None:
-        return {"data": {"status": "already_disconnected"}}
+        # Shape-stable with the connected branch below — the frontend
+        # never has to branch on whether upstream_revocation is present.
+        return {
+            "data": {
+                "status": "already_disconnected",
+                "upstream_revocation": "unsupported",
+            }
+        }
     if integration.user_id is None:
         _require_owner(user)
-    await provider.disconnect(integration=integration, db=db)
-    return {"data": {"status": "disconnected"}}
+    outcome = await provider.disconnect(integration=integration, db=db)
+    return {
+        "data": {
+            "status": "disconnected",
+            "upstream_revocation": outcome.upstream_revocation,
+        }
+    }
 
 
 @router.get("/{slug}/status", summary="Get latest status")

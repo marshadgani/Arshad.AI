@@ -46,6 +46,16 @@
   --accent-commerce-bg:    rgba(43, 255, 176, 0.07);
   --accent-commerce-gold:  #ffc857;
 
+  /* Pending domain accent — signals "not live yet / static placeholder",
+     a readiness/maturity state, distinct from --status-warn's "something is
+     wrong" meaning even though it shares the same hue. Aliased to
+     --status-warn (not a duplicated hex) so the two can never drift apart
+     silently. Used by StatusChip for ComingSoonPage's "Coming soon" pill
+     and FundFlowMap's "Static map · not live data" pill. */
+  --accent-pending:       var(--status-warn);
+  --accent-pending-faint: rgba(245, 166, 35, 0.18);
+  --accent-pending-bg:    rgba(245, 166, 35, 0.07);
+
   /* Text — --text-primary/--text-secondary/--text-muted each meet WCAG AA
      (4.5:1) against every --bg-* surface and are visually distinct from
      their neighbors. --text-muted was lightened to fix a contrast failure;

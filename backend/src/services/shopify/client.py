@@ -20,6 +20,7 @@ import asyncio
 import hashlib
 import logging
 import random
+import time
 from typing import Any
 
 import httpx
@@ -38,6 +39,20 @@ REQUEST_TIMEOUT_SECONDS = 15.0
 # is defined relative to it — see parsers.parse_dashboard.
 ORDERS_PAGE_LIMIT = 250
 VARIANTS_PAGE_LIMIT = 250
+
+# Insights (FEAT-159) fetches a date-RANGE of orders rather than a single
+# day, so it needs cursor pagination — unlike the dashboard query, one page
+# is not guaranteed to cover the whole window. 250 is Shopify's own max
+# page size; 8 pages caps the range at 2000 orders and, combined with one
+# reused httpx.AsyncClient, bounds worst case to 8 requests instead of the
+# 15 a smaller page size + more pages would have needed.
+INSIGHTS_ORDERS_PAGE_LIMIT = 250
+MAX_INSIGHTS_PAGES = 8
+# Cooperative deadline checked at the top of each page iteration. The
+# router additionally wraps the whole call in asyncio.wait_for for a hard
+# upper bound — this is the polite "stop asking for more pages" signal,
+# not the guarantee.
+INSIGHTS_TIME_BUDGET_SECONDS = 20.0
 
 # Shopify's leaky-bucket capacity for a standard (non-Plus) app, used only
 # to scale the THROTTLED back-off — a wrong value slows retries, it does not
@@ -74,6 +89,32 @@ query DashboardData($ordersQuery: String!, $ordersFirst: Int!, $variantsFirst: I
             edges { node { quantities(names: ["available"]) { name quantity } } }
           }
         }
+      }
+    }
+  }
+}
+"""
+
+# Insights (FEAT-159): scalar fields only — no lineItems, no customer, no
+# productVariants. Those are dashboard concerns and each one multiplies
+# GraphQL query cost; a trend chart needs only date + amount per order.
+# Ascending order (reverse: false) makes cursor pagination stable across
+# the whole window — a descending cursor would still work, but ascending
+# means `covered_through` (the createdAt of the last node fetched) is
+# always the earliest possible gap boundary, which is what the truncation
+# rule in parsers.parse_insights depends on.
+_INSIGHTS_QUERY = """
+query InsightsData($ordersQuery: String!, $first: Int!, $after: String) {
+  orders(
+    first: $first, after: $after, query: $ordersQuery
+    sortKey: CREATED_AT, reverse: false
+  ) {
+    pageInfo { hasNextPage endCursor }
+    edges {
+      node {
+        id
+        createdAt
+        currentTotalPriceSet { shopMoney { amount } }
       }
     }
   }
@@ -277,24 +318,138 @@ async def _post_with_retry(
     variables: dict[str, Any],
     shop: str,
 ) -> dict[str, Any]:
-    """POST the GraphQL request. One retry, with jitter, on THROTTLED."""
+    """POST the GraphQL request. One retry, with jitter, on THROTTLED.
+
+    Opens its own single-request httpx.AsyncClient — the dashboard and
+    shop-metadata queries are each one POST, so there is nothing to reuse a
+    connection across. execute_insights_query issues several POSTs per
+    request and calls _post_with_retry_on directly with one shared client
+    instead, to avoid a TCP+TLS handshake per page.
+    """
     async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT_SECONDS) as client:
-        for attempt in range(MAX_THROTTLE_RETRIES + 1):
-            resp = await client.post(
-                url, json={"query": query, "variables": variables}, headers=headers
-            )
-            resp.raise_for_status()
-            body = resp.json()
+        return await _post_with_retry_on(client, url, headers, query, variables, shop)
 
-            throttled = _throttled_error(body)
-            if throttled is None or attempt == MAX_THROTTLE_RETRIES:
-                return body
 
-            delay = _throttle_delay(throttled)
-            _log.warning(
-                "Shopify GraphQL throttled shop_hash=%s, retrying in %.2fs",
-                _shop_hash(shop),
-                delay,
+async def _post_with_retry_on(
+    http: httpx.AsyncClient,
+    url: str,
+    headers: dict[str, str],
+    query: str,
+    variables: dict[str, Any],
+    shop: str,
+) -> dict[str, Any]:
+    """Same retry policy as _post_with_retry, over a caller-supplied client."""
+    for attempt in range(MAX_THROTTLE_RETRIES + 1):
+        resp = await http.post(
+            url, json={"query": query, "variables": variables}, headers=headers
+        )
+        resp.raise_for_status()
+        body = resp.json()
+
+        throttled = _throttled_error(body)
+        if throttled is None or attempt == MAX_THROTTLE_RETRIES:
+            return body
+
+        delay = _throttle_delay(throttled)
+        _log.warning(
+            "Shopify GraphQL throttled shop_hash=%s, retrying in %.2fs",
+            _shop_hash(shop),
+            delay,
+        )
+        await asyncio.sleep(delay)
+    return body  # pragma: no cover — the loop always returns above
+
+
+async def execute_insights_query(
+    shop: str, token: str, window_start: str, window_end: str
+) -> dict[str, Any]:
+    """Fetch every order in [window_start, window_end] via cursor pagination.
+
+    Returns a dict with keys: orders (list of edge nodes, ascending by
+    createdAt), truncated (bool), covered_through (str|None — the createdAt
+    of the last node actually fetched, only meaningful when truncated is
+    True), partial_failures (list[str]).
+
+    One httpx.AsyncClient is opened for the whole loop and reused across
+    every page (unlike _post_with_retry, which is fine opening a fresh one
+    for a single POST). Stops and marks truncated=True on whichever comes
+    first: MAX_INSIGHTS_PAGES pages fetched, INSIGHTS_TIME_BUDGET_SECONDS
+    of wall-clock elapsed, or a GraphQL error on the `orders` alias.
+    """
+    orders_query = (
+        f"created_at:>='{window_start}' created_at:<='{window_end}' test:false"
+    )
+    deadline = time.monotonic() + INSIGHTS_TIME_BUDGET_SECONDS
+
+    nodes: list[dict[str, Any]] = []
+    partial_failures: list[str] = []
+    truncated = False
+    covered_through: str | None = None
+    after: str | None = None
+
+    async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT_SECONDS) as http:
+        for page in range(MAX_INSIGHTS_PAGES):
+            if time.monotonic() >= deadline:
+                truncated = True
+                break
+
+            variables = {
+                "ordersQuery": orders_query,
+                "first": INSIGHTS_ORDERS_PAGE_LIMIT,
+                "after": after,
+            }
+            body = await _post_with_retry_on(
+                http,
+                _graphql_url(shop),
+                _auth_headers(token),
+                _INSIGHTS_QUERY,
+                variables,
+                shop,
             )
-            await asyncio.sleep(delay)
-        return body  # pragma: no cover — the loop always returns above
+
+            page_failures = _log_graphql_errors(body, shop, context="insights")
+            if page_failures:
+                partial_failures.extend(page_failures)
+                truncated = True
+                break
+
+            data = body.get("data") or {}
+            cost = (body.get("extensions") or {}).get("cost") or {}
+            if cost:
+                _log.info(
+                    "Shopify GraphQL cost context=insights shop_hash=%s page=%s "
+                    "requested=%s actual=%s",
+                    _shop_hash(shop),
+                    page + 1,
+                    cost.get("requestedQueryCost"),
+                    cost.get("actualQueryCost"),
+                )
+
+            orders_block = data.get("orders") or {}
+            page_nodes = [
+                e.get("node")
+                for e in (orders_block.get("edges") or [])
+                if e.get("node")
+            ]
+            nodes.extend(page_nodes)
+            if page_nodes:
+                covered_through = str(
+                    page_nodes[-1].get("createdAt") or covered_through
+                )
+
+            page_info = orders_block.get("pageInfo") or {}
+            after = page_info.get("endCursor")
+            if not page_info.get("hasNextPage"):
+                break
+        else:
+            # Loop ran out of MAX_INSIGHTS_PAGES iterations without a
+            # `break` — i.e. the last page fetched still had hasNextPage
+            # True. There is more data beyond what we fetched.
+            truncated = True
+
+    return {
+        "orders": nodes,
+        "truncated": truncated,
+        "covered_through": covered_through,
+        "partial_failures": partial_failures,
+    }

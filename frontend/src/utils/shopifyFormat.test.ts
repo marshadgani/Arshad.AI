@@ -9,7 +9,14 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { formatMoney, formatRelativeTime, shopSubtitle, staleLabel } from './shopifyFormat';
+import {
+  formatMoney,
+  formatPercentChange,
+  formatRelativeTime,
+  formatTrendDirection,
+  shopSubtitle,
+  staleLabel,
+} from './shopifyFormat';
 
 // ---------------------------------------------------------------------------
 // formatMoney
@@ -181,5 +188,46 @@ describe('shopSubtitle', () => {
 
   it('combines both when both are present', () => {
     expect(shopSubtitle('My Shop', 'Europe/London')).toBe('My Shop · Today (Europe/London)');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatPercentChange
+// ---------------------------------------------------------------------------
+
+describe('formatPercentChange', () => {
+  it('returns an em dash when pct is null', () => {
+    expect(formatPercentChange(null)).toBe('—');
+  });
+
+  it('returns an em dash when pct is undefined', () => {
+    expect(formatPercentChange(undefined)).toBe('—');
+  });
+
+  it('formats a positive value with an explicit plus sign', () => {
+    expect(formatPercentChange(12.34)).toBe('+12.3%');
+  });
+
+  it('formats a negative value without a double sign', () => {
+    expect(formatPercentChange(-5.06)).toBe('-5.1%');
+  });
+
+  it('formats zero without a sign', () => {
+    expect(formatPercentChange(0)).toBe('0.0%');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatTrendDirection
+// ---------------------------------------------------------------------------
+
+describe('formatTrendDirection', () => {
+  it.each([
+    ['up', '↑ Up'],
+    ['down', '↓ Down'],
+    ['flat', '→ Flat'],
+    ['unknown', '—'],
+  ] as const)('formats %s as %s', (direction, expected) => {
+    expect(formatTrendDirection(direction)).toBe(expected);
   });
 });

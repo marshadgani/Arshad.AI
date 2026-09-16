@@ -23,6 +23,8 @@ from ..base import (
     IntegrationProvider,
     StatusReport,
     SyncResult,
+    error_summary,
+    safe_detail,
 )
 from ..registry import register
 from ._shared import (
@@ -40,6 +42,9 @@ class YouTubeIntegration(IntegrationProvider):
     description = "Subscriptions, channel info, recent uploads."
     docs_url = "https://developers.google.com/youtube/v3"
     icon = "youtube"
+    # Thin view over the shared Google login grant — see gmail.py's
+    # revocation_kind comment for the full rationale.
+    revocation_kind = "no_credential"
 
     async def connect(
         self, *, user: User | None, db: AsyncSession, payload: dict[str, Any]
@@ -85,9 +90,11 @@ class YouTubeIntegration(IntegrationProvider):
             raise
         except Exception as exc:  # noqa: BLE001
             integration.status = "error"
-            integration.last_error = f"{type(exc).__name__}: {exc}"[:500]
+            integration.last_error = error_summary(exc)
             await db.commit()
-            raise IntegrationError("sync_failed", f"{type(exc).__name__}: {exc}")
+            raise IntegrationError(
+                "sync_failed", f"YouTube sync failed: {safe_detail(exc)}"
+            ) from exc
         integration.config = {
             "subscription_count": len(subs),
             "subscriptions": [

@@ -25,6 +25,7 @@ from ..base import (
     IntegrationProvider,
     StatusReport,
     SyncResult,
+    safe_detail,
 )
 from ..registry import register
 from ._shared import (
@@ -59,6 +60,8 @@ class RenderIntegration(IntegrationProvider):
     description = "Read service status, deploys, and quotas from Render."
     docs_url = "https://api-docs.render.com/reference/introduction"
     icon = "render"
+    # Stateless API key, no revoke API.
+    revocation_kind = "no_revoke"
 
     async def connect(
         self, *, user: User | None, db: AsyncSession, payload: dict[str, Any]
@@ -100,7 +103,9 @@ class RenderIntegration(IntegrationProvider):
                 services = resp.json() or []
         except Exception as exc:  # noqa: BLE001
             await mark_error(integration=integration, db=db, err=exc)
-            raise IntegrationError("sync_failed", f"{type(exc).__name__}: {exc}")
+            raise IntegrationError(
+                "sync_failed", f"Render sync failed: {safe_detail(exc)}"
+            ) from exc
         integration.config = {
             "service_count": len(services),
             "services": [

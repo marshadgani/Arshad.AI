@@ -24,6 +24,7 @@ from fastapi.testclient import TestClient
 from src.auth.dependencies import get_current_user
 from src.integrations.base import (
     ConnectResult,
+    DisconnectOutcome,
     IntegrationError,
     IntegrationProvider,
     StatusReport,
@@ -76,6 +77,7 @@ class _FakeProvider(IntegrationProvider):
     coming_soon = False
     coming_soon_reason = None
     connect_prompt = None
+    revocation_kind = "no_revoke"
 
     # Class-level stubs satisfy ABC — overridden in __init__ with AsyncMocks
     async def connect(self, *, user, db, payload): ...  # type: ignore[override]
@@ -97,7 +99,9 @@ class _FakeProvider(IntegrationProvider):
                 extra={},
             )
         )
-        self.disconnect = AsyncMock(return_value=None)
+        self.disconnect = AsyncMock(
+            return_value=DisconnectOutcome(upstream_revocation="unsupported")
+        )
 
 
 def _make_db(scalars_rows=None, scalar_value=None):

@@ -26,6 +26,9 @@ class GitHubIntegration(IntegrationProvider):
     description = "Track your repos, issues, and pull requests."
     docs_url = "https://docs.github.com/en/rest"
     icon = "github"
+    # Thin view over the shared GitHub login grant — see gmail.py's
+    # revocation_kind comment for the full rationale.
+    revocation_kind = "no_credential"
 
     async def connect(
         self, *, user: User | None, db: AsyncSession, payload: dict[str, Any]

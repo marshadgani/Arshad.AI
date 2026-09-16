@@ -24,6 +24,7 @@ from ..base import (
     IntegrationProvider,
     StatusReport,
     SyncResult,
+    safe_detail,
 )
 from ..registry import register
 
@@ -72,6 +73,8 @@ class HackerNewsIntegration(IntegrationProvider):
     description = "Top stories. No auth required — just toggle on."
     docs_url = "https://github.com/HackerNews/API"
     icon = "hackernews"
+    # No credential of any kind is ever stored for a "static" provider.
+    revocation_kind = "no_credential"
 
     async def connect(
         self, *, user: User | None, db: AsyncSession, payload: dict[str, Any]
@@ -90,7 +93,9 @@ class HackerNewsIntegration(IntegrationProvider):
                 resp.raise_for_status()
                 ids = (resp.json() or [])[:10]
         except Exception as exc:  # noqa: BLE001
-            raise IntegrationError("sync_failed", f"{type(exc).__name__}: {exc}")
+            raise IntegrationError(
+                "sync_failed", f"Hacker News sync failed: {safe_detail(exc)}"
+            ) from exc
         integration.config = {"top_story_count": len(ids), "top_story_ids": ids}
         integration.last_synced_at = datetime.now(timezone.utc)
         integration.last_error = None
@@ -128,6 +133,8 @@ class OpenMeteoIntegration(IntegrationProvider):
     description = "Free weather API — no key. Provide lat/lon in config."
     docs_url = "https://open-meteo.com/en/docs"
     icon = "weather"
+    # No credential of any kind is ever stored for a "static" provider.
+    revocation_kind = "no_credential"
 
     async def connect(
         self, *, user: User | None, db: AsyncSession, payload: dict[str, Any]
@@ -161,7 +168,9 @@ class OpenMeteoIntegration(IntegrationProvider):
                 resp.raise_for_status()
                 body = resp.json() or {}
         except Exception as exc:  # noqa: BLE001
-            raise IntegrationError("sync_failed", f"{type(exc).__name__}: {exc}")
+            raise IntegrationError(
+                "sync_failed", f"Open-Meteo sync failed: {safe_detail(exc)}"
+            ) from exc
         current = body.get("current", {})
         integration.config = {
             **cfg,

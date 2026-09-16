@@ -18,6 +18,7 @@ from ..base import (
     IntegrationProvider,
     StatusReport,
     SyncResult,
+    safe_detail,
 )
 from ..project._shared import (
     mark_error,
@@ -40,6 +41,8 @@ class OpenWeatherMapIntegration(IntegrationProvider):
     description = "Current weather and 5-day forecasts via API key."
     docs_url = "https://openweathermap.org/api"
     icon = "weather"
+    # Stateless API key, no revoke API.
+    revocation_kind = "no_revoke"
 
     async def connect(
         self, *, user: User | None, db: AsyncSession, payload: dict[str, Any]
@@ -96,7 +99,9 @@ class OpenWeatherMapIntegration(IntegrationProvider):
                 body = resp.json() or {}
         except Exception as exc:  # noqa: BLE001
             await mark_error(integration=integration, db=db, err=exc)
-            raise IntegrationError("sync_failed", f"{type(exc).__name__}: {exc}")
+            raise IntegrationError(
+                "sync_failed", f"OpenWeatherMap sync failed: {safe_detail(exc)}"
+            ) from exc
         integration.config = {
             "city": city,
             "last_temperature_kelvin": (body.get("main") or {}).get("temp"),

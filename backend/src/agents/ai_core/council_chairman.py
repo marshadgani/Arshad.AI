@@ -27,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...models.user import User
 from ...services import ai
+from ...utils.errors import safe_detail
 from ..base import Agent, AgentError
 from ..registry import register
 
@@ -134,7 +135,7 @@ async def _panelist_call(
         text = _extract_text(msg)
         return text or "(empty response)", None
     except Exception as exc:  # noqa: BLE001 — surface as panel failure, don't abort
-        return "", f"{type(exc).__name__}: {exc}"
+        return "", safe_detail(exc)
 
 
 async def _reviewer_call(
@@ -170,7 +171,7 @@ async def _reviewer_call(
             return [], "rankings field is not a list"
         return rankings, None
     except Exception as exc:  # noqa: BLE001
-        return [], f"{type(exc).__name__}: {exc}"
+        return [], safe_detail(exc)
 
 
 def _build_anonymised_block(opinions: list[PanelOpinion]) -> str:
@@ -333,7 +334,7 @@ class CouncilChairmanAgent(Agent):
         except Exception as exc:  # noqa: BLE001
             raise AgentError(
                 "chairman_failed",
-                f"Chairman synthesis call failed: {type(exc).__name__}: {exc}",
+                f"Chairman synthesis call failed: {safe_detail(exc)}",
             ) from exc
 
         failures = sum(1 for op in opinions if op.error) + sum(

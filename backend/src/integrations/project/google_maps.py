@@ -10,7 +10,6 @@ Per-feature billing applies on the user's GCP account.
 from __future__ import annotations
 
 import time
-from datetime import datetime, timezone
 from typing import Any
 
 import httpx
@@ -26,6 +25,7 @@ from ..base import (
     IntegrationProvider,
     StatusReport,
     SyncResult,
+    safe_detail,
 )
 from ..registry import register
 from ._shared import (
@@ -35,7 +35,6 @@ from ._shared import (
     require_api_key,
     store_api_key,
 )
-
 
 _PLACES_TEXT_SEARCH = "https://places.googleapis.com/v1/places:searchText"
 
@@ -49,6 +48,8 @@ class GoogleMapsIntegration(IntegrationProvider):
     description = "Place lookups, directions, geocoding via Google Maps Platform."
     docs_url = "https://developers.google.com/maps/documentation/places/web-service"
     icon = "google-maps"
+    # Stateless API key, no revoke API.
+    revocation_kind = "no_revoke"
 
     async def connect(
         self, *, user: User | None, db: AsyncSession, payload: dict[str, Any]
@@ -86,9 +87,7 @@ class GoogleMapsIntegration(IntegrationProvider):
             scopes=["places.textsearch"],
         )
 
-    async def sync(
-        self, *, integration: Integration, db: AsyncSession
-    ) -> SyncResult:
+    async def sync(self, *, integration: Integration, db: AsyncSession) -> SyncResult:
         started = time.perf_counter()
         creds = await db.scalar(
             select(ApiKeyCredential).where(
@@ -114,7 +113,9 @@ class GoogleMapsIntegration(IntegrationProvider):
                 body = resp.json() or {}
         except Exception as exc:  # noqa: BLE001
             await mark_error(integration=integration, db=db, err=exc)
-            raise IntegrationError("sync_failed", f"{type(exc).__name__}: {exc}")
+            raise IntegrationError(
+                "sync_failed", f"Google Maps sync failed: {safe_detail(exc)}"
+            ) from exc
         places = body.get("places", [])
         integration.config = {
             **(integration.config or {}),

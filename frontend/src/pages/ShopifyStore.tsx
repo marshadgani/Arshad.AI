@@ -1,11 +1,16 @@
+import { useState } from 'react';
+
 import {
+  ShopifyAnomalyRadar,
   ShopifyErrorPanel,
+  ShopifyInsightsCard,
   ShopifyKpiGrid,
   ShopifyKpiGridSkeleton,
   ShopifyNoticePanel,
   ShopifyPageHeader,
 } from '../components/shopify';
 import { useShopifyDashboard } from '../hooks/useShopifyDashboard';
+import { useShopifyInsights } from '../hooks/useShopifyInsights';
 import { shopSubtitle, staleLabel } from '../utils/shopifyFormat';
 import styles from './ShopifyStore.module.css';
 
@@ -33,6 +38,21 @@ import styles from './ShopifyStore.module.css';
  */
 export default function ShopifyStore() {
   const { dashboard, isLoading, error } = useShopifyDashboard();
+  const [insightsDays, setInsightsDays] = useState<7 | 14 | 30>(14);
+  // Independent of the dashboard hook — an insights fetch failure must
+  // never blank the KPI grid above it, and this secondary fetch must never
+  // fire on the not-connected / needs-reauth branches (which return before
+  // reaching the content branch below anyway; `skip` additionally covers
+  // the transitional render while `dashboard` is still loading).
+  const {
+    insights,
+    isLoading: insightsLoading,
+    error: insightsError,
+    refetch: refetchInsights,
+  } = useShopifyInsights({
+    days: insightsDays,
+    skip: !dashboard?.connected || !!dashboard?.needs_reauth,
+  });
 
   if (isLoading && !dashboard) {
     return (
@@ -99,6 +119,15 @@ export default function ShopifyStore() {
         </p>
       )}
       <ShopifyKpiGrid dashboard={dashboard} />
+      <ShopifyInsightsCard
+        insights={insights}
+        days={insightsDays}
+        onDaysChange={setInsightsDays}
+        isLoading={insightsLoading}
+        error={insightsError}
+        onRefresh={refetchInsights}
+      />
+      <ShopifyAnomalyRadar insights={insights} isLoading={insightsLoading} error={insightsError} />
     </div>
   );
 }

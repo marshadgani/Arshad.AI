@@ -15,7 +15,7 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...integrations.base import IntegrationError
+from ...integrations.base import IntegrationError, error_summary
 from ...models.integration import Integration
 
 _log = logging.getLogger(__name__)
@@ -33,8 +33,6 @@ _log = logging.getLogger(__name__)
 ACTIVE_STATUSES = ("connected", "expired", "error")
 
 UPSTREAM_FALLBACK_STATUS = 502
-
-_LAST_ERROR_MAX_CHARS = 500
 
 
 async def find_integration(
@@ -95,7 +93,7 @@ async def apply_error_status(
     """
     try:
         integration.status = "expired" if needs_reauth else "error"
-        integration.last_error = f"{type(exc).__name__}: {exc}"[:_LAST_ERROR_MAX_CHARS]
+        integration.last_error = error_summary(exc)
         await db.commit()
     except Exception:  # noqa: BLE001
         _log.exception(

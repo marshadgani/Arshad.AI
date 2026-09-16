@@ -1,0 +1,104 @@
+.panel {
+  position: absolute;
+  top: calc(100% + var(--s-2));
+  right: 0;
+  width: 320px;
+  max-height: 420px;
+  overflow-y: auto;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-faint);
+  border-radius: var(--radius-md);
+  box-shadow: var(--glow-cyan-soft);
+  z-index: var(--z-drawer);
+  padding: var(--s-3);
+}
+
+.header {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0 var(--s-2) var(--s-2);
+}
+
+.status {
+  padding: var(--s-4) var(--s-2);
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s-2);
+  padding: var(--s-4) var(--s-2);
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-align: center;
+}
+
+.retry {
+  padding: var(--s-1) var(--s-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-faint);
+  color: var(--accent);
+  background: transparent;
+}
+.retry:hover {
+  background: var(--accent-bg);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s-2);
+  padding: var(--s-2);
+  border-radius: var(--radius-sm);
+}
+.row:hover {
+  background: var(--accent-bg);
+}
+
+.pin {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+.sevCritical { background: var(--status-danger); box-shadow: 0 0 6px var(--status-danger); }
+.sevWarn     { background: var(--status-warn);   box-shadow: 0 0 6px var(--status-warn); }
+.sevInfo     { background: var(--status-info); }
+.sevOk       { background: var(--status-ok); }
+
+.body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.detail {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.time {
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}

@@ -1,3 +1,5 @@
+import StatusChip from '../StatusChip';
+
 import styles from './ComingSoonPage.module.css';
 
 export interface ComingSoonPageProps {
@@ -17,10 +19,7 @@ export default function ComingSoonPage({ title, emoji, reason }: ComingSoonPageP
         </div>
         <div className={styles.text}>
           <h1 className={styles.title}>{title}</h1>
-          <span className={styles.statusChip}>
-            <span className={styles.dot} aria-hidden="true" />
-            <span className={styles.statusLabel}>Coming soon</span>
-          </span>
+          <StatusChip label="Coming soon" />
         </div>
       </header>
       <p className={styles.reason}>{reason}</p>

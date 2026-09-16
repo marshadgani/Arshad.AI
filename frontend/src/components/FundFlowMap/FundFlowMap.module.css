@@ -31,12 +31,23 @@
   display: inline-block;
 }
 
-.sectionMeta {
+.headMeta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--s-1);
+  max-width: 60%;
+}
+
+.staticMapSubtext {
+  margin: 0;
+  max-width: 40ch;
   font-size: 10px;
   color: var(--text-muted);
   font-family: var(--font-mono);
-  text-transform: uppercase;
   letter-spacing: 0.08em;
+  text-align: right;
+  white-space: normal;
 }
 
 .legend {

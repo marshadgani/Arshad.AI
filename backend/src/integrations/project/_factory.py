@@ -5,6 +5,7 @@ custom sync logic beyond a status check.
 
 from __future__ import annotations
 
+import logging
 import time
 from dataclasses import dataclass, field
 from typing import Any, Callable
@@ -17,6 +18,8 @@ from ...models.integration import ApiKeyCredential
 from ..base import (
     IntegrationError,
     IntegrationProvider,
+    log_detail,
+    safe_detail,
 )
 from ._shared import (
     mark_error,
@@ -25,6 +28,8 @@ from ._shared import (
     require_api_key,
     store_api_key,
 )
+
+_log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -53,6 +58,10 @@ def make_provider(spec: ProviderSpec) -> type[IntegrationProvider]:
         description = spec.description
         docs_url = spec.docs_url
         icon = spec.icon
+        # Every factory-generated provider is a stateless API key with no
+        # published revoke endpoint. The local ApiKeyCredential row is
+        # still hard-deleted on disconnect regardless.
+        revocation_kind = "no_revoke"
 
         async def _probe(self, api_key: str) -> dict[str, Any]:
             async with httpx.AsyncClient(timeout=10.0) as client:
@@ -72,12 +81,26 @@ def make_provider(spec: ProviderSpec) -> type[IntegrationProvider]:
             try:
                 probe = await self._probe(api_key)
             except IntegrationError:
+                # Re-raise first, before the broad handler below, so a
+                # provider-specific code (e.g. Slack's slack_auth_failed)
+                # survives instead of being rewritten to probe_failed.
                 raise
             except httpx.HTTPError as exc:
                 raise IntegrationError(
                     "probe_failed",
-                    f"Could not reach {spec.display_name}: {type(exc).__name__}",
+                    f"Could not reach {spec.display_name}: {safe_detail(exc)}",
+                ) from exc
+            except Exception as exc:  # noqa: BLE001 — any unexpected failure from
+                # spec.parse_probe / resp.json() / spec.auth_header (a bare
+                # Exception a provider lambda still raises, a JSONDecodeError,
+                # a TypeError/KeyError) must not propagate as an unhandled 500.
+                _log.warning(
+                    "%s probe failed unexpectedly: %s", spec.slug, log_detail(exc)
                 )
+                raise IntegrationError(
+                    "probe_failed",
+                    f"{spec.display_name} probe failed: {safe_detail(exc)}",
+                ) from exc
             if spec.per_user and user is None:
                 raise IntegrationError("auth_required", "User context required.")
             return await store_api_key(
@@ -108,13 +131,24 @@ def make_provider(spec: ProviderSpec) -> type[IntegrationProvider]:
                     resp = await client.get(url, headers=spec.auth_header(api_key))
                     resp.raise_for_status()
                     body = resp.json()
+                # parse_sync is enclosed in the same try as the HTTP call —
+                # previously it ran outside this block, so a provider whose
+                # parse_sync raised (e.g. Slack's refresh-time auth check)
+                # propagated as an unhandled 500 instead of sync_failed.
+                parsed = spec.parse_sync(body) if spec.parse_sync else {"ok": True}
+            except IntegrationError as exc:
+                # Re-raise with its own code (e.g. Slack's slack_auth_failed
+                # from parse_sync) instead of flattening it to sync_failed
+                # below — mark_error still records the failure.
+                await mark_error(integration=integration, db=db, err=exc)
+                raise
             except Exception as exc:  # noqa: BLE001
                 await mark_error(integration=integration, db=db, err=exc)
-                raise IntegrationError("sync_failed", f"{type(exc).__name__}: {exc}")
-            integration.config = {
-                **(integration.config or {}),
-                **(spec.parse_sync(body) if spec.parse_sync else {"ok": True}),
-            }
+                detail = safe_detail(exc)
+                raise IntegrationError(
+                    "sync_failed", f"{spec.display_name} sync failed: {detail}"
+                ) from exc
+            integration.config = {**(integration.config or {}), **parsed}
             return await mark_synced(
                 integration=integration,
                 db=db,

@@ -34,6 +34,7 @@ from ..agents.registry import AGENT_REGISTRY
 from ..models.conversation import ConversationMessage, ConversationSession
 from ..models.user import User
 from ..tools.registry import TOOL_REGISTRY
+from ..utils.errors import safe_detail
 from . import ai, intent_classifier
 
 _MAX_AGENTIC_HOPS = 6  # safety cap on tool_use → tool_result → call rounds
@@ -155,7 +156,7 @@ async def _dispatch_tool(
             result = await agent.run(user=user, db=db, payload=payload)
             return (result.model_dump(mode="json"), False)
         except Exception as exc:  # noqa: BLE001 — return as error to Claude, not crash
-            return ({"error": type(exc).__name__, "message": str(exc)}, True)
+            return ({"error": type(exc).__name__, "message": safe_detail(exc)}, True)
 
     tool = TOOL_REGISTRY.get(name)
     if tool is None:
@@ -165,7 +166,7 @@ async def _dispatch_tool(
         result = await tool(user=user, db=db, payload=payload)
         return (result.model_dump(mode="json"), False)
     except Exception as exc:  # noqa: BLE001
-        return ({"error": type(exc).__name__, "message": str(exc)}, True)
+        return ({"error": type(exc).__name__, "message": safe_detail(exc)}, True)
 
 
 def _history_token_budget() -> int:

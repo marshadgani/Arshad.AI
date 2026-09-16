@@ -26,6 +26,12 @@ class GmailIntegration(IntegrationProvider):
     description = "Search threads, draft replies, and label your Gmail."
     docs_url = "https://developers.google.com/gmail/api"
     icon = "gmail"
+    # Thin view over the shared Google login grant (oauth_accounts/
+    # oauth_tokens) — this provider never owns a credential row of its
+    # own, so there is nothing local to scrub and nothing upstream this
+    # slug alone could safely revoke without breaking sibling Google
+    # integrations and login itself.
+    revocation_kind = "no_credential"
 
     async def connect(
         self, *, user: User | None, db: AsyncSession, payload: dict[str, Any]

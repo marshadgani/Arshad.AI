@@ -49,6 +49,9 @@ class SpotifyIntegration(OAuthIntegrationProvider):
     client_id_env = "SPOTIFY_CLIENT_ID"
     client_secret_env = "SPOTIFY_CLIENT_SECRET"
     use_basic_auth_for_token = True
+    # No public token-revocation endpoint as of 2026-09:
+    # https://developer.spotify.com/documentation/web-api/concepts/apps
+    revocation_kind = "no_revoke"
 
     async def fetch_profile(self, access_token: str) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -91,6 +94,10 @@ class StravaIntegration(OAuthIntegrationProvider):
     client_id_env = "STRAVA_CLIENT_ID"
     client_secret_env = "STRAVA_CLIENT_SECRET"
     additional_auth_params = {"approval_prompt": "auto"}
+    revocation_kind = "revokes"
+    # https://developers.strava.com/docs/authentication/#deauthorization
+    # — not RFC 7009: POST access_token only, no client credentials.
+    revoke_url = "https://www.strava.com/oauth/deauthorize"
 
     async def fetch_profile(self, access_token: str) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -105,6 +112,24 @@ class StravaIntegration(OAuthIntegrationProvider):
             "username": body.get("username"),
             "firstname": body.get("firstname"),
         }
+
+    async def _revoke_upstream(self, *, payload):  # type: ignore[override]
+        """Strava's deauthorize takes only access_token — no refresh
+        token, no client credentials — so this bypasses the RFC 7009
+        machinery in _oauth_base._post_revoke entirely."""
+        if payload is None:
+            return "unsupported"
+        access_token = payload.get("access_token")
+        if not access_token:
+            return "unsupported"
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.post(
+                    self.revoke_url, data={"access_token": access_token}
+                )
+        except httpx.HTTPError:
+            return "failed"
+        return "revoked" if resp.status_code in (200, 401) else "failed"
 
     sync = make_oauth_sync_via_api(
         sync_url="https://www.strava.com/api/v3/athlete/activities?per_page=10",
@@ -139,6 +164,9 @@ class OuraIntegration(OAuthIntegrationProvider):
     scopes = ["personal", "daily", "heartrate", "session"]
     client_id_env = "OURA_CLIENT_ID"
     client_secret_env = "OURA_CLIENT_SECRET"
+    # Oura API v2 publishes no token revocation endpoint as of 2026-09:
+    # https://cloud.ouraring.com/v2/docs
+    revocation_kind = "no_revoke"
 
     async def fetch_profile(self, access_token: str) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -192,6 +220,9 @@ class FitbitIntegration(OAuthIntegrationProvider):
     client_id_env = "FITBIT_CLIENT_ID"
     client_secret_env = "FITBIT_CLIENT_SECRET"
     use_basic_auth_for_token = True
+    revocation_kind = "revokes"
+    # RFC 7009 + HTTP Basic: https://dev.fitbit.com/build/reference/web-api/authorization/revoke-token/
+    revoke_url = "https://api.fitbit.com/oauth2/revoke"
 
     async def fetch_profile(self, access_token: str) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -233,6 +264,9 @@ class CoinbaseIntegration(OAuthIntegrationProvider):
     scopes = ["wallet:user:read", "wallet:accounts:read"]
     client_id_env = "COINBASE_CLIENT_ID"
     client_secret_env = "COINBASE_CLIENT_SECRET"
+    revocation_kind = "revokes"
+    # RFC 7009 + client creds in body: https://docs.cdp.coinbase.com/sign-in-with-coinbase/docs/api-revoke-token
+    revoke_url = "https://api.coinbase.com/oauth/revoke"
 
     async def fetch_profile(self, access_token: str) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -281,6 +315,9 @@ class DiscordIntegration(OAuthIntegrationProvider):
     scopes = ["identify", "email", "guilds"]
     client_id_env = "DISCORD_CLIENT_ID"
     client_secret_env = "DISCORD_CLIENT_SECRET"
+    revocation_kind = "revokes"
+    # RFC 7009 + client creds in body: https://discord.com/developers/docs/topics/oauth2#token-revocation
+    revoke_url = "https://discord.com/api/oauth2/token/revoke"
 
     async def fetch_profile(self, access_token: str) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -326,6 +363,9 @@ class RedditIntegration(OAuthIntegrationProvider):
     client_secret_env = "REDDIT_CLIENT_SECRET"
     use_basic_auth_for_token = True
     additional_auth_params = {"duration": "permanent"}
+    revocation_kind = "revokes"
+    # RFC 7009 + HTTP Basic: https://www.reddit.com/dev/api/oauth#POST_api_v1_revoke_token
+    revoke_url = "https://www.reddit.com/api/v1/revoke_token"
 
     async def fetch_profile(self, access_token: str) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -376,6 +416,9 @@ class LinearIntegration(OAuthIntegrationProvider):
     scope_separator = ","
     client_id_env = "LINEAR_CLIENT_ID"
     client_secret_env = "LINEAR_CLIENT_SECRET"
+    # Linear OAuth publishes no revoke endpoint as of 2026-09:
+    # https://developers.linear.app/docs/oauth/authentication
+    revocation_kind = "no_revoke"
 
     async def fetch_profile(self, access_token: str) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -397,7 +440,7 @@ class LinearIntegration(OAuthIntegrationProvider):
         import time
         from datetime import datetime, timezone
 
-        from ..base import IntegrationError, SyncResult
+        from ..base import IntegrationError, SyncResult, error_summary, safe_detail
 
         started = time.perf_counter()
         access_token = await self.get_access_token(integration=integration, db=db)
@@ -414,9 +457,11 @@ class LinearIntegration(OAuthIntegrationProvider):
                 body = resp.json() or {}
         except Exception as exc:  # noqa: BLE001
             integration.status = "error"
-            integration.last_error = f"{type(exc).__name__}: {exc}"[:500]
+            integration.last_error = error_summary(exc)
             await db.commit()
-            raise IntegrationError("sync_failed", f"{type(exc).__name__}: {exc}")
+            raise IntegrationError(
+                "sync_failed", f"Linear sync failed: {safe_detail(exc)}"
+            ) from exc
         nodes = ((body.get("data") or {}).get("issues") or {}).get("nodes") or []
         integration.config = {
             **(integration.config or {}),
@@ -458,6 +503,9 @@ class WhoopIntegration(OAuthIntegrationProvider):
     ]
     client_id_env = "WHOOP_CLIENT_ID"
     client_secret_env = "WHOOP_CLIENT_SECRET"
+    # Whoop API publishes no token revocation endpoint as of 2026-09:
+    # https://developer.whoop.com
+    revocation_kind = "no_revoke"
 
     _BASE = "https://api.prod.whoop.com/developer/v1"
 
@@ -479,7 +527,7 @@ class WhoopIntegration(OAuthIntegrationProvider):
         import time as _time
         from datetime import date, datetime, timedelta, timezone
 
-        from ..base import IntegrationError, SyncResult
+        from ..base import IntegrationError, SyncResult, error_summary, safe_detail
 
         started = _time.perf_counter()
         access_token = await self.get_access_token(integration=integration, db=db)
@@ -495,10 +543,10 @@ class WhoopIntegration(OAuthIntegrationProvider):
                 body = resp.json() or {}
         except Exception as exc:  # noqa: BLE001
             integration.status = "error"
-            integration.last_error = f"{type(exc).__name__}: {exc}"[:500]
+            integration.last_error = error_summary(exc)
             await db.commit()
             raise IntegrationError(
-                "sync_failed", f"{type(exc).__name__}: {exc}"
+                "sync_failed", f"Whoop sync failed: {safe_detail(exc)}"
             ) from exc
         # Biometric fields are fetched live per request — do not cache in cleartext config.
         # Config stores only non-sensitive profile metadata (first_name) set during OAuth connect.

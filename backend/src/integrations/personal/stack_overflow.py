@@ -25,6 +25,7 @@ from ..base import (
     IntegrationProvider,
     StatusReport,
     SyncResult,
+    safe_detail,
 )
 from ..project._shared import (
     mark_error,
@@ -47,6 +48,8 @@ class StackOverflowIntegration(IntegrationProvider):
     description = "Reputation, recent answers, top tags."
     docs_url = "https://api.stackexchange.com/docs"
     icon = "stackoverflow"
+    # Stateless API key, no revoke API.
+    revocation_kind = "no_revoke"
 
     async def connect(
         self, *, user: User | None, db: AsyncSession, payload: dict[str, Any]
@@ -113,7 +116,9 @@ class StackOverflowIntegration(IntegrationProvider):
                 body = resp.json() or {}
         except Exception as exc:  # noqa: BLE001
             await mark_error(integration=integration, db=db, err=exc)
-            raise IntegrationError("sync_failed", f"{type(exc).__name__}: {exc}")
+            raise IntegrationError(
+                "sync_failed", f"Stack Overflow sync failed: {safe_detail(exc)}"
+            ) from exc
         items = body.get("items") or []
         profile = items[0] if items else {}
         integration.config = {
