@@ -104,7 +104,7 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision: str = "o1l2m3n4a5b6"
-down_revision: Union[str, None] = "l1i2j3k4a5b6"
+down_revision: Union[str, None] = "n1k2l3m4a5b6"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -235,6 +235,11 @@ def upgrade() -> None:
         "ontology_relationships",
         ["user_id", "target_entity_id"],
     )
+    op.create_index(
+        "ix_ontology_relationships_source_entity_id",
+        "ontology_relationships",
+        ["user_id", "source_entity_id"],
+    )
 
     op.execute(
         """
@@ -242,11 +247,22 @@ def upgrade() -> None:
         DECLARE
             allow_promotion boolean;
         BEGIN
+            -- Fail-closed: current_setting(guc, true) returns NULL (never
+            -- an error) when the GUC is unset. COALESCE maps that NULL to
+            -- 'false', so an absent GUC always means "no promotion" rather
+            -- than an exception a caller could accidentally swallow.
             allow_promotion := COALESCE(
                 current_setting('app.allow_visibility_promotion', true),
                 'false'
             ) = 'true';
 
+            -- BEFORE ROW triggers fire before CHECK constraints, so a NULL
+            -- here would otherwise pass "IS DISTINCT FROM 'private'" (NULL
+            -- is distinct from everything), reach the promotion gate below,
+            -- and -- with allow_promotion true -- return a NULL-visibility
+            -- row that only the CHECK constraint would catch. Reject it
+            -- here explicitly so the ratchet's own logic never depends on
+            -- the CHECK constraint to close this path.
             IF NEW.visibility IS NULL THEN
                 RAISE EXCEPTION
                     'ontology visibility promotion requires explicit path: '

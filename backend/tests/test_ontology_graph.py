@@ -13,7 +13,11 @@ from __future__ import annotations
 from pathlib import Path
 
 from src.models.ontology import ENTITY_TYPES, RELATIONSHIP_TYPES, VISIBILITIES
-from src.services.ingestion.ontology_graph import EdgeTuple, derive_graph
+from src.services.ingestion.ontology_graph import (
+    MAX_EXTERNAL_KEY_LEN,
+    EdgeTuple,
+    derive_graph,
+)
 
 # ── helpers ────────────────────────────────────────────────────────────────────
 
@@ -23,9 +27,13 @@ def _row(
     provider_id: str = "owner/repo#42",
     occurred_at: str = "2024-01-01T00:00:00Z",
 ) -> dict:
-    """Minimal GitHub activity row shaped exactly like the sweep query's row mapping."""
+    """Minimal GitHub activity row shaped exactly like the sweep query's row
+    mapping: the login lives under ``raw.user.login`` (raw is the ingested
+    GitHub API payload), not at the row's top level — see
+    ``ontology_graph._extract_login`` and ``github.py``'s ingestion of
+    ``raw``."""
     return {
-        "user": {"login": login},
+        "raw": {"user": {"login": login}},
         "provider_id": provider_id,
         "occurred_at": occurred_at,
     }
@@ -106,6 +114,38 @@ def test_edge_tuple_fields_named():
         person_key="contributed_to", relationship="alice", project_key="owner/repo"
     )
     assert correct != wrong_order, "Named-field ordering must be enforced"
+
+
+# ── Oversized external_key ──────────────────────────────────────────────────────
+
+
+def test_skip_oversized_login():
+    """A login longer than MAX_EXTERNAL_KEY_LEN is dropped and counted,
+    not silently truncated or passed through to violate the DB column."""
+    rows = [_row(login="x" * (MAX_EXTERNAL_KEY_LEN + 1))]
+    graph = derive_graph(rows)
+    assert graph.skipped_oversized_key == 1
+    assert len(graph.persons) == 0
+    assert len(graph.edges) == 0
+
+
+def test_skip_oversized_project_key():
+    """A derived project_key (from provider_id) longer than
+    MAX_EXTERNAL_KEY_LEN is dropped and counted the same way."""
+    rows = [_row(provider_id="x" * (MAX_EXTERNAL_KEY_LEN + 1) + "#1")]
+    graph = derive_graph(rows)
+    assert graph.skipped_oversized_key == 1
+    assert len(graph.projects) == 0
+    assert len(graph.edges) == 0
+
+
+def test_key_at_exact_limit_is_not_skipped():
+    """A login of exactly MAX_EXTERNAL_KEY_LEN chars fits the column and
+    must NOT be skipped — only strictly-over-the-limit values are."""
+    rows = [_row(login="x" * MAX_EXTERNAL_KEY_LEN)]
+    graph = derive_graph(rows)
+    assert graph.skipped_oversized_key == 0
+    assert len(graph.persons) == 1
 
 
 # ── Deduplication ──────────────────────────────────────────────────────────────

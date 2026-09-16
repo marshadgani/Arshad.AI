@@ -19,6 +19,12 @@ from typing import Any, NamedTuple
 
 from ...models.ontology_vocabulary import GITHUB_CONTRIBUTION
 
+#: Matches ontology_entities.external_key's column width (see the ontology
+#: migration). A login or repo name longer than this cannot be persisted,
+#: so it must be dropped here rather than failing the whole sweep on an
+#: INSERT error partway through.
+MAX_EXTERNAL_KEY_LEN = 255
+
 
 class EdgeTuple(NamedTuple):
     """A single derived edge. Named fields make transposing person/project
@@ -34,6 +40,11 @@ class DerivedGraph(NamedTuple):
     projects: set[str]
     edges: list[EdgeTuple]
     skipped_no_author: int
+    #: Rows dropped because the derived login or project key exceeded
+    #: MAX_EXTERNAL_KEY_LEN. Kept separate from skipped_no_author so the
+    #: two failure classes (no author info vs. data too large to store)
+    #: are distinguishable in the extraction summary.
+    skipped_oversized_key: int
 
 
 def _extract_login(raw: Any) -> str | None:
@@ -53,6 +64,7 @@ def derive_graph(rows: list[dict[str, Any]]) -> DerivedGraph:
     projects: set[str] = set()
     edges: list[EdgeTuple] = []
     skipped_no_author = 0
+    skipped_oversized_key = 0
 
     for row in rows:
         raw = row.get("raw")
@@ -65,6 +77,10 @@ def derive_graph(rows: list[dict[str, Any]]) -> DerivedGraph:
         project_key = provider_id.split("#", 1)[0]
         if not project_key:
             skipped_no_author += 1
+            continue
+
+        if len(login) > MAX_EXTERNAL_KEY_LEN or len(project_key) > MAX_EXTERNAL_KEY_LEN:
+            skipped_oversized_key += 1
             continue
 
         persons.add(login)
@@ -82,4 +98,5 @@ def derive_graph(rows: list[dict[str, Any]]) -> DerivedGraph:
         projects=projects,
         edges=edges,
         skipped_no_author=skipped_no_author,
+        skipped_oversized_key=skipped_oversized_key,
     )

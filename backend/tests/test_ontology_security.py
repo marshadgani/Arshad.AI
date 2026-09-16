@@ -20,6 +20,13 @@ from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError, ProgrammingError, StatementError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+# pytest-asyncio's strict mode (this repo's default — no asyncio_mode="auto"
+# config exists) only awaits a coroutine test function that's explicitly
+# marked; @pytest.mark.pg alone does not imply it. Every test below is an
+# `async def`, so apply the asyncio marker module-wide rather than repeating
+# it next to every @pytest.mark.pg.
+pytestmark = pytest.mark.asyncio
+
 # ── GUC helpers ───────────────────────────────────────────────────────────────
 
 
@@ -173,9 +180,14 @@ async def test_promotion_succeeds_with_guc_set(
 
 
 @pytest.mark.pg
-async def test_demotion_rejected_even_with_guc(
+async def test_demotion_to_private_succeeds_without_guc(
     pg_session: AsyncSession, committed_user
 ) -> None:
+    """The ratchet only blocks LOOSENING visibility (private -> public)
+    without the GUC — it never blocks TIGHTENING (public -> private), and
+    tightening needs no privilege at all. A prior version of this test
+    asserted the opposite (demotion raising) and would fail against a
+    correctly-implemented trigger; this is the corrected assertion."""
     await _assert_promotion_guc_clear(pg_session)
 
     entity_id = await _insert_entity(
@@ -188,15 +200,23 @@ async def test_demotion_rejected_even_with_guc(
     )
     await pg_session.flush()
 
-    with pytest.raises((StatementError, DBAPIError, ProgrammingError)) as exc_info:
-        await pg_session.execute(
-            text("UPDATE ontology_entities SET visibility = 'private' WHERE id = :id"),
-            {"id": entity_id},
-        )
-        await pg_session.flush()
+    # Explicitly clear the GUC before demoting — proves demotion needs no
+    # promotion privilege, not just that it happens to work while the GUC
+    # is still set from the promotion above.
+    await pg_session.execute(
+        text("SET LOCAL app.allow_visibility_promotion = 'false'")
+    )
+    await pg_session.execute(
+        text("UPDATE ontology_entities SET visibility = 'private' WHERE id = :id"),
+        {"id": entity_id},
+    )
+    await pg_session.flush()
 
-    err_msg = str(exc_info.value).lower()
-    assert "demot" in err_msg or "ratchet" in err_msg or "downgrade" in err_msg
+    row = await pg_session.execute(
+        text("SELECT visibility FROM ontology_entities WHERE id = :id"),
+        {"id": entity_id},
+    )
+    assert row.scalar() == "private"
 
 
 # ── BLOCKER 2 CHECK constraint guards ────────────────────────────────────────

@@ -455,33 +455,72 @@ async def test_runner_dispatches_ontology_extractor(committed_user, pg_session) 
 
 @pytest.mark.pg
 @pytest.mark.asyncio
-async def test_cli_script_inserts_queue_row(committed_user, pg_session) -> None:
+async def test_cli_script_inserts_queue_row(pg_session) -> None:
+    """Deliberately does NOT use the shared ``committed_user`` fixture: the
+    CLI script runs as a genuinely separate subprocess with its own DB
+    connection, which cannot see a user that only lives inside
+    ``pg_session``'s SAVEPOINT tree — inserting a dag_trigger_queue row
+    referencing it would hit a real FK violation. Seeds and cleans up its
+    own truly-committed user instead, same reasoning as
+    ``test_extraction_survives_worker_session_close``."""
     import os
+    import uuid
 
-    env = {**os.environ, "DATABASE_URL": os.environ["TEST_DATABASE_URL"]}
-    result = subprocess.run(
-        [
-            sys.executable,
-            str(REPO_ROOT / "scripts" / "ontology_extract.py"),
-            "--user-id",
-            str(committed_user.id),
-        ],
-        cwd=str(REPO_ROOT),
-        env=env,
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
-    assert result.returncode == 0, result.stderr
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+    from sqlalchemy.pool import NullPool
 
-    row = await pg_session.execute(
-        text(
-            "SELECT dag_id FROM dag_trigger_queue "
-            "WHERE user_id = :uid ORDER BY requested_at DESC LIMIT 1"
-        ),
-        {"uid": committed_user.id},
+    from src.models.user import User
+    from tests.conftest import _require_test_database_url
+
+    engine = create_async_engine(
+        _require_test_database_url(),
+        connect_args={"statement_cache_size": 0},
+        poolclass=NullPool,
     )
-    assert row.scalar_one() == "ontology_extractor"
+    sessionmaker = async_sessionmaker(engine, expire_on_commit=False)
+    user_id = uuid.uuid4()
+    try:
+        async with sessionmaker() as seed_db:
+            seed_db.add(
+                User(
+                    id=user_id,
+                    email=f"test-{user_id.hex[:8]}@example.com",
+                    name="Test User",
+                )
+            )
+            await seed_db.commit()
+
+        env = {**os.environ, "DATABASE_URL": os.environ["TEST_DATABASE_URL"]}
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(REPO_ROOT / "scripts" / "ontology_extract.py"),
+                "--user-id",
+                str(user_id),
+            ],
+            cwd=str(REPO_ROOT),
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        assert result.returncode == 0, result.stderr
+
+        row = await pg_session.execute(
+            text(
+                "SELECT dag_id FROM dag_trigger_queue "
+                "WHERE user_id = :uid ORDER BY requested_at DESC LIMIT 1"
+            ),
+            {"uid": user_id},
+        )
+        assert row.scalar_one() == "ontology_extractor"
+    finally:
+        async with sessionmaker() as cleanup_db:
+            await cleanup_db.execute(
+                text("DELETE FROM users WHERE id = :uid"), {"uid": user_id}
+            )
+            await cleanup_db.commit()
+        await engine.dispose()
 
 
 @pytest.mark.pg
@@ -500,7 +539,7 @@ async def test_large_entity_set_writes_every_row(committed_user, pg_session) -> 
 
 @pytest.mark.pg
 @pytest.mark.asyncio
-async def test_extraction_survives_worker_session_close(committed_user) -> None:
+async def test_extraction_survives_worker_session_close() -> None:
     """Regression: the production commit boundary.
 
     Every other test in this module hands ``extract()`` the pg_session
@@ -516,9 +555,21 @@ async def test_extraction_survives_worker_session_close(committed_user) -> None:
     still there when read back on a *different* connection. Before the
     fix it reported entities_written=2 / relationships_written=1 and
     persisted zero rows.
+
+    Deliberately does NOT use the shared ``committed_user`` fixture: that
+    user only lives inside the SAVEPOINT tree ``pg_session``/``pg_connection``
+    share, invisible to the genuinely separate connections this test opens
+    (via a fresh engine, matching production's ``AsyncSessionLocal``) — a
+    separate connection querying it hits a real FK violation, not a
+    visibility quirk. This test seeds and cleans up its own truly-committed
+    user instead.
     """
+    import uuid
+
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
     from sqlalchemy.pool import NullPool
+
+    from src.models.user import User
     from tests.conftest import _require_test_database_url
 
     engine = create_async_engine(
@@ -527,16 +578,28 @@ async def test_extraction_survives_worker_session_close(committed_user) -> None:
         poolclass=NullPool,
     )
     sessionmaker = async_sessionmaker(engine, expire_on_commit=False)
+    user_id = uuid.uuid4()
     try:
         async with sessionmaker() as seed_db:
-            await _seed_activity(seed_db, committed_user.id, 1)
+            seed_db.add(
+                User(
+                    id=user_id,
+                    email=f"test-{user_id.hex[:8]}@example.com",
+                    name="Test User",
+                )
+            )
+            # Explicit flush before the raw text() INSERT below — that
+            # statement isn't a Core construct autoflush is guaranteed to
+            # precede, and the FK to users must already be satisfiable.
+            await seed_db.flush()
+            await _seed_activity(seed_db, user_id, 1)
             await seed_db.commit()
 
         # Exactly what queue_worker._process does: no commit by the caller.
         async with sessionmaker() as runner_db:
             summary = await runner.run(
                 dag_id="ontology_extractor",
-                user_id=committed_user.id,
+                user_id=user_id,
                 payload={},
                 db=runner_db,
             )
@@ -546,13 +609,13 @@ async def test_extraction_survives_worker_session_close(committed_user) -> None:
         async with sessionmaker() as verify_db:
             entities = await verify_db.scalar(
                 text("SELECT count(*) FROM ontology_entities WHERE user_id = :uid"),
-                {"uid": committed_user.id},
+                {"uid": user_id},
             )
             relationships = await verify_db.scalar(
                 text(
                     "SELECT count(*) FROM ontology_relationships WHERE user_id = :uid"
                 ),
-                {"uid": committed_user.id},
+                {"uid": user_id},
             )
         assert entities == 2, (
             "extract() did not commit — the runner reported success but the "
@@ -562,8 +625,15 @@ async def test_extraction_survives_worker_session_close(committed_user) -> None:
             "Relationship rows were rolled back on worker session close."
         )
     finally:
-        # committed_user's teardown CASCADEs the ontology rows away, but the
-        # engine opened here is this test's own and must be disposed.
+        # This user and its rows were genuinely committed on a separate
+        # connection, outside pg_session's SAVEPOINT tree — nothing else
+        # rolls them back. Delete explicitly; ON DELETE CASCADE removes the
+        # ingested activity, entities, and relationships with it.
+        async with sessionmaker() as cleanup_db:
+            await cleanup_db.execute(
+                text("DELETE FROM users WHERE id = :uid"), {"uid": user_id}
+            )
+            await cleanup_db.commit()
         await engine.dispose()
 
 
