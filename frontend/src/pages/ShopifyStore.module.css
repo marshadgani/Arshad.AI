@@ -21,6 +21,6 @@
 
 .stale {
   font-size: 0.8rem;
-  color: var(--text-faint);
+  color: var(--text-secondary);
   margin: 0 0 var(--s-6);
 }

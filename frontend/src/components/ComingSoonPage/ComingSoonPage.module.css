@@ -1,0 +1,75 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-6);
+  padding: var(--s-8);
+  background: var(--bg-panel);
+  border: 1px solid var(--border-faint);
+  border-radius: var(--radius-xl);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+}
+
+.emoji {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--s-12);
+  height: var(--s-12);
+  font-size: 28px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-faint);
+  border-radius: var(--radius-lg);
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.statusChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  width: fit-content;
+  padding: var(--s-1) var(--s-3);
+  background: var(--accent-pending-bg);
+  border: 1px solid var(--accent-pending-faint);
+  border-radius: var(--radius-sm);
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-pending);
+}
+
+.statusLabel {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent-pending);
+}
+
+.reason {
+  margin: 0;
+  max-width: 60ch;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}

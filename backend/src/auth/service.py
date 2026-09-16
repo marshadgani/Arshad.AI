@@ -24,6 +24,32 @@ from .crypto import encrypt
 from .providers.base import OAuthTokenBundle, OAuthUserInfo
 
 
+def normalize_email(raw: str) -> str:
+    """The single definition of email normalization for this codebase.
+
+    Used at the router boundary for password login (feeding both the
+    lockout bucket key and the DB lookup from the same value) and by
+    ``scripts/set_password.py``. Downstream functions accept an
+    already-normalized ``email_norm`` and must never re-normalize —
+    re-normalizing defensively would hide a future divergence rather
+    than prevent it.
+    """
+    return raw.strip().lower()
+
+
+async def authenticate_with_password(db: AsyncSession, email_norm: str) -> User | None:
+    """Look up a user by normalized email for the password-login path.
+
+    Contains NO bcrypt — bcrypt lives in ``auth/password.py`` and is
+    orchestrated by the route handler, which must control the ordering
+    of "lookup" and "hash comparison" itself to guarantee exactly one
+    bcrypt op runs on every branch (a lookup-owned comparison would let
+    the not-found branch skip bcrypt entirely, which is the timing
+    oracle this design avoids).
+    """
+    return await db.scalar(select(User).where(User.email == email_norm))
+
+
 async def upsert_user_from_oauth(
     db: AsyncSession,
     *,

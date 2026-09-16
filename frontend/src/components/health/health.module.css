@@ -21,7 +21,7 @@
   padding: 4rem 2rem;
   background: var(--bg-panel);
   border: 1px solid var(--border-faint);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   text-align: center;
 }
 
@@ -51,7 +51,7 @@
   color: #050811;
   font-weight: 700;
   font-size: 0.9rem;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   text-decoration: none;
   transition: opacity 0.15s;
 }
@@ -65,7 +65,7 @@
 .card {
   background: var(--bg-panel);
   border: 1px solid var(--border-faint);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 1.5rem;
 }
 
@@ -109,7 +109,7 @@
   fill: none;
   stroke-width: 10;
   stroke-linecap: round;
-  transition: stroke-dashoffset 0.6s ease, stroke 0.3s ease;
+  transition: stroke-dashoffset 0.6s cubic-bezier(0.16, 1, 0.3, 1), stroke 0.3s ease;
 }
 
 .ringScore {
@@ -238,7 +238,7 @@
 .workoutStrain {
   font-size: 0.95rem;
   font-weight: 700;
-  color: var(--status-warn);
+  color: var(--accent-health);
 }
 .empty {
   color: var(--text-muted);
@@ -280,7 +280,7 @@
   color: var(--status-danger);
   background: rgba(255, 77, 109, 0.08);
   border: 1px solid var(--status-danger);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 0.8rem;
   text-align: center;
   padding: 0.6rem 0.75rem;

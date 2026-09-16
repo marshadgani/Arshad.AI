@@ -998,6 +998,14 @@ domains/<domain>/
 
 This applies to every "Merge to Main" trigger below.
 
+### Trigger 0 — Auto merge-to-main on pipeline completion (PERMANENT, no phrase needed)
+
+**Whenever a dev-team pipeline (`Workflow` run of `dev-team-pipeline`) reaches `completed` for a feature** — i.e. the feature was built, committed, and pushed to its own branch, per `tasks/pipeline-queue.md` — **immediately run Trigger 2's full "Merge to Main" procedure on that branch, without waiting for Arshad to say the phrase.** This is a standing instruction (confirmed by Arshad 2026-09-14) and applies in every session, not just the one that ran the pipeline.
+
+- Applies only to features that reach **completed**. A **halted** feature (Architecture Critic block, Security Auditor escalation, EA rejection, exhausted bug-fix loop, etc.) does NOT trigger this — halts still stop for Arshad's review per the Always-On Pipeline rule in the dev-team section above, and instead get preserved per §24 (Alternate Feature Preservation) below.
+- The BLOCKED-gate safety in Trigger 2 still applies: if the 8-agent gate itself comes back BLOCKED on a completed feature, report the blockers and stop — do not force a merge.
+- If multiple features complete in the same run/batch, run Trigger 2 once covering the combined diff (don't spawn a separate gate per feature unless they're on separate branches).
+
 ### Trigger 1 — PR Creation / Review Request
 
 **Whenever the user says any of the following (exact or near-match):**
@@ -1283,4 +1291,62 @@ Blocked tasks stay `pending` in the file — the bot logs a warning and skips to
 | `scripts/backlog_run.py` | Executor — called by the workflow |
 | `.github/workflows/autonomous-backlog.yml` | Scheduled workflow (every 2 h) |
 | `.claude/commands/session-end.md` | Step 3b queues incomplete tasks |
+
+---
+
+## 24. Alternate Feature Preservation (PERMANENT)
+
+> Confirmed by Arshad 2026-09-14. Always active — read at the start of every session.
+> **Nothing built in a session is ever left only in the local working tree.**
+
+### The rule
+
+At the end of any meaningful unit of work — a session ending, a dev-team pipeline run settling (completed OR halted), or any hands-on work outside the pipeline — **every piece of work gets committed and pushed**, regardless of whether it finished cleanly:
+
+1. **Completed pipeline features** → merged to main via §20 Trigger 0 (auto merge-to-main).
+2. **Everything else** — a halted pipeline feature, a half-built ad-hoc change, an experimental or competing approach to something that already exists, anything abandoned mid-way — → committed and pushed to its own branch, and logged as an **alternate feature** in `tasks/alternate-features.md`.
+
+"Alternate feature" here just means: real work that exists in the codebase but isn't (yet, or ever) merged to main. It is never silently dropped, never left uncommitted, and never only described in a chat transcript that disappears when the session ends.
+
+### Branch tagging convention
+
+- Halted dev-team pipeline features: use the existing branch, e.g. `dev-team/feat-<N>-<slug>` (already the convention — see `dev-team/feat-139-141-halted-wip` for a real example of multiple halted features preserved together).
+- Any other alternate/experimental work not from the pipeline: `alt/<short-slug>`.
+- Every such branch gets an entry in `tasks/alternate-features.md` — never just left on disk undocumented.
+
+### `tasks/alternate-features.md` — the registry
+
+Structured the same way as `tasks/pipeline-queue.md`. Each row records:
+
+| Field | Meaning |
+|---|---|
+| `ID` | `ALT-<N>` (own counter, separate from `FEAT-<N>`) — or the original `FEAT-<N>` if it's a halted pipeline feature (reuse that ID, don't re-number) |
+| Description | What it is / what it was trying to do |
+| Branch | Where the code actually lives |
+| Progress point | How far it got — which stage, which files, what's missing to finish it |
+| Status | `halted` / `experimental` / `abandoned` |
+| Notes | Anything needed to pick it back up — blockers, decisions still needed, related FEAT_ID |
+
+### Retrieval trigger
+
+**Whenever Arshad says something matching "bring me all the alternate features" (or a clear near-match — "what alternate features do we have", "show me halted work", "what's parked")** →
+
+1. Read `tasks/alternate-features.md` in full.
+2. Summarize every entry: ID, one-line description, branch, and exactly how far it got.
+3. Wait for Arshad to pick which one(s) to resume — do not auto-resume anything from this trigger alone.
+4. Once he picks one, check out (or reference) that branch and continue from its recorded progress point — treat it as already-in-progress work, not a fresh start.
+
+### When this rule fires
+
+- At every `/session-end`.
+- Whenever a dev-team pipeline run settles in a `halted` state (immediately — don't wait for session end).
+- Whenever Claude detects a session limit approaching, for whatever is currently in flight and not yet pushed.
+- Whenever hands-on work outside the pipeline is abandoned, superseded, or left incomplete for any reason.
+
+### Files involved
+
+| File | Purpose |
+|---|---|
+| `tasks/alternate-features.md` | The registry. Human-readable. Committed to the repo. |
+| `tasks/pipeline-queue.md` | Still the source of truth for pipeline-native halted features (§ Halted rows) — `alternate-features.md` cross-references these by FEAT_ID rather than duplicating them, and is the place for everything the pipeline queue doesn't cover (ad-hoc/experimental work). |
 

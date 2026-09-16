@@ -1,6 +1,6 @@
 .card {
-  background: var(--surface, #161b22);
-  border: 1px solid var(--border, #30363d);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-faint);
   border-radius: 10px;
   padding: 16px;
   display: flex;
@@ -11,12 +11,12 @@
 }
 
 .card:hover {
-  border-color: var(--accent, #1f6feb);
-  box-shadow: 0 0 0 1px var(--accent, #1f6feb)22;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-faint);
 }
 
 .cardActive {
-  border-color: #238636;
+  border-color: var(--status-ok);
 }
 
 .header {
@@ -29,7 +29,7 @@
 .name {
   font-size: 0.9rem;
   font-weight: 700;
-  color: var(--text, #e6edf3);
+  color: var(--text-primary);
   line-height: 1.3;
 }
 
@@ -44,21 +44,21 @@
 }
 
 .statusACTIVE {
-  background: #1a3a1f;
-  color: #3fb950;
-  border: 1px solid #238636;
+  background: rgba(0, 255, 156, 0.12);
+  color: var(--status-ok);
+  border: 1px solid var(--status-ok);
 }
 
 .statusIDLE {
-  background: var(--surface-hover, #21262d);
+  background: var(--bg-panel);
   color: var(--text-muted, #8b949e);
-  border: 1px solid var(--border, #30363d);
+  border: 1px solid var(--border-faint);
 }
 
 .statusUNKNOWN {
-  background: var(--surface-hover, #21262d);
+  background: var(--bg-panel);
   color: var(--text-muted, #8b949e);
-  border: 1px solid var(--border, #30363d);
+  border: 1px solid var(--border-faint);
 }
 
 .purpose {
@@ -87,22 +87,24 @@
   letter-spacing: 0.03em;
 }
 
+/* Opus and Sonnet share the --accent family, differentiated by fill weight
+   (solid vs faint+soft) to satisfy the single-accent-color rule. Haiku
+   keeps its separate --status-ok hue, unchanged from before. */
 .modelOpus {
-  background: #3d1a6b;
-  color: #d2a8ff;
-  border: 1px solid #6e40c9;
+  background: var(--accent);
+  color: var(--bg-deep);
 }
 
 .modelSonnet {
-  background: #1a2a3d;
-  color: #79c0ff;
-  border: 1px solid #1f6feb;
+  background: var(--accent-faint);
+  color: var(--accent);
+  border: 1px solid var(--accent-soft);
 }
 
 .modelHaiku {
-  background: #1a3a2a;
-  color: #56d364;
-  border: 1px solid #238636;
+  background: rgba(0, 255, 156, 0.12);
+  color: var(--status-ok);
+  border: 1px solid var(--status-ok);
 }
 
 .stage {
@@ -120,8 +122,8 @@
   align-items: center;
   gap: 4px;
   flex: 1;
-  background: var(--bg, #0d1117);
-  border: 1px solid var(--border, #30363d);
+  background: var(--bg-deep);
+  border: 1px solid var(--border-faint);
   border-radius: 6px;
   padding: 6px 8px;
 }
@@ -139,7 +141,7 @@
 .metricValue {
   font-size: 0.85rem;
   font-weight: 700;
-  color: var(--text, #e6edf3);
+  color: var(--text-primary);
   font-variant-numeric: tabular-nums;
 }
 
@@ -158,14 +160,14 @@
 
 .efficiencyBar {
   height: 4px;
-  background: var(--border, #30363d);
+  background: var(--border-faint);
   border-radius: 2px;
   overflow: hidden;
 }
 
 .efficiencyFill {
   height: 100%;
-  background: linear-gradient(90deg, #1f6feb, #388bfd);
+  background: linear-gradient(90deg, var(--accent-soft), var(--accent));
   border-radius: 2px;
   transition: width 0.4s ease;
 }

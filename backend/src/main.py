@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 
 import src.integrations  # noqa: F401 — package __init__ triggers @register side-effects
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
@@ -36,6 +37,32 @@ if not SECRET_KEY or SECRET_KEY == "change-me":
         "SECRET_KEY must be set to a non-default value. Generate one with: "
         "python -c 'import secrets; print(secrets.token_urlsafe(32))'"
     )
+
+
+def _enforce_login_allowlist() -> None:
+    """Fail startup loudly, in the one place an operator will definitely see
+    it, if this looks like a real deployment with no login allowlist set.
+
+    This is early/loud feedback, not the actual safety mechanism — that's
+    is_email_allowed()'s deny-by-default in auth/allowlist.py, enforced on
+    every request via auth/dependencies.py regardless of whether this
+    check fires. Extracted into its own function (rather than inline
+    module-level code) so it can be exercised directly by tests instead of
+    only at import time.
+    """
+    from src.auth.allowlist import is_production_backend
+
+    if is_production_backend() and not os.getenv("AUTH_ALLOWED_EMAILS", "").strip():
+        raise RuntimeError(
+            "AUTH_ALLOWED_EMAILS must be set in production — without it, "
+            "login is denied for everyone (AUTH_ALLOWED_EMAILS denies by "
+            "default when unset). Set AUTH_ALLOWED_EMAILS to a comma-"
+            "separated list of allowed emails (e.g. your own) in the "
+            "Render environment."
+        )
+
+
+_enforce_login_allowlist()
 
 CORS_ORIGINS = [
     origin.strip()
@@ -118,6 +145,48 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
     if isinstance(exc.detail, dict) and "error" in exc.detail:
         return JSONResponse(status_code=exc.status_code, content=exc.detail)
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    """Scrub Pydantic v2's raw submitted value out of every 422 body.
+
+    ``RequestValidationError.errors()`` includes an ``"input"`` key holding
+    the raw value that failed validation, and (for request bodies) an
+    ``"url"`` key that's just a docs link. For a field like the password on
+    POST /api/v1/auth/password/login, echoing ``input`` back means a
+    too-long or malformed password is returned verbatim in the response
+    body — into browser devtools, any proxy log, any error tracker. This
+    handler rebuilds every error entry from an explicit allow-list
+    (``loc``, ``msg``, ``type``, ``ctx``) instead of deleting known-bad
+    keys, so a future Pydantic version adding another value-bearing key
+    can't reintroduce the leak silently. ``ctx`` is kept — it carries
+    constraint bounds (e.g. max_length) and never the submitted value, so
+    dropping it would make 422s unactionable for no security gain.
+
+    Applies to every route, not just the password login one: no frontend
+    code and no existing backend test depends on FastAPI's native 422
+    shape (this codebase's error handling goes through the project's
+    ``{"error": {...}}`` envelope), so there is no regression risk in
+    scrubbing globally — and a route-specific handler would leave every
+    other endpoint still echoing raw inputs.
+    """
+    scrubbed = [
+        {key: entry[key] for key in ("loc", "msg", "type", "ctx") if key in entry}
+        for entry in exc.errors()
+    ]
+    return JSONResponse(
+        status_code=422,
+        content={
+            "error": {
+                "code": "validation_error",
+                "message": "Request validation failed.",
+                "details": {"errors": scrubbed},
+            }
+        },
+    )
 
 
 @app.exception_handler(Exception)

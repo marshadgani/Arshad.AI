@@ -15,7 +15,7 @@ from sqlalchemy import ForeignKey, Index, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from .base import Base
+from .base import Base, utcnow
 
 
 class DagTriggerQueue(Base):
@@ -43,7 +43,7 @@ class DagTriggerQueue(Base):
         String(20), nullable=False, default="pending"
     )  # pending | picked | completed | failed
     requested_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), nullable=False, default=datetime.utcnow
+        TIMESTAMP(timezone=True), nullable=False, default=utcnow
     )
     picked_at: Mapped[datetime | None] = mapped_column(
         TIMESTAMP(timezone=True), nullable=True
