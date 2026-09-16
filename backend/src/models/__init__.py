@@ -13,6 +13,7 @@ from . import (  # noqa: F401
     oauth_account,
     oauth_token,
     obsidian,
+    ontology,
     skill,
     user,
 )
