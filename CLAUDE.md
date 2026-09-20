@@ -175,30 +175,30 @@ The orchestrator runs these agents in strict sequence. Every agent output feeds 
 | 0.5 | `code-explorer` | Sonnet | Maps codebase patterns, module boundaries, naming idioms — context fed to all subsequent agents |
 | 1 | `business-analyst` | Haiku | Extracts requirements → RTM + BPDD |
 | 2 | `enterprise-architect` *(pre)* | Sonnet | Enterprise architecture review — rejects bad ideas before any code |
-| 2.5 | `ai-engineer` | **Opus** | Tech lead — challenges decisions, flags scaling risks, sets architecture direction SA must follow |
+| 2.5 | `ai-engineer` | **Sonnet** | Tech lead — challenges decisions, flags scaling risks, sets architecture direction SA must follow |
 | 3 | `solution-architect` | Sonnet | Produces Solution Design Document (SDD) constrained by Tech Lead |
-| 3.1 | `architecture-critic` | **Opus** | Adversarially reviews the SDD — flags over-engineering, coupling risks, convention deviations; blocking findings halt the pipeline |
-| 3.3 | `system-engineer` | **Opus** | Designs system architecture, component structure, data flow, DB schema, caching strategy |
+| 3.1 | `architecture-critic` | **Sonnet** | Adversarially reviews the SDD — flags over-engineering, coupling risks, convention deviations; blocking findings halt the pipeline |
+| 3.3 | `system-engineer` | **Sonnet** | Designs system architecture, component structure, data flow, DB schema, caching strategy |
 | 3.5 | `engineer` | Sonnet | Builds production-ready MVP from SDD + system design |
 | 4 | `developer` | Sonnet | Generates complete feature code |
 | 4.15 | `database-specialist` | Sonnet | Deep SQL/ORM/migration audit — N+1, missing indexes, unsafe queries, Alembic correctness |
 | 4.16 | `python-specialist` | Sonnet | Python/FastAPI audit — async correctness, Pydantic v2, dependency injection, type annotations |
-| 4.2 | `code-reviewer` | **Opus** | Project-conventions review — checks all code against CLAUDE.md rules (api.md, database.md, frontend.md) |
+| 4.2 | `code-reviewer` | **Sonnet** | Project-conventions review — checks all code against CLAUDE.md rules (api.md, database.md, frontend.md) |
 | 4.3 | `frontend-engineer` | Sonnet | Production-grade UI with bold aesthetic direction (frontend-design skill) — all 4 states, accessible, responsive, reusable |
 | 4.4 | `type-design-analyzer` | Sonnet | TypeScript type system audit — weak types, missing invariant encoding, illegal-state prevention |
-| 4.5 | `senior-engineer` | **Opus** | Code quality audit — finds N+1, bad patterns, scalability risks. No functionality changes. |
-| 4.6 | `software-architect` | **Opus** | Architecture restructuring — separates concerns, reduces coupling, increases modularity |
+| 4.5 | `senior-engineer` | **Sonnet** | Code quality audit — finds N+1, bad patterns, scalability risks. No functionality changes. |
+| 4.6 | `software-architect` | **Sonnet** | Architecture restructuring — separates concerns, reduces coupling, increases modularity |
 | 4.7 | `silent-failure-hunter` | Sonnet | Error handling audit — swallowed exceptions, HTTP 200 masking errors, missing propagation |
-| 4.8 | `code-simplifier` | **Opus** | Code clarity refinement — eliminates unnecessary abstraction, over-engineering, verbose constructs |
+| 4.8 | `code-simplifier` | **Sonnet** | Code clarity refinement — eliminates unnecessary abstraction, over-engineering, verbose constructs |
 | 5 | `process-organiser` | Haiku | Logs feature in process hierarchy |
 | 5.9 | `test-architect` | Sonnet | Designs test architecture — unit vs integration boundaries, mock strategy, coverage plan |
 | 6 | `test-script-writer` | Sonnet | Writes test scripts following Test Architect's plan |
 | 6.1 | `pr-test-analyzer` | Sonnet | Test quality review — coverage of happy/error/edge paths, negative tests, behaviour vs implementation |
 | 7 | `tester` | Sonnet | Executes tests, reports defects |
 | 8 | `bug-fixer` ↔ `tester` | Sonnet | Fix + re-test loop (max 5 iterations) |
-| 8.5 | `debugger` | **Opus** | Root cause analysis — production outage mode, 3 levels deep |
+| 8.5 | `debugger` | **Sonnet** | Root cause analysis — production outage mode, 3 levels deep |
 | 8.6 | `performance-optimisation-engineer` | Sonnet | Eliminates bottlenecks — N+1, missing indexes, async gaps, memory leaks |
-| 8.7 | `security-auditor` | **Opus** | OWASP Top 10 — attack scenarios, secure implementation fixes |
+| 8.7 | `security-auditor` | **Sonnet** | OWASP Top 10 — attack scenarios, secure implementation fixes |
 | 8.8 | `devops-engineer` | Sonnet | Deployment architecture, monitoring, scaling, production checklist |
 | 8.9 | `production-validator` | Sonnet | Final production-readiness check — no stubs, no TODOs, all endpoints functional, no debug code |
 | 9 | `enterprise-architect` *(post)* | Sonnet | Final architectural verdict — always runs |
@@ -207,13 +207,27 @@ The orchestrator runs these agents in strict sequence. Every agent output feeds 
 all 28 agents from the top level via `agentType: '<role>'` calls, not through a
 subagent orchestrator (see the ⚠️ note above for why).
 
-### Model Tiers
+### Model Tiers — PERMANENT (max model = Sonnet, no exceptions without one-time approval)
+
+> **Standing instruction, confirmed by Arshad (2026-09-20):** No agent, anywhere in this project — inside the dev-team pipeline or any ad-hoc/project agent — runs on anything higher than Sonnet, ever, without Arshad's explicit one-time approval granted for that specific use. This overrides every per-agent model assignment below and everywhere else in this file that previously said Opus.
 
 | Tier | Agents | Purpose |
 |---|---|---|
-| **Opus** (10 agents) | ai-engineer, architecture-critic, system-engineer, code-reviewer, senior-engineer, software-architect, code-simplifier, debugger, security-auditor | Deep reasoning — architectural decisions, audits, root cause, security |
-| **Sonnet** (16 agents) | code-explorer, engineer, developer, database-specialist, python-specialist, frontend-engineer, type-design-analyzer, silent-failure-hunter, perf-opt, devops, production-validator, solution-architect, enterprise-architect, test-architect, test-writer, tester, bug-fixer, pr-test-analyzer | Execution — code generation, testing, optimization |
-| **Haiku** (2 agents) | business-analyst, process-organiser | Simple extraction and formatting |
+| **Sonnet** (25 agents — includes all 10 formerly-Opus roles) | ai-engineer, architecture-critic, system-engineer, code-reviewer, senior-engineer, software-architect, code-simplifier, debugger, security-auditor, code-explorer, engineer, developer, database-specialist, python-specialist, frontend-engineer, type-design-analyzer, silent-failure-hunter, perf-opt, devops, production-validator, solution-architect, enterprise-architect, test-architect, test-writer, tester, bug-fixer, pr-test-analyzer | Deep reasoning AND execution — architectural decisions, audits, root cause, security, code generation, testing, optimization. Sonnet is the ceiling for every role in this list, including the ones that used to be tagged deep-reasoning/Opus. |
+| **Haiku** (2 agents) | business-analyst, process-organiser | Simple extraction and formatting — unchanged, already the lowest tier |
+
+**Opus (or any model above Sonnet) is never a default assignment for any agent, pipeline or non-pipeline.** It may only be used as a one-time, per-task escalation, and only under the exact conditions in "Model Escalation Policy" below.
+
+### Model Escalation Policy — PERMANENT
+
+> Applies to every agent in the project — the dev-team pipeline and every project/ad-hoc agent alike. Not limited to the pipeline.
+
+1. **Default ceiling is Sonnet.** Any agent already assigned Haiku keeps Haiku — don't upgrade those either. Never assign, hardcode, or fall back to Opus or any higher-tier model in any agent's frontmatter, in the Workflow script's model resolution, or in ad-hoc `Agent()`/`Task()` calls.
+2. **If an agent genuinely cannot complete its assigned work on its standard model** (Sonnet, or Haiku where that's its tier) after a real attempt — not a first-try failure, but a demonstrated, repeated inability to make progress on that specific task — it must **stop and ask Arshad** for permission to escalate, rather than silently retrying forever or silently degrading its output.
+3. **The ask must be explicit and scoped to one task.** State which agent/stage is stuck, what was tried on the standard model, and that a one-time escalation to a specific higher model is being requested for this task only.
+4. **Approval is never standing.** A yes for one escalation does not carry forward to the next failure, the next agent, the next pipeline run, or the next session. Ask again, every single time, with no exceptions — including for the same agent hitting the same kind of wall twice in a row.
+5. **No silent escalation, ever.** An agent (or the orchestrator/Workflow driving it) must never switch itself to Opus or any higher model without having asked and received that turn's explicit approval first.
+6. This policy sits above and constrains §"Model Strategy (Read First)" below, the dev-team pipeline's Model Tiers table, and the agent-registration model-inference rule in §21 — all three are updated to match, but if any of them is ever edited to reintroduce a default-Opus assignment, this section governs and that edit should be treated as a mistake to revert, not a superseding decision.
 
 ### Three Invariants (never break these)
 
@@ -248,12 +262,14 @@ No need for the user to type the command — detect the URL and trigger the fetc
 
 ## Model Strategy (Read First)
 
+> **Superseded/constrained by §20's "Model Tiers" and "Model Escalation Policy" (PERMANENT, confirmed 2026-09-20): Sonnet is the ceiling for every agent, including `planner`. Opus is never a default — see that section for the one-time escalation process.**
+
 | Phase | Model | When |
 |---|---|---|
-| **Planning** | `claude-opus-4-7` | Any task with 3+ steps, architectural decisions, ambiguous requirements |
+| **Planning** | `claude-sonnet-4-6` | Any task with 3+ steps, architectural decisions, ambiguous requirements |
 | **Execution** | `claude-sonnet-4-6` | All regular prompts, all agent runs, all code writing |
 
-**Rule:** Before writing a single line of code on any non-trivial task, invoke the `planner` agent (Opus) via `/plan <description>`. Opus thinks, Sonnet builds.
+**Rule:** Before writing a single line of code on any non-trivial task, invoke the `planner` agent (Sonnet) via `/plan <description>`. If `planner` genuinely cannot produce a workable plan on Sonnet after a real attempt, it asks Arshad for one-time approval to escalate for that task only — see the Model Escalation Policy in §20. Never assume standing permission to run `planner` (or anything else) on a higher model.
 
 **Never skip planning for:**
 - New features touching multiple files or layers
@@ -1146,7 +1162,7 @@ The report includes: agent-by-agent results table, detailed findings per agent, 
 | `agent_name` | Filename without `.md` (e.g. `code-reviewer.md` → `code-reviewer`) |
 | `display_name` | First `# Heading` in the file; fallback: title-case of `agent_name` |
 | `purpose` | First non-empty, non-heading paragraph (strip markdown, truncate to 250 chars) |
-| `model` | Scan content for `opus` → `claude-opus-4-8`; `haiku` → `claude-haiku-4-5-20251001`; default `claude-sonnet-4-6` |
+| `model` | Scan content for `haiku` → `claude-haiku-4-5-20251001`; default `claude-sonnet-4-6`. **Never infer or register `opus`/any higher-tier model as an agent's default** — per §20 Model Tiers / Model Escalation Policy, Sonnet is the ceiling for every registered agent. If a source file's frontmatter still says `opus`, register it as `claude-sonnet-4-6` and flag it for correction at the source file. |
 | `category` | `development_team` if in `.claude/agents/dev-team/`; else `other` |
 | `pipeline_stage` | `null` for all non-dev-team agents |
 
