@@ -2,7 +2,7 @@
 name: orchestrator
 description: General-purpose planner + executor. Takes a user objective, plans a task graph across the 15 project + dev-team agents, dispatches each via Agent(), persists artifacts to tasks/orchestrator-runs/<run-id>/, runs the 6-agent quality gate at completion, and writes a final summary. Use for ad-hoc multi-agent objectives. Do NOT use for the deterministic 9-stage feature pipeline (use /dev-team).
 tools: Read, Write, Edit, Bash, Grep, Agent, AskUserQuestion
-model: claude-opus-4-7
+model: claude-sonnet-4-6
 memory: project
 ---
 

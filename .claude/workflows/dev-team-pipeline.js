@@ -11,7 +11,7 @@ export const meta = {
   ],
 }
 
-const OPUS = 'claude-opus-5'
+const SONNET = 'claude-sonnet-4-6'  // PERMANENT per CLAUDE.md §20: Sonnet is the ceiling for every agent. Opus removed 2026-09-20 — never reintroduce a default-Opus constant here; escalation is one-time, per-task, and requires Arshad's explicit approval each time.
 const HAIKU = 'claude-haiku-4-5-20251001'
 
 const DENY_PREFIXES = [
@@ -164,7 +164,7 @@ async function runFeaturePipeline(f) {
   log_('AI Engineer / Tech Lead')
   const aiEng = await withRole('ai-engineer', () => agent(
     `${ctxHeader(f, 'AI Engineer / Tech Lead')}\nBPDD: ${JSON.stringify(bpdd)}\nEA pre-build: ${JSON.stringify(eaPre)}\nChallenge decisions, flag scaling risks, set architecture direction the Solution Architect must follow. Return JSON: {implementation_plan: string, tech_lead_review: string}.`,
-    { agentType: 'ai-engineer', model: OPUS, phase: 'Design', schema: { type: 'object', properties: { implementation_plan: { type: 'string' }, tech_lead_review: { type: 'string' } }, required: ['implementation_plan'] } }
+    { agentType: 'ai-engineer', model: SONNET, phase: 'Design', schema: { type: 'object', properties: { implementation_plan: { type: 'string' }, tech_lead_review: { type: 'string' } }, required: ['implementation_plan'] } }
   ))
 
   log_('Solution Architect')
@@ -177,7 +177,7 @@ async function runFeaturePipeline(f) {
   log_('Architecture Critic')
   let archCritic = await withRole('architecture-critic', () => agent(
     `${ctxHeader(f, 'Architecture Critic')}\nSDD: ${JSON.stringify(sdd)}\nCodebase context: ${JSON.stringify(codebase_context)}\nAdversarially review the SDD. Flag over-engineering, coupling risk, convention deviations. Return decision; set blocking:true only for genuinely blocking issues.`,
-    { agentType: 'architecture-critic', model: OPUS, phase: 'Design', schema: DECISION_SCHEMA }
+    { agentType: 'architecture-critic', model: SONNET, phase: 'Design', schema: DECISION_SCHEMA }
   ))
 
   // Redesign loop: a blocking verdict here means real bugs the SDD would have
@@ -195,7 +195,7 @@ async function runFeaturePipeline(f) {
     sdd = sa && sa.sdd
     archCritic = await withRole('architecture-critic', () => agent(
       `${ctxHeader(f, `Architecture Critic — re-review iteration ${archIter}`)}\nSDD: ${JSON.stringify(sdd)}\nCodebase context: ${JSON.stringify(codebase_context)}\nThis SDD was revised specifically to address your prior blocking findings. Re-review adversarially — do not rubber-stamp; set blocking:true again if the revision doesn't genuinely fix the issues or introduces new ones.`,
-      { agentType: 'architecture-critic', model: OPUS, phase: 'Design', schema: DECISION_SCHEMA }
+      { agentType: 'architecture-critic', model: SONNET, phase: 'Design', schema: DECISION_SCHEMA }
     ))
   }
   if (archCritic && archCritic.blocking) {
@@ -205,7 +205,7 @@ async function runFeaturePipeline(f) {
   log_('System Engineer')
   const sysEng = await withRole('system-architect', () => agent(
     `${ctxHeader(f, 'System Engineer')}\nSDD: ${JSON.stringify(sdd)}\nArchitecture Critic concerns: ${JSON.stringify(archCritic)}\nDesign system architecture, component structure, data flow, schema, caching strategy. Return JSON: {system_design:{...}}.`,
-    { agentType: 'system-architect', model: OPUS, phase: 'Design', schema: { type: 'object', properties: { system_design: { type: 'object' } }, required: ['system_design'] } }
+    { agentType: 'system-architect', model: SONNET, phase: 'Design', schema: { type: 'object', properties: { system_design: { type: 'object' } }, required: ['system_design'] } }
   ))
 
   phase('Build')
@@ -231,13 +231,13 @@ async function runFeaturePipeline(f) {
   const auditStages = [
     { role: 'database-specialist', label: 'Database Specialist', ask: 'Audit every DB interaction — queries, indexes, ORM, migrations, N+1, unsafe SQL. Fix issues found (empty files array if none apply).' },
     { role: 'python-specialist', label: 'Python Specialist', ask: 'Audit async correctness, FastAPI DI, Pydantic v2, exceptions, type annotations. Fix issues found (empty files array if none apply).' },
-    { role: 'code-reviewer', label: 'Code Reviewer', ask: 'Review against CLAUDE.md rules (api.md, database.md, frontend.md) — naming, error shapes, async patterns, UUIDs. Fix departures.', model: OPUS },
+    { role: 'code-reviewer', label: 'Code Reviewer', ask: 'Review against CLAUDE.md rules (api.md, database.md, frontend.md) — naming, error shapes, async patterns, UUIDs. Fix departures.', model: SONNET },
     { role: 'frontend-developer', label: 'Frontend Engineer', ask: 'Apply the frontend-design skill: bold aesthetic direction, distinctive typography/colour/motion, all 4 states (loading/empty/error/content), accessible, reusable.' },
     { role: 'type-design-analyzer', label: 'Type Design Analyzer', ask: 'Audit the type system for weak types, missing invariant encoding, illegal-state prevention. Improve types.' },
-    { role: 'code-analyzer', label: 'Senior Engineer', ask: 'Code quality audit — N+1, bad patterns, scalability risks. NO functionality changes.', model: OPUS },
-    { role: 'refactoring-specialist', label: 'Software Architect', ask: 'Restructure to separate concerns, reduce coupling, increase modularity. NO functionality changes.', model: OPUS },
+    { role: 'code-analyzer', label: 'Senior Engineer', ask: 'Code quality audit — N+1, bad patterns, scalability risks. NO functionality changes.', model: SONNET },
+    { role: 'refactoring-specialist', label: 'Software Architect', ask: 'Restructure to separate concerns, reduce coupling, increase modularity. NO functionality changes.', model: SONNET },
     { role: 'silent-failure-hunter', label: 'Silent Failure Hunter', ask: 'Find swallowed exceptions, HTTP 200 masking errors, missing propagation. Fix them.' },
-    { role: 'code-simplifier', label: 'Code Simplifier', ask: 'Eliminate unnecessary abstraction, over-engineering, verbose constructs. Preserve all functionality.', model: OPUS },
+    { role: 'code-simplifier', label: 'Code Simplifier', ask: 'Eliminate unnecessary abstraction, over-engineering, verbose constructs. Preserve all functionality.', model: SONNET },
   ]
 
   for (const st of auditStages) {
@@ -330,7 +330,7 @@ async function runFeaturePipeline(f) {
   log_('Debugger (always runs)')
   const dbg = await withRole('debugger', () => agent(
     `${ctxHeader(f, 'Debugger')}\nRemaining defects (if any): ${JSON.stringify(tester && tester.defects)}\nRoot-cause and robustly fix anything remaining.\nCode:\n${dump(code)}`,
-    { agentType: 'debugger', model: OPUS, phase: 'Harden', schema: FILES_SCHEMA }
+    { agentType: 'debugger', model: SONNET, phase: 'Harden', schema: FILES_SCHEMA }
   ))
   code = mergeFiles(code, dbg && dbg.files)
   if (dbg && dbg.summary && /resolved|fixed|clear/i.test(dbg.summary)) halt = null
@@ -345,7 +345,7 @@ async function runFeaturePipeline(f) {
   log_('Security Auditor')
   const sec = await withRole('security-auditor', () => agent(
     `${ctxHeader(f, 'Security Auditor')}\nOWASP Top 10 audit. Fix insecure implementations. Set escalate:true on any finding that must block ship.\nCode:\n${dump(code)}`,
-    { agentType: 'security-auditor', model: OPUS, phase: 'Harden', schema: SECURITY_SCHEMA }
+    { agentType: 'security-auditor', model: SONNET, phase: 'Harden', schema: SECURITY_SCHEMA }
   ))
   code = mergeFiles(code, sec && sec.files)
   const securityHalt = !!(sec && (sec.findings || []).some(x => x.escalate))
