@@ -200,7 +200,7 @@
     "claude-mem": {
       "url": "https://github.com/thedotmack/claude-mem.git",
       "name": "claude-mem",
-      "last_fetched": "2026-09-12 23:39 UTC",
+      "last_fetched": "2026-09-20 02:55 UTC",
       "components": {
         "skills": [
           "mem-setup",
