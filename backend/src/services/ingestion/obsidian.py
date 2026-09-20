@@ -22,15 +22,12 @@ from ...models.user import User
 from ...tools.base import ToolError
 from .. import event_bus
 from ..obsidian_client import ProviderReauthRequired, fetch_blob, fetch_tree, vault_repo
-from .runner import IngestionError
+from .errors import IngestionError
 
 logger = logging.getLogger(__name__)
 
-# ── Frontmatter + metadata helpers ────────────────────────────────
-
 
 def _parse_frontmatter(content: str) -> tuple[dict[str, Any], str]:
-    """Split YAML frontmatter from body. Returns (fm_dict, body_text)."""
     if not content.startswith("---"):
         return {}, content
     end = content.find("\n---", 3)
@@ -79,9 +76,6 @@ def _extract_title(fm: dict[str, Any], body: str, path: str) -> str:
 
 def _word_count(text: str) -> int:
     return len(text.split())
-
-
-# ── Ingestion entry point ──────────────────────────────────────────
 
 
 async def ingest(

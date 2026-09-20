@@ -19,7 +19,7 @@ from sqlalchemy import ForeignKey, Index, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from .base import Base
+from .base import Base, utcnow
 
 
 class ConversationSession(Base):
@@ -42,13 +42,13 @@ class ConversationSession(Base):
     )
     title: Mapped[str] = mapped_column(Text, nullable=False, default="New chat")
     created_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), nullable=False, default=datetime.utcnow
+        TIMESTAMP(timezone=True), nullable=False, default=utcnow
     )
     updated_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True),
         nullable=False,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=utcnow,
+        onupdate=utcnow,
     )
 
 
@@ -76,5 +76,5 @@ class ConversationMessage(Base):
     usage_input_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     usage_output_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), nullable=False, default=datetime.utcnow
+        TIMESTAMP(timezone=True), nullable=False, default=utcnow
     )

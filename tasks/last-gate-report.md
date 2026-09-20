@@ -1,199 +1,173 @@
 # Arshad.AI Quality Gate Report
 
-**Branch:** `claude/ui-repos-reference-jusj4c` → `claude/ai-personal-assistant-main`
-**Triggered by:** "Merge to Main"
-**Scope:** FEAT-161 — live-browser UI Design Council audit
+**PR:** #95 — FEAT-165 (renumbered from FEAT-144): Obsidian ontology layer, Slice 1
+**Branch:** `dev-team/feat-144-feat-144` → `claude/ai-personal-assistant-main`
+**Triggered by:** "merge to main" (user request), gate run directly in-session
+**Date:** 2026-09-16
 
 ---
 
-## What happened in this cycle (read this first)
+## Summary
 
-This was a live, browser-based end-user audit rather than a static code
-review: Playwright/Chromium logged into the deployed app
-(`https://arshad-ai-seven.vercel.app`) with real user credentials and
-walked all 12 authenticated routes plus a mobile (390px) pass, capturing
-screenshots, console/page errors, and network failures.
+FEAT-165 extracts Arshad.AI's ingested calendar/email/GitHub data into a
+Postgres-backed ontology layer of linked entities and relationships
+(people, projects) with per-entity visibility classification enforced by
+a one-way SQL "ratchet" trigger — visibility can only tighten toward
+`private`, never silently loosen. This slice ships zero vault-write
+surface (no Obsidian sync router, no MOC export) by design; that's a
+separate future feature.
 
-Two real, live bugs were found and fixed:
+The diff already passed the internal 30-stage dev-team pipeline
+(Architecture Critic clean, Security Auditor found and fixed one real gap
+in place — the ratchet trigger was originally `UPDATE`-only, fixed to
+`INSERT OR UPDATE` — Enterprise Architect: SHIP). This Merge-to-Main gate
+is an **independent** re-verification against the actual code on disk,
+per this repo's standing rule that pipeline sign-off is never rubber-stamped.
 
-1. **`GET /api/v1/ai-ecosystem/metrics` returned HTTP 500 on every load**,
-   confirmed via a captured network failure and cross-checked against live
-   Render logs, which showed the exact traceback:
-   `asyncpg.exceptions.CannotCoerceError: cannot cast type boolean to
-   double precision` — Postgres refuses a direct `bool → double` cast.
-   Fixed by casting to `Integer` first (`func.avg(cast(AgentUsageLog.success,
-   Integer))`), the standard detour. The frontend was silently swallowing
-   this failure — the AI Ecosystem page just showed all-zero usage stats
-   with no visible error.
+## Gate Summary
 
-2. **Every dashboard widget rendered "loading" (`null`) and "genuinely
-   empty" (`[]`) identically** — confirmed live on both desktop and mobile
-   (`BriefingHero`'s literal `"Loading…"` text sat in the real heading
-   style for 6–12+ seconds; every list widget showed `"0 waiting"`, `"0
-   open"`, `"0 new"`, or a bare `"—"`). Added a shared
-   `CardSkeleton`/`EmptyState` pair and wired the `null` vs `[]`
-   distinction into all 9 widgets.
-
-**The gate then caught a real regression in fix #1**, independently and
-convergently by **6 of the 8 gate agents** (security-auditor, debugger,
-silent-failure-hunter, refactorer, pr-test-analyzer, code-reviewer): the
-diff changed `cast(..., Float)` to `cast(..., Integer)` but a formatting
-pass dropped the `Integer` import, so `GET /metrics` would have raised
-`NameError` instead — the bug this feature exists to fix would not
-actually have been fixed. **Fixed immediately** (commit `15657cb3`) and
-independently re-verified by every subsequent agent.
-
-The gate also surfaced (and this cycle fixed) three smaller real issues:
-a pre-existing `float(x or 1.0)` bug that silently reports a 100%-failure
-agent as 100% successful (a genuine `Decimal(0)` is falsy in Python);
-`CardStatus.tsx` exporting two components from one file (violates
-`.claude/rules/frontend.md`'s one-component-per-file rule — split into
-`CardSkeleton.tsx` + `EmptyState.tsx`); and `WeatherCommuteNewsCard`
-being the one widget with no empty-state message for `news = []`
-(inconsistent with the other 8). Test coverage was widened from 3/9 to
-9/9 frontend widgets (25 tests) and from 0 to 3 real backend tests that
-exercise the actual route (not just the SQL in isolation).
-
-Net result: the gate did exactly what it's for. Zero of this reached
-main broken — including a regression this feature's own fix introduced.
-
----
-
-## Gate Summary (first pass)
-
-| # | Gate | Agent | Result | Critical | Warnings |
-|---|---|---|---|---|---|
-| 1 | Code Review | code-reviewer | ❌ BLOCKED | 1 | 5 |
-| 2 | Security Audit | security-auditor | ❌ BLOCKED | 1 | 0 |
-| 3 | Bug Analysis | debugger | ❌ BLOCKED | 1 | 0 |
-| 4 | Test Coverage | test-writer | ⚠️ WARN/near-FAIL | 0 | 2 (coverage gaps) |
-| 5 | Code Quality | refactorer | ❌ BLOCKED | 1 | 3 |
-| 6 | Documentation | doc-writer | ⚠️ WARN | 0 | 2 |
-| 7 | Silent Failures | silent-failure-hunter | ❌ BLOCKED | 1 | 1 (HIGH, non-blocking) |
-| 8 | Test Quality | pr-test-analyzer | ⚠️ WARN | 0 | 2 |
-
-**First-pass verdict: ❌ BLOCKED** — 5 of 8 agents independently caught
-the same CRITICAL (missing `Integer` import). Per CLAUDE.md §20 Step 2,
-fixed immediately, plus every other real Warning finding closed in the
-same cycle rather than deferred.
-
-## Re-verification (after all fixes)
-
-- `Integer` import restored (commit `15657cb3`) — independently
-  re-confirmed present by re-reading the file after the initial hallucinated-vs-real
-  check (the finding was real, not a subagent hallucination — verified via
-  direct `Read` per `.claude/rules/subagent-verification.md`).
-- `float(r.success_rate or 1.0)` → `float(r.success_rate) if r.success_rate
-  is not None else 1.0`, with a new test proving a genuine 0.0 no longer
-  reports as 1.0.
-- `CardStatus.tsx` split into `CardSkeleton.tsx` + `EmptyState.tsx`
-  (one-component-per-file, matches `CardHeader.tsx`'s existing precedent
-  in the same directory).
-- `WeatherCommuteNewsCard`'s `news = []` now renders `EmptyState` like
-  every other widget.
-- `FocusCard`/`BriefingHero`'s misleadingly-named `.heroSkeleton` class
-  (only one of the two components is a "hero") renamed to
-  `.cardSkeletonWrap`.
-- Frontend test coverage widened from 3/9 to 9/9 widgets — 25 tests total
-  in `loadingStates.test.tsx`, covering null/empty/populated (or the
-  2-state null/populated pattern for `BriefingHero`/`FocusCard`) for
-  every touched widget.
-- Backend test coverage added from 0 to 3 real endpoint tests in
-  `test_ai_ecosystem.py` (`TestGetMetricsEndpoint`) — these mock only
-  `db.execute()`, so the `select(...)` statement (where the `Integer`
-  NameError actually lived) is built in real Python on every test run.
-  Installed the full backend dependency set and ran these against the
-  real FastAPI app + TestClient (not just eyeballed): **52/52 passed**
-  in `test_ai_ecosystem.py`; **619/626** in the full backend suite (7
-  pre-existing, unrelated failures in `test_auth.py` /
-  `test_auth_password.py` / `test_token_service.py` — confirmed via
-  `git diff --stat -- backend/` that this diff touches only
-  `ai_ecosystem.py`, so those failures are pre-existing network/environment
-  gaps, not a regression from this branch).
-
-**Re-verification verdict: ⚠️ WARN — 0 CRITICAL, 0 BLOCKING.** All 5
-BLOCKED-triggering Criticals resolved (they were the same finding,
-caught 5 ways). Every real Warning closed in this cycle rather than
-deferred; the one deliberately-deferred item is documented below.
+| # | Gate | Agent | Initial Result | After fixes |
+|---|---|---|---|---|
+| 1 | Code Review | code-reviewer | ❌ FAIL (2 Critical) | ✅ Fixed |
+| 2 | Security Audit | security-auditor | ❌ FAIL (1 Critical) | ✅ Fixed |
+| 3 | Bug Analysis | debugger | ❌ FAIL (3 Critical) | ✅ Fixed |
+| 4 | Test Coverage | test-writer | ❌ FAIL (3 Critical) | ✅ Fixed |
+| 5 | Code Quality | refactorer | ⚠️ WARN (1 Critical) | ✅ Fixed |
+| 6 | Documentation | doc-writer | ⚠️ WARN (2 Warnings) | ✅ Fixed |
+| 7 | Silent Failures | silent-failure-hunter | ✅ PASS | ✅ PASS (unchanged) |
+| 8 | Test Quality | pr-test-analyzer | ⚠️ WARN (2 Warnings) | Follow-ups logged |
 
 ## Overall Verdict
 
-### ⚠️ GATE PASSED WITH WARNINGS — Ready for merge
+### ✅ GATE PASSED — Ready for merge
 
-Zero FAIL/BLOCKED gates, zero Critical issues in the current state.
-
----
-
-## Detailed Findings (condensed — see conversation history for full text)
-
-**code-reviewer, security-auditor, debugger, refactorer, pr-test-analyzer
-(all independently CRITICAL→fixed):** missing `Integer` import —
-`GET /api/v1/ai-ecosystem/metrics` would `NameError` on every call,
-completely undoing the feature's stated fix. Fixed, re-verified by
-every subsequent agent, and closed with 3 new backend tests that
-actually invoke the route.
-
-**code-reviewer (Warning, fixed):** `float(r.success_rate or 1.0)`
-silently reports a genuine 0% success rate as 100% (Python falsy-zero
-bug) — pre-existing but only reachable once C1 was fixed. Fixed with a
-regression test.
-
-**code-reviewer, refactorer (Warning, fixed):** `CardStatus.tsx`
-violates the one-component-per-file rule (`.claude/rules/frontend.md`).
-Split into `CardSkeleton.tsx` + `EmptyState.tsx`.
-
-**code-reviewer, refactorer (Warning, fixed):** `WeatherCommuteNewsCard`
-was the one widget with no `EmptyState` for `news = []`. Fixed for
-consistency with the other 8 widgets.
-
-**refactorer (Warning, fixed):** `FocusCard` reused `.heroSkeleton`, a
-class name that only made sense for `BriefingHero`. Renamed to the
-generic `.cardSkeletonWrap`.
-
-**test-writer, pr-test-analyzer, refactorer (Warning, fixed):** frontend
-test coverage was 3/9 widgets; backend had 0 tests for the actual
-`/metrics` route. Both closed — 25 frontend tests (9/9 widgets), 3 real
-backend endpoint tests (52/52 passing in the file, run against a live
-TestClient + FastAPI app, not just static analysis).
-
-**doc-writer (Warning, not auto-fixed per gate policy):** `CardSkeleton`
-(now its own file) used a `//` comment instead of JSDoc for an exported
-symbol; `rows` prop docstring described WHAT not WHY. Addressed in the
-`CardSkeleton.tsx`/`EmptyState.tsx` split with proper `/** */` docs and
-a WHY-focused `rows` description.
-
-**silent-failure-hunter (HIGH, explicitly NOT fixed this cycle — see
-Action Items):** all 13 of the dashboard's independent `useFetch` calls
-discard `error` entirely (`useDashboardData.ts` only reads `.data`), so
-a *persistently failing* endpoint — not just a slow one — now renders
-the same `CardSkeleton` shimmer forever, indistinguishable from "still
-loading." This is real and is the same root problem (a silent 500 looks
-fine to the user) one layer further down the stack than what this
-feature fixed. Not fixed here because it requires a genuine design
-decision (an `ErrorState` component + threading `error` through
-`useDashboardData` and all 13 call sites) that goes beyond this cycle's
-scope of style/behavior polish on an already-large diff — logged as an
-action item for a dedicated follow-up feature.
+Every FAIL gate and every Critical finding is resolved and independently
+re-verified below with real command output, not self-reported. Remaining
+items are WARN/Suggestion-tier per this repo's gate thresholds and do not
+block merge — logged as an Action Items checklist.
 
 ---
 
-## Action Items
+## Critical findings — all root-caused, fixed, and re-verified
 
-- [ ] **Dashboard error-state gap (HIGH, from silent-failure-hunter):**
-      `useDashboardData.ts` discards `error` from all 13 `useFetch` calls.
-      A persistently-failing endpoint now renders `CardSkeleton` forever
-      instead of a distinguishable error state. Needs a third `ErrorState`
-      branch threaded through `useDashboardData` + all 13 widgets — real
-      scope, deserves its own feature ticket rather than folding into an
-      already-large diff.
-- [ ] **Integrations page mobile scroll length** (from the live audit,
-      not the gate): 46+ rows across 9 categories render as one flat
-      ~9600px scroll on a 390px viewport with no collapse/accordion.
-      Real usability opportunity, logged as a backlog idea — bigger
-      structural/interaction change than the rest of this batch.
-- [ ] Consider whether `--status-warn` (FEAT-160) will eventually need a
-      dedicated `--status-pending` hue — unchanged carry-forward, not
-      from this cycle.
+All four agents that ran the code independently converged on the same
+root cause, confirming it wasn't a fluke:
+
+1. **`ontology_extract.py` had a hard `ImportError`.** It imported
+   `MAX_EXTERNAL_KEY_LEN` from `ontology_graph.py` and read
+   `graph.skipped_oversized_key`, but `ontology_graph.py` defined neither
+   — `DerivedGraph` had only `persons/projects/edges/skipped_no_author`.
+   Every `ontology_extractor` run would fail at import time; every test in
+   `test_ontology_extraction.py` failed at pytest collection.
+   **Fix:** added `MAX_EXTERNAL_KEY_LEN = 255` (matching the DB column
+   width) plus the length-guard and `skipped_oversized_key` counter to
+   `derive_graph()`/`DerivedGraph`.
+
+2. **`test_ontology_graph.py`'s `_row()` helper built rows without the
+   `"raw"` wrapper** `derive_graph()` actually reads from — every row
+   silently hit the skip path, so 5 of 9 pure unit tests asserted nothing
+   real. **Fix:** corrected the row shape to nest under `"raw"`.
+
+3. **`test_ontology_security.py` never applied `@pytest.mark.asyncio`**
+   (only `@pytest.mark.pg`) — under this repo's default strict
+   pytest-asyncio mode, none of its 14 async tests were ever claimed by
+   the plugin and none actually ran; the entire trigger test suite for
+   this feature's core security mechanism was silently dead.
+   **Fix:** added a module-level `pytestmark = pytest.mark.asyncio`.
+
+4. **`test_demotion_rejected_even_with_guc` asserted the wrong property**
+   — it expected demotion (public→private) to be *rejected*, backwards
+   from the feature's actual, correct design (only promotion needs the
+   GUC; demotion is always allowed, unconditionally). Found by test-writer.
+   **Fix:** rewrote as `test_demotion_to_private_succeeds_without_guc`,
+   asserting the real intended property, explicitly clearing the GUC
+   first to prove demotion needs no privilege at all.
+
+5. **Two tests depended on the shared `committed_user` fixture** while
+   opening genuinely separate DB connections (`subprocess.run` for the
+   CLI test, a fresh `create_async_engine` for the session-close
+   regression test) — `committed_user` only lives inside `pg_session`'s
+   SAVEPOINT tree, invisible outside it, so both hit real FK violations.
+   **Fix:** each test now seeds and cleans up its own truly-committed
+   user via its own connection.
+
+6. **Found independently during verification (not flagged by any of the
+   8 agents, since none ran `alembic upgrade`): two Alembic migration
+   heads.** This branch's ontology migration and main's newer
+   password-hash/timezone-fix chain both descended from the same parent
+   independently — `alembic upgrade head` would fail in production with
+   "multiple heads." **Fix:** retargeted this migration's `down_revision`
+   onto the current chain (safe — this migration has never shipped to
+   main, so this isn't editing a migration the immutability rule protects).
+
+### Independent re-verification (not self-reported)
+
+```
+$ alembic upgrade head   (fresh Postgres 16 database)
+...
+INFO  Running upgrade n1k2l3m4a5b6 -> o1l2m3n4a5b6, ontology entities and relationships (FEAT-144 slice 1)
+→ single head, applies cleanly
+
+$ pytest tests/test_ontology_extraction.py tests/test_ontology_graph.py tests/test_ontology_security.py -q
+................................................                         [100%]
+48 passed in 3.13s
+→ includes all 14 real-Postgres trigger/security tests, now actually executing
+
+$ pytest tests/ -q -k "github or obsidian or runner or queue_worker"
+..................................................                       [100%]
+50 passed
+→ every existing test in files this diff touches, unmodified, still green
+
+$ pytest tests/ -q   (full backend suite)
+683 passed, 5 failed
+→ the 5 failures (test_auth.py, test_auth_password.py, test_token_service.py)
+  are in files this diff does not touch — pre-existing, unrelated, out of scope
+```
 
 ---
-*Generated by Arshad.AI Quality Gate · All 8 agents + full re-verification pass · claude/ui-repos-reference-jusj4c*
+
+## WARN-tier fixes applied (not required to unblock, done anyway since cheap)
+
+- Added a missing FK index (`ix_ontology_relationships_source_entity_id`)
+  per `.claude/rules/database.md`'s "index every foreign key" rule —
+  `target_entity_id` had one, `source_entity_id` didn't.
+- Added two explanatory comments to the visibility-ratchet trigger
+  (`ontology_rank_visibility()`): the fail-closed `COALESCE` mechanism,
+  and why the `NULL` guard is needed independently of the CHECK
+  constraint (BEFORE ROW triggers fire before CHECK constraints).
+- Added 3 new tests for the oversized-external-key skip path
+  (`test_skip_oversized_login`, `test_skip_oversized_project_key`,
+  `test_key_at_exact_limit_is_not_skipped`) — previously had zero
+  coverage since the feature itself didn't exist until this fix.
+
+## Action Items (WARN/Suggestion — not blocking, logged for follow-up)
+
+- [ ] `ontology_extract.py`'s public entry point is named `extract()`;
+      every sibling ingestion module uses `ingest()`. Consider renaming
+      for consistency with `runner.py`'s dispatch convention.
+- [ ] `ontology_repository.upsert_entities()` returns `len(key_map)`
+      (entities touched, including no-op conflict updates) as
+      `entities_written`, unlike `relationships_written` which uses real
+      `rowcount` — the naming is a bit misleading.
+- [ ] `DerivedGraph.skipped_no_author` conflates two causes (missing
+      author vs. missing `provider_id`) — a future slice could split them
+      for clearer operator signal.
+- [ ] `ontology_repository.py`'s "RETURNING fewer rows than input"
+      defensive branch (documented as "should be unreachable") has no
+      direct test.
+- [ ] The shared ratchet trigger is tested directly only against
+      `ontology_entities`; its attachment to `ontology_relationships` is
+      exercised indirectly (via CHECK-constraint tests) but not with a
+      dedicated raw-SQL no-GUC-update test mirroring the entities one.
+- [ ] `_clamp_max_rows`'s comment says a non-coercible `max_rows` is
+      "caller error... surface it" but then substitutes the default
+      rather than raising — reword the comment or raise, for consistency
+      with `_parse_since`'s handling of bad input.
+
+None of the above block this merge — all are WARN/Suggestion-tier per
+this repo's gate thresholds (only Critical findings and FAIL gates
+block), and none touch the security-critical visibility ratchet, which
+is now fully covered and independently verified against live Postgres.
+
+---
+*Generated directly in-session (not via `/gate` auto-invocation) · 8 agents, 4 independently converging on the same root cause · all Critical findings fixed and re-verified with real test execution against a live Postgres 16 instance*

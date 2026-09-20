@@ -43,9 +43,14 @@ def _parse_event_start(raw: dict[str, Any]) -> datetime:
     value = start.get("dateTime") or start.get("date")
     if value:
         try:
-            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
         except ValueError:
             pass
+        else:
+            # start.date (all-day events) parses to a naive midnight;
+            # occurred_at is TIMESTAMP WITH TIME ZONE, so a naive value
+            # here raises the same asyncpg error FEAT-157 fixed elsewhere.
+            return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
     return datetime.now(timezone.utc)
 
 
