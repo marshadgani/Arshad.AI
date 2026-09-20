@@ -3886,7 +3886,7 @@
     "openmontage": {
       "url": "https://github.com/calesthio/OpenMontage.git",
       "name": "OpenMontage",
-      "last_fetched": "2026-09-12 23:30 UTC",
+      "last_fetched": "2026-09-20 02:57 UTC",
       "components": {
         "skills": [
           "flux-best-practices",
@@ -4076,7 +4076,7 @@
     "orca": {
       "url": "https://github.com/stablyai/orca.git",
       "name": "orca",
-      "last_fetched": "2026-09-12 23:31 UTC",
+      "last_fetched": "2026-09-20 02:57 UTC",
       "components": {
         "skills": [
           "computer-use",
