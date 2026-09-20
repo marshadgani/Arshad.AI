@@ -6,7 +6,7 @@
     "claude-code": {
       "url": "https://github.com/anthropics/claude-code.git",
       "name": "claude-code",
-      "last_fetched": "2026-09-12 23:33 UTC",
+      "last_fetched": "2026-09-20 02:55 UTC",
       "components": {
         "skills": [
           "writing-rules",
@@ -100,7 +100,7 @@
     "repomix": {
       "url": "https://github.com/yamadashy/repomix.git",
       "name": "repomix",
-      "last_fetched": "2026-09-11 09:29 UTC",
+      "last_fetched": "2026-09-20 02:55 UTC",
       "components": {
         "skills": [
           "repomix-explorer",
@@ -150,12 +150,13 @@
     "superpowers": {
       "url": "https://github.com/obra/superpowers.git",
       "name": "superpowers",
-      "last_fetched": "2026-09-11 09:29 UTC",
+      "last_fetched": "2026-09-20 02:55 UTC",
       "components": {
         "skills": [
           "using-superpowers",
           "subagent-driven-development",
           "brainstorming",
+          "diagnosing-superpowers",
           "writing-plans",
           "executing-plans",
           "receiving-code-review",
@@ -1006,7 +1007,7 @@
     "ui-ux-pro-max-skill": {
       "url": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git",
       "name": "ui-ux-pro-max-skill",
-      "last_fetched": "2026-09-11 09:30 UTC",
+      "last_fetched": "2026-09-20 02:55 UTC",
       "components": {
         "skills": [
           "banner-design",
@@ -1185,7 +1186,7 @@
     "skills": {
       "url": "https://github.com/anthropics/skills.git",
       "name": "skills",
-      "last_fetched": "2026-09-11 09:30 UTC",
+      "last_fetched": "2026-09-20 02:55 UTC",
       "components": {
         "skills": [
           "canvas-design",
