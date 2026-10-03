@@ -5776,7 +5776,7 @@
     "codegraph": {
       "url": "https://github.com/colbymchenry/codegraph.git",
       "name": "codegraph",
-      "last_fetched": "2026-09-12 23:40 UTC",
+      "last_fetched": "2026-10-03 10:42 UTC",
       "components": {
         "skills": [
           "agent-eval",
@@ -5793,7 +5793,7 @@
     "marketingskills": {
       "url": "https://github.com/coreyhaines31/marketingskills.git",
       "name": "marketingskills",
-      "last_fetched": "2026-09-12 23:40 UTC",
+      "last_fetched": "2026-10-03 10:42 UTC",
       "components": {
         "skills": [
           "free-tools",
