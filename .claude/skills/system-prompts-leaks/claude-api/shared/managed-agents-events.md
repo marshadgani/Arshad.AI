@@ -10,7 +10,7 @@ Send events to a session via `POST /v1/sessions/{id}/events`.
 | ------------------------- | --------------------------------------------------- |
 | `user.message`            | Send a user message |
 | `user.interrupt`          | Interrupt the agent while it's running |
-| `user.tool_confirmation`  | Approve/deny a tool call (when `always_ask` policy) |
+| `user.tool_confirmation`  | Approve/deny a tool call that paused for approval (`always_ask`, or `auto` when the server reached no determination) |
 | `user.custom_tool_result` | Provide result for a custom tool call |
 | `user.define_outcome`     | Start a rubric-graded iterate loop - see `shared/managed-agents-outcomes.md` |
 | `system.message`          | Append privileged system-level context for this turn and every turn after it; see § Adding system context mid-session |
@@ -35,7 +35,7 @@ client.beta.sessions.events.send(
 
 Constraints:
 
-- **Model-gated: Claude Opus 5, Claude Opus 4.8, Claude Sonnet 5, Claude Fable 5.1, and Claude Mythos 5.1.** Only the agent's **primary** model is checked - `system.message` lands on the primary thread only, so subagent models are not considered. On an unsupported primary model the event is rejected with a `model_does_not_support_mid_conversation_system` validation error.
+- **Model-gated: Claude Fable 5.1, Claude Mythos 5.1, Claude Fable 5, Claude Mythos 5, Claude Opus 5.5, Claude Opus 5, Claude Opus 4.8, and Claude Sonnet 5.5 (not Claude Sonnet 5).** Only the agent's **primary** model is checked - `system.message` lands on the primary thread only, so subagent models are not considered. On an unsupported primary model the event is rejected with a `model_does_not_support_mid_conversation_system` validation error.
 - **While the session is idle with `stop_reason: requires_action`** (blocked on `user.custom_tool_result` / `user.tool_confirmation`), a `system.message` is accepted **only when it trails a tool result event in the same request**. Sent on its own - or alongside a `user.message` - it is rejected until the pending tool events are resolved.
 - `content` accepts 1-1000 text items.
 
@@ -51,8 +51,8 @@ Three methods:
 
 All **persisted** events carry `id`, `type`, and `processed_at` (ISO 8601), set when the event finishes processing. On events you send, `processed_at` is `null` while the event is still queued behind earlier ones - **except** `user.define_outcome`, `user.custom_tool_result`, and `user.tool_result`, which are processed on receipt and echoed back with `processed_at` already populated. The stream-only `event_start` / `event_delta` preview events (see § Live previews) carry only the `id` of the event they preview.
 
-> Warning: **Robust polling (raw HTTP).** If you bypass the SDK and roll your own poll loop, don't rely on `requests` or `httpx` timeouts as wall-clock caps - they're **per-chunk** read timeouts, reset every time a byte arrives. A trickling response (heartbeats, a wedged chunked-encoding body, a misbehaving proxy) can keep the call blocked indefinitely even with `timeout=(5, 60)` or `httpx.Timeout(120)`. Neither library has a "total wall-clock" timeout built in. For a hard deadline: track `time.monotonic()` at the loop level and break/cancel if a single request exceeds your budget (e.g. via a watchdog thread, or `asyncio.wait_for()` around async httpx). **Prefer the SDK** - `client.beta.sessions.events.stream()` and `client.beta.sessions.events.list()` handle timeout + retry sanely.
->
+> Warning: **Robust polling (raw HTTP).** If you bypass the SDK and roll your own poll loop, don't rely on `requests` or `httpx` timeouts as wall-clock caps - they're **per-chunk** read timeouts, reset every time a byte arrives. A trickling response (heartbeats, a wedged chunked-encoding body, a misbehaving proxy) can keep the call blocked indefinitely even with `timeout=(5, 60)` or `httpx.Timeout(120)`. Neither library has a "total wall-clock" timeout built in. For a hard deadline: track `time.monotonic()` at the loop level and break/cancel if a single request exceeds your budget (e.g. via a watchdog thread, or `asyncio.wait_for()` around async httpx). **Prefer the SDK** - `client.beta.sessions.events.stream()` and `client.beta.sessions.events.list()` handle timeout + retry sanely.  
+>  
 > If `GET /v1/sessions/{id}/events` (paginated) ever hangs after headers, you've likely hit `GET /v1/sessions/{id}/events/stream` by mistake or a server-side stall - report it; don't treat it as a client-config problem.
 
 ### Event Types (Received)
@@ -63,9 +63,9 @@ Event types use dot notation, grouped by namespace:
 | --- | --- |
 | `agent.message` | Agent text output |
 | `agent.thinking` | Progress signal that the agent is thinking - it does **not** carry the thinking content |
-| `agent.tool_use` | Agent used a built-in tool (`agent_toolset_20260401`) |
+| `agent.tool_use` | Agent used a built-in tool (`agent_toolset_20260401`). Carries `evaluated_permission` (`allow`/`ask`/`deny`) and usually `evaluation` - see `shared/managed-agents-tools.md` § `evaluated_permission` and `evaluation` |
 | `agent.tool_result` | Result from a built-in tool |
-| `agent.mcp_tool_use` | Agent used an MCP tool |
+| `agent.mcp_tool_use` | Agent used an MCP tool. Carries `evaluated_permission` and usually `evaluation`, same as `agent.tool_use` |
 | `agent.mcp_tool_result` | Result from an MCP tool |
 | `agent.custom_tool_use` | Agent invoked a custom tool - session goes idle, you respond with `user.custom_tool_result` |
 | `agent.thread_context_compacted` | Conversation context was compacted |
@@ -106,7 +106,7 @@ stream = client.beta.sessions.events.stream(
 
 When a previewed event begins, the stream emits an `event_start` carrying the upcoming event's `type` and `id`; for `agent.message` it's followed by `event_delta` events carrying incremental text:
 
-```json
+```js
 {"type": "event_start", "event": {"type": "agent.message", "id": "sevt_01abc..."}}
 {"type": "event_delta", "event_id": "sevt_01abc...", "delta": {"type": "content_delta", "index": 0, "content": {"type": "text", "text": "Here is the summary"}}}
 ```
@@ -234,7 +234,7 @@ While at the cap the session accepts **only settle events** (`user.tool_confirma
 
 some events carry useful metadata beyond the status change itself:
 
-`session.status_idle` - includes a `stop_reason` field which elaborates on why the session stopped and what type of further action is required by the user.
+`session.status_idle` - includes a `stop_reason` field which elaborates on why the session stopped and what type of further action is required by the user.  
 ```json
 {
   "id": "sevt_456",
