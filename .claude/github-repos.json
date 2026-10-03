@@ -5856,7 +5856,7 @@
     "obsidian-releases": {
       "url": "https://github.com/obsidianmd/obsidian-releases.git",
       "name": "obsidian-releases",
-      "last_fetched": "2026-09-12 23:40 UTC",
+      "last_fetched": "2026-10-03 10:42 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -5868,7 +5868,7 @@
     "obsidian-git": {
       "url": "https://github.com/Vinzent03/obsidian-git.git",
       "name": "obsidian-git",
-      "last_fetched": "2026-09-12 23:40 UTC",
+      "last_fetched": "2026-10-03 10:42 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -5880,7 +5880,7 @@
     "impeccable": {
       "url": "https://github.com/pbakaus/impeccable.git",
       "name": "impeccable",
-      "last_fetched": "2026-09-12 23:54 UTC",
+      "last_fetched": "2026-10-03 10:42 UTC",
       "components": {
         "skills": [
           "impeccable",
