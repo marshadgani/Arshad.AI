@@ -1,22 +1,22 @@
 ---
-description: "現在のブランチからプッシュされていないコミットでGitHub PRを作成 — テンプレートの検出、変更の分析、プッシュ"
-argument-hint: "[base-branch]（デフォルト: main）"
+description: "Create a GitHub PR from current branch with unpushed commits — discovers templates, analyzes changes, pushes"
+argument-hint: "[base-branch] (default: main)"
 ---
 
-# プルリクエストの作成
+# Create Pull Request
 
-**入力**: `$ARGUMENTS` — オプション。ベースブランチ名やフラグ（例: `--draft`）を含む場合があります。
+**Input**: `$ARGUMENTS` — optional, may contain a base branch name and/or flags (e.g., `--draft`).
 
-**`$ARGUMENTS`のパース**:
-- 認識されたフラグを抽出（`--draft`）
-- 残りの非フラグテキストをベースブランチ名として扱う
-- 指定がなければベースブランチのデフォルトは`main`
+**Parse `$ARGUMENTS`**:
+- Extract any recognized flags (`--draft`)
+- Treat remaining non-flag text as the base branch name
+- Default base branch to `main` if none specified
 
 ---
 
-## フェーズ 1 — VALIDATE
+## Phase 1 — VALIDATE
 
-前提条件をチェック:
+Check preconditions:
 
 ```bash
 git branch --show-current
@@ -24,126 +24,126 @@ git status --short
 git log origin/<base>..HEAD --oneline
 ```
 
-| チェック | 条件 | 失敗時のアクション |
+| Check | Condition | Action if Failed |
 |---|---|---|
-| ベースブランチにいない | 現在のブランチ ≠ base | 停止: "まずフィーチャーブランチに切り替えてください。" |
-| クリーンなワーキングディレクトリ | コミットされていない変更がない | 警告: "コミットされていない変更があります。コミットまたはスタッシュしてください。" |
-| 先行コミットがある | `git log origin/<base>..HEAD`が空でない | 停止: "`<base>`より先行するコミットがありません。PRにする内容がありません。" |
-| 既存のPRがない | `gh pr list --head <branch> --json number`が空 | 停止: "PRは既に存在: #<number>。`gh pr view <number> --web`で開いてください。" |
+| Not on base branch | Current branch ≠ base | Stop: "Switch to a feature branch first." |
+| Clean working directory | No uncommitted changes | Warn: "You have uncommitted changes. Commit or stash first." |
+| Has commits ahead | `git log origin/<base>..HEAD` not empty | Stop: "No commits ahead of `<base>`. Nothing to PR." |
+| No existing PR | `gh pr list --head <branch> --json number` is empty | Stop: "PR already exists: #<number>. Use `gh pr view <number> --web` to open it." |
 
-すべてのチェックが通れば続行。
+If all checks pass, proceed.
 
 ---
 
-## フェーズ 2 — DISCOVER
+## Phase 2 — DISCOVER
 
-### PRテンプレート
+### PR Template
 
-PRテンプレートを順番に検索:
+Search for PR template in order:
 
-1. `.github/PULL_REQUEST_TEMPLATE/`ディレクトリ — 存在する場合、ファイルを一覧しユーザーに選択させる（またはdefault.mdを使用）
+1. `.github/PULL_REQUEST_TEMPLATE/` directory — if exists, list files and let user choose (or use `default.md`)
 2. `.github/PULL_REQUEST_TEMPLATE.md`
 3. `.github/pull_request_template.md`
 4. `docs/pull_request_template.md`
 
-見つかった場合、読み取ってPR本文の構造に使用。
+If found, read it and use its structure for the PR body.
 
-### コミット分析
+### Commit Analysis
 
 ```bash
 git log origin/<base>..HEAD --format="%h %s" --reverse
 ```
 
-コミットを分析して以下を決定:
-- **PRタイトル**: タイププレフィックス付きのconventional commitフォーマットを使用 — `feat: ...`、`fix: ...`など
-  - 複数のタイプがある場合、支配的なものを使用
-  - 単一コミットの場合、そのメッセージをそのまま使用
-- **変更サマリー**: タイプ/領域別にコミットをグループ化
+Analyze commits to determine:
+- **PR title**: Use conventional commit format with type prefix — `feat: ...`, `fix: ...`, etc.
+  - If multiple types, use the dominant one
+  - If single commit, use its message as-is
+- **Change summary**: Group commits by type/area
 
-### ファイル分析
+### File Analysis
 
 ```bash
 git diff origin/<base>..HEAD --stat
 git diff origin/<base>..HEAD --name-only
 ```
 
-変更ファイルをカテゴリ分類: ソース、テスト、ドキュメント、設定、マイグレーション。
+Categorize changed files: source, tests, docs, config, migrations.
 
-### 計画アーティファクト
+### Planning Artifacts
 
-`/plan-prd`、`/plan`、またはレガシーPRPワークフローで作成された関連アーティファクトを確認:
-- `.claude/prds/` — このPRがマイルストーンを実装するPRD
-- `.claude/plans/` — このPRで実行された計画
-- `.claude/PRPs/prds/` — レガシーPRP PRD
-- `.claude/PRPs/plans/` — レガシーPRP実装計画
-- `.claude/PRPs/reports/` — レガシーPRP実装レポート
+Check for related artifacts produced by `/plan-prd`, `/plan`, or the legacy PRP workflow:
+- `.claude/prds/` — PRDs this PR implements a milestone of
+- `.claude/plans/` — Plans executed by this PR
+- `.claude/PRPs/prds/` — legacy PRP PRDs
+- `.claude/PRPs/plans/` — legacy PRP implementation plans
+- `.claude/PRPs/reports/` — legacy PRP implementation reports
 
-存在する場合、PR本文で参照。
+Reference these in the PR body if they exist.
 
 ---
 
-## フェーズ 3 — PUSH
+## Phase 3 — PUSH
 
 ```bash
 git push -u origin HEAD
 ```
 
-ダイバージェンスによりプッシュが失敗した場合:
+If push fails due to divergence:
 ```bash
 git fetch origin
 git rebase origin/<base>
 git push -u origin HEAD
 ```
 
-リベースコンフリクトが発生した場合、停止してユーザーに通知。
+If rebase conflicts occur, stop and inform the user.
 
 ---
 
-## フェーズ 4 — CREATE
+## Phase 4 — CREATE
 
-### テンプレートあり
+### With Template
 
-フェーズ 2でPRテンプレートが見つかった場合、コミットとファイル分析を使用して各セクションを記入。テンプレートのすべてのセクションを保持 — 該当しないセクションは削除せず"N/A"とする。
+If a PR template was found in Phase 2, fill in each section using the commit and file analysis. Preserve all template sections — leave sections as "N/A" if not applicable rather than removing them.
 
-### テンプレートなし
+### Without Template
 
-このデフォルトフォーマットを使用:
+Use this default format:
 
 ```markdown
 ## Summary
 
-<このPRが何をしてなぜかの1-2文の説明>
+<1-2 sentence description of what this PR does and why>
 
 ## Changes
 
-<領域別にグループ化された変更の箇条書きリスト>
+<bulleted list of changes grouped by area>
 
 ## Files Changed
 
-<変更タイプ付きの変更ファイルのテーブルまたはリスト: Added/Modified/Deleted>
+<table or list of changed files with change type: Added/Modified/Deleted>
 
 ## Testing
 
-<変更のテスト方法の説明、または"Needs testing">
+<description of how changes were tested, or "Needs testing">
 
 ## Related Issues
 
-<Closes/Fixes/Relates to #Nでリンクされたイシュー、または"None">
+<linked issues with Closes/Fixes/Relates to #N, or "None">
 ```
 
-### PRの作成
+### Create the PR
 
 ```bash
 gh pr create \
-  --title "<PRタイトル>" \
+  --title "<PR title>" \
   --base <base-branch> \
-  --body "<PR本文>"
-  # $ARGUMENTSから--draftフラグがパースされた場合は--draftを追加
+  --body "<PR body>"
+  # Add --draft if the --draft flag was parsed from $ARGUMENTS
 ```
 
 ---
 
-## フェーズ 5 — VERIFY
+## Phase 5 — VERIFY
 
 ```bash
 gh pr view --json number,url,title,state,baseRefName,headRefName,additions,deletions,changedFiles
@@ -152,9 +152,9 @@ gh pr checks --json name,status,conclusion 2>/dev/null || true
 
 ---
 
-## フェーズ 6 — OUTPUT
+## Phase 6 — OUTPUT
 
-ユーザーへの報告:
+Report to user:
 
 ```
 PR #<number>: <title>
@@ -162,23 +162,23 @@ URL: <url>
 Branch: <head> → <base>
 Changes: +<additions> -<deletions> across <changedFiles> files
 
-CI Checks: <ステータスサマリー or "pending" or "none configured">
+CI Checks: <status summary or "pending" or "none configured">
 
 Artifacts referenced:
-  - <PR本文でリンクされたPRD/計画>
+  - <any PRDs/plans linked in PR body>
 
 Next steps:
-  - gh pr view <number> --web   → ブラウザで開く
-  - /code-review <number>       → PRをレビュー
-  - gh pr merge <number>        → 準備ができたらマージ
+  - gh pr view <number> --web   → open in browser
+  - /code-review <number>       → review the PR
+  - gh pr merge <number>        → merge when ready
 ```
 
 ---
 
-## エッジケース
+## Edge Cases
 
-- **`gh` CLIがない**: 停止: "GitHub CLI (`gh`) が必要です。インストール: <https://cli.github.com/>"
-- **未認証**: 停止: "まず `gh auth login` を実行してください。"
-- **フォースプッシュが必要**: リモートがダイバージしてリベースが行われた場合、`git push --force-with-lease`を使用（`--force`は使わない）。
-- **複数のPRテンプレート**: `.github/PULL_REQUEST_TEMPLATE/`に複数のファイルがある場合、一覧してユーザーに選択させる。
-- **大きなPR（20ファイル超）**: PRサイズについて警告。変更が論理的に分離可能なら分割を提案。
+- **No `gh` CLI**: Stop with: "GitHub CLI (`gh`) is required. Install: <https://cli.github.com/>"
+- **Not authenticated**: Stop with: "Run `gh auth login` first."
+- **Force push needed**: If remote has diverged and rebase was done, use `git push --force-with-lease` (never `--force`).
+- **Multiple PR templates**: If `.github/PULL_REQUEST_TEMPLATE/` has multiple files, list them and ask user to choose.
+- **Large PR (>20 files)**: Warn about PR size. Suggest splitting if changes are logically separable.

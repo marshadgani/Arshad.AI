@@ -1,10 +1,14 @@
-# Build e Correção
+---
+description: Detect the project build system and incrementally fix build/type errors with minimal safe changes.
+---
 
-Corrija erros de build e de tipos incrementalmente com mudanças mínimas e seguras.
+# Build and Fix
 
-## Passo 1: Detectar Sistema de Build
+Incrementally fix build and type errors with minimal, safe changes.
 
-Identifique a ferramenta de build do projeto e execute o build:
+## Step 1: Detect Build System
+
+Identify the project's build tool and run the build:
 
 | Indicator | Build Command |
 |-----------|---------------|
@@ -14,42 +18,42 @@ Identifique a ferramenta de build do projeto e execute o build:
 | `pom.xml` | `mvn compile` |
 | `build.gradle` | `./gradlew compileJava` |
 | `go.mod` | `go build ./...` |
-| `pyproject.toml` | `python -m py_compile` or `mypy .` |
+| `pyproject.toml` | `python -m compileall -q .` or `mypy .` |
 
-## Passo 2: Parsear e Agrupar Erros
+## Step 2: Parse and Group Errors
 
-1. Execute o comando de build e capture o stderr
-2. Agrupe erros por caminho de arquivo
-3. Ordene por ordem de dependência (corrija imports/tipos antes de erros de lógica)
-4. Conte o total de erros para acompanhamento de progresso
+1. Run the build command and capture stderr
+2. Group errors by file path
+3. Sort by dependency order (fix imports/types before logic errors)
+4. Count total errors for progress tracking
 
-## Passo 3: Loop de Correção (Um Erro por Vez)
+## Step 3: Fix Loop (One Error at a Time)
 
-Para cada erro:
+For each error:
 
-1. **Leia o arquivo** — Use a ferramenta Read para ver o contexto do erro (10 linhas ao redor do erro)
-2. **Diagnostique** — Identifique a causa raiz (import ausente, tipo errado, erro de sintaxe)
-3. **Corrija minimamente** — Use a ferramenta Edit para a menor mudança que resolve o erro
-4. **Rode o build novamente** — Verifique que o erro sumiu e que nenhum novo erro foi introduzido
-5. **Vá para o próximo** — Continue com os erros restantes
+1. **Read the file** — Use Read tool to see error context (10 lines around the error)
+2. **Diagnose** — Identify root cause (missing import, wrong type, syntax error)
+3. **Fix minimally** — Use Edit tool for the smallest change that resolves the error
+4. **Re-run build** — Verify the error is gone and no new errors introduced
+5. **Move to next** — Continue with remaining errors
 
-## Passo 4: Guardrails
+## Step 4: Guardrails
 
-Pare e pergunte ao usuário se:
-- Uma correção introduz **mais erros do que resolve**
-- O **mesmo erro persiste após 3 tentativas** (provavelmente há um problema mais profundo)
-- A correção exige **mudanças arquiteturais** (não apenas correção de build)
-- Os erros de build vêm de **dependências ausentes** (precisa de `npm install`, `cargo add`, etc.)
+Stop and ask the user if:
+- A fix introduces **more errors than it resolves**
+- The **same error persists after 3 attempts** (likely a deeper issue)
+- The fix requires **architectural changes** (not just a build fix)
+- Build errors stem from **missing dependencies** (need `npm install`, `cargo add`, etc.)
 
-## Passo 5: Resumo
+## Step 5: Summary
 
-Mostre resultados:
-- Erros corrigidos (com caminhos de arquivos)
-- Erros restantes (se houver)
-- Novos erros introduzidos (deve ser zero)
-- Próximos passos sugeridos para problemas não resolvidos
+Show results:
+- Errors fixed (with file paths)
+- Errors remaining (if any)
+- New errors introduced (should be zero)
+- Suggested next steps for unresolved issues
 
-## Estratégias de Recuperação
+## Recovery Strategies
 
 | Situation | Action |
 |-----------|--------|
@@ -59,4 +63,4 @@ Mostre resultados:
 | Version conflict | Check `package.json` / `Cargo.toml` for version constraints |
 | Build tool misconfiguration | Read config file; compare with working defaults |
 
-Corrija um erro por vez por segurança. Prefira diffs mínimos em vez de refatoração.
+Fix one error at a time for safety. Prefer minimal diffs over refactoring.

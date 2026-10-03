@@ -1,142 +1,139 @@
 ---
-description: 执行带有严格验证循环的实施计划
+description: Execute an implementation plan with rigorous validation loops
 argument-hint: <path/to/plan.md>
 ---
 
-> 改编自 Wirasm 的 PRPs-agentic-eng。属于 PRP 工作流系列。
+> Adapted from PRPs-agentic-eng by Wirasm. Part of the PRP workflow series.
 
-# PRP 实施
+# PRP Implement
 
-按步骤执行计划文件，并进行持续验证。每次更改后立即验证——绝不累积损坏状态。
+Execute a plan file step-by-step with continuous validation. Every change is verified immediately — never accumulate broken state.
 
-**核心理念**：验证循环能及早发现错误。每次更改后都运行检查。立即修复问题。
+**Core Philosophy**: Validation loops catch mistakes early. Run checks after every change. Fix issues immediately.
 
-**黄金法则**：如果验证失败，先修复再继续。绝不累积损坏状态。
+**Golden Rule**: If a validation fails, fix it before moving on. Never accumulate broken state.
 
-***
+---
 
-## 阶段 0 — 检测
+## Phase 0 — DETECT
 
-### 包管理器检测
+### Package Manager Detection
 
-| 文件存在 | 包管理器 | 运行器 |
+| File Exists | Package Manager | Runner |
 |---|---|---|
 | `bun.lockb` | bun | `bun run` |
 | `pnpm-lock.yaml` | pnpm | `pnpm run` |
 | `yarn.lock` | yarn | `yarn` |
 | `package-lock.json` | npm | `npm run` |
-| `pyproject.toml` 或 `requirements.txt` | uv / pip | `uv run` 或 `python -m` |
+| `pyproject.toml` or `requirements.txt` | uv / pip | `uv run` or `python -m` |
 | `Cargo.toml` | cargo | `cargo` |
 | `go.mod` | go | `go` |
 
-### 验证脚本
+### Validation Scripts
 
-检查 `package.json`（或等效文件）中可用的脚本：
+Check `package.json` (or equivalent) for available scripts:
 
 ```bash
 # For Node.js projects
 cat package.json | grep -A 20 '"scripts"'
 ```
 
-记录可用的命令：类型检查、代码检查、测试、构建。
+Note available commands for: type-check, lint, test, build.
 
-***
+---
 
-## 阶段 1 — 加载
+## Phase 1 — LOAD
 
-读取计划文件：
+Read the plan file:
 
 ```bash
 cat "$ARGUMENTS"
 ```
 
-从计划中提取以下部分：
+Extract these sections from the plan:
+- **Summary** — What is being built
+- **Patterns to Mirror** — Code conventions to follow
+- **Files to Change** — What to create or modify
+- **Step-by-Step Tasks** — Implementation sequence
+- **Validation Commands** — How to verify correctness
+- **Acceptance Criteria** — Definition of done
 
-* **摘要** — 正在构建什么
-* **要镜像的模式** — 要遵循的代码约定
-* **要更改的文件** — 要创建或修改的内容
-* **逐步任务** — 实施顺序
-* **验证命令** — 如何验证正确性
-* **验收标准** — 完成的定义
-
-如果文件不存在或不是有效的计划：
-
+If the file doesn't exist or isn't a valid plan:
 ```
-错误：计划文件未找到或无效。
-请先运行 /prp-plan <功能描述> 来创建计划。
+Error: Plan file not found or invalid.
+Run /prp-plan <feature-description> to create a plan first.
 ```
 
-**检查点**：计划已加载。所有部分已识别。任务已提取。
+**CHECKPOINT**: Plan loaded. All sections identified. Tasks extracted.
 
-***
+---
 
-## 阶段 2 — 准备
+## Phase 2 — PREPARE
 
-### Git 状态
+### Git State
 
 ```bash
 git branch --show-current
 git status --porcelain
 ```
 
-### 分支决策
+### Branch Decision
 
-| 当前状态 | 操作 |
+| Current State | Action |
 |---|---|
-| 在功能分支上 | 使用当前分支 |
-| 在主分支上，工作区干净 | 创建功能分支：`git checkout -b feat/{plan-name}` |
-| 在主分支上，工作区有未暂存更改 | **停止** — 要求用户先暂存或提交 |
-| 在此功能的 git 工作树中 | 使用该工作树 |
+| On feature branch | Use current branch |
+| On main, clean working tree | Create feature branch: `git checkout -b feat/{plan-name}` |
+| On main, dirty working tree | **STOP** — Ask user to stash or commit first |
+| In a git worktree for this feature | Use the worktree |
 
-### 同步远程
+### Sync Remote
 
 ```bash
 git pull --rebase origin $(git branch --show-current) 2>/dev/null || true
 ```
 
-**检查点**：位于正确分支。工作区已就绪。远程已同步。
+**CHECKPOINT**: On correct branch. Working tree ready. Remote synced.
 
-***
+---
 
-## 阶段 3 — 执行
+## Phase 3 — EXECUTE
 
-按顺序处理计划中的每个任务。
+Process each task from the plan sequentially.
 
-### 每个任务的循环
+### Per-Task Loop
 
-对于**逐步任务**中的每个任务：
+For each task in **Step-by-Step Tasks**:
 
-1. **读取 MIRROR 参考** — 打开任务 MIRROR 字段中引用的模式文件。在编写代码前理解约定。
+1. **Read MIRROR reference** — Open the pattern file referenced in the task's MIRROR field. Understand the convention before writing code.
 
-2. **实施** — 严格按照模式编写代码。应用 GOTCHA 警告。使用指定的 IMPORTS。
+2. **Implement** — Write the code following the pattern exactly. Apply GOTCHA warnings. Use specified IMPORTS.
 
-3. **立即验证** — 每次文件更改后：
+3. **Validate immediately** — After EVERY file change:
    ```bash
-   # 运行类型检查（根据项目调整命令）
-   [阶段 0 中的类型检查命令]
+   # Run type-check (adjust command per project)
+   [type-check command from Phase 0]
    ```
-   如果类型检查失败 → 在移动到下一个文件之前修复错误。
+   If type-check fails → fix the error before moving to the next file.
 
-4. **跟踪进度** — 记录：`[done] Task N: [task name] — complete`
+4. **Track progress** — Log: `[done] Task N: [task name] — complete`
 
-### 处理偏差
+### Handling Deviations
 
-如果实施必须偏离计划：
+If implementation must deviate from the plan:
+- Note **WHAT** changed
+- Note **WHY** it changed
+- Continue with the corrected approach
+- These deviations will be captured in the report
 
-* 记录**什么**发生了变化
-* 记录**为什么**发生变化
-* 使用修正后的方法继续
-* 这些偏差将在报告中捕获
+**CHECKPOINT**: All tasks executed. Deviations logged.
 
-**检查点**：所有任务已执行。偏差已记录。
+---
 
-***
+## Phase 4 — VALIDATE
 
-## 阶段 4 — 验证
+Run all validation levels from the plan. Fix issues at each level before proceeding.
 
-运行计划中的所有验证级别。在继续之前修复每个级别的问题。
-
-### 级别 1：静态分析
+### Level 1: Static Analysis
 
 ```bash
 # Type checking — zero errors required
@@ -147,29 +144,29 @@ git pull --rebase origin $(git branch --show-current) 2>/dev/null || true
 [project lint-fix command]
 ```
 
-如果自动修复后仍有代码检查错误，请手动修复。
+If lint errors remain after auto-fix, fix manually.
 
-### 级别 2：单元测试
+### Level 2: Unit Tests
 
-为每个新函数编写测试（如计划中的测试策略所指定）。
+Write tests for every new function (as specified in the plan's Testing Strategy).
 
 ```bash
 [project test command for affected area]
 ```
 
-* 每个函数至少需要一个测试
-* 覆盖计划中列出的边缘情况
-* 如果测试失败 → 修复实现（而不是测试，除非测试本身有误）
+- Every function needs at least one test
+- Cover edge cases listed in the plan
+- If a test fails → fix the implementation (not the test, unless the test is wrong)
 
-### 级别 3：构建检查
+### Level 3: Build Check
 
 ```bash
 [project build command]
 ```
 
-构建必须成功，零错误。
+Build must succeed with zero errors.
 
-### 级别 4：集成测试（如适用）
+### Level 4: Integration Testing (if applicable)
 
 ```bash
 # Start server, run tests, stop server
@@ -201,194 +198,188 @@ wait "$SERVER_PID" 2>/dev/null || true
 exit "$TEST_EXIT"
 ```
 
-### 级别 5：边缘情况测试
+### Level 5: Edge Case Testing
 
-运行计划测试策略清单中的边缘情况。
+Run through edge cases from the plan's Testing Strategy checklist.
 
-**检查点**：所有 5 个验证级别均通过。零错误。
+**CHECKPOINT**: All 5 validation levels pass. Zero errors.
 
-***
+---
 
-## 阶段 5 — 报告
+## Phase 5 — REPORT
 
-### 创建实施报告
+### Create Implementation Report
 
 ```bash
 mkdir -p .claude/PRPs/reports
 ```
 
-将报告写入 `.claude/PRPs/reports/{plan-name}-report.md`：
+Write report to `.claude/PRPs/reports/{plan-name}-report.md`:
 
 ```markdown
-# 实现报告：[功能名称]
+# Implementation Report: [Feature Name]
 
-## 摘要
-[已实现的内容]
+## Summary
+[What was implemented]
 
-## 评估与实际对比
+## Assessment vs Reality
 
-| 指标 | 预测（计划） | 实际 |
+| Metric | Predicted (Plan) | Actual |
 |---|---|---|
-| 复杂度 | [来自计划] | [实际] |
-| 信心指数 | [来自计划] | [实际] |
-| 变更文件数 | [来自计划] | [实际数量] |
+| Complexity | [from plan] | [actual] |
+| Confidence | [from plan] | [actual] |
+| Files Changed | [from plan] | [actual count] |
 
-## 已完成任务
+## Tasks Completed
 
-| # | 任务 | 状态 | 备注 |
+| # | Task | Status | Notes |
 |---|---|---|---|
-| 1 | [任务名称] | [已完成] 完成 | |
-| 2 | [任务名称] | [已完成] 完成 | 存在偏差 — [原因] |
+| 1 | [task name] | [done] Complete | |
+| 2 | [task name] | [done] Complete | Deviated — [reason] |
 
-## 验证结果
+## Validation Results
 
-| 级别 | 状态 | 备注 |
+| Level | Status | Notes |
 |---|---|---|
-| 静态分析 | [已完成] 通过 | |
-| 单元测试 | [已完成] 通过 | 编写了 N 个测试 |
-| 构建 | [已完成] 通过 | |
-| 集成测试 | [已完成] 通过 | 或不适用 |
-| 边界情况 | [已完成] 通过 | |
+| Static Analysis | [done] Pass | |
+| Unit Tests | [done] Pass | N tests written |
+| Build | [done] Pass | |
+| Integration | [done] Pass | or N/A |
+| Edge Cases | [done] Pass | |
 
-## 变更文件
+## Files Changed
 
-| 文件 | 操作 | 行数 |
+| File | Action | Lines |
 |---|---|---|
-| `path/to/file` | 新建 | +N |
-| `path/to/file` | 更新 | +N / -M |
+| `path/to/file` | CREATED | +N |
+| `path/to/file` | UPDATED | +N / -M |
 
-## 与计划的偏差
-[列出所有偏差及其原因，或填写"无"]
+## Deviations from Plan
+[List any deviations with WHAT and WHY, or "None"]
 
-## 遇到的问题
-[列出所有问题及解决方案，或填写"无"]
+## Issues Encountered
+[List any problems and how they were resolved, or "None"]
 
-## 编写的测试
+## Tests Written
 
-| 测试文件 | 测试数量 | 覆盖范围 |
+| Test File | Tests | Coverage |
 |---|---|---|
-| `path/to/test` | N 个测试 | [覆盖区域] |
+| `path/to/test` | N tests | [area covered] |
 
-## 后续步骤
-- [ ] 通过 `/code-review` 进行代码审查
-- [ ] 通过 `/prp-pr` 创建拉取请求
+## Next Steps
+- [ ] Code review via `/code-review`
+- [ ] Create PR via `/prp-pr`
 ```
 
-### 更新 PRD（如适用）
+### Update PRD (if applicable)
 
-如果此实施是针对 PRD 阶段的：
+If this implementation was for a PRD phase:
+1. Update the phase status from `in-progress` to `complete`
+2. Add report path as reference
 
-1. 将阶段状态从 `in-progress` 更新为 `complete`
-2. 添加报告路径作为参考
-
-### 归档计划
+### Archive Plan
 
 ```bash
 mkdir -p .claude/PRPs/plans/completed
 mv "$ARGUMENTS" .claude/PRPs/plans/completed/
 ```
 
-**检查点**：报告已创建。PRD 已更新。计划已归档。
+**CHECKPOINT**: Report created. PRD updated. Plan archived.
 
-***
+---
 
-## 阶段 6 — 输出
+## Phase 6 — OUTPUT
 
-向用户报告：
+Report to user:
 
 ```
-## 实现完成
+## Implementation Complete
 
-- **计划**: [计划文件路径] → 已归档至 completed/
-- **分支**: [当前分支名称]
-- **状态**: [完成] 所有任务已完成
+- **Plan**: [plan file path] → archived to completed/
+- **Branch**: [current branch name]
+- **Status**: [done] All tasks complete
 
-### 验证摘要
+### Validation Summary
 
-| 检查项 | 状态 |
+| Check | Status |
 |---|---|
-| 类型检查 | [完成] |
-| 代码检查 | [完成] |
-| 测试 | [完成] (已编写 N 个) |
-| 构建 | [完成] |
-| 集成测试 | [完成] 或 不适用 |
+| Type Check | [done] |
+| Lint | [done] |
+| Tests | [done] (N written) |
+| Build | [done] |
+| Integration | [done] or N/A |
 
-### 文件变更
-- 创建了 [N] 个文件，更新了 [M] 个文件
+### Files Changed
+- [N] files created, [M] files updated
 
-### 偏差
-[摘要 或 "无 — 完全按计划执行"]
+### Deviations
+[Summary or "None — implemented exactly as planned"]
 
-### 产物
-- 报告: `.claude/PRPs/reports/{名称}-report.md`
-- 已归档计划: `.claude/PRPs/plans/completed/{名称}.plan.md`
+### Artifacts
+- Report: `.claude/PRPs/reports/{name}-report.md`
+- Archived Plan: `.claude/PRPs/plans/completed/{name}.plan.md`
 
-### PRD 进度（如适用）
-| 阶段 | 状态 |
+### PRD Progress (if applicable)
+| Phase | Status |
 |---|---|
-| 阶段 1 | [完成] 已完成 |
-| 阶段 2 | [下一步] |
+| Phase 1 | [done] Complete |
+| Phase 2 | [next] |
 | ... | ... |
 
-> 下一步：运行 `/prp-pr` 创建拉取请求，或先运行 `/code-review` 审查更改。
+> Next step: Run `/prp-pr` to create a pull request, or `/code-review` to review changes first.
 ```
 
-***
+---
 
-## 处理失败
+## Handling Failures
 
-### 类型检查失败
+### Type Check Fails
+1. Read the error message carefully
+2. Fix the type error in the source file
+3. Re-run type-check
+4. Continue only when clean
 
-1. 仔细阅读错误信息
-2. 在源文件中修复类型错误
-3. 重新运行类型检查
-4. 仅在干净后继续
+### Tests Fail
+1. Identify whether the bug is in the implementation or the test
+2. Fix the root cause (usually the implementation)
+3. Re-run tests
+4. Continue only when green
 
-### 测试失败
+### Lint Fails
+1. Run auto-fix first
+2. If errors remain, fix manually
+3. Re-run lint
+4. Continue only when clean
 
-1. 确定错误是在实现中还是在测试中
-2. 修复根本原因（通常是实现）
-3. 重新运行测试
-4. 仅在全部通过后继续
+### Build Fails
+1. Usually a type or import issue — check error message
+2. Fix the offending file
+3. Re-run build
+4. Continue only when successful
 
-### 代码检查失败
+### Integration Test Fails
+1. Check server started correctly
+2. Verify endpoint/route exists
+3. Check request format matches expected
+4. Fix and re-run
 
-1. 首先运行自动修复
-2. 如果仍有错误，手动修复
-3. 重新运行代码检查
-4. 仅在干净后继续
+---
 
-### 构建失败
+## Success Criteria
 
-1. 通常是类型或导入问题 — 检查错误信息
-2. 修复有问题的文件
-3. 重新运行构建
-4. 仅在成功后继续
+- **TASKS_COMPLETE**: All tasks from the plan executed
+- **TYPES_PASS**: Zero type errors
+- **LINT_PASS**: Zero lint errors
+- **TESTS_PASS**: All tests green, new tests written
+- **BUILD_PASS**: Build succeeds
+- **REPORT_CREATED**: Implementation report saved
+- **PLAN_ARCHIVED**: Plan moved to `completed/`
 
-### 集成测试失败
+---
 
-1. 检查服务器是否正确启动
-2. 验证端点/路由是否存在
-3. 检查请求格式是否与预期匹配
-4. 修复并重新运行
+## Next Steps
 
-***
-
-## 成功标准
-
-* **TASKS\_COMPLETE**：计划中的所有任务均已执行
-* **TYPES\_PASS**：零类型错误
-* **LINT\_PASS**：零代码检查错误
-* **TESTS\_PASS**：所有测试通过，已编写新测试
-* **BUILD\_PASS**：构建成功
-* **REPORT\_CREATED**：实施报告已保存
-* **PLAN\_ARCHIVED**：计划已移至 `completed/`
-
-***
-
-## 后续步骤
-
-* 运行 `/code-review` 在提交前审查更改
-* 运行 `/prp-commit` 使用描述性消息提交
-* 运行 `/prp-pr` 创建拉取请求
-* 如果 PRD 有更多阶段，运行 `/prp-plan <next-phase>`
+- Run `/code-review` to review changes before committing
+- Run `/prp-commit` to commit with a descriptive message
+- Run `/prp-pr` to create a pull request
+- Run `/prp-plan <next-phase>` if the PRD has more phases
