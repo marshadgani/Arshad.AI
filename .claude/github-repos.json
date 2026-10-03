@@ -3688,7 +3688,7 @@
     "agent-skills": {
       "url": "https://github.com/addyosmani/agent-skills.git",
       "name": "agent-skills",
-      "last_fetched": "2026-09-11 09:30 UTC",
+      "last_fetched": "2026-10-03 10:40 UTC",
       "components": {
         "skills": [
           "interview-me",
@@ -3740,6 +3740,7 @@
           "simplify-ignore.sh",
           "simplify-ignore-test.sh",
           "session-start.sh",
+          "sdd-cache-test.sh",
           "session-start-test.sh"
         ],
         "token_optimization": []
