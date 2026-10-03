@@ -6,7 +6,7 @@
     "claude-code": {
       "url": "https://github.com/anthropics/claude-code.git",
       "name": "claude-code",
-      "last_fetched": "2026-09-12 23:33 UTC",
+      "last_fetched": "2026-10-03 10:38 UTC",
       "components": {
         "skills": [
           "writing-rules",
@@ -1185,7 +1185,7 @@
     "skills": {
       "url": "https://github.com/anthropics/skills.git",
       "name": "skills",
-      "last_fetched": "2026-09-11 09:30 UTC",
+      "last_fetched": "2026-10-03 10:38 UTC",
       "components": {
         "skills": [
           "canvas-design",
@@ -1222,11 +1222,11 @@
           "prompt-caching.md",
           "cost-optimization.md",
           "managed-agents-multiagent.md",
+          "preserved-thinking-migration.md",
           "models.md",
+          "cost-hillclimb.md",
           "live-sources.md",
-          "model-migration.md",
-          "agent-design.md",
-          "tool-use-concepts.md"
+          "model-migration.md"
         ]
       }
     },
