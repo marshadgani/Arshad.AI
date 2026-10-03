@@ -200,11 +200,12 @@
     "claude-mem": {
       "url": "https://github.com/thedotmack/claude-mem.git",
       "name": "claude-mem",
-      "last_fetched": "2026-09-12 23:39 UTC",
+      "last_fetched": "2026-10-03 10:39 UTC",
       "components": {
         "skills": [
           "mem-setup",
           "mem-search",
+          "agent-cost-report",
           "weekly-digests",
           "pathfinder",
           "oh-my-issues",
@@ -214,8 +215,10 @@
           "mode-creator",
           "mem-search",
           "cloud-sync",
+          "agent-cost-report",
           "timeline-report",
           "design-is",
+          "handoff",
           "wowerpoint",
           "make-plan",
           "ccs-align",
@@ -225,14 +228,17 @@
           "standup",
           "babysit",
           "knowledge-agent",
+          "agent-cost-report",
           "make-plan",
           "do",
           "openclaw",
           "host-observer",
           "install",
           "mem-search",
+          "agent-cost-report",
           "install",
-          "mem-search"
+          "mem-search",
+          "agent-cost-report"
         ],
         "agents": [],
         "commands": [
