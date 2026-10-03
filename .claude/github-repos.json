@@ -4321,7 +4321,7 @@
     "learn-claude-code": {
       "url": "https://github.com/shareAI-lab/learn-claude-code.git",
       "name": "learn-claude-code",
-      "last_fetched": "2026-09-12 23:33 UTC",
+      "last_fetched": "2026-10-03 10:41 UTC",
       "components": {
         "skills": [
           "agent-builder",
@@ -4344,7 +4344,7 @@
     "claude-code-router": {
       "url": "https://github.com/musistudio/claude-code-router.git",
       "name": "claude-code-router",
-      "last_fetched": "2026-09-12 23:33 UTC",
+      "last_fetched": "2026-10-03 10:41 UTC",
       "components": {
         "skills": [],
         "agents": [
