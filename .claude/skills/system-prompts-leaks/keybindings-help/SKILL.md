@@ -2,7 +2,6 @@
 name: keybindings-help
 description: |-
   Use when the user wants to customize keyboard shortcuts, rebind keys, add chord bindings, or modify ~/.claude/keybindings.json. Examples: "rebind ctrl+s", "add a chord shortcut", "change the submit key", "customize keybindings".
-user-invocable: false
 ---
 
 # Keybindings Skill
@@ -272,8 +271,6 @@ Claude Code validates `~/.claude/keybindings.json` when it loads; warnings go to
 | `pane:grow` | `ctrl+x left`, `ctrl+x up` | Pane |
 | `pane:shrink` | `ctrl+x right`, `ctrl+x down` | Pane |
 | `pane:close` | `ctrl+x x`, `ctrl+x x` | Pane |
-| `pane:next` | (none) | Pane |
-| `pane:previous` | (none) | Pane |
 | `messageSelector:up` | `up`, `k`, `ctrl+p` | MessageSelector |
 | `messageSelector:down` | `down`, `j`, `ctrl+n` | MessageSelector |
 | `messageSelector:top` | `ctrl+up`, `shift+up`, `meta+up`, `shift+k` | MessageSelector |
