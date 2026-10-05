@@ -6107,7 +6107,7 @@
     "taste-skill": {
       "url": "https://github.com/Leonxlnx/taste-skill.git",
       "name": "taste-skill",
-      "last_fetched": "2026-09-20 02:58 UTC",
+      "last_fetched": "2026-10-05 19:17 UTC",
       "components": {
         "skills": [
           "brandkit",
@@ -6133,7 +6133,7 @@
     "awesome-claude-design": {
       "url": "https://github.com/VoltAgent/awesome-claude-design.git",
       "name": "awesome-claude-design",
-      "last_fetched": "2026-09-20 02:58 UTC",
+      "last_fetched": "2026-10-05 19:17 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -6145,7 +6145,7 @@
     "design-md-chrome": {
       "url": "https://github.com/bergside/design-md-chrome.git",
       "name": "design-md-chrome",
-      "last_fetched": "2026-09-20 02:58 UTC",
+      "last_fetched": "2026-10-05 19:17 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -6157,7 +6157,7 @@
     "design-motion-principles": {
       "url": "https://github.com/kylezantos/design-motion-principles.git",
       "name": "design-motion-principles",
-      "last_fetched": "2026-09-20 02:58 UTC",
+      "last_fetched": "2026-10-05 19:17 UTC",
       "components": {
         "skills": [
           "design-motion-principles"
@@ -6171,7 +6171,7 @@
     "omniroute": {
       "url": "https://github.com/diegosouzapw/OmniRoute.git",
       "name": "OmniRoute",
-      "last_fetched": "2026-09-20 02:58 UTC",
+      "last_fetched": "2026-10-05 19:17 UTC",
       "components": {
         "skills": [
           "omni-context-rtk",
@@ -6220,6 +6220,11 @@
           "omni-github-skills",
           "cli-health",
           "omni-settings",
+          "merge-prs",
+          "quality-scan",
+          "validate-release-green",
+          "sweep-reds",
+          "green-prs",
           "bridge-proof"
         ],
         "agents": [],
