@@ -14,6 +14,7 @@ Usage::
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 from pathlib import Path
 from typing import Any
@@ -24,6 +25,8 @@ from src.models import dashboard as dm
 from src.models import domain as dom
 from src.models.ai_ecosystem import AgentRegistry
 from src.models.database import AsyncSessionLocal
+
+_log = logging.getLogger(__name__)
 
 # ── Hand-translated mockData ───────────────────────────────────────
 TASKS: list[dict[str, Any]] = [
@@ -1147,13 +1150,21 @@ async def seed() -> None:
                     tagline=d["tagline"],
                 )
             )
-            for ord_, kpi in enumerate(d["kpis"]):
+            # kpis/applications/agents/feed are optional per-domain — e.g.
+            # shopify omits "kpis" (FEAT-119: sourced live from
+            # GET /api/v1/shopify/dashboard instead of seeded mock rows).
+            # A missing key is logged so a future unexpected gap is visible
+            # instead of only showing up as an empty panel in the UI.
+            for key in ("kpis", "applications", "agents", "feed"):
+                if key not in d:
+                    _log.warning("seed: domain %r has no %r — skipping", d["slug"], key)
+            for ord_, kpi in enumerate(d.get("kpis", [])):
                 s.add(dom.DomainKPI(domain_slug=d["slug"], ord=ord_, **kpi))
-            for app in d["applications"]:
+            for app in d.get("applications", []):
                 s.add(dom.DomainApplication(domain_slug=d["slug"], **app))
-            for agent in d["agents"]:
+            for agent in d.get("agents", []):
                 s.add(dom.DomainAgent(domain_slug=d["slug"], **agent))
-            for row in d["feed"]:
+            for row in d.get("feed", []):
                 s.add(dom.DomainFeedRow(domain_slug=d["slug"], **row))
 
         s.add_all([dom.NavItem(**n) for n in NAV_ITEMS])

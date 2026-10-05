@@ -35,7 +35,7 @@
 | Error | Root cause | Fix |
 |---|---|---|
 | `Can't locate revision 'k1h2i3j4a5b6'` | `DATABASE_URL_DIRECT` not set on Render — Alembic using Supabase pooler | Set `DATABASE_URL_DIRECT` to direct Supabase connection (port 5432) on Render |
-| `seed skipped/failed — non-fatal` | Was `NameError: Path not defined` — fixed in `15f83a2`, needs merge to main | Merge dev branch to main |
+| `seed skipped/failed — non-fatal` | (1) `NameError: Path not defined` — fixed in `15f83a2` (already merged). (2) `KeyError: 'kpis'` — the `shopify` domain dict in `backend/scripts/seed_from_mock.py`'s DOMAINS list intentionally omits `"kpis"` (FEAT-119: sourced live from `GET /api/v1/shopify/dashboard`), but the seed loop used `d["kpis"]` instead of `d.get("kpis", [])`. Both causes produce the exact same symptom line via the Dockerfile's broad `\|\| echo '...non-fatal'`, so this line alone doesn't tell you which one fired — check the traceback above it. | (1) no action needed. (2) fixed — seed loop now uses `.get(key, [])` for `kpis`/`applications`/`agents`/`feed`, with a `_log.warning` on any missing key so a future gap is visible instead of silent. |
 
 ### Additional Render MCP tools available
 
