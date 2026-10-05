@@ -64,27 +64,91 @@ class TestParseMd:
         result = self._md(f"# Title\n{long_line}")
         assert len(result["purpose"]) <= 250
 
-    def test_detects_opus_model(self):
-        result = self._md("# Agent\nUses Claude Opus for deep reasoning.")
-        assert result["model"] == "claude-opus-4-8"
+    def test_detects_haiku_model_from_frontmatter(self):
+        result = self._md(
+            "---\nmodel: claude-haiku-4-5-20251001\n---\n# Agent\nDoes things."
+        )
+        assert result["model"] == "claude-haiku-4-5-20251001"
 
-    def test_detects_haiku_model(self):
-        result = self._md("# Agent\nUses Haiku for fast responses.")
+    def test_detects_haiku_shorthand_from_frontmatter(self):
+        result = self._md("---\nmodel: haiku\n---\n# Agent\nDoes things.")
         assert result["model"] == "claude-haiku-4-5-20251001"
 
     def test_defaults_to_sonnet(self):
         result = self._md("# Agent\nA general purpose agent.")
         assert result["model"] == "claude-sonnet-4-6"
 
-    def test_opus_takes_precedence_over_haiku(self):
-        result = self._md("# Agent\nMentions opus and haiku.")
-        assert result["model"] == "claude-opus-4-8"
+    def test_no_frontmatter_defaults_to_sonnet_even_if_body_mentions_opus(self):
+        # Regression: the old implementation substring-scanned the whole file
+        # body for "opus" and would wrongly register this as claude-opus-4-8.
+        # Per CLAUDE.md §20/§21, Sonnet is the ceiling — only an explicit
+        # haiku frontmatter value should ever downgrade from it.
+        result = self._md("# Agent\nUses Claude Opus for deep reasoning.")
+        assert result["model"] == "claude-sonnet-4-6"
+
+    def test_opus_frontmatter_is_clamped_to_sonnet(self):
+        result = self._md("---\nmodel: opus\n---\n# Agent\nDoes things.")
+        assert result["model"] == "claude-sonnet-4-6"
+
+    def test_sonnet_frontmatter_not_overridden_by_opus_mentioned_in_body(self):
+        # The exact scenario the bug fix exists to prevent: frontmatter says
+        # sonnet, but the prose body happens to mention "Opus" — that mention
+        # must never escalate the registered model.
+        result = self._md(
+            "---\nmodel: sonnet\n---\n# Agent\nUses Opus-level reasoning for deep tasks."
+        )
+        assert result["model"] == "claude-sonnet-4-6"
 
     def test_file_not_found_raises(self):
         from scripts.register_agent import _parse_md
 
         with pytest.raises(OSError):
             _parse_md("/nonexistent/path/agent.md")
+
+
+# ---------------------------------------------------------------------------
+# seed_from_mock._normalize_model
+# ---------------------------------------------------------------------------
+
+
+class TestNormalizeModel:
+    def _normalize(self, raw: str) -> str:
+        from scripts.seed_from_mock import _normalize_model
+
+        return _normalize_model(raw)
+
+    def test_haiku_shorthand(self):
+        assert self._normalize("haiku") == "claude-haiku-4-5-20251001"
+
+    def test_sonnet_shorthand(self):
+        assert self._normalize("sonnet") == "claude-sonnet-4-6"
+
+    def test_full_haiku_model_id_matches_via_substring(self):
+        assert (
+            self._normalize("claude-haiku-4-5-20251001") == "claude-haiku-4-5-20251001"
+        )
+
+    def test_opus_is_clamped_to_sonnet(self):
+        # Before this fix, "opus" mapped straight through to claude-opus-4-8.
+        assert self._normalize("opus") == "claude-sonnet-4-6"
+
+    def test_full_opus_model_id_is_clamped_to_sonnet(self):
+        # Before this fix, an unrecognized string passed through verbatim,
+        # so this would have returned "claude-opus-4-8" unchanged.
+        assert self._normalize("claude-opus-4-8") == "claude-sonnet-4-6"
+
+    def test_fable_is_clamped_to_sonnet(self):
+        # Before this fix, "fable" mapped to the invalid "claude-fable-5".
+        assert self._normalize("fable") == "claude-sonnet-4-6"
+
+    def test_empty_string_defaults_to_sonnet(self):
+        assert self._normalize("") == "claude-sonnet-4-6"
+
+    def test_inherit_defaults_to_sonnet(self):
+        assert self._normalize("inherit") == "claude-sonnet-4-6"
+
+    def test_completely_unrecognized_value_clamps_to_sonnet(self):
+        assert self._normalize("gpt-4") == "claude-sonnet-4-6"
 
 
 # ---------------------------------------------------------------------------
@@ -431,7 +495,9 @@ class TestGetMetricsEndpoint:
         assert data["agents"][0]["agent_name"] == "code-reviewer"
         assert data["agents"][0]["success_rate"] == 0.5
 
-    def test_metrics_endpoint_reports_a_genuine_zero_success_rate_as_zero(self, metrics_client):
+    def test_metrics_endpoint_reports_a_genuine_zero_success_rate_as_zero(
+        self, metrics_client
+    ):
         # Regression for the `or 1.0` bug this same gate cycle caught: a
         # Decimal(0) success_rate (every invocation failed) must not be
         # silently reported as 1.0 (100% success).

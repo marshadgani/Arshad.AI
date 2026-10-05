@@ -6,7 +6,7 @@
     "claude-code": {
       "url": "https://github.com/anthropics/claude-code.git",
       "name": "claude-code",
-      "last_fetched": "2026-10-05 19:14 UTC",
+      "last_fetched": "2026-10-05 19:30 UTC",
       "components": {
         "skills": [
           "writing-rules",
@@ -100,7 +100,7 @@
     "repomix": {
       "url": "https://github.com/yamadashy/repomix.git",
       "name": "repomix",
-      "last_fetched": "2026-10-05 19:14 UTC",
+      "last_fetched": "2026-10-05 19:30 UTC",
       "components": {
         "skills": [
           "repomix-explorer",
@@ -150,7 +150,7 @@
     "superpowers": {
       "url": "https://github.com/obra/superpowers.git",
       "name": "superpowers",
-      "last_fetched": "2026-10-05 19:14 UTC",
+      "last_fetched": "2026-10-05 19:30 UTC",
       "components": {
         "skills": [
           "using-superpowers",
@@ -200,7 +200,7 @@
     "claude-mem": {
       "url": "https://github.com/thedotmack/claude-mem.git",
       "name": "claude-mem",
-      "last_fetched": "2026-10-05 19:14 UTC",
+      "last_fetched": "2026-10-05 19:30 UTC",
       "components": {
         "skills": [
           "mem-setup",
@@ -260,7 +260,7 @@
     "obsidian-skills": {
       "url": "https://github.com/kepano/obsidian-skills.git",
       "name": "obsidian-skills",
-      "last_fetched": "2026-10-05 19:15 UTC",
+      "last_fetched": "2026-10-05 19:31 UTC",
       "components": {
         "skills": [
           "obsidian-cli",
@@ -279,7 +279,7 @@
     "n8n-mcp": {
       "url": "https://github.com/czlonkowski/n8n-mcp.git",
       "name": "n8n-mcp",
-      "last_fetched": "2026-10-05 19:15 UTC",
+      "last_fetched": "2026-10-05 19:31 UTC",
       "components": {
         "skills": [
           "n8n-code-python",
@@ -319,7 +319,7 @@
     "get-shit-done": {
       "url": "https://github.com/gsd-build/get-shit-done.git",
       "name": "get-shit-done",
-      "last_fetched": "2026-10-05 19:15 UTC",
+      "last_fetched": "2026-10-05 19:31 UTC",
       "components": {
         "skills": [],
         "agents": [
@@ -447,7 +447,7 @@
     "awesome-claude-code": {
       "url": "https://github.com/hesreallyhim/awesome-claude-code.git",
       "name": "awesome-claude-code",
-      "last_fetched": "2026-10-05 19:15 UTC",
+      "last_fetched": "2026-10-05 19:31 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -461,7 +461,7 @@
     "context7": {
       "url": "https://github.com/upstash/context7.git",
       "name": "context7",
-      "last_fetched": "2026-10-05 19:15 UTC",
+      "last_fetched": "2026-10-05 19:31 UTC",
       "components": {
         "skills": [
           "context7-mcp",
@@ -488,7 +488,7 @@
     "everything-claude-code": {
       "url": "https://github.com/affaan-m/everything-claude-code.git",
       "name": "everything-claude-code",
-      "last_fetched": "2026-10-05 19:15 UTC",
+      "last_fetched": "2026-10-05 19:31 UTC",
       "components": {
         "skills": [
           "kotlin-exposed-patterns",
@@ -2299,7 +2299,7 @@
     "claude-plugins-official": {
       "url": "https://github.com/anthropics/claude-plugins-official.git",
       "name": "claude-plugins-official",
-      "last_fetched": "2026-10-05 19:15 UTC",
+      "last_fetched": "2026-10-05 19:31 UTC",
       "components": {
         "skills": [
           "access",
@@ -2423,7 +2423,7 @@
     "ruflo": {
       "url": "https://github.com/ruvnet/ruflo.git",
       "name": "ruflo",
-      "last_fetched": "2026-10-05 19:15 UTC",
+      "last_fetched": "2026-10-05 19:31 UTC",
       "components": {
         "skills": [
           "ruflo",
@@ -3695,7 +3695,7 @@
     "agent-skills": {
       "url": "https://github.com/addyosmani/agent-skills.git",
       "name": "agent-skills",
-      "last_fetched": "2026-10-05 19:15 UTC",
+      "last_fetched": "2026-10-05 19:32 UTC",
       "components": {
         "skills": [
           "interview-me",
@@ -3756,7 +3756,7 @@
     "headroom": {
       "url": "https://github.com/headroomlabs-ai/headroom.git",
       "name": "headroom",
-      "last_fetched": "2026-10-05 19:16 UTC",
+      "last_fetched": "2026-10-05 19:32 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -3779,7 +3779,7 @@
     "agent-browser": {
       "url": "https://github.com/vercel-labs/agent-browser.git",
       "name": "agent-browser",
-      "last_fetched": "2026-10-05 19:16 UTC",
+      "last_fetched": "2026-10-05 19:32 UTC",
       "components": {
         "skills": [
           "agent-browser",
@@ -3802,7 +3802,7 @@
     "andrej-karpathy-skills": {
       "url": "https://github.com/multica-ai/andrej-karpathy-skills.git",
       "name": "andrej-karpathy-skills",
-      "last_fetched": "2026-10-05 19:16 UTC",
+      "last_fetched": "2026-10-05 19:32 UTC",
       "components": {
         "skills": [
           "karpathy-guidelines"
@@ -3816,7 +3816,7 @@
     "ui-ux-pro-max-skill": {
       "url": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git",
       "name": "ui-ux-pro-max-skill",
-      "last_fetched": "2026-10-05 19:16 UTC",
+      "last_fetched": "2026-10-05 19:32 UTC",
       "components": {
         "skills": [
           "banner-design",
@@ -3853,7 +3853,7 @@
     "system-prompts-leaks": {
       "url": "https://github.com/asgeirtj/system_prompts_leaks.git",
       "name": "system_prompts_leaks",
-      "last_fetched": "2026-10-05 19:16 UTC",
+      "last_fetched": "2026-10-05 19:32 UTC",
       "components": {
         "skills": [
           "simplify",
@@ -4108,7 +4108,7 @@
     "awesome-openclaw-skills": {
       "url": "https://github.com/VoltAgent/awesome-openclaw-skills.git",
       "name": "awesome-openclaw-skills",
-      "last_fetched": "2026-10-05 19:16 UTC",
+      "last_fetched": "2026-10-05 19:32 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -4123,7 +4123,7 @@
     "awesome-ai-agents": {
       "url": "https://github.com/e2b-dev/awesome-ai-agents.git",
       "name": "awesome-ai-agents",
-      "last_fetched": "2026-10-05 19:16 UTC",
+      "last_fetched": "2026-10-05 19:32 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -4135,7 +4135,7 @@
     "awesome-agent-skills": {
       "url": "https://github.com/VoltAgent/awesome-agent-skills.git",
       "name": "awesome-agent-skills",
-      "last_fetched": "2026-10-05 19:16 UTC",
+      "last_fetched": "2026-10-05 19:32 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -4149,7 +4149,7 @@
     "awesome-claude-code-subagents": {
       "url": "https://github.com/VoltAgent/awesome-claude-code-subagents.git",
       "name": "awesome-claude-code-subagents",
-      "last_fetched": "2026-10-05 19:16 UTC",
+      "last_fetched": "2026-10-05 19:32 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -4163,7 +4163,7 @@
     "skills": {
       "url": "https://github.com/anthropics/skills.git",
       "name": "skills",
-      "last_fetched": "2026-10-05 19:16 UTC",
+      "last_fetched": "2026-10-05 19:32 UTC",
       "components": {
         "skills": [
           "canvas-design",
@@ -4211,7 +4211,7 @@
     "anydoc": {
       "url": "https://github.com/firecrawl/anydoc.git",
       "name": "anydoc",
-      "last_fetched": "2026-10-05 19:16 UTC",
+      "last_fetched": "2026-10-05 19:32 UTC",
       "components": {
         "skills": [
           "convert-documents-to-markdown"
@@ -4225,7 +4225,7 @@
     "archify": {
       "url": "https://github.com/tt-a1i/archify.git",
       "name": "archify",
-      "last_fetched": "2026-10-05 19:16 UTC",
+      "last_fetched": "2026-10-05 19:32 UTC",
       "components": {
         "skills": [
           "archify",
@@ -4257,7 +4257,7 @@
     "openmontage": {
       "url": "https://github.com/calesthio/OpenMontage.git",
       "name": "OpenMontage",
-      "last_fetched": "2026-10-05 19:16 UTC",
+      "last_fetched": "2026-10-05 19:32 UTC",
       "components": {
         "skills": [
           "flux-best-practices",
@@ -4434,7 +4434,7 @@
     "agent-reach": {
       "url": "https://github.com/Panniantong/Agent-Reach.git",
       "name": "Agent-Reach",
-      "last_fetched": "2026-10-05 19:16 UTC",
+      "last_fetched": "2026-10-05 19:32 UTC",
       "components": {
         "skills": [
           "skill"
@@ -4448,7 +4448,7 @@
     "orca": {
       "url": "https://github.com/stablyai/orca.git",
       "name": "orca",
-      "last_fetched": "2026-10-05 19:16 UTC",
+      "last_fetched": "2026-10-05 19:32 UTC",
       "components": {
         "skills": [
           "computer-use",
@@ -4480,7 +4480,7 @@
     "learn-claude-code": {
       "url": "https://github.com/shareAI-lab/learn-claude-code.git",
       "name": "learn-claude-code",
-      "last_fetched": "2026-10-05 19:17 UTC",
+      "last_fetched": "2026-10-05 19:33 UTC",
       "components": {
         "skills": [
           "agent-builder",
@@ -4503,7 +4503,7 @@
     "claude-code-router": {
       "url": "https://github.com/musistudio/claude-code-router.git",
       "name": "claude-code-router",
-      "last_fetched": "2026-10-05 19:17 UTC",
+      "last_fetched": "2026-10-05 19:33 UTC",
       "components": {
         "skills": [],
         "agents": [
@@ -4539,7 +4539,7 @@
     "claude-skills": {
       "url": "https://github.com/alirezarezvani/claude-skills.git",
       "name": "claude-skills",
-      "last_fetched": "2026-10-05 19:17 UTC",
+      "last_fetched": "2026-10-05 19:33 UTC",
       "components": {
         "skills": [
           "md-review",
@@ -5935,7 +5935,7 @@
     "codegraph": {
       "url": "https://github.com/colbymchenry/codegraph.git",
       "name": "codegraph",
-      "last_fetched": "2026-10-05 19:17 UTC",
+      "last_fetched": "2026-10-05 19:33 UTC",
       "components": {
         "skills": [
           "agent-eval",
@@ -5952,7 +5952,7 @@
     "marketingskills": {
       "url": "https://github.com/coreyhaines31/marketingskills.git",
       "name": "marketingskills",
-      "last_fetched": "2026-10-05 19:17 UTC",
+      "last_fetched": "2026-10-05 19:33 UTC",
       "components": {
         "skills": [
           "free-tools",
@@ -6015,7 +6015,7 @@
     "obsidian-releases": {
       "url": "https://github.com/obsidianmd/obsidian-releases.git",
       "name": "obsidian-releases",
-      "last_fetched": "2026-10-05 19:17 UTC",
+      "last_fetched": "2026-10-05 19:33 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -6027,7 +6027,7 @@
     "obsidian-git": {
       "url": "https://github.com/Vinzent03/obsidian-git.git",
       "name": "obsidian-git",
-      "last_fetched": "2026-10-05 19:17 UTC",
+      "last_fetched": "2026-10-05 19:33 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -6039,7 +6039,7 @@
     "impeccable": {
       "url": "https://github.com/pbakaus/impeccable.git",
       "name": "impeccable",
-      "last_fetched": "2026-10-05 19:17 UTC",
+      "last_fetched": "2026-10-05 19:33 UTC",
       "components": {
         "skills": [
           "impeccable",
@@ -6107,7 +6107,7 @@
     "taste-skill": {
       "url": "https://github.com/Leonxlnx/taste-skill.git",
       "name": "taste-skill",
-      "last_fetched": "2026-10-05 19:17 UTC",
+      "last_fetched": "2026-10-05 19:34 UTC",
       "components": {
         "skills": [
           "brandkit",
@@ -6133,7 +6133,7 @@
     "awesome-claude-design": {
       "url": "https://github.com/VoltAgent/awesome-claude-design.git",
       "name": "awesome-claude-design",
-      "last_fetched": "2026-10-05 19:17 UTC",
+      "last_fetched": "2026-10-05 19:34 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -6145,7 +6145,7 @@
     "design-md-chrome": {
       "url": "https://github.com/bergside/design-md-chrome.git",
       "name": "design-md-chrome",
-      "last_fetched": "2026-10-05 19:17 UTC",
+      "last_fetched": "2026-10-05 19:34 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -6157,7 +6157,7 @@
     "design-motion-principles": {
       "url": "https://github.com/kylezantos/design-motion-principles.git",
       "name": "design-motion-principles",
-      "last_fetched": "2026-10-05 19:17 UTC",
+      "last_fetched": "2026-10-05 19:34 UTC",
       "components": {
         "skills": [
           "design-motion-principles"
@@ -6171,7 +6171,7 @@
     "omniroute": {
       "url": "https://github.com/diegosouzapw/OmniRoute.git",
       "name": "OmniRoute",
-      "last_fetched": "2026-10-05 19:17 UTC",
+      "last_fetched": "2026-10-05 19:34 UTC",
       "components": {
         "skills": [
           "omni-context-rtk",
@@ -6249,7 +6249,7 @@
     "one-skill-to-rule-them-all": {
       "url": "https://github.com/rebelytics/one-skill-to-rule-them-all.git",
       "name": "one-skill-to-rule-them-all",
-      "last_fetched": "2026-10-05 19:18 UTC",
+      "last_fetched": "2026-10-05 19:34 UTC",
       "components": {
         "skills": [
           "one-skill-to-rule-them-all"

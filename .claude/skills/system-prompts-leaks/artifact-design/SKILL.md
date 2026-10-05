@@ -59,6 +59,8 @@ Fundamentals below apply to everything. Follow the editorial process after them 
 
 **When adding charts or diagrams** The craft shifts from identity to honesty — pick the form the data's shape calls for, keep encodings from exaggerating, title the finding rather than the axes. Load the `dataviz` skill for the specifics; this skill continues to govern the page the chart sits in.
 
+
+
 ## Process
 
 Start from what the viewer should be able to do on the page, in addition to what they will read. If the page should take input, keep what people change for whoever opens it next, show live data, or ask Claude something, load the `artifact-capabilities` skill now and design around what it makes available to this user. A page that is only read doesn't need that.

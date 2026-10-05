@@ -2959,6 +2959,7 @@ function commitComparePair({
     };
   } catch (cause) {
     const rollbackErrors = [];
+<<<<<<< HEAD
     const recoveryFiles = targets
       .filter((item) => item.backupRecovery)
       .map((item) => ({
@@ -2966,6 +2967,9 @@ function commitComparePair({
         target: item.capture.commitPath,
         verifiedPrevious: false,
       }));
+=======
+    const recoveryFiles = [];
+>>>>>>> origin/claude/ai-personal-assistant-main
     for (const item of [...committed].reverse()) {
       try {
         const removed = quarantineRemoveRegularFileBinding(
@@ -3063,6 +3067,7 @@ function commitComparePair({
         rollbackErrors.push(`${item.label}: restore failed (${error.message})`);
         // Track failed restoration rather than probing existence: a permission
         // error must not make cleanup discard a potentially recoverable backup.
+<<<<<<< HEAD
         if (item.backupPresent !== false) {
           recoveryFiles.push({
             backup: item.backup,
@@ -3070,6 +3075,9 @@ function commitComparePair({
             verifiedPrevious: item.backupVerified === true,
           });
         }
+=======
+        recoveryFiles.push({ backup: item.backup, target: item.target });
+>>>>>>> origin/claude/ai-personal-assistant-main
       }
     }
     if (!rollbackErrors.length && cause.compareFailure) {
@@ -3086,13 +3094,18 @@ function commitComparePair({
       (rollbackErrors.length
         ? 'Architecture Delta pair commit failed and its previous files could not be fully restored.'
         : 'Architecture Delta pair commit failed; the previous files were restored.')
+<<<<<<< HEAD
         + (recoveryFiles.length
           ? ` Recovery directory retained at ${path.dirname(recoveryFiles[0].backup)}.`
           : ''),
+=======
+        + (recoveryFiles.length ? ` Recovery directory retained at ${stagingDirectory}.` : ''),
+>>>>>>> origin/claude/ai-personal-assistant-main
       rollbackErrors.length ? 'delta/commit-rollback-failed' : 'delta/commit-failed',
       {
         reason: cause.message,
         ...(rollbackErrors.length ? { rollbackErrors } : {}),
+<<<<<<< HEAD
         ...(recoveryFiles.length ? {
           recoveryDirectory: path.dirname(recoveryFiles[0].backup),
           recoveryDirectories: [...new Set(recoveryFiles.map(({ backup }) => path.dirname(backup)))],
@@ -3103,6 +3116,12 @@ function commitComparePair({
             ...recoveryFiles.map(({ backup, target, verifiedPrevious }) => verifiedPrevious
               ? `resolve the filesystem error, inspect the current target, then restore ${JSON.stringify(backup)} to ${JSON.stringify(target)} before retrying`
               : `preserve and inspect the unverified entry at ${JSON.stringify(backup)}; do not treat it as the previous file for ${JSON.stringify(target)}`),
+=======
+        ...(recoveryFiles.length ? { recoveryDirectory: stagingDirectory, recoveryFiles } : {}),
+        supportedFixes: recoveryFiles.length
+          ? [
+            ...recoveryFiles.map(({ backup, target }) => `resolve the filesystem error, inspect the current target, then restore ${JSON.stringify(backup)} to ${JSON.stringify(target)} before retrying`),
+>>>>>>> origin/claude/ai-personal-assistant-main
             'remove the recovery directory only after the previous files have been recovered and verified',
           ]
           : ['check that both output paths are writable regular files, then retry'],
@@ -3897,6 +3916,7 @@ async function commandCompare(args) {
   const htmlCandidate = path.join(stagingDirectory, path.basename(outputPath));
   const receiptCandidate = path.join(stagingDirectory, path.basename(receiptPath));
   let preserveRecoveryDirectory = false;
+<<<<<<< HEAD
   const stagingOwnership = [];
   const captureCompareStagingFile = (filePath, content) => captureOwnedStagingFile(
     stagingOwnership,
@@ -3904,6 +3924,8 @@ async function commandCompare(args) {
     fileBindingRuntime,
     { subject: 'compare-staging-entry', content },
   );
+=======
+>>>>>>> origin/claude/ai-personal-assistant-main
 
   try {
     let baseResult;
@@ -3914,7 +3936,10 @@ async function commandCompare(args) {
     ]) {
       try {
         fs.writeFileSync(snapshotPath, buffer, { flag: 'wx' });
+<<<<<<< HEAD
         captureCompareStagingFile(snapshotPath, artifactIdentity(buffer));
+=======
+>>>>>>> origin/claude/ai-personal-assistant-main
       } catch (error) {
         const message = `Could not freeze ${side} compare snapshot: ${error.message}`;
         reportCompareFailure({
@@ -3933,6 +3958,7 @@ async function commandCompare(args) {
       }
     }
     try {
+<<<<<<< HEAD
       renderValidatedArchitecture(
         rawBaseInput,
         rawBaseCandidate,
@@ -3940,6 +3966,9 @@ async function commandCompare(args) {
         repoArgs.repoRoot,
         captureCompareStagingFile,
       );
+=======
+      renderValidatedArchitecture(rawBaseInput, rawBaseCandidate, qualityArgs.quality, repoArgs.repoRoot);
+>>>>>>> origin/claude/ai-personal-assistant-main
     } catch (error) {
       const diagnosticEntry = error.diagnostics?.[0];
       reportCompareFailure({
@@ -3953,6 +3982,7 @@ async function commandCompare(args) {
       return;
     }
     try {
+<<<<<<< HEAD
       renderValidatedArchitecture(
         rawHeadInput,
         rawHeadCandidate,
@@ -3960,6 +3990,9 @@ async function commandCompare(args) {
         repoArgs.repoRoot,
         captureCompareStagingFile,
       );
+=======
+      renderValidatedArchitecture(rawHeadInput, rawHeadCandidate, qualityArgs.quality, repoArgs.repoRoot);
+>>>>>>> origin/claude/ai-personal-assistant-main
     } catch (error) {
       const diagnosticEntry = error.diagnostics?.[0];
       reportCompareFailure({
@@ -4129,6 +4162,7 @@ async function commandCompare(args) {
     }
   } finally {
     try {
+<<<<<<< HEAD
       if (!preserveRecoveryDirectory) {
         cleanupOwnedStagingDirectory(
           stagingDirectory,
@@ -4139,6 +4173,9 @@ async function commandCompare(args) {
       } else {
         releaseOwnedStagingBindings(stagingOwnership, fileBindingRuntime);
       }
+=======
+      if (!preserveRecoveryDirectory) fs.rmSync(stagingDirectory, { recursive: true, force: true });
+>>>>>>> origin/claude/ai-personal-assistant-main
     } catch (error) {
       console.error(`Warning: could not remove compare staging directory: ${error.message}`);
     }
@@ -5182,6 +5219,7 @@ async function commandPreview(args) {
   }
 }
 
+<<<<<<< HEAD
 async function loadPathIdentityRuntime() {
   try {
     await loadSidecarPathRuntime();
@@ -5204,6 +5242,15 @@ async function loadPathIdentityRuntime() {
   } catch (error) {
     return { error };
   }
+=======
+function commandCheck(args) {
+  const unknown = args.find((arg) => arg.startsWith('--'));
+  if (unknown) fail(`Unknown check option "${unknown}".`);
+  const [html] = args;
+  if (!html || args.length !== 1) fail(usage());
+  const result = runNode([path.join(skillRoot, 'scripts/check-render-output.mjs'), html]);
+  if (result.status !== 0) exitFrom(result);
+>>>>>>> origin/claude/ai-personal-assistant-main
 }
 
 function inspectArtifactDeliveryProvenance(
@@ -5574,6 +5621,7 @@ async function commandBrowserEvidence(rawArgs, { command, capture }) {
   process.exitCode = result.exitCode;
 }
 
+<<<<<<< HEAD
 async function commandVisualCheck(rawArgs) {
   return commandBrowserEvidence(rawArgs, { command: 'visual-check', capture: true });
 }
@@ -5738,6 +5786,8 @@ async function commandFinalize(rawArgs) {
   process.exitCode = result.exitCode;
 }
 
+=======
+>>>>>>> origin/claude/ai-personal-assistant-main
 function commandExamples(args) {
   const unknown = args.find((arg) => arg.startsWith('--'));
   if (unknown) fail(`Unknown examples option "${unknown}".`);

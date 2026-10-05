@@ -978,23 +978,23 @@ _DEV_TEAM_STAGES: dict[str, int] = {
 }
 
 _MODEL_MAP = {
-    "opus": "claude-opus-4-8",
     "sonnet": "claude-sonnet-4-6",
     "haiku": "claude-haiku-4-5-20251001",
-    "fable": "claude-fable-5",
 }
 
 
 def _normalize_model(raw: str) -> str:
+    # Per CLAUDE.md §20/§21: Sonnet is the ceiling for every registered agent.
+    # Any frontmatter value above Sonnet (opus, fable, or anything unrecognized)
+    # is clamped to Sonnet here rather than registered as-is — never infer or
+    # register an Opus-or-higher model as an agent's default.
     raw = raw.strip().lower()
     if raw in _MODEL_MAP:
         return _MODEL_MAP[raw]
     for key, value in _MODEL_MAP.items():
         if key in raw:
             return value
-    if raw in ("inherit", "default", ""):
-        return "claude-sonnet-4-6"
-    return raw or "claude-sonnet-4-6"
+    return "claude-sonnet-4-6"
 
 
 def _parse_frontmatter(path: Path) -> dict[str, str] | None:

@@ -2,150 +2,143 @@
 
 **Branch:** `claude/gallant-fermi-puz9bt` → `claude/ai-personal-assistant-main`
 **Triggered by:** "Merge to main" (user request), gate run directly in-session
-**Date:** 2026-09-20
+**Date:** 2026-10-05
 
 ---
 
 ## Summary
 
-This diff caps every agent in the project — the dev-team pipeline and every
-project/ad-hoc agent alike — at Sonnet as the model ceiling, with a new
-permanent Model Escalation Policy requiring Arshad's explicit, one-time,
-per-task approval before any agent may run on a higher-tier model. It also
-carries forward several weeks of legitimate weekly external-skill-sync
-commits that had accumulated on this branch without yet being merged to
-main (~450 vendored skill/agent/command/hook files).
+This diff adds token-usage optimizations to the dev-team pipeline's Audit
+phase, per Arshad's explicit request to reduce token spend without
+lowering output quality: 4 of the 9 audit stages (`database-specialist`,
+`python-specialist`, `frontend-engineer`, `type-design-analyzer`) are now
+conditional — skipped when the feature's code contains no matching files
+— and their prompts are scoped to their own domain's files instead of the
+full accumulated file list.
 
-**Files actually changed by this session's work:**
-- `.claude/workflows/dev-team-pipeline.js` — renamed the `OPUS` constant to
-  `SONNET` (`claude-sonnet-4-6`) and repointed all 9 stages that referenced
-  it (ai-engineer, architecture-critic ×2, system-architect, code-reviewer,
-  senior-engineer/code-analyzer, software-architect/refactoring-specialist,
-  code-simplifier, debugger, security-auditor).
-- `.claude/agents/orchestrator.md`, `.claude/agents/planner.md`:
-  `claude-opus-4-7` → `claude-sonnet-4-6`.
-- `.claude/agents/dev-team/orchestrator.md`: `claude-fable-5` (an invalid
-  model id) → `claude-sonnet-4-6`.
-- Vendored `code-reviewer.md`/`code-simplifier.md` under
-  `.claude/agents/claude-code/` and `.claude/agents/claude-plugins-official/`:
-  `model: opus` → `model: sonnet` (4 files).
-- `CLAUDE.md`: new "Model Tiers" and "Model Escalation Policy" sections;
-  updated "Model Strategy" and the §21 agent-registration model-inference
-  rule to match.
+**The gate review caught two real regressions in the first version of this
+change, independently confirmed by multiple agents, and both are fixed and
+verified on this branch before this report was written — not deferred:**
 
-**Pre-existing content also present in this diff (not authored this
-session, already on `origin/claude/ai-personal-assistant-main` prior to
-this branch catching up):** the FEAT-165 Obsidian ontology layer
-(`backend/src/models/ontology*.py`, `backend/src/services/ingestion/
-ontology_*.py`, migrations, and their test suite), plus ~450 vendored
-skill/agent/command/hook files from weekly syncs.
+1. **Critical** — `signals`/`scope` were computed once before the Audit
+   loop, so an earlier domain-specific stage's skip decision couldn't see
+   files a later unconditional stage (e.g. `code-reviewer`) introduced
+   afterward. Fixed with a two-pass design: `when`/`scope` now recompute
+   from the live `code` array on every iteration, and a catch-up pass after
+   the main loop re-checks the final file list and runs any specialist that
+   was skipped early but whose domain appeared later.
+2. **Security (Medium, escalated to blocking per this project's policy)** —
+   `database-specialist` was gated on a narrow DB-path heuristic that
+   misses real query/raw-SQL code living in route or service files, which
+   is how this stack actually organizes DB access. Re-gated on
+   `touchesPython` instead, since every DB-touching file in this stack is
+   necessarily a `.py` file.
 
-**Correction applied before this gate ran:** the mandatory squash-divergence
-repair step was initially attempted with `--strategy=ours`, which would
-have silently discarded ~15 already-merged PRs (including the ontology
-feature) on the next squash-merge. This was caught before pushing, undone,
-and replaced with a real merge of `origin/claude/ai-personal-assistant-main`
-into this branch, which resolved cleanly with no conflicts.
+Also added: `dev-team-pipeline.test.js` (12 tests, all passing) covering
+the pure decision logic with a drift-guard against the real file (which
+can't be directly imported — it has a top-level `return`, being a
+Workflow-tool script rather than a standard ES module). Also fixed:
+CLAUDE.md's pipeline table didn't reflect which stages are now conditional
+— added a note on each affected row plus a new explanatory subsection.
 
 ## Gate Summary
 
-| # | Gate | Agent | Result |
-|---|---|---|---|
-| 1 | Code Review | code-reviewer | ✅ PASS — no findings |
-| 2 | Security Audit | security-auditor | ✅ PASS — no findings |
-| 3 | Bug Analysis | debugger | ✅ PASS — no findings |
-| 4 | Test Coverage | test-writer | ✅ PASS — no new logic requiring coverage in this diff |
-| 5 | Code Quality | refactorer | ✅ PASS — no findings |
-| 6 | Documentation | doc-writer | ⚠️ WARN — 2 non-blocking items (see below) |
-| 7 | Silent Failures | silent-failure-hunter | ✅ PASS — no findings |
-| 8 | Test Quality | pr-test-analyzer | ✅ No blocking findings (2 minor follow-ups logged) |
+| # | Gate | Agent | Initial Result | After fixes |
+|---|---|---|---|---|
+| 1 | Code Review | code-reviewer | ⚠️ Important (2 findings — narrow DB heuristic, classification inconsistency) | ✅ Fixed |
+| 2 | Security Audit | security-auditor | ⚠️ Medium (DB-path heuristic security gap) | ✅ Fixed |
+| 3 | Bug Analysis | debugger | ✅ PASS (confirmed fix correct, re-verified against final HEAD) | ✅ PASS |
+| 4 | Test Coverage | test-writer | ❌ BLOCKED (zero coverage on new branching logic) | ✅ Fixed — 12 tests added |
+| 5 | Code Quality | refactorer | ⚠️ 3 Warnings (duplicated logic, misleading thunks, fragile ternary) | ✅ Fixed |
+| 6 | Documentation | doc-writer | ⚠️ WARN (CLAUDE.md pipeline table not synced) | ✅ Fixed |
+| 7 | Silent Failures | silent-failure-hunter | ❌ CRITICAL (stale skip-decision, no signal it went stale) | ✅ Fixed |
+| 8 | Test Quality | pr-test-analyzer | ❌ CRITICAL (same stale-closure root cause, independently found) | ✅ Fixed |
 
-## Overall Verdict: ⚠️ WARN — mergeable
+## Overall Verdict: ✅ GATE PASSED
 
-Zero Critical findings. Zero FAIL gates. Zero security findings (which would
-otherwise auto-escalate to FAIL per this project's policy). One WARN
-category from doc-writer. Per this repo's Gate Verdicts table, WARN with
-zero FAIL/Critical is mergeable on "Merge to Main" — WARN items go into
-this checklist for Arshad to address at his discretion, not auto-fixed.
+Both Critical findings (independently confirmed by 2 agents each) are fixed
+with a verified two-pass design, confirmed correct by debugger's final
+re-check against HEAD. The security finding is fixed. The test-coverage
+blocker is closed with 12 passing tests plus a drift-guard. All Warning/WARN
+items are fixed, not deferred. Zero outstanding findings of any severity.
 
-**GATE PASSED WITH WARNINGS**
-
----
-
-## Detailed Findings
-
-### 1–5, 7. code-reviewer, security-auditor, debugger, test-writer, refactorer, silent-failure-hunter — all PASS
-
-All six agents independently confirmed:
-- The `OPUS` → `SONNET` rename in `dev-team-pipeline.js` is complete — zero
-  remaining references to the old constant name, all 9 former call sites
-  correctly updated, `node --check` passes.
-- All 7 changed agent `.md` files have correct, validly-formatted `model:`
-  values (no typos, no dot-vs-dash inconsistencies).
-- `CLAUDE.md`'s new sections are internally consistent with each other and
-  with the rest of the file.
-- No secrets, credentials, or injection vectors anywhere in the diff
-  (including a full secret-pattern scan across all ~450 vendored files —
-  the only near-hits were documentation prose about LLM "tokens" and one
-  already-masked example API key string).
-- Hook script changes in the vendored diff (`everything-claude-code_run-
-  with-flags-shell.sh`, `everything-claude-code_observe.sh`) are net
-  security *hardening* (added path-traversal containment, fixed a
-  catastrophic-backtracking regex), not regressions.
-- No dead code or leftover references from the constant rename.
-- This diff introduces no new application logic requiring new test
-  coverage — the change is a config/data-value substitution, not new
-  code paths.
-
-### 6. doc-writer — WARN (2 items, both non-blocking)
-
-1. **Pre-existing naming inconsistency, not introduced by this diff:**
-   CLAUDE.md's 28-agent pipeline table names stage 6 `test-script-writer`
-   while the Model Tiers table lists the same slot as `test-writer`. This
-   predates this session's edits (the Model Tiers table merge just carried
-   the existing name forward). Recommend picking one name and applying it
-   consistently — logged here for Arshad's attention, not blocking.
-2. **New in this diff — clarity gap in the Model Escalation Policy:** point
-   2 requires "a demonstrated, repeated inability to make progress... not
-   a first-try failure" before an agent may ask to escalate, but doesn't
-   define how many attempts count as "repeated." Recommend adding a
-   concrete threshold (e.g. "at least two genuine attempts, each producing
-   output that doesn't meet the stage's acceptance criteria") in a future
-   edit.
-
-   *(doc-writer also raised several WARN items about missing class-level
-   docstrings in `backend/src/models/ontology.py` and
-   `ontology_vocabulary.py`. Those files are unchanged in this diff —
-   confirmed identical on both sides by three separate agents — so those
-   findings describe pre-existing code from the already-merged FEAT-165 and
-   are not scored against this gate. Noted for a future ontology-focused
-   PR.)*
-
-### 8. pr-test-analyzer — no blocking findings
-
-Reviewed the ontology feature's test suite (not part of this diff, but
-already merged and present in the working tree) at the task's request.
-Found it to be an unusually strong, regression-driven suite with no
-critical gaps. Two minor (5–6 severity) follow-up items were logged as
-backlog candidates, not merge blockers:
-1. `test_ingestion_datetime_parsing.py` checks `tzinfo is not None` but not
-   that the offset is actually UTC.
-2. `ontology_graph.py`'s empty/missing-`provider_id` branch has no test
-   coverage.
-
-Neither applies to the diff this gate is evaluating.
+**GATE PASSED**
 
 ---
 
-## Action Items (non-blocking, for Arshad's discretion)
+## Detailed Findings and Fixes
 
-- [ ] Reconcile `test-script-writer` vs `test-writer` naming in CLAUDE.md's
-      two pipeline tables.
-- [ ] Add a concrete "repeated attempts" threshold to the Model Escalation
-      Policy.
-- [ ] (Future ontology PR) Add class-level docstrings to `OntologyEntity`
-      and `OntologyRelationship`; document `RelationshipRule` field
-      semantics.
-- [ ] (Future ontology PR) Strengthen the UTC-offset assertion in
-      `test_ingestion_datetime_parsing.py`; add coverage for
-      `ontology_graph.py`'s empty-`provider_id` branch.
+### 1, 2. code-reviewer + security-auditor — narrow `touchesDb` heuristic
+
+Both independently flagged the same root issue: gating `database-specialist`
+on `backend/src/models/`/`alembic/`/`.sql` paths misses real query code in
+route/service files. Fixed by re-gating on `touchesPython` — every
+DB-touching file in this stack is necessarily `.py`. code-reviewer also
+flagged a secondary classification inconsistency (extension-only vs.
+path-prefix-or-extension checks disagreeing on an edge case); resolved by
+having `database-specialist`/`python-specialist` share the same `when`
+signal as the fix above, removing the divergent heuristic entirely.
+
+### 3. debugger — PASS, with a correction to the gate's own framing
+
+Debugger's first pass (before the fix landed) would have found the exact
+Critical bug the other two agents found; by the time it finished, the fix
+(`c1bf5c44`) was already on the branch, and it re-verified against the
+actual HEAD state: no stale closures, the two-pass catch-up design is
+correct, the `promptFiles` fallback is correct, syntax passes, and all 12
+new tests pass. Noted one by-design (non-bug) limitation: a specialist that
+already ran once isn't re-run if its domain gets *more* files added after
+that — only a skipped-then-later-relevant specialist gets the catch-up
+pass. Accepted as the correct, intentionally-scoped behavior (the design
+promises "ran at least once," not "re-run on every subsequent mutation").
+
+### 4. test-writer — BLOCKED → fixed
+
+Zero existing coverage, and the new conditional branching + file
+classification logic was judged to clearly cross into "new logic requiring
+coverage," not a config-value substitution. Added
+`.claude/workflows/dev-team-pipeline.test.js`: 12 tests covering
+`isFrontendFile`, `computeSignals`, and the skip/catch-up decision flow,
+including the exact regression scenario (a domain introduced mid-loop by an
+unconditional stage) and a drift-guard that fails if the test's verbatim
+copy of the logic and the real file diverge. All 12 pass.
+
+### 5. refactorer — 3 Warnings, all fixed
+
+`isFrontendFile` was defined after a duplicate inline version of its own
+logic (fixed: hoisted and reused). `scope` thunks (`() => backendOnly`)
+wrapped already-computed values in a misleading way (superseded entirely
+by the Critical-bug fix, which made `scope` a genuine live-recomputing
+function, not a thunk over a stale value). The skip-reason ternary chain
+was fragile for future stages (fixed: added a `skipReason` field co-located
+with each stage definition).
+
+### 6. doc-writer — WARN, fixed
+
+CLAUDE.md's pipeline table presented all stages as unconditional, which
+would confuse a future session reading the skip-log output. Added a
+parenthetical note to each of the 4 affected rows and a new "Conditional
+Audit Stages" subsection explaining the mechanism, the catch-up pass, and
+that Harden/the Merge-to-Main gate remain untouched.
+
+### 7, 8. silent-failure-hunter + pr-test-analyzer — Critical, fixed
+
+Both independently traced the exact same bug: `signals`/`backendOnly`/
+`frontendOnly` were frozen once before the Audit loop, so an earlier
+domain-specific stage's skip decision couldn't see files a later
+unconditional stage introduced. Fixed with the two-pass catch-up design
+described in the Summary above, verified correct by both a hand-written
+simulation (4 scenarios, including the exact bug scenario and the security-
+gap scenario, all passing) and by debugger's independent re-check.
+
+---
+
+## Verification Performed
+
+- `node --check .claude/workflows/dev-team-pipeline.js` — passes.
+- `node --test .claude/workflows/dev-team-pipeline.test.js` — 12/12 pass.
+- Manual simulation of 4 scenarios (backend-only, frontend-only, domain
+  introduced mid-loop by an unconditional stage, DB code outside
+  `models/`) against the exact fixed logic — all behave as intended.
+- `grep` confirms no dangling references to the removed `touchesDb`/
+  `backendOnly`/`frontendOnly` module-level constants anywhere in the file.
