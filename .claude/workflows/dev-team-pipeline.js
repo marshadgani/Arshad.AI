@@ -236,12 +236,28 @@ async function runFeaturePipeline(f) {
 
   phase('Audit')
 
+  // Domain-specific audit stages only earn their cost when the feature
+  // actually touches that domain — a Python audit on a pure-frontend
+  // feature (or vice versa) is pure token spend with nothing to find.
+  // Signals are computed from the real accumulated file list, not guessed
+  // ahead of time, so this can never under-run: if Engineer/Developer wrote
+  // a .py file, the Python Specialist runs, full stop.
+  //
+  // This does NOT touch the Harden phase (Debugger → EA post-build) — those
+  // stages always run regardless of feature size per this file's own
+  // existing invariant below ("Steps 8.5 → 9 always run"), and it does not
+  // touch the separate Merge-to-Main gate (.claude/commands/gate.md) at all.
+  const touchesPython = code.some(x => x.path.endsWith('.py'))
+  const touchesFrontend = code.some(x => x.path.startsWith('frontend/') || /\.(tsx?|jsx?|css|scss)$/.test(x.path))
+  const touchesDb = code.some(x => x.path.startsWith('backend/src/models/') || x.path.startsWith('backend/alembic/') || /\.sql$/.test(x.path))
+  const signals = { touchesPython, touchesFrontend, touchesDb }
+
   const auditStages = [
-    { role: 'database-specialist', label: 'Database Specialist', ask: 'Audit every DB interaction — queries, indexes, ORM, migrations, N+1, unsafe SQL. Fix issues found (empty files array if none apply).' },
-    { role: 'python-specialist', label: 'Python Specialist', ask: 'Audit async correctness, FastAPI DI, Pydantic v2, exceptions, type annotations. Fix issues found (empty files array if none apply).' },
+    { role: 'database-specialist', label: 'Database Specialist', ask: 'Audit every DB interaction — queries, indexes, ORM, migrations, N+1, unsafe SQL. Fix issues found (empty files array if none apply).', when: s => s.touchesDb },
+    { role: 'python-specialist', label: 'Python Specialist', ask: 'Audit async correctness, FastAPI DI, Pydantic v2, exceptions, type annotations. Fix issues found (empty files array if none apply).', when: s => s.touchesPython },
     { role: 'code-reviewer', label: 'Code Reviewer', ask: 'Review against CLAUDE.md rules (api.md, database.md, frontend.md) — naming, error shapes, async patterns, UUIDs. Fix departures.', model: SONNET },
-    { role: 'frontend-developer', label: 'Frontend Engineer', ask: 'Apply the frontend-design skill: bold aesthetic direction, distinctive typography/colour/motion, all 4 states (loading/empty/error/content), accessible, reusable.' },
-    { role: 'type-design-analyzer', label: 'Type Design Analyzer', ask: 'Audit the type system for weak types, missing invariant encoding, illegal-state prevention. Improve types.' },
+    { role: 'frontend-developer', label: 'Frontend Engineer', ask: 'Apply the frontend-design skill: bold aesthetic direction, distinctive typography/colour/motion, all 4 states (loading/empty/error/content), accessible, reusable.', when: s => s.touchesFrontend },
+    { role: 'type-design-analyzer', label: 'Type Design Analyzer', ask: 'Audit the type system for weak types, missing invariant encoding, illegal-state prevention. Improve types.', when: s => s.touchesFrontend },
     { role: 'code-analyzer', label: 'Senior Engineer', ask: 'Code quality audit — N+1, bad patterns, scalability risks. NO functionality changes.', model: SONNET },
     { role: 'refactoring-specialist', label: 'Software Architect', ask: 'Restructure to separate concerns, reduce coupling, increase modularity. NO functionality changes.', model: SONNET },
     { role: 'silent-failure-hunter', label: 'Silent Failure Hunter', ask: 'Find swallowed exceptions, HTTP 200 masking errors, missing propagation. Fix them.' },
@@ -249,6 +265,10 @@ async function runFeaturePipeline(f) {
   ]
 
   for (const st of auditStages) {
+    if (st.when && !st.when(signals)) {
+      log_(`${st.label} — skipped (no matching files: ${st.role === 'database-specialist' ? 'no DB files' : st.role === 'python-specialist' ? 'no .py files' : 'no frontend files'})`)
+      continue
+    }
     log_(st.label)
     const r = await withRole(st.role, () => agent(
       `${ctxHeader(f, st.label)}\n${st.ask}\nCurrent files:\n${dump(code)}`,
