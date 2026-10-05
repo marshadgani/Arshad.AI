@@ -2299,7 +2299,7 @@
     "claude-plugins-official": {
       "url": "https://github.com/anthropics/claude-plugins-official.git",
       "name": "claude-plugins-official",
-      "last_fetched": "2026-09-20 02:56 UTC",
+      "last_fetched": "2026-10-05 19:15 UTC",
       "components": {
         "skills": [
           "access",
@@ -2311,6 +2311,8 @@
           "build-mcp-server",
           "build-mcpb",
           "build-mcp-app",
+          "siege",
+          "solo",
           "skill-creator",
           "writing-rules",
           "example-command",
@@ -2335,6 +2337,9 @@
           "claude-automation-recommender"
         ],
         "agents": [
+          "math-proof-worker-deep",
+          "math-proof-judge",
+          "math-proof-worker",
           "code-simplifier",
           "code-explorer",
           "code-architect",
@@ -2347,6 +2352,7 @@
           "conversation-analyzer",
           "scan-researcher",
           "patch-generator",
+          "scan-redactor",
           "scan-inventory",
           "patch-verifier",
           "claude-security",
@@ -2386,13 +2392,16 @@
           "ralph-loop",
           "cancel-ralph",
           "modernize-map",
+          "modernize-review",
           "modernize-harden",
           "modernize-extract-rules",
           "modernize-status",
+          "modernize-verify",
           "modernize-assess",
           "modernize-preflight",
           "modernize-transform",
           "modernize-reimagine",
+          "modernize",
           "modernize-uplift",
           "modernize-brief",
           "code-review",
