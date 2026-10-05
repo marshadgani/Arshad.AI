@@ -1,40 +1,39 @@
 ---
-description: 为Rust强制执行TDD工作流。先写测试，然后实现。使用cargo-llvm-cov验证80%以上的覆盖率。
+description: Enforce TDD workflow for Rust. Write tests first, then implement. Verify 80%+ coverage with cargo-llvm-cov.
 ---
 
-# Rust TDD 命令
+# Rust TDD Command
 
-该命令使用 `#[test]`、rstest、proptest 和 mockall 来强制执行 Rust 代码的测试驱动开发方法。
+This command enforces test-driven development methodology for Rust code using `#[test]`, rstest, proptest, and mockall.
 
-## 该命令的作用
+## What This Command Does
 
-1. **定义类型/特征**：使用 `todo!()` 搭建函数签名
-2. **编写测试**：创建全面的测试模块（RED）
-3. **运行测试**：验证测试因正确的原因而失败
-4. **实现代码**：编写通过测试所需的最少代码（GREEN）
-5. **重构**：在保持测试通过的前提下进行改进
-6. **检查覆盖率**：使用 cargo-llvm-cov 确保 80%+ 的覆盖率
+1. **Define Types/Traits**: Scaffold function signatures with `todo!()`
+2. **Write Tests**: Create comprehensive test module (RED)
+3. **Run Tests**: Verify tests fail for the right reason
+4. **Implement Code**: Write minimal code to pass (GREEN)
+5. **Refactor**: Improve while keeping tests green
+6. **Check Coverage**: Ensure 80%+ coverage with cargo-llvm-cov
 
-## 何时使用
+## When to Use
 
-在以下情况使用 `/rust-test`：
+Use `/rust-test` when:
+- Implementing new Rust functions, methods, or traits
+- Adding test coverage to existing Rust code
+- Fixing bugs (write failing test first)
+- Building critical business logic
+- Learning TDD workflow in Rust
 
-* 实现新的 Rust 函数、方法或特征时
-* 为现有 Rust 代码添加测试覆盖时
-* 修复错误时（首先编写失败的测试）
-* 构建关键业务逻辑时
-* 学习 Rust 中的 TDD 工作流程时
-
-## TDD 循环
+## TDD Cycle
 
 ```
-RED     -> 先编写失败的测试
-GREEN   -> 实现最小化代码以通过测试
-REFACTOR -> 改进代码，保持测试通过
-REPEAT  -> 下一个测试用例
+RED     -> Write failing test first
+GREEN   -> Implement minimal code to pass
+REFACTOR -> Improve code, tests stay green
+REPEAT  -> Next test case
 ```
 
-## 示例会话
+## Example Session
 
 ````text
 User: /rust-test I need a function to validate user registration
@@ -186,9 +185,9 @@ Coverage: 100%
 ## TDD Complete!
 ````
 
-## 测试模式
+## Test Patterns
 
-### 单元测试
+### Unit Tests
 
 ```rust
 #[cfg(test)]
@@ -209,7 +208,7 @@ mod tests {
 }
 ```
 
-### 使用 rstest 进行参数化测试
+### Parameterized Tests with rstest
 
 ```rust
 use rstest::{rstest, fixture};
@@ -223,7 +222,7 @@ fn test_string_length(#[case] input: &str, #[case] expected: usize) {
 }
 ```
 
-### 异步测试
+### Async Tests
 
 ```rust
 #[tokio::test]
@@ -234,7 +233,7 @@ async fn fetches_data_successfully() {
 }
 ```
 
-### 基于属性的测试
+### Property-Based Tests
 
 ```rust
 use proptest::prelude::*;
@@ -249,7 +248,7 @@ proptest! {
 }
 ```
 
-## 覆盖率命令
+## Coverage Commands
 
 ```bash
 # Summary report
@@ -271,41 +270,39 @@ cargo test -- --nocapture
 cargo test --no-fail-fast
 ```
 
-## 覆盖率目标
+## Coverage Targets
 
-| 代码类型 | 目标 |
+| Code Type | Target |
 |-----------|--------|
-| 关键业务逻辑 | 100% |
-| 公共 API | 90%+ |
-| 通用代码 | 80%+ |
-| 生成的 / FFI 绑定 | 排除 |
+| Critical business logic | 100% |
+| Public API | 90%+ |
+| General code | 80%+ |
+| Generated / FFI bindings | Exclude |
 
-## TDD 最佳实践
+## TDD Best Practices
 
-**应做：**
+**DO:**
+- Write test FIRST, before any implementation
+- Run tests after each change
+- Use `assert_eq!` over `assert!` for better error messages
+- Use `?` in tests that return `Result` for cleaner output
+- Test behavior, not implementation
+- Include edge cases (empty, boundary, error paths)
 
-* **首先**编写测试，在任何实现之前
-* 每次更改后运行测试
-* 使用 `assert_eq!` 而非 `assert!` 以获得更好的错误信息
-* 在返回 `Result` 的测试中使用 `?` 以获得更清晰的输出
-* 测试行为，而非实现
-* 包含边界情况（空值、边界值、错误路径）
+**DON'T:**
+- Write implementation before tests
+- Skip the RED phase
+- Use `#[should_panic]` when `Result::is_err()` works
+- Use `sleep()` in tests — use channels or `tokio::time::pause()`
+- Mock everything — prefer integration tests when feasible
 
-**不应做：**
+## Related Commands
 
-* 在测试之前编写实现
-* 跳过 RED 阶段
-* 在 `Result::is_err()` 可用时使用 `#[should_panic]`
-* 在测试中使用 `sleep()` — 应使用通道或 `tokio::time::pause()`
-* 模拟一切 — 在可行时优先使用集成测试
+- `/rust-build` - Fix build errors
+- `/rust-review` - Review code after implementation
+- `verification-loop` skill - Run full verification loop
 
-## 相关命令
+## Related
 
-* `/rust-build` - 修复构建错误
-* `/rust-review` - 在实现后审查代码
-* `/verify` - 运行完整的验证循环
-
-## 相关
-
-* 技能：`skills/rust-testing/`
-* 技能：`skills/rust-patterns/`
+- Skill: `skills/rust-testing/`
+- Skill: `skills/rust-patterns/`

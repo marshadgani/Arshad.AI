@@ -1,44 +1,127 @@
 ---
-description: Reafirme requisitos, avalie riscos e crie plano de implementação passo a passo. ESPERE confirmação do usuário ANTES de tocar em qualquer código.
+description: Restate requirements, assess risks, and create step-by-step implementation plan. WAIT for user CONFIRM before touching any code. Use for a single-model inline or PRD-driven implementation plan; for a dual-model (Codex/Antigravity) plan use /multi-plan, and for visual annotate-and-approve review of the resulting plan use /plan-canvas.
+argument-hint: "[feature description | path/to/*.prd.md]"
 ---
 
-# Comando Plan
+# Plan Command
 
-Este comando invoca o agente **planner** para criar um plano abrangente de implementação antes de escrever qualquer código.
+This command creates a comprehensive implementation plan before writing any code. It accepts either free-form requirements or a PRD markdown file.
 
-## O Que Este Comando Faz
+Run inline by default. Do not call the Task tool or any subagent by default. This keeps `/plan` usable from plugin installs that ship commands without agent files.
 
-1. **Reafirmar Requisitos** - Esclarecer o que precisa ser construído
-2. **Identificar Riscos** - Levantar problemas e bloqueios potenciais
-3. **Criar Plano em Etapas** - Quebrar implementação em fases
-4. **Aguardar Confirmação** - DEVE receber aprovação do usuário antes de prosseguir
+## What This Command Does
 
-## Quando Usar
+1. **Restate Requirements** - Clarify what needs to be built
+2. **Identify Risks** - Surface potential issues and blockers
+3. **Create Step Plan** - Break down implementation into phases
+4. **Wait for Confirmation** - MUST receive user approval before proceeding
 
-Use `/plan` quando:
-- Estiver iniciando uma nova feature
-- For fazer mudanças arquiteturais significativas
-- Estiver trabalhando em refatoração complexa
-- Múltiplos arquivos/componentes serão afetados
-- Requisitos estiverem pouco claros ou ambíguos
+## When to Use
 
-## Como Funciona
+Use `/plan` when:
+- Starting a new feature
+- Making significant architectural changes
+- Working on complex refactoring
+- Multiple files/components will be affected
+- Requirements are unclear or ambiguous
 
-O agente planner vai:
+## How It Works
 
-1. **Analisar o pedido** e reafirmar os requisitos de forma clara
-2. **Quebrar em fases** com etapas específicas e acionáveis
-3. **Identificar dependências** entre componentes
-4. **Avaliar riscos** e possíveis bloqueios
-5. **Estimar complexidade** (High/Medium/Low)
-6. **Apresentar o plano** e AGUARDAR sua confirmação explícita
+The assistant will:
 
-## Exemplo de Uso
+1. **Analyze the request** and restate requirements in clear terms
+2. **Ground the plan** in relevant codebase patterns when the repo is available
+3. **Break down into phases** with specific, actionable steps
+4. **Identify dependencies** between components
+5. **Assess risks** and potential blockers
+6. **Estimate complexity** (High/Medium/Low)
+7. **Present the plan** and WAIT for your explicit confirmation
+
+## Input Modes
+
+| Input | Mode | Behavior |
+|---|---|---|
+| `path/to/name.prd.md` | PRD artifact mode | Read the PRD, pick the next pending delivery milestone or implementation phase, and write `.claude/plans/{name}.plan.md` |
+| Any other markdown path | Reference mode | Read the file as context and produce an inline plan |
+| Free-form text | Conversational mode | Produce an inline plan |
+| Empty input | Clarification mode | Ask what should be planned |
+
+In PRD artifact mode, create `.claude/plans/` if needed. If the PRD contains a `Delivery Milestones` table, update only the selected row from `pending` to `in-progress` and set its `Plan` cell to the generated plan path. If the PRD uses the legacy `.claude/PRPs/prds/` format with `Implementation Phases`, read it without migrating paths.
+
+## Pattern Grounding
+
+Before writing the plan, search the codebase for conventions the implementation should mirror. Capture the top example for each relevant category with file references:
+
+| Category | What to capture |
+|---|---|
+| Naming | File, function, type, command, or script naming in the affected area |
+| Error handling | How failures are raised, returned, logged, or handled gracefully |
+| Logging | Levels, format, and what gets logged |
+| Data access | Repository, service, query, or filesystem patterns |
+| Tests | Test file location, framework, fixtures, and assertion style |
+
+If no similar code exists, state that explicitly. Do not invent a pattern.
+
+## PRD Artifact Output
+
+When called with a `.prd.md` file, write the plan to `.claude/plans/{kebab-case-name}.plan.md` using this structure:
+
+````markdown
+# Plan: {Feature Name}
+
+**Source PRD**: {path}
+**Selected Milestone**: {milestone or phase name}
+**Complexity**: {Small | Medium | Large}
+
+## Summary
+{2-3 sentences}
+
+## Patterns to Mirror
+| Category | Source | Pattern |
+|---|---|---|
+| Naming | `path:line` | {short description} |
+| Errors | `path:line` | {short description} |
+| Tests | `path:line` | {short description} |
+
+## Files to Change
+| File | Action | Why |
+|---|---|---|
+| `path` | CREATE / UPDATE / DELETE | {reason} |
+
+## Tasks
+### Task 1: {name}
+- **Action**: {what to do}
+- **Mirror**: {pattern to follow}
+- **Validate**: {command that proves correctness}
+
+## Validation
+```bash
+{project-specific validation commands}
+```
+
+## Risks
+| Risk | Likelihood | Mitigation |
+|---|---|---|
+
+## Acceptance
+- [ ] All tasks complete
+- [ ] Validation passes
+- [ ] Patterns mirrored, not reinvented
+````
+
+After writing the artifact, report its path and WAIT for confirmation before writing code.
+
+> **Visual review:** instead of asking for a typed confirmation, you can open the
+> artifact in the browser Plan Canvas (`/plan-canvas`, or the `plan-canvas` skill):
+> the user annotates the plan in place and clicks **Approve plan** or **Request
+> changes**, which arrives as your confirmation signal.
+
+## Example Usage
 
 ```
 User: /plan I need to add real-time notifications when markets resolve
 
-Agent (planner):
+Assistant:
 # Implementation Plan: Real-Time Market Resolution Notifications
 
 ## Requirements Restatement
@@ -91,23 +174,33 @@ Agent (planner):
 **WAITING FOR CONFIRMATION**: Proceed with this plan? (yes/no/modify)
 ```
 
-## Notas Importantes
+## Important Notes
 
-**CRITICAL**: O agente planner **NÃO** vai escrever código até você confirmar explicitamente o plano com "yes", "proceed" ou resposta afirmativa similar.
+**CRITICAL**: This command will **NOT** write any code until you explicitly confirm the plan with "yes" or "proceed" or similar affirmative response.
 
-Se quiser mudanças, responda com:
-- "modificar: [suas alterações]"
-- "abordagem diferente: [alternativa]"
-- "pular fase 2 e fazer fase 3 primeiro"
+If you want changes, respond with:
+- "modify: [your changes]"
+- "different approach: [alternative]"
+- "skip phase 2 and do phase 3 first"
 
-Após planejar:
-- Use `/tdd` para implementar com test-driven development
-- Use `/build-fix` se ocorrerem erros de build
-- Use `/code-review` para revisar a implementação concluída
+## Integration with Other Commands
 
-## Agentes Relacionados
+After planning:
+- Use `/plan-canvas` to run the confirmation gate visually in the browser (annotate + approve)
+- Use the `tdd-workflow` skill to implement with test-driven development
+- Use `/build-fix` if build errors occur
+- Use `/code-review` to review completed implementation
+- Use `/pr` or `/prp-pr` to open a pull request
 
-Este comando invoca o agente `planner` fornecido pelo ECC.
+> **Need requirements first?** Use `/plan-prd` for a lean PRD at `.claude/prds/{name}.prd.md`.
+>
+> **Need the legacy PRP flow?** Use `/prp-plan` for deep PRP planning with `.claude/PRPs/` artifacts. Use `/prp-implement` to execute those plans with rigorous validation loops.
 
-Para instalações manuais, o arquivo fonte fica em:
+## Optional Planner Agent
+
+ECC also provides a `planner` agent for manual installs that include agent files. Use it only when the local runtime already exposes that subagent and the user explicitly asks you to delegate planning.
+
+If the `planner` subagent is unavailable, continue planning inline instead of surfacing an "Agent type 'planner' not found" error.
+
+For manual installs, the source file lives at:
 `agents/planner.md`

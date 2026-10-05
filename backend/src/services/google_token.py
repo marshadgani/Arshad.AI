@@ -75,18 +75,25 @@ async def _refresh(token_row: OAuthToken, db: AsyncSession) -> str:
     except TokenDecryptError as exc:
         raise TokenUnavailableError("Refresh token decryption failed.") from exc
 
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        resp = await client.post(
-            _GOOGLE_TOKEN_URL,
-            data={
-                "grant_type": "refresh_token",
-                "refresh_token": refresh_token,
-                "client_id": os.getenv("GOOGLE_OAUTH_CLIENT_ID", ""),
-                "client_secret": os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", ""),
-            },
-        )
-    resp.raise_for_status()
-    data = resp.json()
+    # A revoked or expired refresh token comes back as 400 invalid_grant.
+    # Letting that escape turned every Google-backed dashboard widget into a
+    # 500 instead of the documented fallback, so map any refresh failure to
+    # TokenUnavailableError.
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(
+                _GOOGLE_TOKEN_URL,
+                data={
+                    "grant_type": "refresh_token",
+                    "refresh_token": refresh_token,
+                    "client_id": os.getenv("GOOGLE_OAUTH_CLIENT_ID", ""),
+                    "client_secret": os.getenv("GOOGLE_OAUTH_CLIENT_SECRET", ""),
+                },
+            )
+        resp.raise_for_status()
+        data = resp.json()
+    except (httpx.HTTPError, ValueError) as exc:
+        raise TokenUnavailableError(f"Google token refresh failed: {exc}") from exc
 
     new_access = data["access_token"]
     expires_in = int(data.get("expires_in", 3600))

@@ -1,10 +1,14 @@
+---
+description: Safely identify and remove dead code with verification after each change.
+---
+
 # Refactor Clean
 
-Identifique e remova código morto com segurança, com verificação de testes em cada passo.
+Safely identify and remove dead code with test verification at every step.
 
-## Passo 1: Detectar Código Morto
+## Step 1: Detect Dead Code
 
-Rode ferramentas de análise com base no tipo do projeto:
+Run analysis tools based on project type:
 
 | Tool | What It Finds | Command |
 |------|--------------|---------|
@@ -15,14 +19,14 @@ Rode ferramentas de análise com base no tipo do projeto:
 | deadcode | Unused Go code | `deadcode ./...` |
 | cargo-udeps | Unused Rust dependencies | `cargo +nightly udeps` |
 
-Se nenhuma ferramenta estiver disponível, use Grep para encontrar exports com zero imports:
+If no tool is available, use Grep to find exports with zero imports:
 ```
 # Find exports, then check if they're imported anywhere
 ```
 
-## Passo 2: Categorizar Achados
+## Step 2: Categorize Findings
 
-Classifique os achados em níveis de segurança:
+Sort findings into safety tiers:
 
 | Tier | Examples | Action |
 |------|----------|--------|
@@ -30,35 +34,35 @@ Classifique os achados em níveis de segurança:
 | **CAUTION** | Components, API routes, middleware | Verify no dynamic imports or external consumers |
 | **DANGER** | Config files, entry points, type definitions | Investigate before touching |
 
-## Passo 3: Loop de Remoção Segura
+## Step 3: Safe Deletion Loop
 
-Para cada item SAFE:
+For each SAFE item:
 
-1. **Rode a suíte completa de testes** — Estabeleça baseline (tudo verde)
-2. **Delete o código morto** — Use a ferramenta Edit para remoção cirúrgica
-3. **Rode a suíte de testes novamente** — Verifique se nada quebrou
-4. **Se testes falharem** — Reverta imediatamente com `git checkout -- <file>` e pule este item
-5. **Se testes passarem** — Vá para o próximo item
+1. **Run full test suite** — Establish baseline (all green)
+2. **Delete the dead code** — Use Edit tool for surgical removal
+3. **Re-run test suite** — Verify nothing broke
+4. **If tests fail** — Immediately revert with `git checkout -- <file>` and skip this item
+5. **If tests pass** — Move to next item
 
-## Passo 4: Tratar Itens CAUTION
+## Step 4: Handle CAUTION Items
 
-Antes de deletar itens CAUTION:
-- Procure imports dinâmicos: `import()`, `require()`, `__import__`
-- Procure referências em string: nomes de rota, nomes de componente em configs
-- Verifique se é exportado por API pública de pacote
-- Verifique ausência de consumidores externos (dependents, se publicado)
+Before deleting CAUTION items:
+- Search for dynamic imports: `import()`, `require()`, `__import__`
+- Search for string references: route names, component names in configs
+- Check if exported from a public package API
+- Verify no external consumers (check dependents if published)
 
-## Passo 5: Consolidar Duplicatas
+## Step 5: Consolidate Duplicates
 
-Depois de remover código morto, procure:
-- Funções quase duplicadas (>80% similares) — mesclar em uma
-- Definições de tipo redundantes — consolidar
-- Funções wrapper sem valor — inline
-- Re-exports sem propósito — remover indireção
+After removing dead code, look for:
+- Near-duplicate functions (>80% similar) — merge into one
+- Redundant type definitions — consolidate
+- Wrapper functions that add no value — inline them
+- Re-exports that serve no purpose — remove indirection
 
-## Passo 6: Resumo
+## Step 6: Summary
 
-Reporte resultados:
+Report results:
 
 ```
 Dead Code Cleanup
@@ -72,9 +76,9 @@ Saved:     ~450 lines removed
 All tests passing PASS:
 ```
 
-## Regras
+## Rules
 
-- **Nunca delete sem rodar testes antes**
-- **Uma remoção por vez** — Mudanças atômicas facilitam rollback
-- **Se houver dúvida, pule** — Melhor manter código morto do que quebrar produção
-- **Não refatore durante limpeza** — Separe responsabilidades (limpar primeiro, refatorar depois)
+- **Never delete without running tests first**
+- **One deletion at a time** — Atomic changes make rollback easy
+- **Skip if uncertain** — Better to keep dead code than break production
+- **Don't refactor while cleaning** — Separate concerns (clean first, refactor later)
