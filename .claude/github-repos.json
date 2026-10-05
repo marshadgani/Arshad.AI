@@ -6171,7 +6171,7 @@
     "omniroute": {
       "url": "https://github.com/diegosouzapw/OmniRoute.git",
       "name": "OmniRoute",
-      "last_fetched": "2026-09-20 02:58 UTC",
+      "last_fetched": "2026-10-05 19:34 UTC",
       "components": {
         "skills": [
           "omni-context-rtk",
@@ -6220,6 +6220,11 @@
           "omni-github-skills",
           "cli-health",
           "omni-settings",
+          "merge-prs",
+          "quality-scan",
+          "validate-release-green",
+          "sweep-reds",
+          "green-prs",
           "bridge-proof"
         ],
         "agents": [],
