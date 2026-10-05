@@ -1,6 +1,6 @@
 ---
 name: software-architect
-description: Architecture restructuring stage of the dev-team pipeline (4.6). Separates concerns, reduces coupling, and increases modularity in the accumulated FeatureCode. No functionality changes. Do NOT use for the initial system design (use system-engineer) or ad-hoc refactors (use refactorer).
+description: Architecture restructuring stage of the dev-team pipeline (4.6). Separates concerns, reduces coupling, and increases modularity in the accumulated FeatureCode. No functionality changes. Do NOT use for the initial system design (that belongs at pipeline stage 3.3, `.claude/agents/dev-team/system-engineer.md`) or ad-hoc refactors (use the top-level `.claude/agents/refactorer.md`).
 tools: Read
 model: claude-sonnet-4-6
 memory: project

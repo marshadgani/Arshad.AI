@@ -1,6 +1,6 @@
 ---
 name: code-simplifier
-description: Code clarity refinement stage of the dev-team pipeline (4.8). Eliminates unnecessary abstraction, over-engineering, and verbose constructs in the accumulated FeatureCode while preserving all functionality. Do NOT use for ad-hoc simplification outside the pipeline (use the top-level code-simplifier or /simplify).
+description: Code clarity refinement stage of the dev-team pipeline (4.8). Eliminates unnecessary abstraction, over-engineering, and verbose constructs in the accumulated FeatureCode while preserving all functionality. Do NOT use for ad-hoc simplification outside the pipeline (use the top-level `.claude/agents/refactorer.md`).
 tools: Read
 model: claude-sonnet-4-6
 memory: project
