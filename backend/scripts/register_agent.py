@@ -50,12 +50,12 @@ def _parse_md(path: str) -> dict:
         purpose = re.sub(r"[*_`]", "", line.strip())[:250]
         break
 
-    # model: detect from content
+    # model: detect from the model: frontmatter field only — never substring-scan
+    # the whole file body. Per CLAUDE.md §20/§21, Sonnet is the ceiling for every
+    # registered agent; this must never infer/assign an Opus-tier model.
     model = "claude-sonnet-4-6"
-    lower = text.lower()
-    if "opus" in lower:
-        model = "claude-opus-4-8"
-    elif "haiku" in lower:
+    fm_model = re.search(r"^model:\s*(\S+)", text, re.MULTILINE)
+    if fm_model and "haiku" in fm_model.group(1).lower():
         model = "claude-haiku-4-5-20251001"
 
     return {
