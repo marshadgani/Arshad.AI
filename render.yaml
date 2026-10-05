@@ -29,5 +29,9 @@ services:
         sync: false
       - key: CORS_ORIGINS
         sync: false
+      - key: OBSIDIAN_VAULT_REPO_TOKEN
+        sync: false
+      - key: OBSIDIAN_VAULT_REPO_URL
+        value: marshadgani/obsidian-vault
       - key: PYTHONUNBUFFERED
         value: "1"

@@ -24,15 +24,24 @@ Internal structure
 from __future__ import annotations
 
 import json
+import logging
 import re
 from dataclasses import dataclass
 
 from ...models.ontology_vocabulary import CONTRIBUTED_TO, PERSON, PROJECT, PUBLIC
 
+logger = logging.getLogger(__name__)
+
 _SOURCE = "github"
 _DIR_BY_TYPE = {PERSON: "People", PROJECT: "Projects"}
 _DISALLOWED = re.compile(r"[^\w-]", re.ASCII)
 _DASHES = re.compile(r"-{2,}")
+_MAX_NAME_LEN = 200
+_WINDOWS_RESERVED = frozenset(
+    {"CON", "PRN", "AUX", "NUL"}
+    | {f"COM{i}" for i in range(1, 10)}
+    | {f"LPT{i}" for i in range(1, 10)}
+)
 
 
 @dataclass(frozen=True)
@@ -62,6 +71,10 @@ def _sanitize_key(key: str) -> str:
     cleaned = _DASHES.sub("-", cleaned).strip("-")
     if not cleaned:
         raise ValueError("external_key sanitizes to an empty filename")
+    if len(cleaned) > _MAX_NAME_LEN:
+        raise ValueError("external_key sanitizes to an over-long filename")
+    if cleaned.upper() in _WINDOWS_RESERVED:
+        raise ValueError(f"external_key sanitizes to a Windows-reserved filename: {cleaned!r}")
     _assert_no_traversal(cleaned)
     return cleaned
 
@@ -94,19 +107,33 @@ def _build_export_paths(
 ) -> dict[tuple[str, str], str]:
     """Map (entity_type, external_key) → relative file path (without .md suffix).
 
-    Entities with unknown types (not in ``_DIR_BY_TYPE``) are silently dropped.
-    Raises ``ValueError`` if two external_keys sanitize to the same filename.
+    Entities with unknown types (not in ``_DIR_BY_TYPE``) are skipped with a
+    warning. Raises ``ValueError`` (naming the entity id) if a key cannot be
+    sanitized, or if two keys sanitize to the same filename.
     """
     exported: dict[tuple[str, str], str] = {}
+    seen_paths: dict[str, tuple[str, str]] = {}
+    skipped_types: set[str] = set()
     for entity in sorted(entities, key=lambda e: (e.entity_type, e.external_key)):
         if entity.entity_type not in _DIR_BY_TYPE:
+            skipped_types.add(entity.entity_type)
             continue
-        exported[(entity.entity_type, entity.external_key)] = _path(
-            entity.entity_type, entity.external_key
+        try:
+            path = _path(entity.entity_type, entity.external_key)
+        except ValueError as exc:
+            raise ValueError(
+                f"entity id={entity.id} type={entity.entity_type}: {exc}"
+            ) from exc
+        if path in seen_paths:
+            raise ValueError(f"two external_keys sanitize to the same filename: {path}")
+        ident = (entity.entity_type, entity.external_key)
+        exported[ident] = path
+        seen_paths[path] = ident
+    if skipped_types:
+        logger.warning(
+            "vault render skipped entities of unsupported types: %s",
+            sorted(skipped_types),
         )
-    paths = list(exported.values())
-    if len(set(paths)) != len(paths):
-        raise ValueError("two external_keys sanitize to the same filename")
     return exported
 
 
@@ -123,6 +150,7 @@ def _build_adjacency(
     """
     projects_of: dict[str, set[str]] = {}
     contributors_of: dict[str, set[str]] = {}
+    dropped = 0
     for rel in relationships:
         if (
             rel.relationship_type != CONTRIBUTED_TO
@@ -133,9 +161,15 @@ def _build_adjacency(
         src = (rel.source_type, rel.source_key)
         dst = (rel.target_type, rel.target_key)
         if src not in exported or dst not in exported:
+            dropped += 1
             continue
         projects_of.setdefault(rel.source_key, set()).add(rel.target_key)
         contributors_of.setdefault(rel.target_key, set()).add(rel.source_key)
+    if dropped:
+        logger.warning(
+            "vault render dropped %d relationship(s) with an unexported endpoint",
+            dropped,
+        )
     return projects_of, contributors_of
 
 
@@ -153,17 +187,11 @@ def render_vault(
     for (etype, key), path in exported.items():
         entity = Entity("", etype, key, PUBLIC)
         if etype == PERSON:
-            links = [
-                exported[(PROJECT, k)]
-                for k in sorted(projects_of.get(key, ()))
-                if (PROJECT, k) in exported
-            ]
+            links = [exported[(PROJECT, k)] for k in sorted(projects_of.get(key, ()))]
             files[f"{path}.md"] = _note(entity, "Projects", links)
         else:
             links = [
-                exported[(PERSON, k)]
-                for k in sorted(contributors_of.get(key, ()))
-                if (PERSON, k) in exported
+                exported[(PERSON, k)] for k in sorted(contributors_of.get(key, ()))
             ]
             files[f"{path}.md"] = _note(entity, "Contributors", links)
     return files

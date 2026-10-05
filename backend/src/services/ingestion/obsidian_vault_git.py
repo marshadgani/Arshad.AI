@@ -45,6 +45,7 @@ logger = logging.getLogger(__name__)
 
 RETRY_AFTER_CAP_SECONDS = 60
 MAX_RETRIES = 3
+_PATH_BATCH_SIZE = 500
 TOTAL_OPERATION_TIMEOUT_SECONDS = 900
 _PER_COMMAND_TIMEOUT_SECONDS = 300
 _RATE_LIMIT_PATTERNS = (
@@ -172,8 +173,11 @@ def _setup_git_env(tmp_dir: Path, token: str) -> dict[str, str]:
     askpass = tmp_dir / "askpass.sh"
     askpass.write_text(_ASKPASS_SCRIPT)
     askpass.chmod(stat.S_IRWXU)
+    base = {k: os.environ[k] for k in ("PATH", "LANG", "LC_ALL", "SSL_CERT_FILE") if k in os.environ}
     return {
-        **os.environ,
+        **base,
+        "HOME": str(tmp_dir),
+        "GIT_CONFIG_NOSYSTEM": "1",
         "GIT_ASKPASS": str(askpass),
         "GIT_TERMINAL_PROMPT": "0",
         "OBSIDIAN_VAULT_GIT_TOKEN": token,
@@ -214,6 +218,21 @@ def _detect_changed_files(
     return changed, stale
 
 
+def _run_chunked(
+    prefix: list[str],
+    paths: list[str],
+    cwd: str,
+    env: dict[str, str],
+    token: str,
+    step: str,
+) -> None:
+    """Run a git path command in fixed-size batches to stay under ARG_MAX."""
+    for i in range(0, len(paths), _PATH_BATCH_SIZE):
+        proc = _run_git([*prefix, *paths[i : i + _PATH_BATCH_SIZE]], cwd=cwd, env=env)
+        if proc.returncode != 0:
+            raise _fail(step, proc, token)
+
+
 def _stage_and_commit(
     repo: Path,
     cwd: str,
@@ -230,13 +249,9 @@ def _stage_and_commit(
     """
     if changed:
         _write_files(repo, changed)
-        proc = _run_git(["add", "--", *changed], cwd=cwd, env=env)
-        if proc.returncode != 0:
-            raise _fail("add", proc, token)
+        _run_chunked(["add", "--"], list(changed), cwd, env, token, "add")
     if stale:
-        proc = _run_git(["rm", "--cached", "--", *stale], cwd=cwd, env=env)
-        if proc.returncode != 0:
-            raise _fail("rm", proc, token)
+        _run_chunked(["rm", "--cached", "--"], stale, cwd, env, token, "rm")
     proc = _run_git(["diff", "--cached", "--name-only"], cwd=cwd, env=env)
     if proc.returncode != 0:
         raise _fail("diff", proc, token)
