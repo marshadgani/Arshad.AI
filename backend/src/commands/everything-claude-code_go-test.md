@@ -1,30 +1,30 @@
 ---
-description: Impõe fluxo de TDD para Go. Escreva table-driven tests primeiro e depois implemente. Verifique cobertura de 80%+ com go test -cover.
+description: Enforce TDD workflow for Go. Write table-driven tests first, then implement. Verify 80%+ coverage with go test -cover.
 ---
 
-# Comando TDD Go
+# Go TDD Command
 
-Este comando impõe a metodologia de desenvolvimento orientado a testes para código Go usando padrões idiomáticos de teste em Go.
+This command enforces test-driven development methodology for Go code using idiomatic Go testing patterns.
 
-## O Que Este Comando Faz
+## What This Command Does
 
-1. **Definir Tipos/Interfaces**: Estrutura assinaturas de função primeiro
-2. **Escrever Table-Driven Tests**: Criar casos de teste abrangentes (RED)
-3. **Rodar Testes**: Verificar que os testes falham pelo motivo certo
-4. **Implementar Código**: Escrever código mínimo para passar (GREEN)
-5. **Refatorar**: Melhorar mantendo testes verdes
-6. **Checar Cobertura**: Garantir 80%+ de cobertura
+1. **Define Types/Interfaces**: Scaffold function signatures first
+2. **Write Table-Driven Tests**: Create comprehensive test cases (RED)
+3. **Run Tests**: Verify tests fail for the right reason
+4. **Implement Code**: Write minimal code to pass (GREEN)
+5. **Refactor**: Improve while keeping tests green
+6. **Check Coverage**: Ensure 80%+ coverage
 
-## Quando Usar
+## When to Use
 
-Use `/go-test` quando:
-- Implementar novas funções Go
-- Adicionar cobertura de testes a código existente
-- Corrigir bugs (escreva primeiro o teste que falha)
-- Construir lógica de negócio crítica
-- Aprender fluxo TDD em Go
+Use `/go-test` when:
+- Implementing new Go functions
+- Adding test coverage to existing code
+- Fixing bugs (write failing test first)
+- Building critical business logic
+- Learning TDD workflow in Go
 
-## Ciclo TDD
+## TDD Cycle
 
 ```
 RED     → Write failing table-driven test
@@ -33,7 +33,7 @@ REFACTOR → Improve code, tests stay green
 REPEAT  → Next test case
 ```
 
-## Exemplo de Sessão
+## Example Session
 
 ````
 User: /go-test I need a function to validate email addresses
@@ -169,7 +169,7 @@ ok      project/validator    0.003s
 ## TDD Complete!
 ````
 
-## Padrões de Teste
+## Test Patterns
 
 ### Table-Driven Tests
 ```go
@@ -191,7 +191,7 @@ for _, tt := range tests {
 }
 ```
 
-### Testes Paralelos
+### Parallel Tests
 ```go
 for _, tt := range tests {
     tt := tt // Capture
@@ -202,7 +202,7 @@ for _, tt := range tests {
 }
 ```
 
-### Helpers de Teste
+### Test Helpers
 ```go
 func setupTestDB(t *testing.T) *sql.DB {
     t.Helper()
@@ -212,7 +212,7 @@ func setupTestDB(t *testing.T) *sql.DB {
 }
 ```
 
-## Comandos de Cobertura
+## Coverage Commands
 
 ```bash
 # Basic coverage
@@ -231,7 +231,7 @@ go tool cover -func=coverage.out
 go test -race -cover ./...
 ```
 
-## Metas de Cobertura
+## Coverage Targets
 
 | Code Type | Target |
 |-----------|--------|
@@ -240,29 +240,29 @@ go test -race -cover ./...
 | General code | 80%+ |
 | Generated code | Exclude |
 
-## Boas Práticas de TDD
+## TDD Best Practices
 
 **DO:**
-- Escreva teste PRIMEIRO, antes de qualquer implementação
-- Rode testes após cada mudança
-- Use table-driven tests para cobertura abrangente
-- Teste comportamento, não detalhes de implementação
-- Inclua casos de borda (empty, nil, max values)
+- Write test FIRST, before any implementation
+- Run tests after each change
+- Use table-driven tests for comprehensive coverage
+- Test behavior, not implementation details
+- Include edge cases (empty, nil, max values)
 
 **DON'T:**
-- Escrever implementação antes dos testes
-- Pular a fase RED
-- Testar funções privadas diretamente
-- Usar `time.Sleep` em testes
-- Ignorar testes flaky
+- Write implementation before tests
+- Skip the RED phase
+- Test private functions directly
+- Use `time.Sleep` in tests
+- Ignore flaky tests
 
-## Comandos Relacionados
+## Related Commands
 
-- `/go-build` - Corrigir erros de build
-- `/go-review` - Revisar código após implementação
-- `/verify` - Rodar loop completo de verificação
+- `/go-build` - Fix build errors
+- `/go-review` - Review code after implementation
+- `verification-loop` skill - Run full verification loop
 
-## Relacionado
+## Related
 
 - Skill: `skills/golang-testing/`
 - Skill: `skills/tdd-workflow/`

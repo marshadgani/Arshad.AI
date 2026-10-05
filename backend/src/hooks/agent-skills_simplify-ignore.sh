@@ -16,6 +16,14 @@
 
 set -euo pipefail
 
+# Bash 5.2+ turns on patsub_replacement by default, which makes `&` and
+# backslash special on the replacement side of ${var//pattern/replacement}:
+# `&` expands to the matched text and `\\` collapses. expand_file substitutes
+# raw block content there, and code routinely contains `&&` and backslashes,
+# so the option must be off or protected blocks come back corrupted on Linux.
+# Older bashes do not know the option; ignore the error there.
+shopt -u patsub_replacement 2>/dev/null || true
+
 if ! command -v jq >/dev/null 2>&1; then
   printf '%s\n' "error: missing jq" >&2; exit 1
 fi
