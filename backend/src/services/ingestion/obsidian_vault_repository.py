@@ -50,6 +50,7 @@ async def fetch_public_relationships(
             dst.external_key.label("target_key"),
             dst.entity_type.label("target_type"),
             OntologyRelationship.relationship_type.label("relationship_type"),
+            OntologyRelationship.visibility.label("visibility"),
         )
         .select_from(OntologyRelationship)
         .join(

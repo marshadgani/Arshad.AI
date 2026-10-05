@@ -28,6 +28,7 @@ REL = {
     "target_key": "o/r",
     "target_type": "project",
     "relationship_type": "contributed_to",
+    "visibility": "public",
 }
 
 
@@ -117,13 +118,12 @@ async def test_private_row_from_query_layer_blocks_push_and_wraps_error():
 
 
 @pytest.mark.asyncio
-async def test_key_collision_surfaces_as_ingestion_error_and_no_push():
+async def test_key_collision_is_disambiguated_and_export_proceeds():
     a = {**PROJECT, "external_key": "o/r"}
     b = {**PROJECT, "id": uuid.uuid4(), "external_key": "o-r"}
-    push = AsyncMock(return_value=PushResult("ok", 1, "s", "m"))
-    with pytest.raises(IngestionError):
-        await _run([a, b], [], push=push)
-    push.assert_not_awaited()
+    push = AsyncMock(return_value=PushResult("ok", 2, "s", "m"))
+    await _run([a, b], [], push=push)
+    push.assert_awaited_once()
 
 
 @pytest.mark.asyncio

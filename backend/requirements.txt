@@ -22,8 +22,8 @@ httpx==0.28.1
 
 # Phase C — OAuth + JWT auth
 authlib==1.6.12
-cryptography==49.0.0
-pyjwt==2.13.0
+cryptography==50.0.2
+pyjwt==2.15.1
 
 # FEAT-143 — password login. bcrypt only (not passlib): passlib is
 # unmaintained and its bcrypt backend has known 72-byte-detection bugs

@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 import random
 
+import re
+
 import pytest
 
 from src.services.ingestion import obsidian_vault_render as r
@@ -23,7 +25,7 @@ def _project(key):
 
 
 def _edge(person_key, project_key, rtype="contributed_to", stype="person", ttype="project"):
-    return Relationship(person_key, stype, project_key, ttype, rtype)
+    return Relationship(person_key, stype, project_key, ttype, rtype, "public")
 
 
 def _frontmatter(content):
@@ -97,7 +99,7 @@ def test_unknown_relationship_type_ignored():
 def test_wrong_direction_edge_ignored():
     out = render_vault(
         [_person("a"), _project("o/x")],
-        [Relationship("o/x", "project", "a", "person", "contributed_to")],
+        [Relationship("o/x", "project", "a", "person", "contributed_to", "public")],
     )
     assert "[[" not in out["People/a.md"] + out["Projects/o-x.md"]
 
@@ -125,9 +127,17 @@ def test_mixed_batch_fails_closed():
         render_vault(ents, [])
 
 
-def test_collision_raises():
-    with pytest.raises(ValueError, match="same filename"):
-        render_vault([_project("owner/repo"), _project("owner-repo")], [])
+def test_collision_gets_stable_hash_suffix_and_does_not_abort():
+    files = render_vault([_project("owner/repo"), _project("owner-repo")], [])
+    assert len(files) == 2
+    assert all(re.fullmatch(r"Projects/owner-repo-[0-9a-f]{8}\.md", f) for f in files)
+    assert files == render_vault([_project("owner-repo"), _project("owner/repo")], [])
+
+
+def test_non_public_relationship_is_refused():
+    rel = Relationship("p", "person", "r", "project", "contributed_to", "private")
+    with pytest.raises(ValueError, match="non-public relationship"):
+        render_vault([_person("p"), _project("r")], [rel])
 
 
 def test_person_and_project_same_name_do_not_collide():

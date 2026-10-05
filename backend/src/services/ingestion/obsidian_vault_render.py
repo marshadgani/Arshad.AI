@@ -23,6 +23,7 @@ Internal structure
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import re
@@ -59,6 +60,7 @@ class Relationship:
     target_key: str
     target_type: str
     relationship_type: str
+    visibility: str
 
 
 def _assert_no_traversal(segment: str) -> None:
@@ -109,10 +111,11 @@ def _build_export_paths(
 
     Entities with unknown types (not in ``_DIR_BY_TYPE``) are skipped with a
     warning. Raises ``ValueError`` (naming the entity id) if a key cannot be
-    sanitized, or if two keys sanitize to the same filename.
+    sanitized, Keys that sanitize to the same filename each get a short stable hash suffix
+    so one collision never aborts the whole export.
     """
     exported: dict[tuple[str, str], str] = {}
-    seen_paths: dict[str, tuple[str, str]] = {}
+    seen_paths: dict[str, list[tuple[str, str]]] = {}
     skipped_types: set[str] = set()
     for entity in sorted(entities, key=lambda e: (e.entity_type, e.external_key)):
         if entity.entity_type not in _DIR_BY_TYPE:
@@ -124,11 +127,14 @@ def _build_export_paths(
             raise ValueError(
                 f"entity id={entity.id} type={entity.entity_type}: {exc}"
             ) from exc
-        if path in seen_paths:
-            raise ValueError(f"two external_keys sanitize to the same filename: {path}")
         ident = (entity.entity_type, entity.external_key)
         exported[ident] = path
-        seen_paths[path] = ident
+        seen_paths.setdefault(path, []).append(ident)
+    for path, idents in seen_paths.items():
+        if len(idents) > 1:
+            for ident in idents:
+                digest = hashlib.sha1(f"{ident[0]}:{ident[1]}".encode()).hexdigest()[:8]
+                exported[ident] = f"{path}-{digest}"
     if skipped_types:
         logger.warning(
             "vault render skipped entities of unsupported types: %s",
@@ -179,6 +185,10 @@ def render_vault(
     for entity in entities:
         if entity.visibility != PUBLIC:
             raise ValueError("refusing to render a non-public entity")
+
+    for rel in relationships:
+        if rel.visibility != PUBLIC:
+            raise ValueError("refusing to render a non-public relationship")
 
     exported = _build_export_paths(entities)
     projects_of, contributors_of = _build_adjacency(relationships, exported)

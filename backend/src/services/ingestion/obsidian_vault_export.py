@@ -68,6 +68,7 @@ def _to_relationships(rows: list[dict[str, Any]]) -> list[Relationship]:
             target_key=r["target_key"],
             target_type=r["target_type"],
             relationship_type=r["relationship_type"],
+            visibility=r["visibility"],
         )
         for r in rows
     ]
