@@ -23,6 +23,8 @@
 
 Manual verification: 131/131 vault tests pass against real Postgres 16, including the public-only query filter and tenant isolation. Full backend suite: 811 pass, 8 fail. The same 8 fail on the old dependency pins, so they predate this change (event-loop and env issues in auth and token tests).
 
+**Diff scope note:** the squash-divergence merge briefly reverted some of main's newer vendored skill files (weekly-sync noise). They were restored from main, so this PR's diff is FEAT-166 code, tests, config and task files only (21 files).
+
 ## Fixed in this PR (from gate findings)
 
 - Empty public set no longer wipes the vault. Export refuses unless the trigger payload sets `allow_empty_prune`.
