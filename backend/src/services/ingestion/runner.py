@@ -65,5 +65,9 @@ async def run(
         from . import ontology_extract as ontology_extract_svc
 
         return await ontology_extract_svc.extract(user=user, db=db, payload=payload)
+    if dag_id == "obsidian_vault_export":
+        from . import obsidian_vault_export as obsidian_vault_export_svc
+
+        return await obsidian_vault_export_svc.export(user=user, db=db, payload=payload)
 
     raise IngestionError(f"unknown_dag_id: {dag_id}")
