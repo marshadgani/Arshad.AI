@@ -1,138 +1,546 @@
 ---
 name: workflow-authoring
-description: |-
-  Reference for writing a Workflow tool script (script API and gotchas, resume, quality patterns, worked examples). Load before authoring a script for a workflow the user already opted into; it does not itself authorize running one.
+description: Use when authoring a non-trivial Workflow for research, review, migration, or other multi-agent work, especially when the task needs multiple evidence sources, verification, or synthesis.
+user-invocable: false
 ---
 
-# Workflow authoring reference
+# Workflow Authoring
 
-A workflow structures work across many agents — to be comprehensive (decompose and cover in parallel), to be confident (independent perspectives and adversarial checks before committing), or to take on scale one context can't hold (migrations, audits, broad sweeps). The script is where you encode that structure: what fans out, what verifies, what synthesizes.
+Load this reference exactly once per parent session before the first non-trivial Workflow.
+After a successful load, reuse that result for later Workflow authoring.
+Do not call `read_skill` again after validation errors or for retries and resumes.
+Select exactly one profile section from the active Workflow guidance.
+Never mix symbols across profiles, and never use a call that the active
+ToolSpec does not advertise.
 
-When you do call it, the right move is often **hybrid**: scout inline first (list the files, find the channels, scope the diff) to discover the work-list, then call Workflow to pipeline over it. You don't need to know the shape before the *task* — only before the *orchestration step*.
+## Shared research contract
 
-Common single-phase workflows you can chain across turns:
-- **Understand** — parallel readers over relevant subsystems → structured map
-- **Design** — judge panel of N independent approaches → scored synthesis
-- **Review** — dimensions → find → adversarially verify (the review-changes example)
-- **Research** — multi-modal sweep → deep-read → synthesize
-- **Migrate** — discover sites → transform each (worktree isolation) → verify
+A fixed batch count never proves completion. Scale the number and diversity of
+children to the request, then stop on evidence state or an explicit caller or
+runtime boundary.
 
-For larger work, run several in sequence — read each result before deciding the next phase. You stay in the loop; each workflow is one well-scoped fan-out.
+For a review of a change the user has already identified, first take stock inline
+of which files it touches and how large it is, then size the workflow to that
+list: a small change gets a few focused children plus one verify vote, not the
+full research shape.
 
-**Ultracode.** When a system-reminder confirms ultracode is on, that opt-in is standing: author and run a workflow for every substantive task by default. The goal is the most exhaustive, correct answer you can produce — token cost is not a constraint. For multi-phase work (understand → design → implement → review), that often means several workflows in sequence — one per phase — so you stay in the loop between them. The quality patterns below (adversarial verify, multi-modal sweep, completeness critic, loop-until-dry) are the tools; pick what fits the task. Lean toward orchestrating with workflows and adversarially verifying your findings — unless the work is trivial or already verified. Solo only on conversational turns or trivial mechanical edits. When a reminder says ultracode is off, revert to the opt-in rule in the Workflow tool description.
+Discovery pointers are not inspected evidence when the relevant body is
+readable. Require each research child to open every implementation or test body
+it cites before `submit_result` when readable; search and grep output only
+locate candidates. Back every assigned claim with inspected evidence or name
+it as unresolved. Ask research children for
+`complete:boolean`, `evidence:string[]`, and `unresolved:string[]`. Handle the
+V2 spill marker below before checking for missing data. For inline results,
+treat a profile-specific unsuccessful result envelope, missing or wrong-typed
+data, `complete !== true`, or nonempty `unresolved` as incomplete.
 
-Pass the script inline via `script` — do not Write it to a file first. Every invocation automatically persists its script to a file under the session directory and returns the path in the tool result. To iterate on a workflow, edit that file with Write/Edit and re-invoke Workflow with `{scriptPath: "<path>"}` instead of resending the full script.
+Never use data from an unsuccessful envelope as evidence or a gap disposition.
+Critic unavailability is a synthesis note, never a research gap. Preserve
+compact evidence, provenance refs, and every unresolved item in synthesis.
+Synthesize from compact `result.data`, not from uninspected summaries. Disclose
+omitted scope.
 
-Every script must begin with `export const meta = {...}`:
-  export const meta = {
-    name: 'find-flaky-tests',
-    description: 'Find flaky tests and propose fixes',   // one-line, shown in permission dialog
-    phases: [                                            // one entry per phase() call
-      { title: 'Scan', detail: 'grep test logs for retries' },
-      { title: 'Fix', detail: 'one agent per flaky test' },
-    ],
+Use independent verification when a claim has materially different failure
+modes. Repeating the same prompt is not independent coverage.
+
+Keep these reusable patterns when they fit the request:
+
+- Multi-angle sweep: split initial researchers across genuinely different
+  evidence surfaces, such as implementation, tests, design records, and
+  operational traces; different role names do not increase coverage when they
+  use the same search plan.
+- Adversarial verification: give a skeptic a concrete falsification target for
+  each material claim; retain only claims that survive inspected counterevidence,
+  and mark an unavailable or invalid verdict unresolved.
+- Judge panel: for an open solution space, generate candidates from different
+  angles, score them against explicit criteria with independent judges, and
+  synthesize the winner with useful runner-up ideas by provenance ref.
+  A failed or invalid judge is not an affirmative vote.
+
+## V2 spilled child results
+
+Schema-valid `submit_result` custom data above 4096 canonical UTF-8 bytes
+(excluding `notes`) is accepted and stored in full. Exactly 4096 bytes stays
+inline. An oversize result arrives with `dataSpilledForSize: true`,
+`submittedPayloadBytes`, `submittedPayloadChars`, and `ref`, with no inline
+`data`. Size facts describe the full canonical submission, including non-null
+`notes`; they are not the custom-only spill measurement.
+
+Scripts MUST carry `dataSpilledForSize`, both size facts, and `ref` through to
+their returned results. Preserve the envelope, or copy those fields explicitly
+as in the V2 examples below. Never collapse a result to `data ?? null`. You
+MUST NOT treat a spilled result as empty or failed, or repeat completed work
+merely because inline data is absent. Continue to respect the envelope's actual
+status and errors. Submission completion does not prove that uninspected
+evidence is complete; preserve existing unresolved gaps.
+
+No script-side or parent-side API currently returns the full value. The full
+submission is retained under its `ref` in durable session storage and exposed
+through the MSP subagent view. Repeating a result observation or passing the
+ref to another child supplies no lossless fetch; ref context is bounded.
+
+Ask children to keep custom data under 4096 canonical bytes. When file tools
+are available, write large artifacts (test modules, reports) to files and
+return paths plus a compact summary. Otherwise split the work or ask for a
+compact schema. Report a spilled submission as complete but large, include its
+`ref` and size facts, say where the full submission is retained, and disclose
+that its contents remain uninspected by this Workflow. Do not claim a file was
+written unless the child actually returned that artifact path.
+
+## Two convergence rules
+
+Open-ended discovery and a known evidence gap are different jobs. Do not apply
+one loop rule to both.
+
+### Example: open discovery
+
+Maintain `seen` and `dryRounds` in deterministic Workflow state. In each round,
+ask complementary finders for items not already in `seen`. Add every reported
+item to `seen` before judging it:
+
+- deduplicate against all seen items, including rejected findings;
+- If a round adds any fresh item, reset the dry count to zero;
+- if it adds none, increment the dry count; and
+- After two consecutive dry rounds, stop discovery.
+
+A caller limit, capacity boundary, or runtime budget may stop it earlier; that
+stop is partial unless all requested scope is covered.
+
+### Example: explicit gap follow-up
+
+Track the lineage of each concrete unresolved gap.
+
+- Dispatch exactly one focused follow-up for that gap lineage.
+- After that attempt, carry the narrowed, reworded, or still-unresolved descendant unchanged into synthesis.
+- Do not make its new wording look like a new gap and dispatch it again.
+
+### Example: verification and omitted scope
+
+For a claim involving behavior, abuse resistance, and a reported failure:
+
+- use separate correctness, security, and reproduction lenses;
+- give each verifier a distinct falsification target;
+- State omitted scope for top-N, sampling, no-retry, capacity, caller limit, and runtime budget boundaries; and
+- never describe a bounded sample as exhaustive.
+
+## Workflow API V1
+
+The API is available as bare globals - agent, parallel, pipeline, phase, log,
+args, budget - and through the legacy host object. Use the V1 globals or their
+`host` aliases described by the active ToolSpec. Read caller input from
+`host.args`, the only advertised caller-input spelling.
+For example, fan out independent research with `host.parallel(` and use
+`host.agent` for the critic, one gap follow-up, and final synthesis:
+
+```javascript
+export default async function workflow(host) {
+  const evidenceSchema = {
+    type: "object",
+    required: ["complete", "evidence", "unresolved"],
+    properties: {
+      complete: { type: "boolean" },
+      evidence: { type: "array", items: { type: "string" } },
+      unresolved: { type: "array", items: { type: "string" } },
+    },
+  };
+  const compact = (result, scope, missing = `${scope}: missing complete evidence result`) => {
+    const failed = result === null || result.error_kind;
+    const data = !failed && result.data && typeof result.data === "object" ? result.data : null;
+    const evidence = !failed && Array.isArray(data?.evidence) ? data.evidence.filter(Boolean) : [];
+    const declared = !failed && Array.isArray(data?.unresolved) ? data.unresolved.filter(Boolean) : [];
+    const complete = data?.complete === true && evidence.length > 0 && declared.length === 0;
+    return {
+      scope,
+      ref: result?.ref ?? null,
+      complete,
+      evidence,
+      unresolved: complete ? [] : (declared.length ? declared : [missing]),
+    };
+  };
+
+  const reports = await host.parallel([
+    { input: "Inspect the implementation body; return complete/evidence/unresolved.", schema: evidenceSchema },
+    { input: "Inspect the tests; return complete/evidence/unresolved.", schema: evidenceSchema },
+  ]);
+  const compactReports = reports.map((result, index) => compact(result, `primary-${index}`));
+  const synthesisNotes = [];
+  const critic = await host.agent({
+    input: `Find concrete gaps in this compact evidence: ${JSON.stringify(compactReports)}.`,
+    schema: evidenceSchema,
+  });
+  const criticData = critic !== null && !critic.error_kind && critic.data && typeof critic.data === "object" ? critic.data : null;
+  const criticEvidence = Array.isArray(criticData?.evidence) ? criticData.evidence.filter(Boolean) : [];
+  const criticUnresolved = Array.isArray(criticData?.unresolved) ? criticData.unresolved.filter(Boolean) : [];
+  const criticHasUsableDisposition = (criticData?.complete === true && criticEvidence.length > 0 && criticUnresolved.length === 0)
+    || criticUnresolved.length > 0;
+  const compactCritic = criticHasUsableDisposition
+    ? compact(critic, "critic")
+    : (synthesisNotes.push("completeness critic unavailable"), { scope: "critic", ref: critic?.ref ?? null, complete: true, evidence: [], unresolved: [] });
+  const open = [...compactReports, compactCritic].flatMap((report) => report.unresolved);
+  const firstGap = open[0];
+  const followup = firstGap ? await host.agent({
+    input: `Resolve this exact gap once, or return it unchanged: ${firstGap}`,
+    schema: evidenceSchema,
+  }) : null;
+  const followupReport = firstGap ? compact(followup, firstGap, firstGap) : null;
+  const all = followupReport ? [...compactReports, compactCritic, followupReport] : [...compactReports, compactCritic];
+  const unresolved = firstGap ? [...open.slice(1), ...followupReport.unresolved] : open;
+  const evidence = all.flatMap((report) => report.evidence.map((value) => ({ source: report.scope, ref: report.ref, value })));
+  const refs = [...new Set(all.map((report) => report.ref).filter(Boolean))];
+  const synthesis = await host.agent({
+    input: `Synthesize only this compact evidence: ${JSON.stringify({ evidence, refs, unresolved, notes: synthesisNotes })}`,
+    schema: evidenceSchema,
+  });
+  const synthesisFailed = synthesis === null || synthesis.error_kind;
+  const synthesisData = !synthesisFailed && synthesis.data && typeof synthesis.data === "object" ? synthesis.data : null;
+  const synthesisUnresolved = Array.isArray(synthesisData?.unresolved) ? synthesisData.unresolved.filter(Boolean) : [];
+  const synthesisComplete = synthesisData?.complete === true
+    && Array.isArray(synthesisData.evidence)
+    && synthesisData.evidence.length > 0
+    && synthesisUnresolved.length === 0;
+  if (!synthesisComplete) synthesisNotes.push("synthesis unavailable or incomplete");
+  return { status: unresolved.length || synthesisUnresolved.length || synthesisNotes.length > 0 ? "partial" : "complete", ref: synthesis?.ref ?? null, unresolved: [...unresolved, ...synthesisUnresolved], notes: synthesisNotes };
+}
+```
+
+Wrap the shared discovery and gap-lineage state machine around these calls when
+the request needs it. Use compact structured results and refs; follow the V1
+ToolSpec for schemas, budgets, isolation, failures, and return shape.
+
+## Diagnostic Workflow API V2
+
+Keep each V2 `input` within 4096 UTF-8 bytes, including task text and refs.
+Deferred commands also obey their whole-command size limit. The refs below
+request bounded prior-result context; inspect needed bodies and return
+`complete: false` with unresolved gaps if required evidence is unavailable.
+Refs do not carry lossless `result.data` or parent-local gap state. Include
+known unresolved items and synthesis notes as essential compact context.
+
+The diagnostic script surface is exactly Agent, Phase, Pipeline, ParallelGroup,
+WorkflowCommandError, log, args, and budget. This profile is fresh-run and
+terminal-only. Use deferred work inside the diagnostic containers for
+parallelism, then read immutable results:
+
+```javascript
+const evidenceSchema = {
+  type: "object",
+  required: ["complete", "evidence", "unresolved"],
+  properties: {
+    complete: { type: "boolean" },
+    evidence: { type: "array", items: { type: "string" } },
+    unresolved: { type: "array", items: { type: "string" } },
+  },
+};
+const synthesisNotes = [];
+const spilledResults = [];
+const recordSpill = (result, scope) => {
+  if (result?.dataSpilledForSize !== true) return false;
+  spilledResults.push({
+    scope, ref: result.ref, status: result.status, ok: result.ok, error: result.error,
+    dataSpilledForSize: result.dataSpilledForSize,
+    submittedPayloadBytes: result.submittedPayloadBytes,
+    submittedPayloadChars: result.submittedPayloadChars,
+  });
+  synthesisNotes.push(`${scope}: large submission retained at ${result.ref} in session storage / MSP subagent view; contents uninspected.`);
+  return result.status === "completed" && result.ok === true && result.error == null;
+};
+const group = await ParallelGroup.start({
+  members: [
+    Agent.defer.start({ input: "Inspect the implementation body; return complete/evidence/unresolved.", schema: evidenceSchema }),
+    Agent.defer.start({ input: "Inspect the tests; return complete/evidence/unresolved.", schema: evidenceSchema }),
+  ],
+});
+const reports = await group.result();
+const fromAttemptOutcome = (outcome, scope) => {
+  if (outcome?.kind !== "attempt" || !outcome.result?.ref) {
+    return { scope, ref: null, complete: false, evidence: [], unresolved: [`${scope}: no completed attempt result`] };
   }
-  // script body starts here — use agent()/parallel()/pipeline()/phase()/log()
-  phase('Scan')
-  const flaky = await agent('grep CI logs for retry markers', {schema: FLAKY_SCHEMA})
-  ...
-
-The `meta` object must be a PURE LITERAL — no variables, function calls, spreads, or template interpolation. Required fields: `name`, `description`. Optional: `whenToUse` (shown in the workflow list), `phases`. Use the SAME phase titles in meta.phases as in phase() calls — titles are matched exactly; a phase() call with no matching meta entry just gets its own progress group.
-
-Script body hooks:
-- agent(prompt: string, opts?: {label?: string, phase?: string, schema?: object, effort?: string, isolation?: 'worktree', agentType?: string}): Promise<any> — spawn a subagent. Without schema, returns its final text as a string. With schema (a JSON Schema), the subagent is forced to call a StructuredOutput tool and agent() returns the validated object — no parsing needed. Returns null if the user skips the agent mid-run or the subagent dies on a terminal API error after retries (filter with .filter(Boolean)). opts.label overrides the display label. opts.phase explicitly assigns this agent to a progress group (use this inside pipeline()/parallel() stages to avoid races on the global phase() state — same phase string → same group box). opts.effort overrides the reasoning effort for this agent call ('low' | 'medium' | 'high' | 'xhigh' | 'max') — omit to inherit the session effort; use 'low' for cheap mechanical stages and higher tiers only for the hardest verify/judge stages. opts.isolation: 'worktree' runs the agent in a fresh git worktree — EXPENSIVE (~200-500ms setup + disk per agent), use ONLY when agents mutate files in parallel and would otherwise conflict; the worktree is auto-removed if unchanged. opts.agentType uses a custom subagent type (e.g. 'general-purpose', 'code-reviewer') instead of the default workflow subagent — resolved from the same registry as the Agent tool; composes with schema (the custom agent's system prompt gets a StructuredOutput instruction appended).
-- pipeline(items, stage1, stage2, ...): Promise<any[]> — run each item through all stages independently, NO barrier between stages. Item A can be in stage 3 while item B is still in stage 1. This is the DEFAULT for multi-stage work. Wall-clock = slowest single-item chain, not sum-of-slowest-per-stage. Every stage callback receives (prevResult, originalItem, index) — use originalItem/index in later stages to label work without threading context through stage 1's return value. A stage that throws drops that item to `null` and skips its remaining stages.
-- parallel(thunks: Array<() => Promise<any>>): Promise<any[]> — run tasks concurrently. This is a BARRIER: awaits all thunks before returning. A thunk that throws (or whose agent errors) resolves to `null` in the result array — the call itself never rejects, so `.filter(Boolean)` before using the results. Use ONLY when you genuinely need all results together.
-- log(message: string): void — emit a progress message to the user (shown as a narrator line above the progress tree)
-- phase(title: string): void — start a new phase; subsequent agent() calls are grouped under this title in the progress display
-- args: any — the value passed as Workflow's `args` input, verbatim (undefined if not provided). Pass arrays/objects as actual JSON values in the tool call, NOT as a JSON-encoded string — `args: ["a.ts", "b.ts"]`, not `args: "[\"a.ts\", ...]"` (a stringified list reaches the script as one string, so `args.filter`/`args.map` throw). Use this to parameterize named workflows — e.g. pass a research question, target path, or config object directly instead of via a side-channel file.
-- budget: {total: number|null, spent(): number, remaining(): number} — the turn's token target from the user's "+500k"-style directive. `budget.total` is null if no target was set. `budget.spent()` returns output tokens spent this turn across the main loop and all workflows — the pool is shared, not per-workflow. `budget.remaining()` returns `max(0, total - spent())`, or `Infinity` if no target. The target is a HARD ceiling, not advisory: once `spent()` reaches `total`, further `agent()` calls throw. Use for dynamic loops: `while (budget.total && budget.remaining() > 50_000) { ... }`, or static scaling: `const FLEET = budget.total ? Math.floor(budget.total / 100_000) : 5`.
-- workflow(nameOrRef: string | {scriptPath: string}, args?: any): Promise<any> — run another workflow inline as a sub-step and return whatever it returns. Pass a name to invoke a saved workflow (same registry as {name: "..."}), or {scriptPath} to run a script file you Wrote earlier. The child shares this run's concurrency cap, agent counter, abort signal, and token budget — its agents appear under a "▸ name" group in /workflows and its tokens count toward budget.spent(). The args param becomes the child's `args` global. Nesting is one level only: workflow() inside a child throws. Throws on unknown name / unreadable scriptPath / child syntax error; catch to handle gracefully.
-
-Subagents are told their final text IS the return value (not a human-facing message), so they return raw data. For structured output, use the schema option — validation happens at the tool-call layer so the model retries on mismatch.
-Schemas need {type: 'object', properties: {...}} at root and required ⊆ properties; unsatisfiable ones throw at agent().
-
-Workflow agents can reach all session-connected MCP tools via ToolSearch — schemas load on demand per agent. Caveat: interactively-authenticated MCP servers (e.g. claude.ai) may be absent in headless/cron runs.
-
-Scripts are plain JavaScript, NOT TypeScript — type annotations (`: string[]`), interfaces, and generics fail to parse. The script body runs in an async context — use await directly. Standard JS built-ins (JSON, Math, Array, etc.) are available — EXCEPT `Date.now()`/`Math.random()`/argless `new Date()`, which throw (they would break resume); pass timestamps in via `args`, stamp results after the workflow returns, and for randomness vary the agent prompt/label by index. No filesystem or Node.js API access.
-
-DEFAULT TO pipeline(). Only reach for a barrier (parallel between stages) when you genuinely need ALL prior-stage results together.
-
-A barrier is correct ONLY when stage N needs cross-item context from all of stage N-1:
-- Dedup/merge across the full result set before expensive downstream work
-- Early-exit if the total count is zero ("0 bugs found → skip verification entirely")
-- Stage N's prompt references "the other findings" for comparison
-
-A barrier is NOT justified by:
-- "I need to flatten/map/filter first" — do it inside a pipeline stage: pipeline(items, stageA, r => transform([r]).flat(), stageB)
-- "The stages are conceptually separate" — that's what pipeline() models. Separate stages ≠ synchronized stages.
-- "It's cleaner code" — barrier latency is real. If 5 finders run and the slowest takes 3× the fastest, a barrier wastes 2/3 of the fast finders' idle time.
-
-Smell test: if you wrote
-  const a = await parallel(...)
-  const b = transform(a)        // flatten, map, filter — no cross-item dependency
-  const c = await parallel(b.map(...))
-that middle transform doesn't need the barrier. Rewrite as a pipeline with the transform inside a stage. When in doubt: pipeline.
-
-Concurrent agent() calls are capped at min(16, available CPUs - 2) per workflow — excess calls queue and run as slots free up. You can still pass 100 items to parallel()/pipeline() and they all complete; only ~10 run at any moment. Total agent count across a workflow's lifetime is capped at 1000 — a runaway-loop backstop set far above any real workflow. A single parallel()/pipeline() call accepts at most 4096 items; passing more is an explicit error, not a silent truncation.
-
-When a barrier IS correct — dedup across all findings before expensive verification:
-  const all = await parallel(DIMENSIONS.map(d => () => agent(d.prompt, {schema: FINDINGS_SCHEMA})))
-  const deduped = dedupeByFileAndLine(all.filter(Boolean).flatMap(r => r.findings))  // <-- genuinely needs ALL at once
-  const verified = await parallel(deduped.map(f => () => agent(verifyPrompt(f), {schema: VERDICT_SCHEMA})))
-
-Loop-until-count pattern — accumulate to a target:
-  const bugs = []
-  while (bugs.length < 10) {
-    const result = await agent("Find bugs in this codebase.", {schema: BUGS_SCHEMA})
-    bugs.push(...result.bugs)
-    log(`${bugs.length}/10 found`)
+  const result = outcome.result;
+  const ref = outcome.result.ref;
+  if (recordSpill(result, scope)) {
+    return { scope, ref: result.ref, complete: false, evidence: [], unresolved: [] };
   }
-
-Loop-until-budget pattern — scale depth to the user's "+500k" directive. Guard on budget.total: with no target set, remaining() is Infinity and the loop would run straight to the 1000-agent cap.
-  const bugs = []
-  while (budget.total && budget.remaining() > 50_000) {
-    const result = await agent("Find bugs in this codebase.", {schema: BUGS_SCHEMA})
-    bugs.push(...result.bugs)
-    log(`${bugs.length} found, ${Math.round(budget.remaining()/1000)}k remaining`)
+  const data = result?.data && typeof result.data === "object" ? result.data : null;
+  const terminalOk = result.status === "completed" && result.ok === true && result.error == null && data !== null;
+  const evidence = terminalOk && Array.isArray(data.evidence) ? data.evidence.filter(Boolean) : [];
+  const declared = terminalOk && Array.isArray(data.unresolved) ? data.unresolved.filter(Boolean) : [];
+  const complete = terminalOk && data.complete === true && evidence.length > 0 && declared.length === 0;
+  return {
+    scope,
+    ref,
+    complete,
+    evidence: terminalOk ? evidence : [],
+    unresolved: complete ? [] : (declared.length ? declared : [`${scope}: no completed attempt result`]),
+  };
+};
+const compactReports = reports.map((outcome, index) => fromAttemptOutcome(outcome, `parallel-${index}`));
+const pipeline = await Pipeline.start({
+  items: reports,
+  stages: [{
+    title: "Check",
+    run: ({ item, index }) => {
+      if (item?.kind !== "attempt" || !item.result?.ref) {
+        return { complete: false, evidence: [], unresolved: [`parallel-${index}: missing result ref`] };
+      }
+      return Agent.defer.start({ input: `Verify the evidence behind ${item.result.ref}; return complete/evidence/unresolved.`, schema: evidenceSchema });
+    },
+  }],
+});
+const checked = await pipeline.result();
+const checkedReports = checked.map((item, index) => {
+  if (item?.kind !== "completed" || !item.output?.ref) {
+    return { scope: `pipeline-${index}`, ref: null, complete: false, evidence: [], unresolved: [`pipeline-${index}: not completed`] };
   }
-
-Composing patterns — exhaustive review (find → dedup vs seen → diverse-lens panel → loop-until-dry):
-  const seen = new Set(), confirmed = []
-  let dry = 0
-  while (dry < 2) {                                              // loop-until-dry
-    const found = (await parallel(FINDERS.map(f => () =>          // barrier: collect all finders this round
-      agent(f.prompt, {phase: 'Find', schema: BUGS})))).filter(Boolean).flatMap(r => r.bugs)
-    const fresh = found.filter(b => !seen.has(key(b)))           // dedup vs ALL seen — plain code, not an agent
-    if (!fresh.length) { dry++; continue }
-    dry = 0; fresh.forEach(b => seen.add(key(b)))
-    const judged = await parallel(fresh.map(b => () =>           // every fresh bug judged concurrently...
-      parallel(['correctness','security','repro'].map(lens => () =>   // ...each by 3 distinct lenses
-        agent(`Judge "${b.desc}" via the ${lens} lens — real?`, {phase: 'Verify', schema: VERDICT})))
-        .then(vs => ({ b, real: vs.filter(Boolean).filter(v => v.real).length >= 2 }))))
-    confirmed.push(...judged.filter(v => v.real).map(v => v.b))
+  if (recordSpill(item.output, `pipeline-${index}`)) {
+    return { scope: `pipeline-${index}`, ref: item.output.ref, complete: false, evidence: [], unresolved: [] };
   }
-  return confirmed
-  // dedup vs `seen`, NOT `confirmed` — else judge-rejected findings reappear every round and it never converges.
+  const data = item.output.data && typeof item.output.data === "object" ? item.output.data : null;
+  const outputOk = item.output.status === "completed" && item.output.ok === true && item.output.error == null && data !== null;
+  const evidence = outputOk && Array.isArray(data.evidence) ? data.evidence.filter(Boolean) : [];
+  const declared = outputOk && Array.isArray(data.unresolved) ? data.unresolved.filter(Boolean) : [];
+  const complete = outputOk && data.complete === true && evidence.length > 0 && declared.length === 0;
+  return {
+    scope: `pipeline-${index}`,
+    ref: item.output.ref,
+    complete,
+    evidence: outputOk ? evidence : [],
+    unresolved: complete ? [] : (declared.length ? declared : [`pipeline-${index}: missing structured output`]),
+  };
+});
+const unresolved = [...compactReports, ...checkedReports].flatMap((report) => report.unresolved);
+const refs = [...compactReports, ...checkedReports].map((report) => report.ref).filter(Boolean);
+const evidence = [...compactReports, ...checkedReports].flatMap((report) => report.evidence.map((value) => ({ source: report.scope, ref: report.ref, value })));
+const critic = await Agent.start({ input: `Inspect relevant bodies and find concrete gaps in reports ${refs.join(" ")}. Known unresolved items: ${JSON.stringify(unresolved)}. Return complete/evidence/unresolved; set complete:false and name unresolved gaps when evidence is unavailable.`, schema: evidenceSchema });
+const gaps = await critic.latestAttempt.result();
+const criticSpilled = recordSpill(gaps, "critic");
+const criticData = gaps?.data && typeof gaps.data === "object" ? gaps.data : null;
+const criticTerminalOk = gaps?.status === "completed"
+  && gaps?.ok === true
+  && gaps?.error == null
+  && criticData !== null;
+const criticGaps = criticTerminalOk && Array.isArray(criticData.unresolved) ? criticData.unresolved.filter(Boolean) : [];
+if (criticTerminalOk && Array.isArray(criticData.evidence)) {
+  evidence.push(...criticData.evidence.filter(Boolean).map((value) => ({ source: "critic", ref: gaps.ref, value })));
+}
+const criticComplete = criticTerminalOk
+  && criticData?.complete === true
+  && Array.isArray(criticData.evidence)
+  && criticData.evidence.length > 0
+  && Array.isArray(criticData.unresolved)
+  && criticData.unresolved.length === 0;
+if (!criticComplete && criticGaps.length === 0 && !criticSpilled) {
+  synthesisNotes.push("completeness critic unavailable");
+}
+const open = [...unresolved, ...criticGaps];
+const firstGap = open[0];
+let gapResult = null;
+let gapDescendants = [];
+if (firstGap) {
+  const resolver = await Agent.start({ input: `Resolve this exact gap once, or return it unchanged: ${firstGap}`, schema: evidenceSchema });
+  gapResult = await resolver.latestAttempt.result();
+  recordSpill(gapResult, firstGap);
+  const gapData = gapResult?.data && typeof gapResult.data === "object" ? gapResult.data : null;
+  const gapTerminalOk = gapResult?.status === "completed"
+    && gapResult?.ok === true
+    && gapResult?.error == null
+    && gapData !== null;
+  const reportedDescendants = gapTerminalOk && Array.isArray(gapData.unresolved) ? gapData.unresolved.filter(Boolean) : [];
+  if (gapTerminalOk && Array.isArray(gapData.evidence)) {
+    evidence.push(...gapData.evidence.filter(Boolean).map((value) => ({ source: firstGap, ref: gapResult.ref, value })));
+  }
+  const gapComplete = gapTerminalOk
+    && gapData?.complete === true
+    && Array.isArray(gapData.evidence)
+    && gapData.evidence.length > 0
+    && reportedDescendants.length === 0;
+  if (!gapComplete) gapDescendants = reportedDescendants.length > 0 ? reportedDescendants : [firstGap];
+}
+const finalUnresolved = firstGap ? [...open.slice(1), ...gapDescendants] : open;
+const synthesisRefs = [...refs, gaps?.ref, gapResult?.ref].filter(Boolean);
+const synthesisAgent = await Agent.start({
+  input: `Synthesize reports ${synthesisRefs.join(" ")} using inspected bodies only. Preserve this known state: ${JSON.stringify({ unresolved: finalUnresolved, notes: synthesisNotes })}. Keep unavailable-critic notes separate from research gaps. Inspect relevant bodies as needed; preserve unresolved items and omitted scope. Set complete:false when needed evidence is unavailable.`,
+  schema: evidenceSchema,
+});
+const synthesis = await synthesisAgent.latestAttempt.result();
+const synthesisSpilled = recordSpill(synthesis, "synthesis");
+const synthesisData = synthesis?.data && typeof synthesis.data === "object" ? synthesis.data : null;
+const synthesisTerminalOk = synthesis?.status === "completed"
+  && synthesis?.ok === true
+  && synthesis?.error == null
+  && synthesisData !== null;
+const synthesisGaps = synthesisTerminalOk && Array.isArray(synthesisData.unresolved) ? synthesisData.unresolved.filter(Boolean) : [];
+const synthesisComplete = synthesisTerminalOk
+  && synthesisData?.complete === true
+  && Array.isArray(synthesisData.evidence)
+  && synthesisData.evidence.length > 0
+  && synthesisGaps.length === 0;
+if (!synthesisComplete && !synthesisSpilled) synthesisNotes.push("synthesis unavailable or incomplete");
+return { status: finalUnresolved.length || synthesisGaps.length || synthesisNotes.length > 0 ? "partial" : "complete", ref: synthesis?.ref ?? null, reports: synthesisRefs, spilledResults, unresolved: [...finalUnresolved, ...synthesisGaps], notes: synthesisNotes };
+```
 
-Quality patterns — common shapes; pick by task and compose freely:
-- Adversarial verify: spawn N independent skeptics per finding, each prompted to REFUTE. Kill if ≥majority refute. Prevents plausible-but-wrong findings from surviving.
-    const votes = await parallel(Array.from({length: 3}, () => () =>
-      agent(`Try to refute: ${claim}. Default to refuted=true if uncertain.`, {schema: VERDICT})))
-    const survives = votes.filter(Boolean).filter(v => !v.refuted).length >= 2
-- Perspective-diverse verify: when a finding can fail in more than one way, give each verifier a distinct lens (correctness, security, perf, does-it-reproduce) instead of N identical refuters — diversity catches failure modes redundancy can't.
-- Judge panel: generate N independent attempts from different angles (e.g. MVP-first, risk-first, user-first), score with parallel judges, synthesize from the winner while grafting the best ideas from runners-up. Beats one-attempt-iterated when the solution space is wide.
-- Loop-until-dry: for unknown-size discovery (bugs, issues, edge cases), keep spawning finders until K consecutive rounds return nothing new. Simple counters (while count < N) miss the tail.
-- Multi-modal sweep: parallel agents each searching a different way (by-container, by-content, by-entity, by-time). Each is blind to what the others surface; useful when one search angle won't find everything.
-- Completeness critic: a final agent that asks "what's missing — modality not run, claim unverified, source unread?" What it finds becomes the next round of work.
-- No silent caps: if a workflow bounds coverage (top-N, no-retry, sampling), `log()` what was dropped — silent truncation reads as "covered everything" when it didn't.
+Wrap the shared discovery and gap-lineage state machine around these calls when
+needed. Do not invent durable control or recovery methods in this profile.
 
-Scale to what the user asked for. "find any bugs" → a few finders, single-vote verify. "thoroughly audit this" or "be comprehensive" → larger finder pool, 3–5 vote adversarial pass, synthesis stage. When unsure, lean toward thoroughness for research/review/audit requests and toward brevity for quick checks.
+## Live Workflow API V2
 
-These patterns aren't exhaustive — compose novel harnesses when the task calls for it (tournament brackets, self-repair loops, staged escalation, whatever fits).
+Budget the complete caller-supplied `input` or `message` string to at most
+4096 UTF-8 bytes before runtime-added prior-result context. This applies to
+`Agent.start`, `agent.followup`, and `agent.send`. Count task text, JSON syntax,
+evidence, refs, and unresolved items together; JavaScript `string.length` is
+not a UTF-8 byte count.
 
-Use this tool for multi-step orchestration where control flow should be deterministic (loops, conditionals, fan-out) rather than model-driven.
+Build critic and synthesis handoffs as a short task and accessible `result.ref`
+tokens plus only essential compact context. The runtime adds bounded context
+for those refs; children must inspect needed bodies and return `complete: false`
+with unresolved gaps when required evidence is unavailable.
+Refs do not carry lossless `result.data` or parent-local gap state. Include
+known unresolved items and synthesis notes as essential compact context.
+Keep every unresolved item unchanged in workflow state and in the final outcome.
+If essential context will not fit, split work within the remaining budget or
+disclose the omitted scope; do not truncate JSON or silently drop gap lists.
 
-## Resume
+The live Workflow API V2 surface in this activation slice is the Agent and
+AgentAttempt path. Start each independent worker, then observe the exact
+attempt. Use a follow-up only for an explicit gap lineage that has not already
+received one:
 
-The tool result includes a runId. To resume after a pause, kill, or script edit, relaunch with Workflow({scriptPath, resumeFromRunId}) — the longest unchanged prefix of agent() calls returns cached results instantly; the first edited/new call and everything after it runs live. Same script + same args → 100% cache hit. Before diagnosing why a completed workflow returned an empty or unexpected result, Read <transcriptDir>/journal.jsonl — it records each agent's actual return value; do not assume cached results are non-empty. Date.now()/Math.random()/new Date() are unavailable in scripts (they would break this) — stamp results after the workflow returns, or pass timestamps via args. Fallback when no journal is available: Read agent-<id>.jsonl files in the transcript directory and hand-author a continuation script.
+```javascript
+const evidenceSchema = {
+  type: "object",
+  required: ["complete", "evidence", "unresolved"],
+  properties: {
+    complete: { type: "boolean" },
+    evidence: { type: "array", items: { type: "string" } },
+    unresolved: { type: "array", items: { type: "string" } },
+  },
+};
+const synthesisNotes = [];
+const spilledResults = [];
+const recordSpill = (result, scope) => {
+  if (result?.dataSpilledForSize !== true) return false;
+  spilledResults.push({
+    scope, ref: result.ref, status: result.status, ok: result.ok, error: result.error,
+    dataSpilledForSize: result.dataSpilledForSize,
+    submittedPayloadBytes: result.submittedPayloadBytes,
+    submittedPayloadChars: result.submittedPayloadChars,
+  });
+  synthesisNotes.push(`${scope}: large submission retained at ${result.ref} in session storage / MSP subagent view; contents uninspected.`);
+  return result.status === "completed" && result.ok === true && result.error == null;
+};
+const agent = await Agent.start({ input: "Inspect the implementation body; return complete/evidence/unresolved.", schema: evidenceSchema });
+const tests = await Agent.start({ input: "Inspect the tests; return complete/evidence/unresolved.", schema: evidenceSchema });
+const workers = [agent, tests];
+const reports = await Promise.all([
+  agent.latestAttempt.result(),
+  tests.latestAttempt.result(),
+]);
+const compact = (result, scope) => {
+  if (recordSpill(result, scope)) {
+    return { scope, ref: result.ref, complete: false, evidence: [], unresolved: [] };
+  }
+  const data = result?.data && typeof result.data === "object" ? result.data : null;
+  const terminalOk = result.status === "completed" && result.ok === true && result.error == null && data !== null;
+  const evidence = terminalOk && Array.isArray(data.evidence) ? data.evidence.filter(Boolean) : [];
+  const declared = terminalOk && Array.isArray(data.unresolved) ? data.unresolved.filter(Boolean) : [];
+  const complete = terminalOk && data.complete === true && evidence.length > 0 && declared.length === 0;
+  return {
+    scope,
+    ref: result?.ref ?? null,
+    complete,
+    evidence: terminalOk ? evidence : [],
+    unresolved: complete ? [] : (declared.length ? declared : [`${scope}: missing complete evidence result`]),
+  };
+};
+const compactReports = reports.map((result, index) => compact(result, `primary-${index}`));
+const primaryRefs = compactReports.map((report) => report.ref).filter(Boolean);
+const evidence = compactReports.flatMap((report) => report.evidence.map((value) => ({ source: report.scope, ref: report.ref, value })));
+const primaryGaps = compactReports.flatMap((report) => report.unresolved);
+const critic = await Agent.start({
+  input: `Inspect relevant bodies and find concrete gaps in reports ${primaryRefs.join(" ")}. Known unresolved items: ${JSON.stringify(primaryGaps)}. Return complete/evidence/unresolved; set complete:false and name unresolved gaps when evidence is unavailable.`,
+  schema: evidenceSchema,
+});
+const criticResult = await critic.latestAttempt.result();
+const criticSpilled = recordSpill(criticResult, "critic");
+const criticData = criticResult?.data && typeof criticResult.data === "object" ? criticResult.data : null;
+const criticTerminalOk = criticResult?.status === "completed"
+  && criticResult?.ok === true
+  && criticResult?.error == null
+  && criticData !== null;
+const criticGaps = criticTerminalOk && Array.isArray(criticData.unresolved) ? criticData.unresolved.filter(Boolean) : [];
+if (criticTerminalOk && Array.isArray(criticData.evidence)) {
+  evidence.push(...criticData.evidence.filter(Boolean).map((value) => ({ source: "critic", ref: criticResult.ref, value })));
+}
+const criticComplete = criticTerminalOk
+  && criticData?.complete === true
+  && Array.isArray(criticData.evidence)
+  && criticData.evidence.length > 0
+  && criticGaps.length === 0;
+if (!criticComplete && criticGaps.length === 0 && !criticSpilled) {
+  synthesisNotes.push("completeness critic unavailable");
+}
+const open = [...primaryGaps, ...criticGaps];
+const gapOwner = compactReports.findIndex((report) => report.unresolved.length > 0);
+const firstGap = gapOwner >= 0 ? compactReports[gapOwner].unresolved[0] : (criticGaps[0] ?? null);
+const gapAgent = gapOwner >= 0 ? workers[gapOwner] : critic;
+const gapDescendants = [];
+let followupRef = null;
+if (firstGap) {
+  const followupAttempt = await gapAgent.followup({ input: `Resolve this exact gap once, or return it unchanged: ${firstGap}` });
+  const followupResult = await followupAttempt.result();
+  recordSpill(followupResult, firstGap);
+  followupRef = followupResult?.ref ?? null;
+  const data = followupResult?.data && typeof followupResult.data === "object" ? followupResult.data : null;
+  const followupTerminalOk = followupResult?.status === "completed"
+    && followupResult?.ok === true
+    && followupResult?.error == null
+    && data !== null;
+  const reportedDescendants = followupTerminalOk && Array.isArray(data.unresolved) ? data.unresolved.filter(Boolean) : [];
+  if (followupTerminalOk && Array.isArray(data.evidence)) {
+    evidence.push(...data.evidence.filter(Boolean).map((value) => ({ source: firstGap, ref: followupResult.ref, value })));
+  }
+  const descendants = reportedDescendants.length > 0 ? reportedDescendants : [firstGap];
+  const followupComplete = followupTerminalOk
+    && data?.complete === true
+    && Array.isArray(data.evidence)
+    && data.evidence.length > 0
+    && reportedDescendants.length === 0;
+  if (!followupComplete) gapDescendants.push(...descendants);
+}
+const unresolved = firstGap ? [...open.slice(1), ...gapDescendants] : open;
+const synthesisRefs = [...primaryRefs, criticResult?.ref, followupRef].filter(Boolean);
+const synthesis = await Agent.start({
+  input: `Synthesize reports ${synthesisRefs.join(" ")} using inspected bodies only. Preserve this known state: ${JSON.stringify({ unresolved, notes: synthesisNotes })}. Keep unavailable-critic notes separate from research gaps. Inspect relevant bodies as needed; preserve unresolved items and omitted scope. Set complete:false when needed evidence is unavailable.`,
+  schema: evidenceSchema,
+});
+const final = await synthesis.latestAttempt.result();
+const finalSpilled = recordSpill(final, "synthesis");
+const finalData = final?.data && typeof final.data === "object" ? final.data : null;
+const finalTerminalOk = final?.status === "completed"
+  && final?.ok === true
+  && final?.error == null
+  && finalData !== null;
+const finalUnresolved = finalTerminalOk && Array.isArray(finalData.unresolved) ? finalData.unresolved.filter(Boolean) : [];
+const finalOk = finalTerminalOk
+  && finalData?.complete === true
+  && Array.isArray(finalData.evidence)
+  && finalData.evidence.length > 0
+  && Array.isArray(finalData.unresolved)
+  && finalData.unresolved.length === 0;
+if (!finalOk && !finalSpilled) synthesisNotes.push("synthesis unavailable or incomplete");
+return { status: unresolved.length || finalUnresolved.length || synthesisNotes.length > 0 || !finalOk ? "partial" : "complete", ref: final?.ref ?? null, spilledResults, unresolved: [...unresolved, ...finalUnresolved], notes: synthesisNotes };
+```
+
+Check `dataSpilledForSize` first. For inline results, read structured child
+data from `result.data`, including `data.unresolved`; the top-level result
+object is only the envelope. To stop a whole launched run
+from the parent conversation, call `work_stop` with `work_id` set to the
+`workId` from the launch result when that tool is available. `interrupt()` stops
+only one live child attempt: check `agent.latestAttempt.getStatus()` and call
+`agent.latestAttempt.interrupt()` before awaiting
+`agent.latestAttempt.result()`. After `result()` resolves, the attempt is
+terminal.
+
+For later-owner recovery, invoke the Workflow tool with the returned
+`scriptPath` and `resumeFromRunId`; do not add those fields to the script API.
+Wrap the shared discovery and gap-lineage state machine around the Agent calls,
+and preserve unresolved descendants unchanged at the final boundary.
