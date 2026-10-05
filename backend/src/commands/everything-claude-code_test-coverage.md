@@ -1,8 +1,12 @@
-# Cobertura de Testes
+---
+description: Analyze coverage, identify gaps, and generate missing tests toward the target threshold.
+---
 
-Analise cobertura de testes, identifique lacunas e gere testes faltantes para alcançar cobertura de 80%+.
+# Test Coverage
 
-## Passo 1: Detectar Framework de Teste
+Analyze test coverage, identify gaps, and generate missing tests to reach 80%+ coverage.
+
+## Step 1: Detect Test Framework
 
 | Indicator | Coverage Command |
 |-----------|-----------------|
@@ -13,42 +17,42 @@ Analise cobertura de testes, identifique lacunas e gere testes faltantes para al
 | `pom.xml` with JaCoCo | `mvn test jacoco:report` |
 | `go.mod` | `go test -coverprofile=coverage.out ./...` |
 
-## Passo 2: Analisar Relatório de Cobertura
+## Step 2: Analyze Coverage Report
 
-1. Rode o comando de cobertura
-2. Parseie a saída (resumo em JSON ou saída de terminal)
-3. Liste arquivos **abaixo de 80% de cobertura**, ordenados do pior para o melhor
-4. Para cada arquivo abaixo da meta, identifique:
-   - Funções ou métodos sem teste
-   - Cobertura de branch faltante (if/else, switch, caminhos de erro)
-   - Código morto que infla o denominador
+1. Run the coverage command
+2. Parse the output (JSON summary or terminal output)
+3. List files **below 80% coverage**, sorted worst-first
+4. For each under-covered file, identify:
+   - Untested functions or methods
+   - Missing branch coverage (if/else, switch, error paths)
+   - Dead code that inflates the denominator
 
-## Passo 3: Gerar Testes Faltantes
+## Step 3: Generate Missing Tests
 
-Para cada arquivo abaixo da meta, gere testes seguindo esta prioridade:
+For each under-covered file, generate tests following this priority:
 
-1. **Happy path** — Funcionalidade principal com entradas válidas
-2. **Tratamento de erro** — Entradas inválidas, dados ausentes, falhas de rede
-3. **Casos de borda** — Arrays vazios, null/undefined, valores de fronteira (0, -1, MAX_INT)
-4. **Cobertura de branch** — Cada if/else, caso de switch, ternário
+1. **Happy path** — Core functionality with valid inputs
+2. **Error handling** — Invalid inputs, missing data, network failures
+3. **Edge cases** — Empty arrays, null/undefined, boundary values (0, -1, MAX_INT)
+4. **Branch coverage** — Each if/else, switch case, ternary
 
-### Regras para Geração de Testes
+### Test Generation Rules
 
-- Coloque testes adjacentes ao código-fonte: `foo.ts` → `foo.test.ts` (ou convenção do projeto)
-- Use padrões de teste existentes do projeto (estilo de import, biblioteca de asserção, abordagem de mocking)
-- Faça mock de dependências externas (banco, APIs, sistema de arquivos)
-- Cada teste deve ser independente — sem estado mutável compartilhado entre testes
-- Nomeie testes de forma descritiva: `test_create_user_with_duplicate_email_returns_409`
+- Place tests adjacent to source: `foo.ts` → `foo.test.ts` (or project convention)
+- Use existing test patterns from the project (import style, assertion library, mocking approach)
+- Mock external dependencies (database, APIs, file system)
+- Each test should be independent — no shared mutable state between tests
+- Name tests descriptively: `test_create_user_with_duplicate_email_returns_409`
 
-## Passo 4: Verificar
+## Step 4: Verify
 
-1. Rode a suíte completa de testes — todos os testes devem passar
-2. Rode cobertura novamente — confirme a melhoria
-3. Se ainda estiver abaixo de 80%, repita o Passo 3 para as lacunas restantes
+1. Run the full test suite — all tests must pass
+2. Re-run coverage — verify improvement
+3. If still below 80%, repeat Step 3 for remaining gaps
 
-## Passo 5: Reportar
+## Step 5: Report
 
-Mostre comparação antes/depois:
+Show before/after comparison:
 
 ```
 Coverage Report
@@ -60,10 +64,10 @@ src/utils/validation.ts 32%    82%
 Overall:               67%     84%  PASS:
 ```
 
-## Áreas de Foco
+## Focus Areas
 
-- Funções com branching complexo (alta complexidade ciclomática)
-- Error handlers e blocos catch
-- Funções utilitárias usadas em todo o codebase
-- Handlers de endpoint de API (fluxo request → response)
-- Casos de borda: null, undefined, string vazia, array vazio, zero, números negativos
+- Functions with complex branching (high cyclomatic complexity)
+- Error handlers and catch blocks
+- Utility functions used across the codebase
+- API endpoint handlers (request → response flow)
+- Edge cases: null, undefined, empty string, empty array, zero, negative numbers
