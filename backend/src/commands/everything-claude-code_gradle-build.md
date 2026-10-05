@@ -1,72 +1,70 @@
 ---
-description: 修复 Android 和 KMP 项目的 Gradle 构建错误
+description: Fix Gradle build errors for Android and KMP projects
 ---
 
-# Gradle 构建修复
+# Gradle Build Fix
 
-逐步修复 Android 和 Kotlin 多平台项目的 Gradle 构建和编译错误。
+Incrementally fix Gradle build and compilation errors for Android and Kotlin Multiplatform projects.
 
-## 步骤 1：检测构建配置
+## Step 1: Detect Build Configuration
 
-识别项目类型并运行相应的构建：
+Identify the project type and run the appropriate build:
 
-| 指示符 | 构建命令 |
+| Indicator | Build Command |
 |-----------|---------------|
 | `build.gradle.kts` + `composeApp/` (KMP) | `./gradlew composeApp:compileKotlinMetadata 2>&1` |
 | `build.gradle.kts` + `app/` (Android) | `./gradlew app:compileDebugKotlin 2>&1` |
-| `settings.gradle.kts` 包含模块 | `./gradlew assemble 2>&1` |
-| 配置了 Detekt | `./gradlew detekt 2>&1` |
+| `settings.gradle.kts` with modules | `./gradlew assemble 2>&1` |
+| Detekt configured | `./gradlew detekt 2>&1` |
 
-同时检查 `gradle.properties` 和 `local.properties` 以获取配置信息。
+Also check `gradle.properties` and `local.properties` for configuration.
 
-## 步骤 2：解析并分组错误
+## Step 2: Parse and Group Errors
 
-1. 运行构建命令并捕获输出
-2. 将 Kotlin 编译错误与 Gradle 配置错误分开
-3. 按模块和文件路径分组
-4. 排序：先处理配置错误，然后按依赖顺序处理编译错误
+1. Run the build command and capture output
+2. Separate Kotlin compilation errors from Gradle configuration errors
+3. Group by module and file path
+4. Sort: configuration errors first, then compilation errors by dependency order
 
-## 步骤 3：修复循环
+## Step 3: Fix Loop
 
-针对每个错误：
+For each error:
 
-1. **读取文件** — 错误行周围的完整上下文
-2. **诊断** — 常见类别：
-   * 缺少导入或无法解析的引用
-   * 类型不匹配或不兼容的类型
-   * `build.gradle.kts` 中缺少依赖项
-   * Expect/actual 不匹配 (KMP)
-   * Compose 编译器错误
-3. **最小化修复** — 解决错误所需的最小改动
-4. **重新运行构建** — 验证修复并检查新错误
-5. **继续** — 处理下一个错误
+1. **Read the file** — Full context around the error line
+2. **Diagnose** — Common categories:
+   - Missing import or unresolved reference
+   - Type mismatch or incompatible types
+   - Missing dependency in `build.gradle.kts`
+   - Expect/actual mismatch (KMP)
+   - Compose compiler error
+3. **Fix minimally** — Smallest change that resolves the error
+4. **Re-run build** — Verify fix and check for new errors
+5. **Continue** — Move to next error
 
-## 步骤 4：防护措施
+## Step 4: Guardrails
 
-如果出现以下情况，请停止并询问用户：
+Stop and ask the user if:
+- Fix introduces more errors than it resolves
+- Same error persists after 3 attempts
+- Error requires adding new dependencies or changing module structure
+- Gradle sync itself fails (configuration-phase error)
+- Error is in generated code (Room, SQLDelight, KSP)
 
-* 修复引入的错误比解决的错误多
-* 同一错误在 3 次尝试后仍然存在
-* 错误需要添加新的依赖项或更改模块结构
-* Gradle 同步本身失败（配置阶段错误）
-* 错误出现在生成的代码中（Room、SQLDelight、KSP）
+## Step 5: Summary
 
-## 步骤 5：总结
+Report:
+- Errors fixed (module, file, description)
+- Errors remaining
+- New errors introduced (should be zero)
+- Suggested next steps
 
-报告：
+## Common Gradle/KMP Fixes
 
-* 已修复的错误（模块、文件、描述）
-* 剩余的错误
-* 引入的新错误（应为零）
-* 建议的后续步骤
-
-## 常见的 Gradle/KMP 修复方案
-
-| 错误 | 修复方法 |
+| Error | Fix |
 |-------|-----|
-| `commonMain` 中无法解析的引用 | 检查依赖项是否在 `commonMain.dependencies {}` 中 |
-| Expect 声明没有 actual 实现 | 在每个平台源码集中添加 `actual` 实现 |
-| Compose 编译器版本不匹配 | 在 `libs.versions.toml` 中统一 Kotlin 和 Compose 编译器版本 |
-| 重复类 | 使用 `./gradlew dependencies` 检查是否存在冲突的依赖项 |
-| KSP 错误 | 运行 `./gradlew kspCommonMainKotlinMetadata` 重新生成 |
-| 配置缓存问题 | 检查是否存在不可序列化的任务输入 |
+| Unresolved reference in `commonMain` | Check if the dependency is in `commonMain.dependencies {}` |
+| Expect declaration without actual | Add `actual` implementation in each platform source set |
+| Compose compiler version mismatch | Align Kotlin and Compose compiler versions in `libs.versions.toml` |
+| Duplicate class | Check for conflicting dependencies with `./gradlew dependencies` |
+| KSP error | Run `./gradlew kspCommonMainKotlinMetadata` to regenerate |
+| Configuration cache issue | Check for non-serializable task inputs |

@@ -1,30 +1,29 @@
 ---
-description: 运行Flutter/Dart测试，报告失败，并逐步修复测试问题。涵盖单元测试、组件测试、黄金测试和集成测试。
+description: Run Flutter/Dart tests, report failures, and incrementally fix test issues. Covers unit, widget, golden, and integration tests.
 ---
 
-# Flutter 测试
+# Flutter Test
 
-此命令运行 Flutter 测试套件并报告结果。当出现失败时，会逐步诊断并修复问题。
+This command runs the Flutter test suite and reports results. When failures occur, it diagnoses and fixes issues incrementally.
 
-## 此命令的功能
+## What This Command Does
 
-1. **运行测试**：执行 `flutter test`（或限定范围至已更改文件）
-2. **解析失败项**：按类型和原因识别失败测试
-3. **逐步修复**：尽可能每次只修复一个失败项
-4. **验证**：每次修复后重新运行
-5. **报告**：显示覆盖率摘要和剩余失败项
+1. **Run Tests**: Execute `flutter test` (or scope to changed files)
+2. **Parse Failures**: Identify failing tests by type and cause
+3. **Fix Incrementally**: One failure at a time where possible
+4. **Verify**: Re-run after each fix
+5. **Report**: Show coverage summary and remaining failures
 
-## 使用时机
+## When to Use
 
-在以下情况使用 `/flutter-test`：
+Use `/flutter-test` when:
+- After implementing a feature to verify nothing broke
+- After running `/flutter-build` to ensure tests pass
+- To check test coverage on new code
+- When a specific test file is failing
+- Before submitting a PR
 
-* 实现功能后验证未破坏现有功能
-* 运行 `/flutter-build` 后确保测试通过
-* 检查新代码的测试覆盖率
-* 特定测试文件失败时
-* 提交 PR 前
-
-## 执行的命令
+## Commands Run
 
 ```bash
 # Run all tests
@@ -46,100 +45,100 @@ flutter test integration_test/ 2>&1
 flutter test --update-goldens 2>&1
 ```
 
-## 示例会话
+## Example Session
 
 ````text
-用户：/flutter-test
+User: /flutter-test
 
-代理：
-# Flutter 测试运行
+Agent:
+# Flutter Test Run
 
-## 测试执行
+## Test Execution
 
 ```
 $ flutter test
-00:05 +42 -2: 部分测试失败。
+00:05 +42 -2: Some tests failed.
 
-失败：test/unit/data/user_repository_test.dart
+FAILED: test/unit/data/user_repository_test.dart
   UserRepository getById
-    当用户未找到时返回 null
-    期望：null
-    实际：User(id: 'test-id', name: 'Test User')
+    returns null when user not found
+    Expected: null
+    Actual: User(id: 'test-id', name: 'Test User')
 
-失败：test/widget/cart_page_test.dart
+FAILED: test/widget/cart_page_test.dart
   CartPage
-    购物车为空时显示空状态
-    期望：恰好一个包含文本 'Your cart is empty' 的组件
-    找到：没有包含文本 'Your cart is empty' 的组件
+    shows empty state when cart is empty
+    Expected: exactly one widget with text 'Your cart is empty'
+    Found: no widget with text 'Your cart is empty'
 ```
 
-## 修复 1：仓库测试
+## Fix 1: Repository Test
 
-文件：test/unit/data/user_repository_test.dart
-失败：`getById` 在应返回 null 时返回了一个用户（针对缺失的 ID）
+File: test/unit/data/user_repository_test.dart
+Failure: `getById` returns a user when it should return null for missing ID
 
-根本原因：测试设置添加了一个 ID 为 'test-id' 的用户，但查询时使用了 'missing-id'。
-修复：更新测试以查询 'missing-id' —— 设置是正确的，查询是错误的。
+Root cause: Test setup adds a user with ID 'test-id' but queries with 'missing-id'.
+Fix: Updated test to query with 'missing-id' — setup was correct, query was wrong.
 
 ```
 $ flutter test test/unit/data/user_repository_test.dart
-1 个测试通过。
+1 test passed.
 ```
 
-## 修复 2：组件测试
+## Fix 2: Widget Test
 
-文件：test/widget/cart_page_test.dart
-失败：未找到空状态文本组件
+File: test/widget/cart_page_test.dart
+Failure: Empty state text widget not found
 
-根本原因：组件中的空状态消息已从 'Your cart is empty' 重命名为 'Cart is empty'。
-修复：更新测试字符串以匹配当前组件文案。
+Root cause: Empty state message was renamed from 'Your cart is empty' to 'Cart is empty' in the widget.
+Fix: Updated test string to match current widget copy.
 
 ```
 $ flutter test test/widget/cart_page_test.dart
-1 个测试通过。
+1 test passed.
 ```
 
-## 最终运行
+## Final Run
 
 ```
 $ flutter test --coverage
-全部 44 个测试通过。
-覆盖率：84.2%（目标：80%）
+All 44 tests passed.
+Coverage: 84.2% (target: 80%)
 ```
 
-## 总结
+## Summary
 
-| 指标 | 值 |
+| Metric | Value |
 |--------|-------|
-| 总测试数 | 44 |
-| 通过 | 44 |
-| 失败 | 0 |
-| 覆盖率 | 84.2% |
+| Total tests | 44 |
+| Passed | 44 |
+| Failed | 0 |
+| Coverage | 84.2% |
 
-测试状态：通过 ✓
+Test Status: PASS ✓
 ````
 
-## 常见测试失败项
+## Common Test Failures
 
-| 失败类型 | 典型修复方法 |
+| Failure | Typical Fix |
 |---------|-------------|
-| `Expected: <X> Actual: <Y>` | 更新断言或修复实现 |
-| `Widget not found` | 修复查找器选择器或组件重命名后更新测试 |
-| `Golden file not found` | 运行 `flutter test --update-goldens` 生成 |
-| `Golden mismatch` | 检查差异；若变更有意则运行 `--update-goldens` |
-| `MissingPluginException` | 在测试设置中模拟平台通道 |
-| `LateInitializationError` | 在 `setUp()` 中初始化 `late` 字段 |
-| `pumpAndSettle timed out` | 替换为显式 `pump(Duration)` 调用 |
+| `Expected: <X> Actual: <Y>` | Update assertion or fix implementation |
+| `Widget not found` | Fix finder selector or update test after widget rename |
+| `Golden file not found` | Run `flutter test --update-goldens` to generate |
+| `Golden mismatch` | Inspect diff; run `--update-goldens` if change was intentional |
+| `MissingPluginException` | Mock platform channel in test setup |
+| `LateInitializationError` | Initialize `late` fields in `setUp()` |
+| `pumpAndSettle timed out` | Replace with explicit `pump(Duration)` calls |
 
-## 相关命令
+## Related Commands
 
-* `/flutter-build` — 运行测试前修复构建错误
-* `/flutter-review` — 测试通过后审查代码
-* `tdd-workflow` 技能 — 测试驱动开发工作流
+- `/flutter-build` — Fix build errors before running tests
+- `/flutter-review` — Review code after tests pass
+- `tdd-workflow` skill — Test-driven development workflow
 
-## 相关内容
+## Related
 
-* 代理：`agents/flutter-reviewer.md`
-* 代理：`agents/dart-build-resolver.md`
-* 技能：`skills/flutter-dart-code-review/`
-* 规则：`rules/dart/testing.md`
+- Agent: `agents/flutter-reviewer.md`
+- Agent: `agents/dart-build-resolver.md`
+- Skill: `skills/flutter-dart-code-review/`
+- Rules: `rules/dart/testing.md`

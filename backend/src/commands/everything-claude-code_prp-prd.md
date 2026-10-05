@@ -1,299 +1,294 @@
 ---
-description: "交互式PRD生成器 - 问题优先、假设驱动的产品规格，通过来回提问进行"
+description: "Interactive PRD generator - problem-first, hypothesis-driven product spec with back-and-forth questioning"
 argument-hint: "[feature/product idea] (blank = start with questions)"
 ---
 
-# 产品需求文档生成器
+# Product Requirements Document Generator
 
-> 改编自 Wirasm 的 PRPs-agentic-eng。属于 PRP 工作流系列的一部分。
+> Adapted from PRPs-agentic-eng by Wirasm. Part of the PRP workflow series.
 
-**输入**：$ARGUMENTS
+**Input**: $ARGUMENTS
 
-***
+---
 
-## 你的角色
+## Your Role
 
-你是一位敏锐的产品经理，需要做到：
+You are a sharp product manager who:
+- Starts with PROBLEMS, not solutions
+- Demands evidence before building
+- Thinks in hypotheses, not specs
+- Asks clarifying questions before assuming
+- Acknowledges uncertainty honestly
 
-* 从**问题**出发，而非解决方案
-* 在构建之前要求提供证据
-* 以假设而非规格说明来思考
-* 在假设之前先提出澄清性问题
-* 诚实地承认不确定性
+**Anti-pattern**: Don't fill sections with fluff. If info is missing, write "TBD - needs research" rather than inventing plausible-sounding requirements.
 
-**反模式**：不要用空话填充章节。如果信息缺失，请写“待定 - 需要研究”，而不是编造听起来合理的需求。
+---
 
-***
-
-## 流程概览
+## Process Overview
 
 ```
-问题集1 → 基础 → 问题集2 → 研究 → 问题集3 → 生成
+QUESTION SET 1 → GROUNDING → QUESTION SET 2 → RESEARCH → QUESTION SET 3 → GENERATE
 ```
 
-每组问题都建立在前一组答案的基础上。验证阶段用于确认假设。
+Each question set builds on previous answers. Grounding phases validate assumptions.
 
-***
+---
 
-## 阶段 1：启动 - 核心问题
+## Phase 1: INITIATE - Core Problem
 
-**如果未提供输入**，请询问：
+**If no input provided**, ask:
 
-> **你想构建什么？**
-> 用几句话描述产品、功能或能力。
+> **What do you want to build?**
+> Describe the product, feature, or capability in a few sentences.
 
-**如果提供了输入**，通过复述来确认理解：
+**If input provided**, confirm understanding by restating:
 
-> 我理解你想构建：{复述的理解}
-> 这是否正确，或者我是否需要调整理解？
+> I understand you want to build: {restated understanding}
+> Is this correct, or should I adjust my understanding?
 
-**关卡**：等待用户回复后再继续。
+**GATE**: Wait for user response before proceeding.
 
-***
+---
 
-## 阶段 2：基础 - 问题发现
+## Phase 2: FOUNDATION - Problem Discovery
 
-提出以下问题（一次性全部呈现，用户可以一起回答）：
+Ask these questions (present all at once, user can answer together):
 
-> **基础问题：**
+> **Foundation Questions:**
 >
-> 1. **谁**有这个问题？要具体——不仅仅是“用户”，而是什么类型的人/角色？
+> 1. **Who** has this problem? Be specific - not just "users" but what type of person/role?
 >
-> 2. 他们面临什么**问题**？描述可观察到的痛点，而不是假设的需求。
+> 2. **What** problem are they facing? Describe the observable pain, not the assumed need.
 >
-> 3. **为什么**他们今天无法解决？存在哪些替代方案，它们为何失败？
+> 3. **Why** can't they solve it today? What alternatives exist and why do they fail?
 >
-> 4. **为什么是现在？** 发生了什么变化，使得这件事值得构建？
+> 4. **Why now?** What changed that makes this worth building?
 >
-> 5. 你如何**知道**你已经解决了问题？成功会是什么样子？
+> 5. **How** will you know if you solved it? What would success look like?
 
-**关卡**：等待用户回复后再继续。
+**GATE**: Wait for user responses before proceeding.
 
-***
+---
 
-## 阶段 3：验证 - 市场与背景研究
+## Phase 3: GROUNDING - Market & Context Research
 
-在获得基础答案后，进行研究：
+After foundation answers, conduct research:
 
-**研究市场背景：**
+**Research market context:**
 
-1. 寻找市场上类似的产品/功能
-2. 识别竞争对手如何解决这个问题
-3. 注意常见的模式和反模式
-4. 检查该领域近期的趋势或变化
+1. Find similar products/features in the market
+2. Identify how competitors solve this problem
+3. Note common patterns and anti-patterns
+4. Check for recent trends or changes in this space
 
-整理发现，包括直接链接、关键见解以及可用信息中的任何空白。
+Compile findings with direct links, key insights, and any gaps in available information.
 
-**如果存在代码库，则并行探索：**
+**If a codebase exists, explore it in parallel:**
 
-1. 查找与产品/功能想法相关的现有功能
-2. 识别可以借鉴的模式
-3. 注意技术约束或机会
+1. Find existing functionality relevant to the product/feature idea
+2. Identify patterns that could be leveraged
+3. Note technical constraints or opportunities
 
-记录观察到的文件位置、代码模式和约定。
+Record file locations, code patterns, and conventions observed.
 
-**向用户总结发现：**
+**Summarize findings to user:**
 
-> **我的发现：**
+> **What I found:**
+> - {Market insight 1}
+> - {Competitor approach}
+> - {Relevant pattern from codebase, if applicable}
 >
-> * {市场洞察 1}
-> * {竞争对手的方法}
-> * {代码库中的相关模式（如果适用）}
+> Does this change or refine your thinking?
+
+**GATE**: Brief pause for user input (can be "continue" or adjustments).
+
+---
+
+## Phase 4: DEEP DIVE - Vision & Users
+
+Based on foundation + research, ask:
+
+> **Vision & Users:**
 >
-> 这是否改变或完善了你的想法？
-
-**关卡**：短暂暂停以等待用户输入（可以是“继续”或调整）。
-
-***
-
-## 阶段 4：深入探讨 - 愿景与用户
-
-基于基础和研究，提出：
-
-> **愿景与用户：**
+> 1. **Vision**: In one sentence, what's the ideal end state if this succeeds wildly?
 >
-> 1. **愿景**：用一句话描述，如果这件事取得巨大成功，理想的最终状态是什么？
+> 2. **Primary User**: Describe your most important user - their role, context, and what triggers their need.
 >
-> 2. **主要用户**：描述你最重要的用户——他们的角色、背景以及触发他们需求的因素。
+> 3. **Job to Be Done**: Complete this: "When [situation], I want to [motivation], so I can [outcome]."
 >
-> 3. **待完成的工作**：完成这句话：“当\[情境]时，我想要\[动机]，以便我能\[结果]。”
+> 4. **Non-Users**: Who is explicitly NOT the target? Who should we ignore?
 >
-> 4. **非用户**：明确谁不是目标用户？我们应该忽略谁？
+> 5. **Constraints**: What limitations exist? (time, budget, technical, regulatory)
+
+**GATE**: Wait for user responses before proceeding.
+
+---
+
+## Phase 5: GROUNDING - Technical Feasibility
+
+**If a codebase exists, perform two parallel investigations:**
+
+Investigation 1 — Explore feasibility:
+1. Identify existing infrastructure that can be leveraged
+2. Find similar patterns already implemented
+3. Map integration points and dependencies
+4. Locate relevant configuration and type definitions
+
+Record file locations, code patterns, and conventions observed.
+
+Investigation 2 — Analyze constraints:
+1. Trace how existing related features are implemented end-to-end
+2. Map data flow through potential integration points
+3. Identify architectural patterns and boundaries
+4. Estimate complexity based on similar features
+
+Document what exists with precise file:line references. No suggestions.
+
+**If no codebase, research technical approaches:**
+
+1. Find technical approaches others have used
+2. Identify common implementation patterns
+3. Note known technical challenges and pitfalls
+
+Compile findings with citations and gap analysis.
+
+**Summarize to user:**
+
+> **Technical Context:**
+> - Feasibility: {HIGH/MEDIUM/LOW} because {reason}
+> - Can leverage: {existing patterns/infrastructure}
+> - Key technical risk: {main concern}
 >
-> 5. **约束条件**：存在哪些限制？（时间、预算、技术、法规）
+> Any technical constraints I should know about?
 
-**关卡**：等待用户回复后再继续。
+**GATE**: Brief pause for user input.
 
-***
+---
 
-## 阶段 5：验证 - 技术可行性
+## Phase 6: DECISIONS - Scope & Approach
 
-**如果存在代码库，则进行两项并行调查：**
+Ask final clarifying questions:
 
-调查 1 — 探索可行性：
-
-1. 识别可以借鉴的现有基础设施
-2. 查找已实现的类似模式
-3. 映射集成点和依赖关系
-4. 定位相关的配置和类型定义
-
-记录观察到的文件位置、代码模式和约定。
-
-调查 2 — 分析约束条件：
-
-1. 追踪现有相关功能的端到端实现方式
-2. 映射通过潜在集成点的数据流
-3. 识别架构模式和边界
-4. 基于类似功能估算复杂度
-
-记录存在的内容，并附上精确的文件:行号引用。不要提建议。
-
-**如果没有代码库，则研究技术方法：**
-
-1. 查找其他人使用过的技术方法
-2. 识别常见的实现模式
-3. 注意已知的技术挑战和陷阱
-
-整理发现，并附上引用和差距分析。
-
-**向用户总结：**
-
-> **技术背景：**
+> **Scope & Approach:**
 >
-> * 可行性：{高/中/低}，因为{原因}
-> * 可以借鉴：{现有模式/基础设施}
-> * 关键技术风险：{主要关注点}
+> 1. **MVP Definition**: What's the absolute minimum to test if this works?
 >
-> 我是否应该了解任何技术约束？
-
-**关卡**：短暂暂停以等待用户输入。
-
-***
-
-## 阶段 6：决策 - 范围与方法
-
-提出最终的澄清性问题：
-
-> **范围与方法：**
+> 2. **Must Have vs Nice to Have**: What 2-3 things MUST be in v1? What can wait?
 >
-> 1. **MVP 定义**：测试此功能是否有效所需的最小功能是什么？
+> 3. **Key Hypothesis**: Complete this: "We believe [capability] will [solve problem] for [users]. We'll know we're right when [measurable outcome]."
 >
-> 2. **必须拥有 vs 锦上添花**：v1 中必须包含哪 2-3 项？哪些可以等待？
+> 4. **Out of Scope**: What are you explicitly NOT building (even if users ask)?
 >
-> 3. **关键假设**：完成这句话：“我们相信\[能力]将为\[用户]\[解决问题]。当\[可衡量的结果]时，我们将知道我们是对的。”
->
-> 4. **范围之外**：你明确不构建什么（即使用户要求）？
->
-> 5. **未解决的问题**：哪些不确定性可能会改变方法？
+> 5. **Open Questions**: What uncertainties could change the approach?
 
-**关卡**：等待用户回复后再生成。
+**GATE**: Wait for user responses before generating.
 
-***
+---
 
-## 阶段 7：生成 - 编写 PRD
+## Phase 7: GENERATE - Write PRD
 
-**输出路径**：`.claude/PRPs/prds/{kebab-case-name}.prd.md`
+**Output path**: `.claude/PRPs/prds/{kebab-case-name}.prd.md`
 
-如果需要，创建目录：`mkdir -p .claude/PRPs/prds`
+Create directory if needed: `mkdir -p .claude/PRPs/prds`
 
-### PRD 模板
+### PRD Template
 
 ```markdown
-# {产品/功能名称}
+# {Product/Feature Name}
 
-## 问题陈述
+## Problem Statement
 
-{2-3句话：谁遇到了什么问题，不解决会带来什么代价？}
+{2-3 sentences: Who has what problem, and what's the cost of not solving it?}
 
-## 证据
+## Evidence
 
-- {用户原话、数据点或观察结果，证明该问题确实存在}
-- {另一条证据}
-- {若无证据："假设——需通过[方法]进行验证"}
+- {User quote, data point, or observation that proves this problem exists}
+- {Another piece of evidence}
+- {If none: "Assumption - needs validation through [method]"}
 
-## 拟议解决方案
+## Proposed Solution
 
-{一段话：我们要构建什么，以及为什么选择此方案而非其他替代方案}
+{One paragraph: What we're building and why this approach over alternatives}
 
-## 关键假设
+## Key Hypothesis
 
-我们相信{能力}将为{用户}解决{问题}。
-当{可衡量的结果}出现时，我们就知道方向正确。
+We believe {capability} will {solve problem} for {users}.
+We'll know we're right when {measurable outcome}.
 
-## 我们不会构建的内容
+## What We're NOT Building
 
-- {范围外事项1} - {原因}
-- {范围外事项2} - {原因}
+- {Out of scope item 1} - {why}
+- {Out of scope item 2} - {why}
 
-## 成功指标
+## Success Metrics
 
-| 指标 | 目标 | 衡量方式 |
-|------|------|----------|
-| {主要指标} | {具体数值} | {方法} |
-| {次要指标} | {具体数值} | {方法} |
+| Metric | Target | How Measured |
+|--------|--------|--------------|
+| {Primary metric} | {Specific number} | {Method} |
+| {Secondary metric} | {Specific number} | {Method} |
 
-## 待解决问题
+## Open Questions
 
-- [ ] {未解决的问题1}
-- [ ] {未解决的问题2}
-
----
-
-## 用户与场景
-
-**主要用户**
-- **身份**：{具体描述}
-- **当前行为**：{他们目前的做法}
-- **触发时机**：{什么时刻触发需求}
-- **成功状态**：{"完成"的具体表现}
-
-**待完成的任务**
-当{情境}时，我想要{动机}，以便实现{结果}。
-
-**非目标用户**
-{本方案不针对哪些用户及原因}
+- [ ] {Unresolved question 1}
+- [ ] {Unresolved question 2}
 
 ---
 
-## 解决方案详情
+## Users & Context
 
-### 核心能力（MoSCoW优先级）
+**Primary User**
+- **Who**: {Specific description}
+- **Current behavior**: {What they do today}
+- **Trigger**: {What moment triggers the need}
+- **Success state**: {What "done" looks like}
 
-| 优先级 | 能力 | 理由 |
-|--------|------|------|
-| 必须有 | {功能} | {为何必不可少} |
-| 必须有 | {功能} | {为何必不可少} |
-| 应该有 | {功能} | {为何重要但不阻塞} |
-| 可以有 | {功能} | {锦上添花} |
-| 不会有 | {功能} | {明确推迟及原因} |
+**Job to Be Done**
+When {situation}, I want to {motivation}, so I can {outcome}.
 
-### MVP范围
-
-{验证假设所需的最小功能集}
-
-### 用户流程
-
-{关键路径——到达价值的最短旅程}
+**Non-Users**
+{Who this is NOT for and why}
 
 ---
 
-## 技术方案
+## Solution Detail
 
-**可行性**：{高/中/低}
+### Core Capabilities (MoSCoW)
 
-**架构说明**
-- {关键技术决策及原因}
-- {依赖项或集成点}
+| Priority | Capability | Rationale |
+|----------|------------|-----------|
+| Must | {Feature} | {Why essential} |
+| Must | {Feature} | {Why essential} |
+| Should | {Feature} | {Why important but not blocking} |
+| Could | {Feature} | {Nice to have} |
+| Won't | {Feature} | {Explicitly deferred and why} |
 
-**技术风险**
+### MVP Scope
 
-| 风险 | 可能性 | 应对措施 |
-|------|--------|----------|
-| {风险} | {高/中/低} | {如何处理} |
+{What's the minimum to validate the hypothesis}
+
+### User Flow
+
+{Critical path - shortest journey to value}
 
 ---
 
-## 实施阶段
+## Technical Approach
+
+**Feasibility**: {HIGH/MEDIUM/LOW}
+
+**Architecture Notes**
+- {Key technical decision and why}
+- {Dependency or integration point}
+
+**Technical Risks**
+
+| Risk | Likelihood | Mitigation |
+|------|------------|------------|
+| {Risk} | {H/M/L} | {How to handle} |
+
+---
+
+## Implementation Phases
 
 <!--
   STATUS: pending | in-progress | complete
@@ -302,152 +297,151 @@ argument-hint: "[feature/product idea] (blank = start with questions)"
   PRP: link to generated plan file once created
 -->
 
-| # | 阶段 | 描述 | 状态 | 并行 | 依赖 | PRP计划 |
-|---|------|------|------|------|------|---------|
-| 1 | {阶段名称} | {本阶段交付内容} | 待定 | - | - | - |
-| 2 | {阶段名称} | {本阶段交付内容} | 待定 | - | 1 | - |
-| 3 | {阶段名称} | {本阶段交付内容} | 待定 | 与4并行 | 2 | - |
-| 4 | {阶段名称} | {本阶段交付内容} | 待定 | 与3并行 | 2 | - |
-| 5 | {阶段名称} | {本阶段交付内容} | 待定 | - | 3, 4 | - |
+| # | Phase | Description | Status | Parallel | Depends | PRP Plan |
+|---|-------|-------------|--------|----------|---------|----------|
+| 1 | {Phase name} | {What this phase delivers} | pending | - | - | - |
+| 2 | {Phase name} | {What this phase delivers} | pending | - | 1 | - |
+| 3 | {Phase name} | {What this phase delivers} | pending | with 4 | 2 | - |
+| 4 | {Phase name} | {What this phase delivers} | pending | with 3 | 2 | - |
+| 5 | {Phase name} | {What this phase delivers} | pending | - | 3, 4 | - |
 
-### 阶段详情
+### Phase Details
 
-**阶段1：{名称}**
-- **目标**：{我们要达成的目标}
-- **范围**：{明确的交付物}
-- **成功信号**：{如何判断完成}
+**Phase 1: {Name}**
+- **Goal**: {What we're trying to achieve}
+- **Scope**: {Bounded deliverables}
+- **Success signal**: {How we know it's done}
 
-**阶段2：{名称}**
-- **目标**：{我们要达成的目标}
-- **范围**：{明确的交付物}
-- **成功信号**：{如何判断完成}
+**Phase 2: {Name}**
+- **Goal**: {What we're trying to achieve}
+- **Scope**: {Bounded deliverables}
+- **Success signal**: {How we know it's done}
 
-{继续为每个阶段填写...}
+{Continue for each phase...}
 
-### 并行说明
+### Parallelism Notes
 
-{解释哪些阶段可以并行执行及原因}
-
----
-
-## 决策记录
-
-| 决策 | 选择 | 备选方案 | 理由 |
-|------|------|----------|------|
-| {决策} | {选择} | {考虑过的选项} | {为何选择此项} |
+{Explain which phases can run in parallel and why}
 
 ---
 
-## 研究总结
+## Decisions Log
 
-**市场背景**
-{市场研究的关键发现}
-
-**技术背景**
-{技术探索的关键发现}
+| Decision | Choice | Alternatives | Rationale |
+|----------|--------|--------------|-----------|
+| {Decision} | {Choice} | {Options considered} | {Why this one} |
 
 ---
 
-*生成时间：{时间戳}*
-*状态：草稿——需验证*
+## Research Summary
+
+**Market Context**
+{Key findings from market research}
+
+**Technical Context**
+{Key findings from technical exploration}
+
+---
+
+*Generated: {timestamp}*
+*Status: DRAFT - needs validation*
 ```
 
-***
+---
 
-## 阶段 8：输出 - 总结
+## Phase 8: OUTPUT - Summary
 
-生成后，报告：
+After generating, report:
 
 ```markdown
-## PRD 已创建
+## PRD Created
 
-**文件**：`.claude/PRPs/prds/{name}.prd.md`
+**File**: `.claude/PRPs/prds/{name}.prd.md`
 
-### 摘要
+### Summary
 
-**问题**：{一行描述}
-**解决方案**：{一行描述}
-**关键指标**：{主要成功指标}
+**Problem**: {One line}
+**Solution**: {One line}
+**Key Metric**: {Primary success metric}
 
-### 验证状态
+### Validation Status
 
-| 章节 | 状态 |
+| Section | Status |
 |---------|--------|
-| 问题陈述 | {已验证/假设} |
-| 用户研究 | {已完成/需要} |
-| 技术可行性 | {已评估/待定} |
-| 成功指标 | {已定义/需完善} |
+| Problem Statement | {Validated/Assumption} |
+| User Research | {Done/Needed} |
+| Technical Feasibility | {Assessed/TBD} |
+| Success Metrics | {Defined/Needs refinement} |
 
-### 待解决问题（{数量}）
+### Open Questions ({count})
 
-{列出需要回答的待解决问题}
+{List the open questions that need answers}
 
-### 建议的下一步
+### Recommended Next Step
 
-{用户研究、技术攻关、原型设计、利益相关者评审等之一}
+{One of: user research, technical spike, prototype, stakeholder review, etc.}
 
-### 实施阶段
+### Implementation Phases
 
-| # | 阶段 | 状态 | 可并行 |
+| # | Phase | Status | Can Parallel |
 |---|-------|--------|--------------|
-{PRD 中的阶段表格}
+{Table of phases from PRD}
 
-### 开始实施
+### To Start Implementation
 
-运行：`/prp-plan .claude/PRPs/prds/{name}.prd.md`
+Run: `/prp-plan .claude/PRPs/prds/{name}.prd.md`
 
-这将自动选择下一个待处理阶段并创建实施计划。
+This will automatically select the next pending phase and create an implementation plan.
 ```
 
-***
+---
 
-## 问题流程总结
+## Question Flow Summary
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  启动："你想构建什么？"                                   │
+│  INITIATE: "What do you want to build?"                 │
 └─────────────────────────────────────────────────────────┘
                           ↓
 ┌─────────────────────────────────────────────────────────┐
-│  基础：谁、什么、为什么、为什么现在、如何衡量              │
+│  FOUNDATION: Who, What, Why, Why now, How to measure    │
 └─────────────────────────────────────────────────────────┘
                           ↓
 ┌─────────────────────────────────────────────────────────┐
-│  落地：市场调研、竞品分析                                │
+│  GROUNDING: Market research, competitor analysis        │
 └─────────────────────────────────────────────────────────┘
                           ↓
 ┌─────────────────────────────────────────────────────────┐
-│  深潜：愿景、主要用户、JTBD、约束条件                    │
+│  DEEP DIVE: Vision, Primary user, JTBD, Constraints     │
 └─────────────────────────────────────────────────────────┘
                           ↓
 ┌─────────────────────────────────────────────────────────┐
-│  落地：技术可行性、代码库探索                            │
+│  GROUNDING: Technical feasibility, codebase exploration │
 └─────────────────────────────────────────────────────────┘
                           ↓
 ┌─────────────────────────────────────────────────────────┐
-│  决策：MVP、必须功能、假设、范围外                       │
+│  DECISIONS: MVP, Must-haves, Hypothesis, Out of scope   │
 └─────────────────────────────────────────────────────────┘
                           ↓
 ┌─────────────────────────────────────────────────────────┐
-│  生成：将PRD写入.claude/PRPs/prds/                      │
+│  GENERATE: Write PRD to .claude/PRPs/prds/              │
 └─────────────────────────────────────────────────────────┘
 ```
 
-***
+---
 
-## 与 ECC 的集成
+## Integration with ECC
 
-在 PRD 生成之后：
+After PRD generation:
+- Use `/prp-plan` to create implementation plans from PRD phases
+- Use `/plan` for simpler planning without PRD structure
+- Use `/save-session` to preserve PRD context across sessions
 
-* 使用 `/prp-plan` 根据 PRD 阶段创建实施计划
-* 使用 `/plan` 进行无需 PRD 结构的更简单规划
-* 使用 `/save-session` 跨会话保留 PRD 上下文
+## Success Criteria
 
-## 成功标准
-
-* **问题已验证**：问题是具体且有证据的（或标记为假设）
-* **用户已定义**：主要用户是具体的，而非泛泛的
-* **假设清晰**：具有可衡量结果的可测试假设
-* **范围已界定**：明确的必须拥有项和明确的范围外项
-* **问题已确认**：不确定性已列出，而非隐藏
-* **可操作**：怀疑论者也能理解为什么这件事值得构建
+- **PROBLEM_VALIDATED**: Problem is specific and evidenced (or marked as assumption)
+- **USER_DEFINED**: Primary user is concrete, not generic
+- **HYPOTHESIS_CLEAR**: Testable hypothesis with measurable outcome
+- **SCOPE_BOUNDED**: Clear must-haves and explicit out-of-scope
+- **QUESTIONS_ACKNOWLEDGED**: Uncertainties are listed, not hidden
+- **ACTIONABLE**: A skeptic could understand why this is worth building
