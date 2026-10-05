@@ -1147,7 +1147,7 @@ async def seed() -> None:
                     tagline=d["tagline"],
                 )
             )
-            for ord_, kpi in enumerate(d["kpis"]):
+            for ord_, kpi in enumerate(d.get("kpis", [])):
                 s.add(dom.DomainKPI(domain_slug=d["slug"], ord=ord_, **kpi))
             for app in d["applications"]:
                 s.add(dom.DomainApplication(domain_slug=d["slug"], **app))
