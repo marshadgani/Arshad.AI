@@ -1,20 +1,20 @@
 ---
-description: 在不打断或丢失当前任务上下文的情况下，快速回答一个附带问题。回答后自动恢复工作。
+description: Answer a quick side question without interrupting or losing context from the current task. Resume work automatically after answering.
 ---
 
-# 旁述指令
+# Aside Command
 
-在任务进行中提问，获得即时、聚焦的回答——然后立即从暂停处继续。当前任务、文件和上下文绝不会被修改。
+Ask a question mid-task and get an immediate, focused answer — then continue right where you left off. The current task, files, and context are never modified.
 
-## 何时使用
+## When to Use
 
-* 你在 Claude 工作时对某事感到好奇，但又不想打断工作节奏
-* 你需要快速解释 Claude 当前正在编辑的代码
-* 你想就某个决定征求第二意见或进行澄清，而不会使任务偏离方向
-* 在 Claude 继续之前，你需要理解一个错误、概念或模式
-* 你想询问与当前任务无关的事情，而无需开启新会话
+- You're curious about something while Claude is working and don't want to lose momentum
+- You need a quick explanation of code Claude is currently editing
+- You want a second opinion or clarification on a decision without derailing the task
+- You need to understand an error, concept, or pattern before Claude proceeds
+- You want to ask something unrelated to the current task without starting a new session
 
-## 使用方法
+## Usage
 
 ```
 /aside <your question>
@@ -25,28 +25,27 @@ description: 在不打断或丢失当前任务上下文的情况下，快速回�
 /aside should we be worried about the N+1 query we just added?
 ```
 
-## 流程
+## Process
 
-### 步骤 1：冻结当前任务状态
+### Step 1: Freeze the current task state
 
-在回答任何问题之前，先在心里记下：
+Before answering anything, mentally note:
+- What is the active task? (what file, feature, or problem was being worked on)
+- What step was in progress at the moment `/aside` was invoked?
+- What was about to happen next?
 
-* 当前活动任务是什么？（正在处理哪个文件、功能或问题）
-* 在调用 `/aside` 时，进行到哪一步了？
-* 接下来原本要发生什么？
+Do NOT touch, edit, create, or delete any files during the aside.
 
-在旁述期间，**不要**触碰、编辑、创建或删除任何文件。
+### Step 2: Answer the question directly
 
-### 步骤 2：直接回答问题
+Answer the question in the most concise form that is still complete and useful.
 
-以最简洁但仍完整有用的形式回答问题。
+- Lead with the answer, not the reasoning
+- Keep it short — if a full explanation is needed, offer to go deeper after the task
+- If the question is about the current file or code being worked on, reference it precisely (file path and line number if relevant)
+- If answering requires reading a file, read it — but read only, never write
 
-* 先说答案，再说推理过程
-* 保持简短——如果需要完整解释，请在任务结束后再提供
-* 如果问题涉及当前正在处理的文件或代码，请精确引用（相关时包括文件路径和行号）
-* 如果回答问题需要读取文件，就读它——但只读不写
-
-将响应格式化为：
+Format the response as:
 
 ```
 ASIDE: [restate the question briefly]
@@ -56,17 +55,16 @@ ASIDE: [restate the question briefly]
 — Back to task: [one-line description of what was being done]
 ```
 
-### 步骤 3：恢复主任务
+### Step 3: Resume the main task
 
-在给出答案后，立即从暂停的确切点继续执行活动任务。除非旁述回答揭示了阻碍或需要重新考虑当前方法的理由（见边缘情况），否则不要请求恢复许可。
+After delivering the answer, immediately continue the active task from the exact point it was paused. Do not ask for permission to resume unless the aside answer revealed a blocker or a reason to reconsider the current approach (see Edge Cases).
 
-***
+---
 
-## 边缘情况
+## Edge Cases
 
-**未提供问题（`/aside` 后面没有内容）：**
-回复：
-
+**No question provided (`/aside` with nothing after it):**
+Respond:
 ```
 ASIDE: no question provided
 
@@ -75,35 +73,30 @@ What would you like to know? (ask your question and I'll answer without losing t
 — Back to task: [one-line description of what was being done]
 ```
 
-**问题揭示了当前任务的潜在问题：**
-在恢复之前清楚地标记出来：
-
+**Question reveals a potential problem with the current task:**
+Flag it clearly before resuming:
 ```
 ASIDE: [answer]
 
 WARNING: Note: This answer suggests [issue] with the current approach. Want to address this before continuing, or proceed as planned?
 ```
+Wait for the user's decision before resuming.
 
-等待用户的决定后再恢复。
-
-**问题实际上是任务重定向（而非旁述问题）：**
-如果问题暗示要改变正在构建的内容（例如，`/aside actually, let's use Redis instead`），请澄清：
-
+**Question is actually a task redirect (not a side question):**
+If the question implies changing what is being built (e.g., `/aside actually, let's use Redis instead`), clarify:
 ```
 ASIDE: That sounds like a direction change, not just a side question.
 Do you want to:
   (a) Answer this as information only and keep the current plan
   (b) Pause the current task and change approach
 ```
+Wait for the user's answer — do not make assumptions.
 
-等待用户的回答——不要自行假设。
+**Question is about the currently open file or code:**
+Answer from the live context. If the file was read earlier in the session, reference it directly. If not, read it now (read-only) and answer with a file:line reference.
 
-**问题涉及当前打开的文件或代码：**
-根据实时上下文回答。如果该文件在会话早期已被读取，直接引用它。如果尚未读取，现在读取它（只读）并在回答时附带文件:行号引用。
-
-**无活动任务（调用 `/aside` 时没有进行中的任务）：**
-仍然使用标准包装器，以保持响应格式一致：
-
+**No active task (nothing in progress when `/aside` is invoked):**
+Still use the standard wrapper so the response shape stays consistent:
 ```
 ASIDE: [restate the question briefly]
 
@@ -112,31 +105,29 @@ ASIDE: [restate the question briefly]
 — Back to task: no active task to resume
 ```
 
-**问题需要长篇回答：**
-简洁地给出核心答案，然后提供：
-
+**Question requires a long answer:**
+Give the essential answer concisely, then offer:
 ```
 That's the short version. Want a deeper explanation after we finish [current task]?
 ```
 
-**连续多个 `/aside` 问题：**
-依次回答每个问题。在回答完最后一个问题后，恢复主任务。不要在一连串旁述中丢失任务状态。
+**Multiple `/aside` questions in a row:**
+Answer each one in sequence. After the last answer, resume the main task. Do not lose task state across a chain of asides.
 
-**旁述回答暗示需要进行代码更改：**
-记下所需的更改，但不要在旁述期间进行更改：
-
+**Aside answer implies a code change is needed:**
+Note the change needed but do not make it during the aside:
 ```
 ASIDE: [answer]
 
  Worth fixing: [what should be changed]. I'll flag this after the current task unless you want to address it now.
 ```
 
-**问题含糊不清或过于笼统：**
-提出一个澄清性问题——一个能获取回答所需信息的最简短问题。不要提出多个问题。
+**Question is ambiguous or too vague:**
+Ask one clarifying question — the shortest question that gets the information needed to answer. Do not ask multiple questions.
 
-***
+---
 
-## 示例输出
+## Example Output
 
 ```
 User: /aside what does fetchWithRetry() actually do?
@@ -162,12 +153,12 @@ Node.js server but would be a real problem with worker threads or clustering.
 WARNING: Note: This could affect the feature we're building. Want to address this now or continue and fix it in a follow-up?
 ```
 
-***
+---
 
-## 注意事项
+## Notes
 
-* 在旁述期间**绝不**修改文件——仅限只读访问
-* 旁述是对话暂停，不是新任务——必须始终恢复原始任务
-* 保持回答聚焦：目标是快速为用户扫清障碍，而不是进行长篇大论
-* 如果旁述引发了更广泛的讨论，请先完成当前任务，除非旁述揭示了阻碍
-* 除非明确与任务结果相关，否则旁述内容不会保存到会话文件中
+- Never modify files during an aside — read-only access only
+- The aside is a conversation pause, not a new task — the original task must always resume
+- Keep answers focused: the goal is to unblock the user quickly, not to deliver a lecture
+- If an aside sparks a larger discussion, finish the current task first unless the aside reveals a blocker
+- Asides are not saved to session files unless explicitly relevant to the task outcome
