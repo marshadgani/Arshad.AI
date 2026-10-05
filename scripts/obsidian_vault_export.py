@@ -32,11 +32,22 @@ from src.models.user import User  # noqa: E402
 
 async def _resolve_user_id(explicit: str | None) -> uuid.UUID:
     if explicit:
-        return uuid.UUID(explicit)
+        try:
+            return uuid.UUID(explicit)
+        except ValueError:
+            print(f"Invalid UUID: {explicit!r}", file=sys.stderr)
+            sys.exit(2)
 
     env_value = os.getenv("OBSIDIAN_VAULT_EXPORT_USER_ID")
     if env_value:
-        return uuid.UUID(env_value)
+        try:
+            return uuid.UUID(env_value)
+        except ValueError:
+            print(
+                f"Invalid UUID in OBSIDIAN_VAULT_EXPORT_USER_ID: {env_value!r}",
+                file=sys.stderr,
+            )
+            sys.exit(2)
 
     async with AsyncSessionLocal() as db:
         rows = (await db.execute(select(User.id, User.email))).all()

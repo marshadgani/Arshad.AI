@@ -9,9 +9,11 @@ Scope: GitHub person/project entities only (no calendar/email), write-only
 (Arshad.AI never reads the vault back), no Maps of Content, and no
 Obsidian Local REST API.
 
-Known limitation: stale vault files (entities removed from the DB, or demoted
-from public to private via the visibility ratchet) are never deleted from the
-vault. The export only writes/updates files; pruning is a future feature.
+Stale file pruning: when an entity is demoted to private or deleted, its vault
+note is removed by the git layer (``git rm --cached``) in the same commit as
+new/changed files. This is why ``push_vault`` is always called, even when the
+public entity set is empty — the git layer must be given the opportunity to
+prune any managed-prefix files that remain in the vault repo.
 """
 
 from __future__ import annotations
@@ -25,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...models.user import User
 from . import obsidian_vault_repository as repo
+from .errors import IngestionError
 from .obsidian_vault_git import push_vault
 from .obsidian_vault_render import Entity, Relationship, render_vault
 
@@ -80,7 +83,13 @@ async def export(
     # requires the module to close its own transaction.
     await db.commit()
 
-    if entity_rows and not rel_rows:
+    if not entity_rows:
+        logger.warning(
+            "No public entities for user %s; will prune stale vault files if any "
+            "(entities default to visibility=private via FEAT-165 ratchet).",
+            user.id,
+        )
+    elif not rel_rows:
         logger.warning(
             "No public relationships for user %s: relationships default to "
             "visibility=private (FEAT-165 ratchet); entity notes will have "
@@ -91,16 +100,20 @@ async def export(
     entities = _to_entities(entity_rows)
     relationships = _to_relationships(rel_rows)
 
-    files = render_vault(entities, relationships)
+    try:
+        files = render_vault(entities, relationships)
+    except ValueError as exc:
+        raise IngestionError(f"vault_render_failed: {exc}") from exc
+
     commit_message = (
-        f"vault export: {len(entities)} entities, {len(relationships)} "
+        f"vault export: {len(files)} notes, {len(relationships)} "
         f"relationships ({datetime.now(timezone.utc).isoformat()})"
     )
     result = await push_vault(files, commit_message)
 
     return ExportSummary(
         status=result.status,
-        entities_exported=len(entities),
+        entities_exported=len(files),
         relationships_exported=len(relationships),
         files_written=result.files_written,
         commit_sha=result.commit_sha,

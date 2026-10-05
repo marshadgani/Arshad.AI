@@ -15,6 +15,11 @@ in ``git ls-tree -r HEAD``; unchanged files are not written, and if nothing
 differs the push is skipped (``status='no_changes'``). ``git diff --cached``
 is a second check before committing.
 
+Stale file pruning: vault files under ``People/`` and ``Projects/`` that are
+present in HEAD but absent from the current render set (entities demoted to
+private or deleted) are removed via ``git rm --cached`` in the same commit,
+so the privacy invariant is maintained incrementally.
+
 Rate limits: git subprocess output carries no HTTP headers, so a push failing
 with a rate-limit message waits ``RETRY_AFTER_CAP_SECONDS`` unconditionally
 (up to ``MAX_RETRIES`` attempts); any other failure raises immediately.
@@ -42,7 +47,11 @@ RETRY_AFTER_CAP_SECONDS = 60
 MAX_RETRIES = 3
 TOTAL_OPERATION_TIMEOUT_SECONDS = 900
 _PER_COMMAND_TIMEOUT_SECONDS = 300
-_RATE_LIMIT_PATTERNS = ("rate limit exceeded", "too many requests", "429")
+_RATE_LIMIT_PATTERNS = (
+    "rate limit exceeded",
+    "too many requests",
+    "returned error: 429",
+)
 _DEFAULT_REPO = "marshadgani/obsidian-vault"
 _REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 _TOKEN_ENV = "OBSIDIAN_VAULT_REPO_TOKEN"
@@ -53,6 +62,8 @@ _ASKPASS_SCRIPT = (
     '  *) echo "$OBSIDIAN_VAULT_GIT_TOKEN" ;;\n'
     "esac\n"
 )
+# Managed directories — stale files in these prefixes are pruned each export.
+_MANAGED_PREFIXES = ("People/", "Projects/")
 
 
 @dataclass(frozen=True)
@@ -64,10 +75,28 @@ class PushResult:
 
 
 def vault_repo_url() -> str:
-    slug = (os.getenv("OBSIDIAN_VAULT_REPO_URL") or _DEFAULT_REPO).strip()
+    raw = os.getenv("OBSIDIAN_VAULT_REPO_URL")
+    # Treat a missing env var as "use default"; treat an explicitly set empty
+    # string as a configuration error rather than silently falling back.
+    slug = (_DEFAULT_REPO if raw is None else raw).strip()
+    if not slug:
+        raise IngestionError("invalid_vault_repo: expected owner/repo")
     if not _REPO_RE.match(slug):
         raise IngestionError("invalid_vault_repo: expected owner/repo")
+    owner, _, repo_name = slug.partition("/")
+    # Reject dot-only segments (e.g. "../evil") that would survive the regex.
+    if not repo_name or set(owner) <= {"."} or set(repo_name) <= {"."}:
+        raise IngestionError("invalid_vault_repo: dot-segment in owner/repo")
     return slug
+
+
+def _clone_url(slug: str) -> str:
+    """Return the HTTPS clone URL for *slug*.
+
+    Extracted as a separate function so tests can patch it to redirect clones
+    to a local bare repository without touching argv scrubbing or token logic.
+    """
+    return f"https://github.com/{slug}.git"
 
 
 def blob_sha(content: bytes) -> str:
@@ -97,6 +126,10 @@ def _run_git(
         )
     except subprocess.TimeoutExpired:
         raise IngestionError(f"git_timeout: git {args[0] if args else ''}") from None
+    except OSError as exc:
+        raise IngestionError(
+            f"git_unavailable: cannot execute git ({type(exc).__name__})"
+        ) from None
 
 
 def _fail(
@@ -153,39 +186,57 @@ def _detect_changed_files(
     env: dict[str, str],
     token: str,
     has_head: bool,
-) -> dict[str, str]:
-    """Return only the files whose content differs from what is in HEAD.
+) -> tuple[dict[str, str], list[str]]:
+    """Return ``(changed, stale)`` relative to the current HEAD.
+
+    *changed* — files whose content differs from HEAD (or all files when the
+    repo has no HEAD).
+    *stale* — paths under the managed prefixes (``People/``, ``Projects/``)
+    that exist in HEAD but are absent from the current render set, meaning
+    the underlying entity was deleted or demoted to private.
 
     When the repo has no HEAD (first push into an empty repo), every file is
-    treated as changed.
+    treated as changed and the stale list is empty.
     """
     if not has_head:
-        return dict(files)
+        return dict(files), []
     existing = _existing_blobs(cwd, env, token)
-    return {
+    changed = {
         path: content
         for path, content in files.items()
         if existing.get(path) != blob_sha(content.encode("utf-8"))
     }
+    stale = [
+        path
+        for path in existing
+        if any(path.startswith(p) for p in _MANAGED_PREFIXES) and path not in files
+    ]
+    return changed, stale
 
 
 def _stage_and_commit(
     repo: Path,
     cwd: str,
     changed: dict[str, str],
+    stale: list[str],
     commit_message: str,
     env: dict[str, str],
     token: str,
 ) -> bool:
-    """Write changed files, stage them, and commit.
+    """Write changed files, remove stale files, stage both, and commit.
 
     Returns ``True`` if a commit was created, ``False`` if ``git diff --cached``
     shows nothing staged (second-line idempotency guard).
     """
-    _write_files(repo, changed)
-    proc = _run_git(["add", "--", *changed], cwd=cwd, env=env)
-    if proc.returncode != 0:
-        raise _fail("add", proc, token)
+    if changed:
+        _write_files(repo, changed)
+        proc = _run_git(["add", "--", *changed], cwd=cwd, env=env)
+        if proc.returncode != 0:
+            raise _fail("add", proc, token)
+    if stale:
+        proc = _run_git(["rm", "--cached", "--", *stale], cwd=cwd, env=env)
+        if proc.returncode != 0:
+            raise _fail("rm", proc, token)
     proc = _run_git(["diff", "--cached", "--name-only"], cwd=cwd, env=env)
     if proc.returncode != 0:
         raise _fail("diff", proc, token)
@@ -240,7 +291,7 @@ def _push_all_sync(
         repo = tmp_path / "repo"
 
         proc = _run_git(
-            ["clone", "--depth=1", f"https://github.com/{repo_slug}.git", str(repo)],
+            ["clone", "--depth=1", _clone_url(repo_slug), str(repo)],
             env=env,
         )
         if proc.returncode != 0:
@@ -251,17 +302,27 @@ def _push_all_sync(
             _run_git(["rev-parse", "--verify", "HEAD"], cwd=cwd, env=env).returncode
             == 0
         )
-        changed = _detect_changed_files(files, cwd, env, token, has_head)
-        if not changed:
+        if not has_head:
+            logger.info("vault repo %s has no commits; initial export", repo_slug)
+        changed, stale = _detect_changed_files(files, cwd, env, token, has_head)
+        if not changed and not stale:
             return PushResult("no_changes", 0, None, commit_message)
 
-        committed = _stage_and_commit(repo, cwd, changed, commit_message, env, token)
+        committed = _stage_and_commit(
+            repo, cwd, changed, stale, commit_message, env, token
+        )
         if not committed:
             return PushResult("no_changes", 0, None, commit_message)
 
         _push_with_retry(cwd, env, token, deadline)
-        sha = _run_git(["rev-parse", "HEAD"], cwd=cwd, env=env).stdout.strip() or None
-        return PushResult("ok", len(changed), sha, commit_message)
+        head = _run_git(["rev-parse", "HEAD"], cwd=cwd, env=env)
+        sha = head.stdout.strip() if head.returncode == 0 else None
+        if not sha:
+            logger.warning(
+                "vault push succeeded but commit sha could not be read: %s",
+                _scrub(head.stderr or "", token)[:200],
+            )
+        return PushResult("ok", len(changed), sha or None, commit_message)
 
 
 async def push_vault(files: dict[str, str], commit_message: str) -> PushResult:
