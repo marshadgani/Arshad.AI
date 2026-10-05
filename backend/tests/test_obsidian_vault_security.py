@@ -44,9 +44,10 @@ async def test_query_layer_returns_only_public_rows_and_edges(
     }
     pg_session.add_all(ents.values())
     await pg_session.flush()
+    await pg_session.execute(text("SET LOCAL app.allow_visibility_promotion = 'true'"))
     await pg_session.execute(
-        text("UPDATE ontology_entities SET visibility='private' WHERE id=:i"),
-        {"i": ents["priv_r"].id},
+        text("UPDATE ontology_entities SET visibility='public' WHERE user_id=:u AND external_key IN ('pub_p','pub_r')"),
+        {"u": uid},
     )
     for tgt in ("pub_r", "priv_r"):
         pg_session.add(
@@ -76,6 +77,7 @@ async def test_query_layer_returns_only_public_rows_and_edges(
 @pytest.mark.asyncio
 @pytest.mark.pg
 async def test_tenant_isolation(pg_session, committed_user):
+    from sqlalchemy import text
     from src.models.ontology import OntologyEntity
     from src.models.user import User
     from src.services.ingestion import obsidian_vault_repository as repo
@@ -92,6 +94,8 @@ async def test_tenant_isolation(pg_session, committed_user):
             )
         )
     await pg_session.flush()
+    await pg_session.execute(text("SET LOCAL app.allow_visibility_promotion = 'true'"))
+    await pg_session.execute(text("UPDATE ontology_entities SET visibility='public'"))
     got = {
         e["external_key"]
         for e in await repo.fetch_public_entities(pg_session, committed_user.id)
