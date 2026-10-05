@@ -4108,7 +4108,7 @@
     "awesome-openclaw-skills": {
       "url": "https://github.com/VoltAgent/awesome-openclaw-skills.git",
       "name": "awesome-openclaw-skills",
-      "last_fetched": "2026-09-20 02:56 UTC",
+      "last_fetched": "2026-10-05 19:32 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -4123,7 +4123,7 @@
     "awesome-ai-agents": {
       "url": "https://github.com/e2b-dev/awesome-ai-agents.git",
       "name": "awesome-ai-agents",
-      "last_fetched": "2026-09-20 02:56 UTC",
+      "last_fetched": "2026-10-05 19:32 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -4135,7 +4135,7 @@
     "awesome-agent-skills": {
       "url": "https://github.com/VoltAgent/awesome-agent-skills.git",
       "name": "awesome-agent-skills",
-      "last_fetched": "2026-09-20 02:56 UTC",
+      "last_fetched": "2026-10-05 19:32 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -4149,7 +4149,7 @@
     "awesome-claude-code-subagents": {
       "url": "https://github.com/VoltAgent/awesome-claude-code-subagents.git",
       "name": "awesome-claude-code-subagents",
-      "last_fetched": "2026-09-20 02:57 UTC",
+      "last_fetched": "2026-10-05 19:32 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -4163,7 +4163,7 @@
     "skills": {
       "url": "https://github.com/anthropics/skills.git",
       "name": "skills",
-      "last_fetched": "2026-10-05 19:30 UTC",
+      "last_fetched": "2026-10-05 19:32 UTC",
       "components": {
         "skills": [
           "canvas-design",
@@ -4211,7 +4211,7 @@
     "anydoc": {
       "url": "https://github.com/firecrawl/anydoc.git",
       "name": "anydoc",
-      "last_fetched": "2026-09-20 02:57 UTC",
+      "last_fetched": "2026-10-05 19:32 UTC",
       "components": {
         "skills": [
           "convert-documents-to-markdown"
@@ -4225,7 +4225,7 @@
     "archify": {
       "url": "https://github.com/tt-a1i/archify.git",
       "name": "archify",
-      "last_fetched": "2026-09-20 02:57 UTC",
+      "last_fetched": "2026-10-05 19:32 UTC",
       "components": {
         "skills": [
           "archify",
