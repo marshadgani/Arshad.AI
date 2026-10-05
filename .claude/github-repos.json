@@ -4448,7 +4448,7 @@
     "orca": {
       "url": "https://github.com/stablyai/orca.git",
       "name": "orca",
-      "last_fetched": "2026-09-20 02:57 UTC",
+      "last_fetched": "2026-10-05 19:32 UTC",
       "components": {
         "skills": [
           "computer-use",
@@ -4470,10 +4470,10 @@
           "claude-events.ts",
           "claude-lifecycle-events.ts",
           "claude-status-build.ts",
+          "jcode-turn-prompt.test.ts",
           "provider-event-routing.ts",
           "terminal-title-agent-type.ts",
-          "agent-task-complete-notify.ts",
-          "pty-exit-hibernate.ts"
+          "agent-task-complete-notify.ts"
         ]
       }
     },
