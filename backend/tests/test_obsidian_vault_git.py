@@ -142,7 +142,7 @@ async def test_token_never_in_argv_remote_url_or_logs(caplog):
     assert TOKEN not in str(exc.value) and TOKEN not in caplog.text
     assert all(TOKEN not in " ".join(a) for _, a in fake.calls)
     clone = next(a for s, a in fake.calls if s == "clone")
-    assert f"https://github.com/marshadgani/obsidian-vault.git" in clone
+    assert f"https://github.com/marshadgani/Arshad-Ideaverse.git" in clone
     assert fake.envs[0]["OBSIDIAN_VAULT_GIT_TOKEN"] == TOKEN
     assert fake.envs[0]["GIT_TERMINAL_PROMPT"] == "0"
 
@@ -172,7 +172,7 @@ async def test_missing_token_raises_before_any_git_call(monkeypatch):
 
 
 def test_repo_url_default_and_override(monkeypatch):
-    assert g.vault_repo_url() == "marshadgani/obsidian-vault"
+    assert g.vault_repo_url() == "marshadgani/Arshad-Ideaverse"
     monkeypatch.setenv("OBSIDIAN_VAULT_REPO_URL", "o/v")
     assert g.vault_repo_url() == "o/v"
 

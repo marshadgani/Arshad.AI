@@ -1,5 +1,5 @@
 """obsidian_vault_export — renders public ontology entities to markdown and
-pushes them to the external vault repo (marshadgani/obsidian-vault).
+pushes them to the external vault repo (marshadgani/Arshad-Ideaverse).
 
 Sequence: fetch public entities/relationships -> render (pure) -> git push.
 Called from ``runner.run(dag_id="obsidian_vault_export", ...)``, triggered by

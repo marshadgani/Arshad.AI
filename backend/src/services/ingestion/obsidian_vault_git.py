@@ -53,7 +53,7 @@ _RATE_LIMIT_PATTERNS = (
     "too many requests",
     "returned error: 429",
 )
-_DEFAULT_REPO = "marshadgani/obsidian-vault"
+_DEFAULT_REPO = "marshadgani/Arshad-Ideaverse"
 _REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 _TOKEN_ENV = "OBSIDIAN_VAULT_REPO_TOKEN"
 _ASKPASS_SCRIPT = (

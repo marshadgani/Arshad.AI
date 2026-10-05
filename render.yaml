@@ -32,6 +32,6 @@ services:
       - key: OBSIDIAN_VAULT_REPO_TOKEN
         sync: false
       - key: OBSIDIAN_VAULT_REPO_URL
-        value: marshadgani/obsidian-vault
+        value: marshadgani/Arshad-Ideaverse
       - key: PYTHONUNBUFFERED
         value: "1"
