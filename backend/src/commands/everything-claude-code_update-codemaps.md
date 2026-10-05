@@ -1,16 +1,20 @@
-# Atualizar Codemaps
+---
+description: Scan project structure and generate token-lean architecture codemaps.
+---
 
-Analise a estrutura do codebase e gere documentação arquitetural enxuta em tokens.
+# Update Codemaps
 
-## Passo 1: Escanear Estrutura do Projeto
+Analyze the codebase structure and generate token-lean architecture documentation.
 
-1. Identifique o tipo de projeto (monorepo, app única, library, microservice)
-2. Encontre todos os diretórios de código-fonte (src/, lib/, app/, packages/)
-3. Mapeie entry points (main.ts, index.ts, app.py, main.go, etc.)
+## Step 1: Scan Project Structure
 
-## Passo 2: Gerar Codemaps
+1. Identify the project type (monorepo, single app, library, microservice)
+2. Find all source directories (src/, lib/, app/, packages/)
+3. Map entry points (main.ts, index.ts, app.py, main.go, etc.)
 
-Crie ou atualize codemaps em `docs/CODEMAPS/` (ou `.reports/codemaps/`):
+## Step 2: Generate Codemaps
+
+Create or update codemaps in `docs/CODEMAPS/` (or `.reports/codemaps/`):
 
 | File | Contents |
 |------|----------|
@@ -20,9 +24,9 @@ Crie ou atualize codemaps em `docs/CODEMAPS/` (ou `.reports/codemaps/`):
 | `data.md` | Database tables, relationships, migration history |
 | `dependencies.md` | External services, third-party integrations, shared libraries |
 
-### Formato de Codemap
+### Codemap Format
 
-Cada codemap deve ser enxuto em tokens — otimizado para consumo de contexto por IA:
+Each codemap should be token-lean — optimized for AI context consumption:
 
 ```markdown
 # Backend Architecture
@@ -41,32 +45,32 @@ src/repos/user.ts (database access, 80 lines)
 - Stripe (payment processing)
 ```
 
-## Passo 3: Detecção de Diff
+## Step 3: Diff Detection
 
-1. Se codemaps anteriores existirem, calcule a porcentagem de diff
-2. Se mudanças > 30%, mostre o diff e solicite aprovação do usuário antes de sobrescrever
-3. Se mudanças <= 30%, atualize in-place
+1. If previous codemaps exist, calculate the diff percentage
+2. If changes > 30%, show the diff and request user approval before overwriting
+3. If changes <= 30%, update in place
 
-## Passo 4: Adicionar Metadados
+## Step 4: Add Metadata
 
-Adicione um cabeçalho de freshness em cada codemap:
+Add a freshness header to each codemap:
 
 ```markdown
 <!-- Generated: 2026-02-11 | Files scanned: 142 | Token estimate: ~800 -->
 ```
 
-## Passo 5: Salvar Relatório de Análise
+## Step 5: Save Analysis Report
 
-Escreva um resumo em `.reports/codemap-diff.txt`:
-- Arquivos adicionados/removidos/modificados desde o último scan
-- Novas dependências detectadas
-- Mudanças de arquitetura (novas rotas, novos serviços etc.)
-- Alertas de obsolescência para docs sem atualização em 90+ dias
+Write a summary to `.reports/codemap-diff.txt`:
+- Files added/removed/modified since last scan
+- New dependencies detected
+- Architecture changes (new routes, new services, etc.)
+- Staleness warnings for docs not updated in 90+ days
 
-## Dicas
+## Tips
 
-- Foque em **estrutura de alto nível**, não em detalhes de implementação
-- Prefira **caminhos de arquivo e assinaturas de função** em vez de blocos de código completos
-- Mantenha cada codemap abaixo de **1000 tokens** para carregamento eficiente de contexto
-- Use diagramas ASCII para fluxo de dados em vez de descrições verbosas
-- Rode após grandes adições de feature ou sessões de refatoração
+- Focus on **high-level structure**, not implementation details
+- Prefer **file paths and function signatures** over full code blocks
+- Keep each codemap under **1000 tokens** for efficient context loading
+- Use ASCII diagrams for data flow instead of verbose descriptions
+- Run after major feature additions or refactoring sessions
