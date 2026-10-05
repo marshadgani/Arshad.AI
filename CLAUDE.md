@@ -181,11 +181,11 @@ The orchestrator runs these agents in strict sequence. Every agent output feeds 
 | 3.3 | `system-engineer` | **Sonnet** | Designs system architecture, component structure, data flow, DB schema, caching strategy |
 | 3.5 | `engineer` | Sonnet | Builds production-ready MVP from SDD + system design |
 | 4 | `developer` | Sonnet | Generates complete feature code |
-| 4.15 | `database-specialist` | Sonnet | Deep SQL/ORM/migration audit — N+1, missing indexes, unsafe queries, Alembic correctness |
-| 4.16 | `python-specialist` | Sonnet | Python/FastAPI audit — async correctness, Pydantic v2, dependency injection, type annotations |
+| 4.15 | `database-specialist` | Sonnet | Deep SQL/ORM/migration audit — N+1, missing indexes, unsafe queries, Alembic correctness *(conditional — skipped if the feature has no `.py` files; see "Conditional Audit Stages" below)* |
+| 4.16 | `python-specialist` | Sonnet | Python/FastAPI audit — async correctness, Pydantic v2, dependency injection, type annotations *(conditional — skipped if the feature has no `.py` files; see "Conditional Audit Stages" below)* |
 | 4.2 | `code-reviewer` | **Sonnet** | Project-conventions review — checks all code against CLAUDE.md rules (api.md, database.md, frontend.md) |
-| 4.3 | `frontend-engineer` | Sonnet | Production-grade UI with bold aesthetic direction (frontend-design skill) — all 4 states, accessible, responsive, reusable |
-| 4.4 | `type-design-analyzer` | Sonnet | TypeScript type system audit — weak types, missing invariant encoding, illegal-state prevention |
+| 4.3 | `frontend-engineer` | Sonnet | Production-grade UI with bold aesthetic direction (frontend-design skill) — all 4 states, accessible, responsive, reusable *(conditional — skipped if the feature has no frontend files; see "Conditional Audit Stages" below)* |
+| 4.4 | `type-design-analyzer` | Sonnet | TypeScript type system audit — weak types, missing invariant encoding, illegal-state prevention *(conditional — skipped if the feature has no frontend files; see "Conditional Audit Stages" below)* |
 | 4.5 | `senior-engineer` | **Sonnet** | Code quality audit — finds N+1, bad patterns, scalability risks. No functionality changes. |
 | 4.6 | `software-architect` | **Sonnet** | Architecture restructuring — separates concerns, reduces coupling, increases modularity |
 | 4.7 | `silent-failure-hunter` | Sonnet | Error handling audit — swallowed exceptions, HTTP 200 masking errors, missing propagation |
@@ -206,6 +206,29 @@ The orchestrator runs these agents in strict sequence. Every agent output feeds 
 **Orchestration: `.claude/workflows/dev-team-pipeline.js` (Workflow tool)** — runs
 all 28 agents from the top level via `agentType: '<role>'` calls, not through a
 subagent orchestrator (see the ⚠️ note above for why).
+
+### Conditional Audit Stages (2026-10-05)
+
+Four of the nine Audit-phase stages are conditional, not unconditional like every
+other stage in the table above: `database-specialist`, `python-specialist`,
+`frontend-engineer`, `type-design-analyzer`. Each is skipped if the feature's
+accumulated code contains no matching files (no `.py` files for the first two, no
+frontend files for the last two) — a Python audit on a pure-frontend feature (or
+vice versa) is pure token spend with nothing to find. The signal is computed from
+the real file list after Engineer/Developer run, not guessed ahead of time, and a
+catch-up pass re-checks after the full Audit loop in case a later unconditional
+stage (e.g. `code-reviewer`) introduces the feature's first file in a domain that
+was skipped earlier — so a domain can never go completely unaudited regardless of
+stage order. `database-specialist` is gated on the same "any `.py` file" signal as
+`python-specialist`, not a narrower DB-path heuristic, since real query code in
+this stack routinely lives outside `backend/src/models/`/`alembic/`.
+
+This does **not** touch the Harden phase (8.5 → 9, which always run per the Three
+Invariants below) or the separate Merge-to-Main gate — both remain fully
+unconditional for every feature regardless of size or domain. See
+`.claude/workflows/dev-team-pipeline.js` (inline comments above the `auditStages`
+array) and `.claude/workflows/dev-team-pipeline.test.js` for the decision-logic
+tests.
 
 ### Model Tiers — PERMANENT (max model = Sonnet, no exceptions without one-time approval)
 

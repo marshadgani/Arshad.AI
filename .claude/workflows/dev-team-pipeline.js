@@ -239,58 +239,83 @@ async function runFeaturePipeline(f) {
   // Domain-specific audit stages only earn their cost when the feature
   // actually touches that domain — a Python audit on a pure-frontend
   // feature (or vice versa) is pure token spend with nothing to find.
-  // Signals are computed from the real accumulated file list, not guessed
-  // ahead of time, so this can never under-run: if Engineer/Developer wrote
-  // a .py file, the Python Specialist runs, full stop.
+  //
+  // `database-specialist` is gated on touchesPython, NOT a narrower DB-path
+  // heuristic (backend/src/models/, alembic/, .sql) — queries in this stack
+  // routinely live in route/service files outside those paths, and a
+  // narrower gate would skip the one stage whose job is catching unsafe SQL
+  // on exactly the files most likely to contain it. Gate agents (code-reviewer,
+  // security-auditor) flagged the narrower version as a real quality/security
+  // gap on 2026-10-05; this is the fix.
+  //
+  // Both `when` and `scope` are recomputed from the LIVE `code` value on
+  // every loop iteration (via computeSignals/isFrontendFile), not a frozen
+  // pre-loop snapshot — code-reviewer and other unconditional stages can
+  // introduce new files mid-loop, and a stale snapshot would make an earlier
+  // stage's skip decision silently wrong. A catch-up pass after the main
+  // loop closes the remaining gap: if a domain only appears AFTER its own
+  // stage's turn already passed (e.g. code-reviewer adds the feature's only
+  // .py file), the skipped specialist still gets to run once, at the end,
+  // against the final file list. (Confirmed as a real, not hypothetical,
+  // gap by two independent gate reviews on 2026-10-05.)
   //
   // This does NOT touch the Harden phase (Debugger → EA post-build) — those
   // stages always run regardless of feature size per this file's own
   // existing invariant below ("Steps 8.5 → 9 always run"), and it does not
   // touch the separate Merge-to-Main gate (.claude/commands/gate.md) at all.
-  const touchesPython = code.some(x => x.path.endsWith('.py'))
-  const touchesFrontend = code.some(x => x.path.startsWith('frontend/') || /\.(tsx?|jsx?|css|scss)$/.test(x.path))
-  const touchesDb = code.some(x => x.path.startsWith('backend/src/models/') || x.path.startsWith('backend/alembic/') || /\.sql$/.test(x.path))
-  const signals = { touchesPython, touchesFrontend, touchesDb }
-
-  // Backend- and frontend-domain stages don't need the other domain's files
-  // in their prompt at all — a Python audit gains nothing from seeing .css
-  // files, and vice versa. Scoping is input-only: the stage still sees every
-  // file in its own domain (so cross-file concerns within that domain are
-  // unaffected), and whatever it returns still merges into the full `code`
-  // array exactly as before. The general/cross-cutting stages (code-reviewer,
-  // senior-engineer, software-architect, silent-failure-hunter, code-simplifier)
-  // deliberately keep the full dump — coupling and modularity concerns span
-  // both domains and must not be scoped down.
+  // isFrontendFile/computeSignals are duplicated verbatim in
+  // dev-team-pipeline.test.js (this file can't be `import`-ed by a
+  // standard test runner — it has a top-level `return` later on, since
+  // it's executed by the Workflow tool's own runtime, not loaded as a
+  // plain ES module). The test file's drift-guard test re-reads this exact
+  // block as text and fails if the two copies diverge.
   const isFrontendFile = p => p.startsWith('frontend/') || /\.(tsx?|jsx?|css|scss)$/.test(p)
-  const backendOnly = code.filter(x => !isFrontendFile(x.path))
-  const frontendOnly = code.filter(x => isFrontendFile(x.path))
+  const computeSignals = c => ({
+    touchesPython: c.some(x => x.path.endsWith('.py')),
+    touchesFrontend: c.some(x => isFrontendFile(x.path)),
+  })
 
   const auditStages = [
-    { role: 'database-specialist', label: 'Database Specialist', ask: 'Audit every DB interaction — queries, indexes, ORM, migrations, N+1, unsafe SQL. Fix issues found (empty files array if none apply).', when: s => s.touchesDb, scope: () => backendOnly },
-    { role: 'python-specialist', label: 'Python Specialist', ask: 'Audit async correctness, FastAPI DI, Pydantic v2, exceptions, type annotations. Fix issues found (empty files array if none apply).', when: s => s.touchesPython, scope: () => backendOnly },
+    { role: 'database-specialist', label: 'Database Specialist', ask: 'Audit every DB interaction — queries, indexes, ORM, migrations, N+1, unsafe SQL. Fix issues found (empty files array if none apply).', when: s => s.touchesPython, scope: c => c.filter(x => !isFrontendFile(x.path)), skipReason: 'no backend/.py files' },
+    { role: 'python-specialist', label: 'Python Specialist', ask: 'Audit async correctness, FastAPI DI, Pydantic v2, exceptions, type annotations. Fix issues found (empty files array if none apply).', when: s => s.touchesPython, scope: c => c.filter(x => !isFrontendFile(x.path)), skipReason: 'no .py files' },
     { role: 'code-reviewer', label: 'Code Reviewer', ask: 'Review against CLAUDE.md rules (api.md, database.md, frontend.md) — naming, error shapes, async patterns, UUIDs. Fix departures.', model: SONNET },
-    { role: 'frontend-developer', label: 'Frontend Engineer', ask: 'Apply the frontend-design skill: bold aesthetic direction, distinctive typography/colour/motion, all 4 states (loading/empty/error/content), accessible, reusable.', when: s => s.touchesFrontend, scope: () => frontendOnly },
-    { role: 'type-design-analyzer', label: 'Type Design Analyzer', ask: 'Audit the type system for weak types, missing invariant encoding, illegal-state prevention. Improve types.', when: s => s.touchesFrontend, scope: () => frontendOnly },
+    { role: 'frontend-developer', label: 'Frontend Engineer', ask: 'Apply the frontend-design skill: bold aesthetic direction, distinctive typography/colour/motion, all 4 states (loading/empty/error/content), accessible, reusable.', when: s => s.touchesFrontend, scope: c => c.filter(x => isFrontendFile(x.path)), skipReason: 'no frontend files' },
+    { role: 'type-design-analyzer', label: 'Type Design Analyzer', ask: 'Audit the type system for weak types, missing invariant encoding, illegal-state prevention. Improve types.', when: s => s.touchesFrontend, scope: c => c.filter(x => isFrontendFile(x.path)), skipReason: 'no frontend files' },
     { role: 'code-analyzer', label: 'Senior Engineer', ask: 'Code quality audit — N+1, bad patterns, scalability risks. NO functionality changes.', model: SONNET },
     { role: 'refactoring-specialist', label: 'Software Architect', ask: 'Restructure to separate concerns, reduce coupling, increase modularity. NO functionality changes.', model: SONNET },
     { role: 'silent-failure-hunter', label: 'Silent Failure Hunter', ask: 'Find swallowed exceptions, HTTP 200 masking errors, missing propagation. Fix them.' },
     { role: 'code-simplifier', label: 'Code Simplifier', ask: 'Eliminate unnecessary abstraction, over-engineering, verbose constructs. Preserve all functionality.', model: SONNET },
   ]
 
-  for (const st of auditStages) {
-    if (st.when && !st.when(signals)) {
-      log_(`${st.label} — skipped (no matching files: ${st.role === 'database-specialist' ? 'no DB files' : st.role === 'python-specialist' ? 'no .py files' : 'no frontend files'})`)
-      continue
-    }
-    log_(st.label)
-    const promptFiles = st.scope ? st.scope() : code
+  async function runAuditStage(st, catchUp) {
+    log_(catchUp ? `${st.label} — catch-up run (domain files appeared later in Audit phase)` : st.label)
+    const promptFiles = st.scope ? st.scope(code) : code
     const r = await withRole(st.role, () => agent(
       `${ctxHeader(f, st.label)}\n${st.ask}\nCurrent files:\n${dump(promptFiles)}`,
       { agentType: st.role, model: st.model, phase: 'Audit', schema: FILES_SCHEMA }
     ))
     code = mergeFiles(code, r && r.files)
     const hits = denylistHits(r && r.files)
-    if (hits.length) return { featId: f.featId, status: 'halted', reason: `Denylist violation at ${st.label}: ${hits.map(h => h.path).join(', ')}` }
+    if (hits.length) return `Denylist violation at ${st.label}${catchUp ? ' (catch-up)' : ''}: ${hits.map(h => h.path).join(', ')}`
+    return null
+  }
+
+  const ranStage = new Set()
+  for (const st of auditStages) {
+    if (st.when && !st.when(computeSignals(code))) {
+      log_(`${st.label} — skipped (${st.skipReason})`)
+      continue
+    }
+    ranStage.add(st.role)
+    const violation = await runAuditStage(st, false)
+    if (violation) return { featId: f.featId, status: 'halted', reason: violation }
+  }
+
+  const finalSignals = computeSignals(code)
+  for (const st of auditStages) {
+    if (!st.when || ranStage.has(st.role) || !st.when(finalSignals)) continue
+    const violation = await runAuditStage(st, true)
+    if (violation) return { featId: f.featId, status: 'halted', reason: violation }
   }
 
   log_('Process Organiser')
