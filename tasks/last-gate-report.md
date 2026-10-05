@@ -2,150 +2,49 @@
 
 **Branch:** `claude/gallant-fermi-puz9bt` → `claude/ai-personal-assistant-main`
 **Triggered by:** "Merge to main" (user request), gate run directly in-session
-**Date:** 2026-09-20
+**Date:** 2026-10-05
 
 ---
 
 ## Summary
 
-This diff caps every agent in the project — the dev-team pipeline and every
-project/ad-hoc agent alike — at Sonnet as the model ceiling, with a new
-permanent Model Escalation Policy requiring Arshad's explicit, one-time,
-per-task approval before any agent may run on a higher-tier model. It also
-carries forward several weeks of legitimate weekly external-skill-sync
-commits that had accumulated on this branch without yet being merged to
-main (~450 vendored skill/agent/command/hook files).
+This diff fixes a real registry bug discovered while investigating why the AI Ecosystem page still showed Opus badges after the prior Sonnet-only policy change: 9 pipeline agents (`ai-engineer`, `architecture-critic`, `system-engineer`, `code-reviewer`, `senior-engineer`, `software-architect`, `code-simplifier`, `debugger`, `security-auditor`) existed in the `agent_registry` database table with `category=development_team` and a `pipeline_stage`, but had no corresponding `.md` file under `.claude/agents/dev-team/` — so the registry sync (`scripts/seed_from_mock.py`, which runs as a `preDeployCommand` on every Render deploy) never had a file to re-sync them from, leaving their rows orphaned at whatever model they were originally seeded with.
 
 **Files actually changed by this session's work:**
-- `.claude/workflows/dev-team-pipeline.js` — renamed the `OPUS` constant to
-  `SONNET` (`claude-sonnet-4-6`) and repointed all 9 stages that referenced
-  it (ai-engineer, architecture-critic ×2, system-architect, code-reviewer,
-  senior-engineer/code-analyzer, software-architect/refactoring-specialist,
-  code-simplifier, debugger, security-auditor).
-- `.claude/agents/orchestrator.md`, `.claude/agents/planner.md`:
-  `claude-opus-4-7` → `claude-sonnet-4-6`.
-- `.claude/agents/dev-team/orchestrator.md`: `claude-fable-5` (an invalid
-  model id) → `claude-sonnet-4-6`.
-- Vendored `code-reviewer.md`/`code-simplifier.md` under
-  `.claude/agents/claude-code/` and `.claude/agents/claude-plugins-official/`:
-  `model: opus` → `model: sonnet` (4 files).
-- `CLAUDE.md`: new "Model Tiers" and "Model Escalation Policy" sections;
-  updated "Model Strategy" and the §21 agent-registration model-inference
-  rule to match.
+- Created the 9 missing `.claude/agents/dev-team/*.md` files, each `model: claude-sonnet-4-6`, matching the existing dev-team agent file conventions.
+- Fixed `backend/scripts/register_agent.py::_parse_md` — it substring-scanned the **entire file body** for the literal word "opus" and assigned `claude-opus-4-8` if found anywhere, even in unrelated prose. Now reads only the `model:` frontmatter field via regex, defaulting to Sonnet.
+- Fixed `backend/scripts/seed_from_mock.py::_normalize_model` — `_MODEL_MAP` mapped a literal `opus`/`fable` frontmatter value straight through to that model, and an unrecognized value passed through verbatim. Now clamps anything above Sonnet or unrecognized down to `claude-sonnet-4-6`.
+- Updated `backend/tests/test_ai_ecosystem.py`: replaced 3 stale tests that asserted the removed body-scan behavior (and would have failed against the fix) with tests matching the new frontmatter-only contract, plus the exact regression case the fix exists to prevent. Added a new `TestNormalizeModel` class covering `seed_from_mock.py`'s previously-untested function.
+- Fixed two dead-end routing hints in the new agent files (`code-simplifier.md`, `software-architect.md` referenced a nonexistent top-level agent/command) and merged a duplicated `## Rules` section in `system-engineer.md`.
 
-**Pre-existing content also present in this diff (not authored this
-session, already on `origin/claude/ai-personal-assistant-main` prior to
-this branch catching up):** the FEAT-165 Obsidian ontology layer
-(`backend/src/models/ontology*.py`, `backend/src/services/ingestion/
-ontology_*.py`, migrations, and their test suite), plus ~450 vendored
-skill/agent/command/hook files from weekly syncs.
-
-**Correction applied before this gate ran:** the mandatory squash-divergence
-repair step was initially attempted with `--strategy=ours`, which would
-have silently discarded ~15 already-merged PRs (including the ontology
-feature) on the next squash-merge. This was caught before pushing, undone,
-and replaced with a real merge of `origin/claude/ai-personal-assistant-main`
-into this branch, which resolved cleanly with no conflicts.
+**Pre-existing content also present in this diff (not authored this session):** several weeks of legitimate weekly external-skill-sync commits. A real merge of `origin/claude/ai-personal-assistant-main` into this branch was required first (main had advanced by exactly one commit — this session's own prior PR, squashed); that merge produced genuine conflicts in vendored skill/agent/command files that both branches had independently re-synced from the same upstream repos at different times. Resolved by taking main's canonical snapshot for conflicting vendored files, and merging `.claude/github-repos.json` by keeping whichever side's entry had the more recent `last_fetched` timestamp per repo (same 45 repos on both sides — pure timestamp drift, no divergent content).
 
 ## Gate Summary
 
 | # | Gate | Agent | Result |
 |---|---|---|---|
-| 1 | Code Review | code-reviewer | ✅ PASS — no findings |
-| 2 | Security Audit | security-auditor | ✅ PASS — no findings |
-| 3 | Bug Analysis | debugger | ✅ PASS — no findings |
-| 4 | Test Coverage | test-writer | ✅ PASS — no new logic requiring coverage in this diff |
-| 5 | Code Quality | refactorer | ✅ PASS — no findings |
-| 6 | Documentation | doc-writer | ⚠️ WARN — 2 non-blocking items (see below) |
-| 7 | Silent Failures | silent-failure-hunter | ✅ PASS — no findings |
-| 8 | Test Quality | pr-test-analyzer | ✅ No blocking findings (2 minor follow-ups logged) |
+| 1 | Code Review | code-reviewer | ⚠️ Important finding — **fixed**: duplicate `## Rules` section in `system-engineer.md` |
+| 2 | Security Audit | security-auditor | ✅ PASS — no findings; confirmed the fix is a security *improvement* (no path to Opus escalation, code execution, or SQL injection) |
+| 3 | Bug Analysis | debugger | ✅ PASS — no findings; regex and no-match fallback paths verified safe |
+| 4 | Test Coverage | test-writer | ❌ BLOCKED → **fixed**: 3 existing tests asserted removed behavior and would fail; new logic had zero coverage |
+| 5 | Code Quality | refactorer | ⚠️ WARN — non-blocking: duplicated model-normalization logic across two scripts (acceptable per refactorer's own assessment — different invocation paths, 3-5 lines) |
+| 6 | Documentation | doc-writer | ⚠️ WARN — 2 items **fixed** (dead-end routing, duplicate Rules); 2 items left as non-blocking checklist (missing explicit output-schema section in 6 files, undefined "FeatureCode" term) |
+| 7 | Silent Failures | silent-failure-hunter | ⚠️ WARN — non-blocking: the Sonnet-ceiling clamp is correct but silent; no log/signal when a value is actually clamped, which the Model Escalation Policy's "flag it for correction at the source file" language calls for but nothing currently emits |
+| 8 | Test Quality | pr-test-analyzer | ❌ BLOCKED → **fixed**: same finding as #4, independently confirmed |
 
 ## Overall Verdict: ⚠️ WARN — mergeable
 
-Zero Critical findings. Zero FAIL gates. Zero security findings (which would
-otherwise auto-escalate to FAIL per this project's policy). One WARN
-category from doc-writer. Per this repo's Gate Verdicts table, WARN with
-zero FAIL/Critical is mergeable on "Merge to Main" — WARN items go into
-this checklist for Arshad to address at his discretion, not auto-fixed.
+The one blocking condition (stale tests that would fail CI, confirmed independently by two agents) is fixed and verified — both by direct logic-tracing against the actual source (sqlalchemy isn't installed in this sandbox, so the fix was verified by extracting the exact function bodies and running all 15 assertions against them directly: 6 for `_parse_md`, 9 for `_normalize_model` — all passed) and by manual review. Zero Critical findings remain. Zero FAIL gates remain. Zero security findings. Three WARN items remain, each explicitly assessed as non-blocking by the agent that raised it.
 
 **GATE PASSED WITH WARNINGS**
 
 ---
 
-## Detailed Findings
-
-### 1–5, 7. code-reviewer, security-auditor, debugger, test-writer, refactorer, silent-failure-hunter — all PASS
-
-All six agents independently confirmed:
-- The `OPUS` → `SONNET` rename in `dev-team-pipeline.js` is complete — zero
-  remaining references to the old constant name, all 9 former call sites
-  correctly updated, `node --check` passes.
-- All 7 changed agent `.md` files have correct, validly-formatted `model:`
-  values (no typos, no dot-vs-dash inconsistencies).
-- `CLAUDE.md`'s new sections are internally consistent with each other and
-  with the rest of the file.
-- No secrets, credentials, or injection vectors anywhere in the diff
-  (including a full secret-pattern scan across all ~450 vendored files —
-  the only near-hits were documentation prose about LLM "tokens" and one
-  already-masked example API key string).
-- Hook script changes in the vendored diff (`everything-claude-code_run-
-  with-flags-shell.sh`, `everything-claude-code_observe.sh`) are net
-  security *hardening* (added path-traversal containment, fixed a
-  catastrophic-backtracking regex), not regressions.
-- No dead code or leftover references from the constant rename.
-- This diff introduces no new application logic requiring new test
-  coverage — the change is a config/data-value substitution, not new
-  code paths.
-
-### 6. doc-writer — WARN (2 items, both non-blocking)
-
-1. **Pre-existing naming inconsistency, not introduced by this diff:**
-   CLAUDE.md's 28-agent pipeline table names stage 6 `test-script-writer`
-   while the Model Tiers table lists the same slot as `test-writer`. This
-   predates this session's edits (the Model Tiers table merge just carried
-   the existing name forward). Recommend picking one name and applying it
-   consistently — logged here for Arshad's attention, not blocking.
-2. **New in this diff — clarity gap in the Model Escalation Policy:** point
-   2 requires "a demonstrated, repeated inability to make progress... not
-   a first-try failure" before an agent may ask to escalate, but doesn't
-   define how many attempts count as "repeated." Recommend adding a
-   concrete threshold (e.g. "at least two genuine attempts, each producing
-   output that doesn't meet the stage's acceptance criteria") in a future
-   edit.
-
-   *(doc-writer also raised several WARN items about missing class-level
-   docstrings in `backend/src/models/ontology.py` and
-   `ontology_vocabulary.py`. Those files are unchanged in this diff —
-   confirmed identical on both sides by three separate agents — so those
-   findings describe pre-existing code from the already-merged FEAT-165 and
-   are not scored against this gate. Noted for a future ontology-focused
-   PR.)*
-
-### 8. pr-test-analyzer — no blocking findings
-
-Reviewed the ontology feature's test suite (not part of this diff, but
-already merged and present in the working tree) at the task's request.
-Found it to be an unusually strong, regression-driven suite with no
-critical gaps. Two minor (5–6 severity) follow-up items were logged as
-backlog candidates, not merge blockers:
-1. `test_ingestion_datetime_parsing.py` checks `tzinfo is not None` but not
-   that the offset is actually UTC.
-2. `ontology_graph.py`'s empty/missing-`provider_id` branch has no test
-   coverage.
-
-Neither applies to the diff this gate is evaluating.
-
----
-
 ## Action Items (non-blocking, for Arshad's discretion)
 
-- [ ] Reconcile `test-script-writer` vs `test-writer` naming in CLAUDE.md's
-      two pipeline tables.
-- [ ] Add a concrete "repeated attempts" threshold to the Model Escalation
-      Policy.
-- [ ] (Future ontology PR) Add class-level docstrings to `OntologyEntity`
-      and `OntologyRelationship`; document `RelationshipRule` field
-      semantics.
-- [ ] (Future ontology PR) Strengthen the UTC-offset assertion in
-      `test_ingestion_datetime_parsing.py`; add coverage for
-      `ontology_graph.py`'s empty-`provider_id` branch.
+- [ ] Extract the duplicated model-normalization logic in `register_agent.py` and `seed_from_mock.py` into a shared helper, to prevent the two from silently diverging if a model tier is ever added/changed.
+- [ ] Add a log/print signal when `_normalize_model` or `_parse_md` actually clamps a non-default value down to Sonnet, so a maintainer can distinguish "registered as Sonnet because that's what the file said" from "registered as Sonnet because we overrode something" — per the Model Escalation Policy's "flag it for correction at the source file" language, which nothing currently implements.
+- [ ] Add an explicit `## Output schema` section to the 6 new dev-team agent files that currently just say "Return ONLY the corrected files JSON" (code-reviewer, senior-engineer, software-architect, code-simplifier, debugger, security-auditor), showing the `{path, content}` array shape.
+- [ ] Define "FeatureCode" explicitly (one sentence) in those same 6 files, or add a cross-reference to where it's defined, so a session reading one file cold doesn't have to infer its shape from the pipeline script.
+- [ ] (Carried from the prior gate report) Reconcile `test-script-writer` vs `test-writer` naming in CLAUDE.md's two pipeline tables.
+- [ ] (Carried from the prior gate report) Add a concrete "repeated attempts" threshold to the Model Escalation Policy.
