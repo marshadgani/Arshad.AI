@@ -32,7 +32,7 @@ REL = {
 }
 
 
-async def _run(ents, rels, push=None, db=None):
+async def _run(ents, rels, push=None, db=None, payload=None):
     user = MagicMock(id=uuid.uuid4())
     db = db or AsyncMock()
     push = push or AsyncMock(return_value=PushResult("ok", 2, "sha1", "m"))
@@ -43,7 +43,7 @@ async def _run(ents, rels, push=None, db=None):
         ),
         patch.object(ex, "push_vault", push),
     ):
-        result = await ex.export(user=user, db=db, payload={})
+        result = await ex.export(user=user, db=db, payload=payload or {})
     return db, push, result
 
 
@@ -76,17 +76,21 @@ async def test_db_transaction_closed_before_git_push():
 
 
 @pytest.mark.asyncio
-async def test_no_public_entities_still_calls_push_for_pruning():
-    """Empty render set still triggers push_vault so the git layer can prune stale files."""
+async def test_no_public_entities_refuses_to_prune_by_default():
     push = AsyncMock(return_value=PushResult("no_changes", 0, None, "m"))
-    _, _, result = await _run([], [], push=push)
+    with pytest.raises(IngestionError, match="vault_export_refused"):
+        await _run([], [], push=push)
+    push.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_no_public_entities_prunes_when_explicitly_allowed():
+    push = AsyncMock(return_value=PushResult("no_changes", 0, None, "m"))
+    _, _, result = await _run([], [], push=push, payload={"allow_empty_prune": True})
     push.assert_awaited_once()
     files_arg, _ = push.await_args.args
     assert files_arg == {}
-    assert result["status"] == "no_changes"
     assert result["entities_exported"] == 0
-    assert result["files_written"] == 0
-    assert result["commit_sha"] is None
 
 
 @pytest.mark.asyncio

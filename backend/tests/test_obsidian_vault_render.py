@@ -154,9 +154,21 @@ def test_sanitize_table(key, expected):
 
 
 @pytest.mark.parametrize("key", ["", "///", "...", "!!!", "../..", "--"])
-def test_sanitize_rejects_empty_result(key):
-    with pytest.raises(ValueError):
-        r._sanitize_key(key)
+def test_sanitize_empty_result_falls_back_to_stable_hash_name(key):
+    name = r._sanitize_key(key)
+    assert re.fullmatch(r"key-[0-9a-f]{8}", name)
+    assert name == r._sanitize_key(key)
+
+
+def test_case_only_collision_gets_hash_suffix():
+    files = render_vault([_project("Foo"), _project("foo")], [])
+    assert len(files) == 2
+    assert len({f.lower() for f in files}) == 2
+
+
+def test_frontmatter_escapes_unicode_line_separators():
+    out = render_vault([_person("a\u2028b")], [])
+    assert "\u2028" not in next(iter(out.values())).split("---")[1]
 
 
 @pytest.mark.parametrize("key", ["../../etc/passwd", "/abs/path", "C:\\x", ".git", "a/../../b", "inject]]x", "o[[l", "p|q"])

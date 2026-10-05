@@ -72,7 +72,8 @@ def _sanitize_key(key: str) -> str:
     cleaned = _DISALLOWED.sub("", key.replace("/", "-"))
     cleaned = _DASHES.sub("-", cleaned).strip("-")
     if not cleaned:
-        raise ValueError("external_key sanitizes to an empty filename")
+        # Non-ASCII-only keys (e.g. CJK) would otherwise abort the whole export.
+        cleaned = "key-" + hashlib.sha1(key.encode()).hexdigest()[:8]
     if len(cleaned) > _MAX_NAME_LEN:
         raise ValueError("external_key sanitizes to an over-long filename")
     if cleaned.upper() in _WINDOWS_RESERVED:
@@ -92,7 +93,7 @@ def _frontmatter(entity: Entity) -> str:
         "source": _SOURCE,
         "external_key": entity.external_key,
     }
-    lines = [f"{k}: {json.dumps(v, ensure_ascii=False)}" for k, v in fields.items()]
+    lines = [f"{k}: {json.dumps(v, ensure_ascii=True)}" for k, v in fields.items()]
     return "---\n" + "\n".join(lines) + "\n---\n"
 
 
@@ -111,8 +112,9 @@ def _build_export_paths(
 
     Entities with unknown types (not in ``_DIR_BY_TYPE``) are skipped with a
     warning. Raises ``ValueError`` (naming the entity id) if a key cannot be
-    sanitized, Keys that sanitize to the same filename each get a short stable hash suffix
-    so one collision never aborts the whole export.
+    sanitized. Keys that sanitize to the same filename, compared case-insensitively
+    because the vault is opened on case-insensitive filesystems, each get a short
+    stable hash suffix so one collision never aborts the whole export.
     """
     exported: dict[tuple[str, str], str] = {}
     seen_paths: dict[str, list[tuple[str, str]]] = {}
@@ -129,12 +131,12 @@ def _build_export_paths(
             ) from exc
         ident = (entity.entity_type, entity.external_key)
         exported[ident] = path
-        seen_paths.setdefault(path, []).append(ident)
-    for path, idents in seen_paths.items():
+        seen_paths.setdefault(path.lower(), []).append(ident)
+    for idents in seen_paths.values():
         if len(idents) > 1:
             for ident in idents:
                 digest = hashlib.sha1(f"{ident[0]}:{ident[1]}".encode()).hexdigest()[:8]
-                exported[ident] = f"{path}-{digest}"
+                exported[ident] = f"{exported[ident]}-{digest}"
     if skipped_types:
         logger.warning(
             "vault render skipped entities of unsupported types: %s",
@@ -182,6 +184,11 @@ def _build_adjacency(
 def render_vault(
     entities: list[Entity], relationships: list[Relationship]
 ) -> dict[str, str]:
+    """Render public entities to ``{path.md: markdown}``.
+
+    Raises ``ValueError`` (not ``IngestionError``) if any non-public entity or
+    relationship reaches it: the second line of defence behind the query filter.
+    """
     for entity in entities:
         if entity.visibility != PUBLIC:
             raise ValueError("refusing to render a non-public entity")

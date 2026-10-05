@@ -77,6 +77,10 @@ def _to_relationships(rows: list[dict[str, Any]]) -> list[Relationship]:
 async def export(
     *, user: User, db: AsyncSession, payload: dict[str, Any]
 ) -> dict[str, Any]:
+    """Export the user's public ontology to the vault repo and return an ExportSummary dict.
+
+    Never deletes by itself on an empty result: that needs ``allow_empty_prune``.
+    """
     entity_rows = await repo.fetch_public_entities(db, user.id)
     rel_rows = await repo.fetch_public_relationships(db, user.id)
     # Reads are done: end the transaction now so no DB connection is held
@@ -85,11 +89,14 @@ async def export(
     await db.commit()
 
     if not entity_rows:
-        logger.warning(
-            "No public entities for user %s; will prune stale vault files if any "
-            "(entities default to visibility=private via FEAT-165 ratchet).",
-            user.id,
-        )
+        # An empty set prunes every managed note, so a wrong user id or a bulk
+        # demotion bug would wipe the vault with a success status.
+        if not payload.get("allow_empty_prune"):
+            raise IngestionError(
+                "vault_export_refused: no public entities; pass "
+                "allow_empty_prune=true in the trigger payload to prune the vault"
+            )
+        logger.warning("No public entities for user %s; pruning vault by request.", user.id)
     elif not rel_rows:
         logger.warning(
             "No public relationships for user %s: relationships default to "

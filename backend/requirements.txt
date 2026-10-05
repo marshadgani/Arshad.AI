@@ -22,7 +22,7 @@ httpx==0.28.1
 
 # Phase C — OAuth + JWT auth
 authlib==1.6.12
-cryptography==50.0.2
+cryptography==49.0.0
 pyjwt==2.15.1
 
 # FEAT-143 — password login. bcrypt only (not passlib): passlib is

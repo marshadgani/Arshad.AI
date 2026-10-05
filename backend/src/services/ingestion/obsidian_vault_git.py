@@ -101,6 +101,7 @@ def _clone_url(slug: str) -> str:
 
 
 def blob_sha(content: bytes) -> str:
+    """Git blob SHA (sha1 of ``blob <len>\\0`` + content), used only to detect unchanged files."""
     return hashlib.sha1(b"blob %d\0" % len(content) + content).hexdigest()  # noqa: S324
 
 
@@ -173,7 +174,7 @@ def _setup_git_env(tmp_dir: Path, token: str) -> dict[str, str]:
     askpass = tmp_dir / "askpass.sh"
     askpass.write_text(_ASKPASS_SCRIPT)
     askpass.chmod(stat.S_IRWXU)
-    base = {k: os.environ[k] for k in ("PATH", "LANG", "LC_ALL", "SSL_CERT_FILE") if k in os.environ}
+    base = {k: os.environ[k] for k in ("PATH", "LANG", "LC_ALL", "SSL_CERT_FILE", "GIT_SSL_CAINFO", "HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY") if k in os.environ}
     return {
         **base,
         "HOME": str(tmp_dir),
@@ -341,6 +342,13 @@ def _push_all_sync(
 
 
 async def push_vault(files: dict[str, str], commit_message: str) -> PushResult:
+    """Clone the vault repo, write changed files, prune stale managed notes, commit and push.
+
+    The token is read at call time. Git work runs in a worker thread. A
+    ``no_changes`` status is a valid result and needs no retry. Pruning only
+    removes the tip: git history keeps earlier versions, so the vault repo
+    must stay private.
+    """
     token = os.getenv(_TOKEN_ENV)
     if not token:
         raise IngestionError(f"vault_token_missing: set {_TOKEN_ENV}")
