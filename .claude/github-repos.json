@@ -4257,7 +4257,7 @@
     "openmontage": {
       "url": "https://github.com/calesthio/OpenMontage.git",
       "name": "OpenMontage",
-      "last_fetched": "2026-09-12 23:30 UTC",
+      "last_fetched": "2026-10-05 18:35 UTC",
       "components": {
         "skills": [
           "flux-best-practices",
@@ -4320,6 +4320,7 @@
           "hyperframes-cli",
           "vercel-composition-patterns",
           "atlas-cloud",
+          "provider-model-refresh",
           "video-download",
           "agents",
           "ai-video-gen",
