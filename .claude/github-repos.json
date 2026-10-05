@@ -4480,7 +4480,7 @@
     "learn-claude-code": {
       "url": "https://github.com/shareAI-lab/learn-claude-code.git",
       "name": "learn-claude-code",
-      "last_fetched": "2026-09-20 02:57 UTC",
+      "last_fetched": "2026-10-05 19:17 UTC",
       "components": {
         "skills": [
           "agent-builder",
@@ -4503,7 +4503,7 @@
     "claude-code-router": {
       "url": "https://github.com/musistudio/claude-code-router.git",
       "name": "claude-code-router",
-      "last_fetched": "2026-09-20 02:57 UTC",
+      "last_fetched": "2026-10-05 19:17 UTC",
       "components": {
         "skills": [],
         "agents": [
@@ -4539,7 +4539,7 @@
     "claude-skills": {
       "url": "https://github.com/alirezarezvani/claude-skills.git",
       "name": "claude-skills",
-      "last_fetched": "2026-09-20 02:57 UTC",
+      "last_fetched": "2026-10-05 19:17 UTC",
       "components": {
         "skills": [
           "md-review",
