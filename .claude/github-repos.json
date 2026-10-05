@@ -100,7 +100,7 @@
     "repomix": {
       "url": "https://github.com/yamadashy/repomix.git",
       "name": "repomix",
-      "last_fetched": "2026-09-20 02:55 UTC",
+      "last_fetched": "2026-10-05 19:30 UTC",
       "components": {
         "skills": [
           "repomix-explorer",
@@ -150,7 +150,7 @@
     "superpowers": {
       "url": "https://github.com/obra/superpowers.git",
       "name": "superpowers",
-      "last_fetched": "2026-09-20 02:55 UTC",
+      "last_fetched": "2026-10-05 19:30 UTC",
       "components": {
         "skills": [
           "using-superpowers",
@@ -3613,7 +3613,7 @@
     "ui-ux-pro-max-skill": {
       "url": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git",
       "name": "ui-ux-pro-max-skill",
-      "last_fetched": "2026-09-20 02:56 UTC",
+      "last_fetched": "2026-10-05 19:30 UTC",
       "components": {
         "skills": [
           "banner-design",
