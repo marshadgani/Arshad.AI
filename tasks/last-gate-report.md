@@ -23,7 +23,7 @@
 
 Manual verification: 131/131 vault tests pass against real Postgres 16, including the public-only query filter and tenant isolation. Full backend suite: 811 pass, 8 fail. The same 8 fail on the old dependency pins, so they predate this change (event-loop and env issues in auth and token tests).
 
-**Follow-up PR note:** FEAT-166 itself merged in #101. This PR only restores main's newer vendored skill files that #101 reverted through squash divergence, and carries no code change.
+**Follow-up PR note:** FEAT-166 itself merged in #101. This PR only restores main's newer vendored skill files that #101 reverted through squash divergence, and carries no code change. Restored 68 vendored files from main commit a325b0df.
 
 **Diff scope note:** the squash-divergence merge briefly reverted some of main's newer vendored skill files (weekly-sync noise). They were restored from main, so this PR's diff is FEAT-166 code, tests, config and task files only (21 files).
 
