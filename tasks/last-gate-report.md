@@ -8,43 +8,137 @@
 
 ## Summary
 
-This diff fixes a real registry bug discovered while investigating why the AI Ecosystem page still showed Opus badges after the prior Sonnet-only policy change: 9 pipeline agents (`ai-engineer`, `architecture-critic`, `system-engineer`, `code-reviewer`, `senior-engineer`, `software-architect`, `code-simplifier`, `debugger`, `security-auditor`) existed in the `agent_registry` database table with `category=development_team` and a `pipeline_stage`, but had no corresponding `.md` file under `.claude/agents/dev-team/` — so the registry sync (`scripts/seed_from_mock.py`, which runs as a `preDeployCommand` on every Render deploy) never had a file to re-sync them from, leaving their rows orphaned at whatever model they were originally seeded with.
+This diff adds token-usage optimizations to the dev-team pipeline's Audit
+phase, per Arshad's explicit request to reduce token spend without
+lowering output quality: 4 of the 9 audit stages (`database-specialist`,
+`python-specialist`, `frontend-engineer`, `type-design-analyzer`) are now
+conditional — skipped when the feature's code contains no matching files
+— and their prompts are scoped to their own domain's files instead of the
+full accumulated file list.
 
-**Files actually changed by this session's work:**
-- Created the 9 missing `.claude/agents/dev-team/*.md` files, each `model: claude-sonnet-4-6`, matching the existing dev-team agent file conventions.
-- Fixed `backend/scripts/register_agent.py::_parse_md` — it substring-scanned the **entire file body** for the literal word "opus" and assigned `claude-opus-4-8` if found anywhere, even in unrelated prose. Now reads only the `model:` frontmatter field via regex, defaulting to Sonnet.
-- Fixed `backend/scripts/seed_from_mock.py::_normalize_model` — `_MODEL_MAP` mapped a literal `opus`/`fable` frontmatter value straight through to that model, and an unrecognized value passed through verbatim. Now clamps anything above Sonnet or unrecognized down to `claude-sonnet-4-6`.
-- Updated `backend/tests/test_ai_ecosystem.py`: replaced 3 stale tests that asserted the removed body-scan behavior (and would have failed against the fix) with tests matching the new frontmatter-only contract, plus the exact regression case the fix exists to prevent. Added a new `TestNormalizeModel` class covering `seed_from_mock.py`'s previously-untested function.
-- Fixed two dead-end routing hints in the new agent files (`code-simplifier.md`, `software-architect.md` referenced a nonexistent top-level agent/command) and merged a duplicated `## Rules` section in `system-engineer.md`.
+**The gate review caught two real regressions in the first version of this
+change, independently confirmed by multiple agents, and both are fixed and
+verified on this branch before this report was written — not deferred:**
 
-**Pre-existing content also present in this diff (not authored this session):** several weeks of legitimate weekly external-skill-sync commits. A real merge of `origin/claude/ai-personal-assistant-main` into this branch was required first (main had advanced by exactly one commit — this session's own prior PR, squashed); that merge produced genuine conflicts in vendored skill/agent/command files that both branches had independently re-synced from the same upstream repos at different times. Resolved by taking main's canonical snapshot for conflicting vendored files, and merging `.claude/github-repos.json` by keeping whichever side's entry had the more recent `last_fetched` timestamp per repo (same 45 repos on both sides — pure timestamp drift, no divergent content).
+1. **Critical** — `signals`/`scope` were computed once before the Audit
+   loop, so an earlier domain-specific stage's skip decision couldn't see
+   files a later unconditional stage (e.g. `code-reviewer`) introduced
+   afterward. Fixed with a two-pass design: `when`/`scope` now recompute
+   from the live `code` array on every iteration, and a catch-up pass after
+   the main loop re-checks the final file list and runs any specialist that
+   was skipped early but whose domain appeared later.
+2. **Security (Medium, escalated to blocking per this project's policy)** —
+   `database-specialist` was gated on a narrow DB-path heuristic that
+   misses real query/raw-SQL code living in route or service files, which
+   is how this stack actually organizes DB access. Re-gated on
+   `touchesPython` instead, since every DB-touching file in this stack is
+   necessarily a `.py` file.
+
+Also added: `dev-team-pipeline.test.js` (12 tests, all passing) covering
+the pure decision logic with a drift-guard against the real file (which
+can't be directly imported — it has a top-level `return`, being a
+Workflow-tool script rather than a standard ES module). Also fixed:
+CLAUDE.md's pipeline table didn't reflect which stages are now conditional
+— added a note on each affected row plus a new explanatory subsection.
 
 ## Gate Summary
 
-| # | Gate | Agent | Result |
-|---|---|---|---|
-| 1 | Code Review | code-reviewer | ⚠️ Important finding — **fixed**: duplicate `## Rules` section in `system-engineer.md` |
-| 2 | Security Audit | security-auditor | ✅ PASS — no findings; confirmed the fix is a security *improvement* (no path to Opus escalation, code execution, or SQL injection) |
-| 3 | Bug Analysis | debugger | ✅ PASS — no findings; regex and no-match fallback paths verified safe |
-| 4 | Test Coverage | test-writer | ❌ BLOCKED → **fixed**: 3 existing tests asserted removed behavior and would fail; new logic had zero coverage |
-| 5 | Code Quality | refactorer | ⚠️ WARN — non-blocking: duplicated model-normalization logic across two scripts (acceptable per refactorer's own assessment — different invocation paths, 3-5 lines) |
-| 6 | Documentation | doc-writer | ⚠️ WARN — 2 items **fixed** (dead-end routing, duplicate Rules); 2 items left as non-blocking checklist (missing explicit output-schema section in 6 files, undefined "FeatureCode" term) |
-| 7 | Silent Failures | silent-failure-hunter | ⚠️ WARN — non-blocking: the Sonnet-ceiling clamp is correct but silent; no log/signal when a value is actually clamped, which the Model Escalation Policy's "flag it for correction at the source file" language calls for but nothing currently emits |
-| 8 | Test Quality | pr-test-analyzer | ❌ BLOCKED → **fixed**: same finding as #4, independently confirmed |
+| # | Gate | Agent | Initial Result | After fixes |
+|---|---|---|---|---|
+| 1 | Code Review | code-reviewer | ⚠️ Important (2 findings — narrow DB heuristic, classification inconsistency) | ✅ Fixed |
+| 2 | Security Audit | security-auditor | ⚠️ Medium (DB-path heuristic security gap) | ✅ Fixed |
+| 3 | Bug Analysis | debugger | ✅ PASS (confirmed fix correct, re-verified against final HEAD) | ✅ PASS |
+| 4 | Test Coverage | test-writer | ❌ BLOCKED (zero coverage on new branching logic) | ✅ Fixed — 12 tests added |
+| 5 | Code Quality | refactorer | ⚠️ 3 Warnings (duplicated logic, misleading thunks, fragile ternary) | ✅ Fixed |
+| 6 | Documentation | doc-writer | ⚠️ WARN (CLAUDE.md pipeline table not synced) | ✅ Fixed |
+| 7 | Silent Failures | silent-failure-hunter | ❌ CRITICAL (stale skip-decision, no signal it went stale) | ✅ Fixed |
+| 8 | Test Quality | pr-test-analyzer | ❌ CRITICAL (same stale-closure root cause, independently found) | ✅ Fixed |
 
-## Overall Verdict: ⚠️ WARN — mergeable
+## Overall Verdict: ✅ GATE PASSED
 
-The one blocking condition (stale tests that would fail CI, confirmed independently by two agents) is fixed and verified — both by direct logic-tracing against the actual source (sqlalchemy isn't installed in this sandbox, so the fix was verified by extracting the exact function bodies and running all 15 assertions against them directly: 6 for `_parse_md`, 9 for `_normalize_model` — all passed) and by manual review. Zero Critical findings remain. Zero FAIL gates remain. Zero security findings. Three WARN items remain, each explicitly assessed as non-blocking by the agent that raised it.
+Both Critical findings (independently confirmed by 2 agents each) are fixed
+with a verified two-pass design, confirmed correct by debugger's final
+re-check against HEAD. The security finding is fixed. The test-coverage
+blocker is closed with 12 passing tests plus a drift-guard. All Warning/WARN
+items are fixed, not deferred. Zero outstanding findings of any severity.
 
-**GATE PASSED WITH WARNINGS**
+**GATE PASSED**
 
 ---
 
-## Action Items (non-blocking, for Arshad's discretion)
+## Detailed Findings and Fixes
 
-- [ ] Extract the duplicated model-normalization logic in `register_agent.py` and `seed_from_mock.py` into a shared helper, to prevent the two from silently diverging if a model tier is ever added/changed.
-- [ ] Add a log/print signal when `_normalize_model` or `_parse_md` actually clamps a non-default value down to Sonnet, so a maintainer can distinguish "registered as Sonnet because that's what the file said" from "registered as Sonnet because we overrode something" — per the Model Escalation Policy's "flag it for correction at the source file" language, which nothing currently implements.
-- [ ] Add an explicit `## Output schema` section to the 6 new dev-team agent files that currently just say "Return ONLY the corrected files JSON" (code-reviewer, senior-engineer, software-architect, code-simplifier, debugger, security-auditor), showing the `{path, content}` array shape.
-- [ ] Define "FeatureCode" explicitly (one sentence) in those same 6 files, or add a cross-reference to where it's defined, so a session reading one file cold doesn't have to infer its shape from the pipeline script.
-- [ ] (Carried from the prior gate report) Reconcile `test-script-writer` vs `test-writer` naming in CLAUDE.md's two pipeline tables.
-- [ ] (Carried from the prior gate report) Add a concrete "repeated attempts" threshold to the Model Escalation Policy.
+### 1, 2. code-reviewer + security-auditor — narrow `touchesDb` heuristic
+
+Both independently flagged the same root issue: gating `database-specialist`
+on `backend/src/models/`/`alembic/`/`.sql` paths misses real query code in
+route/service files. Fixed by re-gating on `touchesPython` — every
+DB-touching file in this stack is necessarily `.py`. code-reviewer also
+flagged a secondary classification inconsistency (extension-only vs.
+path-prefix-or-extension checks disagreeing on an edge case); resolved by
+having `database-specialist`/`python-specialist` share the same `when`
+signal as the fix above, removing the divergent heuristic entirely.
+
+### 3. debugger — PASS, with a correction to the gate's own framing
+
+Debugger's first pass (before the fix landed) would have found the exact
+Critical bug the other two agents found; by the time it finished, the fix
+(`c1bf5c44`) was already on the branch, and it re-verified against the
+actual HEAD state: no stale closures, the two-pass catch-up design is
+correct, the `promptFiles` fallback is correct, syntax passes, and all 12
+new tests pass. Noted one by-design (non-bug) limitation: a specialist that
+already ran once isn't re-run if its domain gets *more* files added after
+that — only a skipped-then-later-relevant specialist gets the catch-up
+pass. Accepted as the correct, intentionally-scoped behavior (the design
+promises "ran at least once," not "re-run on every subsequent mutation").
+
+### 4. test-writer — BLOCKED → fixed
+
+Zero existing coverage, and the new conditional branching + file
+classification logic was judged to clearly cross into "new logic requiring
+coverage," not a config-value substitution. Added
+`.claude/workflows/dev-team-pipeline.test.js`: 12 tests covering
+`isFrontendFile`, `computeSignals`, and the skip/catch-up decision flow,
+including the exact regression scenario (a domain introduced mid-loop by an
+unconditional stage) and a drift-guard that fails if the test's verbatim
+copy of the logic and the real file diverge. All 12 pass.
+
+### 5. refactorer — 3 Warnings, all fixed
+
+`isFrontendFile` was defined after a duplicate inline version of its own
+logic (fixed: hoisted and reused). `scope` thunks (`() => backendOnly`)
+wrapped already-computed values in a misleading way (superseded entirely
+by the Critical-bug fix, which made `scope` a genuine live-recomputing
+function, not a thunk over a stale value). The skip-reason ternary chain
+was fragile for future stages (fixed: added a `skipReason` field co-located
+with each stage definition).
+
+### 6. doc-writer — WARN, fixed
+
+CLAUDE.md's pipeline table presented all stages as unconditional, which
+would confuse a future session reading the skip-log output. Added a
+parenthetical note to each of the 4 affected rows and a new "Conditional
+Audit Stages" subsection explaining the mechanism, the catch-up pass, and
+that Harden/the Merge-to-Main gate remain untouched.
+
+### 7, 8. silent-failure-hunter + pr-test-analyzer — Critical, fixed
+
+Both independently traced the exact same bug: `signals`/`backendOnly`/
+`frontendOnly` were frozen once before the Audit loop, so an earlier
+domain-specific stage's skip decision couldn't see files a later
+unconditional stage introduced. Fixed with the two-pass catch-up design
+described in the Summary above, verified correct by both a hand-written
+simulation (4 scenarios, including the exact bug scenario and the security-
+gap scenario, all passing) and by debugger's independent re-check.
+
+---
+
+## Verification Performed
+
+- `node --check .claude/workflows/dev-team-pipeline.js` — passes.
+- `node --test .claude/workflows/dev-team-pipeline.test.js` — 12/12 pass.
+- Manual simulation of 4 scenarios (backend-only, frontend-only, domain
+  introduced mid-loop by an unconditional stage, DB code outside
+  `models/`) against the exact fixed logic — all behave as intended.
+- `grep` confirms no dangling references to the removed `touchesDb`/
+  `backendOnly`/`frontendOnly` module-level constants anywhere in the file.
