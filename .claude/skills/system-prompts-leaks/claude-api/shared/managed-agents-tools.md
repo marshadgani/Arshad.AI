@@ -90,7 +90,7 @@ Control whether server-executed tools (agent toolset + MCP) run automatically, w
 
 **Responding to `always_ask`** (and to `auto` calls that pause): send a `user.tool_confirmation` event with `tool_use_id` set to the **event ID** (`sevt_...`, not a `toolu_` ID) of the triggering `agent.tool_use` / `agent.mcp_tool_use` event. Several confirmations can go in one `events` request:
 
-```js
+```json
 { "type": "user.tool_confirmation", "tool_use_id": "sevt_abc123", "result": "allow" }
 { "type": "user.tool_confirmation", "tool_use_id": "sevt_def456", "result": "deny", "deny_message": "Read .env.example instead" }
 ```
@@ -110,7 +110,7 @@ Set `{"type": "auto"}` anywhere a `permission_policy` is accepted: a toolset's `
 ```json
 {
   "name": "Ops Agent",
-  "model": "claude-opus-5-5",
+  "model": "claude-opus-5",
   "mcp_servers": [{ "type": "url", "name": "github", "url": "https://mcp.example.com/github" }],
   "tools": [
     {
@@ -432,7 +432,7 @@ Skills reach the agent two ways: **attached** through the agent's `skills` array
 | **Pre-built Anthropic skills** | Common document tasks (PowerPoint, Excel, Word, PDF). Reference by name (e.g. `xlsx`). |
 | **Custom skills** | Skills you've created in your organization via the Skills API. Reference by `skill_id` + optional `version`. |
 
-**Max 20 skills per agent.** Agent creation uses `managed-agents-2026-04-01`; the separate Skills API (for managing custom skill definitions) is out of beta and needs no beta header.
+**Max 20 skills per agent.** Agent creation uses `managed-agents-2026-04-01`; the separate Skills API (for managing custom skill definitions) uses `skills-2025-10-02`.
 
 ### Enabling skills on a session
 
@@ -442,7 +442,7 @@ Skills are attached to the **agent** definition via `agents.create()`:
 const agent = await client.beta.agents.create(
   {
     name: "Financial Agent",
-    model: "claude-opus-5-5",
+    model: "claude-opus-5",
     system: "You are a financial analysis agent.",
     skills: [
       { type: "anthropic", skill_id: "xlsx" },
@@ -457,7 +457,7 @@ Python:
 ```python
 agent = client.beta.agents.create(
     name="Financial Agent",
-    model="claude-opus-5-5",
+    model="claude-opus-5",
     system="You are a financial analysis agent.",
     skills=[
         {"type": "anthropic", "skill_id": "xlsx"},

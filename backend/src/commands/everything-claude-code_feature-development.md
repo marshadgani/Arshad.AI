@@ -1,12 +1,12 @@
 ---
 name: feature-development
-description: Workflow command scaffold for feature-development in ECC.
+description: Workflow command scaffold for feature-development in everything-claude-code.
 allowed-tools: ["Bash", "Read", "Write", "Grep", "Glob"]
 ---
 
 # /feature-development
 
-Use this workflow when working on **feature-development** in ECC.
+Use this workflow when working on **feature-development** in `everything-claude-code`.
 
 ## Goal
 
