@@ -942,6 +942,13 @@ NAV_ITEMS: list[dict[str, Any]] = [
         "domain": None,
         "ord": 9,
     },
+    {
+        "path": "/ontology-visibility",
+        "label": "Entity Visibility",
+        "icon": "👁",
+        "domain": None,
+        "ord": 10,
+    },
 ]
 
 
