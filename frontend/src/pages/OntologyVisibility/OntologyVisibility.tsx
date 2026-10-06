@@ -43,6 +43,8 @@ export default function OntologyVisibility({ pageSize = 20 }: OntologyVisibility
       }));
       setSelected(new Set());
     } else {
+      setOverrides({});
+      setSelected(new Set());
       refetch();
     }
   }
@@ -60,10 +62,15 @@ export default function OntologyVisibility({ pageSize = 20 }: OntologyVisibility
     setSelected(allSelected ? new Set() : new Set(entities.map((e) => e.id)));
   }
 
+  function goToOffset(next: number) {
+    setOffset(next);
+    setSelected(new Set());
+    setOverrides({});
+  }
+
   function changeFilter<T extends string>(setter: (v: T) => void, value: T) {
     setter(value);
-    setOffset(0);
-    setSelected(new Set());
+    goToOffset(0);
   }
 
   const selectedIds = [...selected];
@@ -73,7 +80,8 @@ export default function OntologyVisibility({ pageSize = 20 }: OntologyVisibility
       <h1 className={styles.title}>Entity Visibility</h1>
       <p className={styles.help}>
         Public means the note will be written to the private vault repo {VAULT_REPO} on the next
-        export. Private entities are never exported.
+        export. For a person, their GitHub login name is what gets written. Private entities are
+        never exported.
       </p>
 
       {hasPerson && !bannerDismissed && (
@@ -146,6 +154,11 @@ export default function OntologyVisibility({ pageSize = 20 }: OntologyVisibility
         <p className={styles.empty}>
           No entities found. <Link to="/obsidian">Sync your vault</Link> and run the ontology
           extraction first.
+          {offset > 0 && (
+            <button type="button" className={styles.btn} onClick={() => goToOffset(0)}>
+              Back to first page
+            </button>
+          )}
         </p>
       )}
 
@@ -162,6 +175,7 @@ export default function OntologyVisibility({ pageSize = 20 }: OntologyVisibility
                 <button
                   type="button"
                   className={styles.btn}
+                  disabled={changing.size > 0}
                   onClick={() => void handleMutate(selectedIds, Visibility.Public)}
                 >
                   Publish selected
@@ -169,6 +183,7 @@ export default function OntologyVisibility({ pageSize = 20 }: OntologyVisibility
                 <button
                   type="button"
                   className={styles.btn}
+                  disabled={changing.size > 0}
                   onClick={() => void handleMutate(selectedIds, Visibility.Private)}
                 >
                   Unpublish selected
@@ -220,7 +235,7 @@ export default function OntologyVisibility({ pageSize = 20 }: OntologyVisibility
               type="button"
               className={styles.btn}
               disabled={offset === 0}
-              onClick={() => setOffset(Math.max(0, offset - pageSize))}
+              onClick={() => goToOffset(Math.max(0, offset - pageSize))}
             >
               Previous
             </button>
@@ -231,7 +246,7 @@ export default function OntologyVisibility({ pageSize = 20 }: OntologyVisibility
               type="button"
               className={styles.btn}
               disabled={offset + pageSize >= total}
-              onClick={() => setOffset(offset + pageSize)}
+              onClick={() => goToOffset(offset + pageSize)}
             >
               Next
             </button>

@@ -7,6 +7,7 @@ from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -100,7 +101,9 @@ async def _fetch_entities(
                 OntologyEntity.visibility,
             )
             .where(*conditions)
-            .order_by(OntologyEntity.entity_type, OntologyEntity.external_key)
+            .order_by(
+                OntologyEntity.entity_type, OntologyEntity.external_key, OntologyEntity.id
+            )
             .limit(limit)
             .offset(offset)
         )
@@ -150,8 +153,15 @@ async def set_visibility(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
+    """Publish or unpublish the caller's entities.
+
+    The service never commits, so this route owns the transaction: it commits
+    once on success and rolls back on any failure, which also discards the
+    transaction-local promotion setting.
+    """
     try:
         result = await set_entity_visibility(db, user.id, body.ids, body.visibility)
+        await db.commit()
     except EntityNotFoundError:
         await db.rollback()
         raise HTTPException(
@@ -164,5 +174,19 @@ async def set_visibility(
                 }
             },
         ) from None
-    await db.commit()
+    except SQLAlchemyError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": {
+                    "code": "visibility_update_failed",
+                    "message": "The visibility change could not be applied. Try again.",
+                    "details": {},
+                }
+            },
+        ) from None
+    except Exception:
+        await db.rollback()
+        raise
     return {"data": result}

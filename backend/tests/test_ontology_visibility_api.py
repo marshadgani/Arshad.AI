@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import DBAPIError
 from src.auth.dependencies import get_current_user
 from src.main import app
 from src.models.database import get_db
@@ -271,5 +272,35 @@ def test_patch_service_value_error_does_not_commit(ctx):
         SERVICE, new_callable=AsyncMock, side_effect=ValueError("at most 200 ids")
     ):
         resp = _patch(c, [uuid.uuid4()])
-    assert resp.status_code >= 400
+    assert resp.status_code == 500
+    db.commit.assert_not_awaited()
+
+
+def test_patch_database_error_is_structured_409_and_rolls_back(ctx):
+    c, _, db = ctx
+    err = DBAPIError("UPDATE secret-key-xyz", {}, Exception("trigger said no"))
+    with patch(SERVICE, new_callable=AsyncMock, side_effect=err):
+        resp = _patch(c, [uuid.uuid4()])
+    assert resp.status_code == 409
+    assert resp.json()["error"]["code"] == "visibility_update_failed"
+    assert "secret-key-xyz" not in resp.text
+    db.rollback.assert_awaited()
+    db.commit.assert_not_awaited()
+
+
+def test_patch_commit_failure_is_structured_409_and_rolls_back(ctx):
+    c, _, db = ctx
+    db.commit.side_effect = DBAPIError("COMMIT", {}, Exception("deadlock"))
+    with patch(SERVICE, new_callable=AsyncMock, return_value={"updated": 1, "unchanged": 0}):
+        resp = _patch(c, [uuid.uuid4()])
+    assert resp.status_code == 409
+    db.rollback.assert_awaited()
+
+
+def test_patch_unexpected_error_rolls_back_before_the_global_handler(ctx):
+    c, _, db = ctx
+    with patch(SERVICE, new_callable=AsyncMock, side_effect=RuntimeError("boom")):
+        resp = _patch(c, [uuid.uuid4()])
+    assert resp.status_code == 500
+    db.rollback.assert_awaited()
     db.commit.assert_not_awaited()

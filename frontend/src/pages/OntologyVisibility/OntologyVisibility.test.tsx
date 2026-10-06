@@ -230,7 +230,7 @@ describe('selection and bulk actions', () => {
     expect(screen.getByRole('checkbox', { name: 'Select my-project' })).toBeChecked();
     expect(screen.getByText('2 selected')).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: /^publish selected/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^publish selected$/i }));
     await waitFor(() => expect(patchCalls(fn)).toHaveLength(1));
     const body = JSON.parse(String((patchCalls(fn)[0][1] as RequestInit).body));
     expect(body.visibility).toBe('public');
@@ -310,5 +310,58 @@ describe('filters and paging', () => {
     expect(screen.getByRole('button', { name: /previous/i })).toBeDisabled();
     expect(screen.getByRole('button', { name: /next/i })).toBeDisabled();
     expect(screen.getByText(/1–20 of 20/)).toBeInTheDocument();
+  });
+
+  it('paging clears the selection so rows no longer in view cannot be bulk-changed', async () => {
+    installFetch({ list: () => listOf([PERSON], 2) });
+    renderPage({ pageSize: 1 });
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'Select alice-gh' }));
+    expect(screen.getByText(/1 selected/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /next/i }));
+    await screen.findByText('alice-gh');
+    expect(screen.queryByText(/selected$/)).not.toBeInTheDocument();
+  });
+});
+
+describe('in-flight and failure states', () => {
+  it('disables the bulk buttons while a request is in flight', async () => {
+    let release: (r: Response) => void = () => undefined;
+    installFetch({ patch: () => new Promise<Response>((resolve) => (release = resolve)) });
+    renderPage();
+    await userEvent.click(await screen.findByRole('checkbox', { name: /select all in view/i }));
+    await userEvent.click(screen.getByRole('button', { name: /^publish selected$/i }));
+    expect(screen.getByRole('button', { name: /^publish selected$/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /unpublish selected/i })).toBeDisabled();
+    release(json({ data: { updated: 2, unchanged: 0 } }));
+    await waitFor(() => expect(screen.queryByText(/selected$/)).not.toBeInTheDocument());
+  });
+
+  it('hides the saved banner when a later change fails', async () => {
+    let calls = 0;
+    installFetch({
+      patch: (b) =>
+        ++calls === 1 ? json({ data: { updated: b.ids.length, unchanged: 0 } }) : json({}, 500),
+    });
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Set alice-gh to public' }));
+    expect(await screen.findByRole('status')).toHaveTextContent(/visibility saved/i);
+    await userEvent.click(screen.getByRole('button', { name: 'Set my-project to private' }));
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('shows a plain message on a 422 instead of only the status code', async () => {
+    installFetch({ patch: () => json({ detail: [{ msg: 'too long' }] }, 422) });
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Set alice-gh to public' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/request was not valid/i);
+  });
+
+  it('keeps the login-name warning in the always-visible help text', async () => {
+    installFetch({});
+    renderPage();
+    await screen.findByText('alice-gh');
+    await userEvent.click(screen.getByRole('button', { name: /dismiss/i }));
+    expect(screen.getByText(/their GitHub login name is what gets written/i)).toBeInTheDocument();
   });
 });

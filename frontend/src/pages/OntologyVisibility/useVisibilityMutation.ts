@@ -26,15 +26,20 @@ export type UseVisibilityMutationResult = {
 };
 
 async function describeFailure(resp: Response): Promise<string> {
-  if (resp.status === 404) {
-    return 'Some of these entities no longer exist. Reloading the list.';
-  }
+  let code = '';
   let serverMessage = '';
   try {
-    const body = (await resp.json()) as { error?: { message?: unknown } };
+    const body = (await resp.json()) as { error?: { code?: unknown; message?: unknown } };
+    if (typeof body.error?.code === 'string') code = body.error.code;
     if (typeof body.error?.message === 'string') serverMessage = ` ${body.error.message}`;
   } catch (err) {
     console.error('Could not parse visibility error body', err);
+  }
+  if (resp.status === 404 && code === 'entity_not_found') {
+    return 'Some of these entities no longer exist. Reloading the list.';
+  }
+  if (resp.status === 422) {
+    return 'Could not update visibility: the request was not valid. Select fewer entities and try again.';
   }
   return `Could not update visibility (${resp.status}).${serverMessage}`;
 }
@@ -49,6 +54,7 @@ export function useVisibilityMutation(): UseVisibilityMutationResult {
     visibility: Visibility,
   ): Promise<readonly string[] | null> {
     setMutationError(null);
+    setChanged(false);
     setChanging((prev) => new Set([...prev, ...ids]));
     try {
       const token = getToken();
