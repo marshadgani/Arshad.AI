@@ -22,11 +22,14 @@ from __future__ import annotations
 import logging
 import os
 from typing import Any
+from urllib.parse import quote, urlencode
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request, status
 from fastapi.responses import (
     RedirectResponse,  # noqa: F401 — used by oauth_callback below
 )
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -298,7 +301,7 @@ async def oauth_callback(
 
     All redirect destinations are on FRONTEND_URL.
     """
-    from ._oauth_base import (
+    from .personal._oauth_base import (
         OAuthCallbackContext,
         OAuthIntegrationProvider,
         consume_oauth_state,
@@ -370,3 +373,132 @@ async def oauth_callback(
     return RedirectResponse(
         f"{frontend}/integrations?connected={slug}", status_code=302
     )
+
+
+# ── Personal OAuth attach (signed-in user connects a new provider) ───────
+
+
+class CompleteOAuthAttachRequest(BaseModel):
+    pending_key: str = Field(..., min_length=1, max_length=200)
+    slug: str = Field(..., min_length=1, max_length=100)
+
+
+def _integrations_redirect(**params: str) -> RedirectResponse:
+    # Fixed frontend path from env; only query values vary, always encoded.
+    return RedirectResponse(
+        f"{_frontend_url_env()}/integrations?{urlencode(params)}", status_code=302
+    )
+
+
+@router.get(
+    "/personal/attach/{oauth_provider}/callback",
+    summary="Personal OAuth attach callback (anonymous browser redirect)",
+)
+async def personal_attach_callback(
+    oauth_provider: str,
+    code: str | None = Query(None),
+    state: str | None = Query(None),
+    error: str | None = Query(None),
+) -> RedirectResponse:
+    """Consumes the state once and parks the encrypted code in a pending
+    record. Links nothing: that happens only in POST /oauth-complete, which
+    requires the initiating user's JWT."""
+    from .personal._attach import ATTACH_PROVIDERS
+    from .personal._oauth_base import consume_oauth_state
+    from .personal._pending import store_attach_pending
+
+    if oauth_provider not in ATTACH_PROVIDERS:
+        raise http_error(
+            status.HTTP_400_BAD_REQUEST,
+            "unsupported_oauth_provider",
+            "Unsupported OAuth provider.",
+        )
+    if not state:
+        return _integrations_redirect(error="invalid_state")
+
+    triple = await consume_oauth_state(state)
+    if triple is None or triple[2].get("oauth_provider") != oauth_provider:
+        return _integrations_redirect(error="invalid_state")
+    user_id, slug, _ctx = triple
+
+    if error:
+        return _integrations_redirect(error=error[:64], slug=slug)
+    if not code:
+        return _integrations_redirect(error="missing_code", slug=slug)
+
+    try:
+        pending_id = await store_attach_pending(
+            user_id=user_id, slug=slug, oauth_provider=oauth_provider, code=code
+        )
+    except Exception:  # noqa: BLE001 — state is burned; user must see an error
+        _log.exception("attach pending write failed for %s", slug)
+        return _integrations_redirect(error="internal_error", slug=slug)
+
+    return RedirectResponse(
+        f"{_frontend_url_env()}/integrations/oauth-complete"
+        f"?pending={quote(pending_id)}&slug={quote(slug)}",
+        status_code=302,
+    )
+
+
+@router.post("/oauth-complete", summary="Complete a personal OAuth attach")
+async def complete_oauth_attach(
+    body: CompleteOAuthAttachRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    from .personal._attach import complete_personal_attach
+    from .personal._pending import (
+        consume_attach_pending,
+        decrypt_pending_code,
+        peek_attach_pending,
+    )
+
+    pending = await peek_attach_pending(body.pending_key)
+    if pending is None:
+        raise http_error(
+            status.HTTP_400_BAD_REQUEST,
+            "pending_expired",
+            "OAuth session expired or already used.",
+        )
+    try:
+        owner = UUID(pending["user_id"])
+    except ValueError:
+        owner = None
+    if owner != user.id:
+        # Not consumed: a different user must not be able to burn the record.
+        _log.warning(
+            "oauth-complete user mismatch: session=%s pending=%s",
+            user.id,
+            pending["user_id"],
+        )
+        raise http_error(
+            status.HTTP_400_BAD_REQUEST,
+            "state_user_mismatch",
+            "Session user does not match OAuth state.",
+        )
+    if pending["slug"] != body.slug:
+        raise http_error(
+            status.HTTP_400_BAD_REQUEST,
+            "slug_mismatch",
+            "Integration slug does not match OAuth state.",
+        )
+    if not await consume_attach_pending(body.pending_key):
+        raise http_error(
+            status.HTTP_400_BAD_REQUEST,
+            "pending_expired",
+            "OAuth session expired or already used.",
+        )
+    try:
+        email = await complete_personal_attach(
+            user=user,
+            slug=pending["slug"],
+            oauth_provider=pending["oauth_provider"],
+            code=decrypt_pending_code(pending["code_enc"]),
+            db=db,
+        )
+    except IntegrationError as exc:
+        raise http_error(status.HTTP_400_BAD_REQUEST, exc.code, exc.message) from exc
+    return {
+        "data": {"slug": pending["slug"], "connected": True, "provider_email": email}
+    }
