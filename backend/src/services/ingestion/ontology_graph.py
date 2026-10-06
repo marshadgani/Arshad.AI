@@ -59,6 +59,16 @@ def _extract_login(raw: Any) -> str | None:
     return login
 
 
+def _is_bot(raw: dict[str, Any], login: str) -> bool:
+    # GitHub marks automation two ways: GitHub App actors carry a "[bot]"
+    # login suffix, while bot user accounts carry user.type == "Bot".
+    # Neither signal covers the other.
+    user = raw.get("user")
+    return login.endswith("[bot]") or (
+        isinstance(user, dict) and user.get("type") == "Bot"
+    )
+
+
 def derive_graph(rows: list[dict[str, Any]]) -> DerivedGraph:
     persons: set[str] = set()
     projects: set[str] = set()
@@ -83,8 +93,13 @@ def derive_graph(rows: list[dict[str, Any]]) -> DerivedGraph:
             skipped_oversized_key += 1
             continue
 
-        persons.add(login)
+        # The project is kept even when only bots touched it: the repo exists
+        # and is worth tracking, but automation is not modelled as a person.
         projects.add(project_key)
+        if _is_bot(raw, login):
+            continue
+
+        persons.add(login)
         edges.append(
             EdgeTuple(
                 person_key=login,
