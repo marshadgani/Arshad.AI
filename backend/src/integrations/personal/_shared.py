@@ -6,14 +6,12 @@ integrations here are *thin views* over that existing data — connecting
 Google Calendar and Gmail does NOT trigger another OAuth flow because
 the consent screen at login already covers all Google scopes.
 
-For NEW providers added in Phase H (Notion, Slack, Linear), the OAuth flow
-will require a separate /api/v1/integrations/oauth/{provider}/callback
-endpoint to attach extra accounts to an already-authenticated user.
+When the signed-in user has no oauth_account for the provider (logged in with
+a different one), _attach.py runs an authenticated attach flow instead.
 """
 
 from __future__ import annotations
 
-import os
 import time
 from datetime import datetime, timezone
 from typing import Any
@@ -32,17 +30,13 @@ from ..base import (
 )
 
 
-def _frontend_url() -> str:
-    return os.getenv("FRONTEND_URL", "http://localhost:3000").rstrip("/")
-
-
 async def upsert_personal_integration(
     *, user: User, db: AsyncSession, slug: str, oauth_provider: str
 ) -> ConnectResult:
     """Phase G-MVP behavior: if the user already has an oauth_account for
     the underlying provider (Google or GitHub), promote it into an
-    integration row. Otherwise tell the frontend to send the user back
-    through the login flow with the right scopes."""
+    integration row. Otherwise signal needs_oauth_attach so the caller
+    starts the authenticated attach flow (see _attach.py)."""
     existing_account = await db.scalar(
         select(OAuthAccount).where(
             OAuthAccount.user_id == user.id,
@@ -50,8 +44,7 @@ async def upsert_personal_integration(
         )
     )
     if existing_account is None:
-        login_url = f"{_frontend_url()}/login?reason=missing_{oauth_provider}_scope"
-        return ConnectResult(integration_id=None, redirect_url=login_url)
+        return ConnectResult(needs_oauth_attach=True)
 
     integration = await db.scalar(
         select(Integration).where(

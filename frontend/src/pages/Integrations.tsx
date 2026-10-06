@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 import { ConnectError, connectIntegration } from '../api/integrations';
 import { getToken } from '../auth/tokenStorage';
@@ -54,6 +55,43 @@ function timeAgo(iso: string | null): string {
   return `${Math.floor(ms / 86_400_000)}d ago`;
 }
 
+const ERROR_TOAST_MS = 5000;
+
+const SLUG_NAMES: Record<string, string> = {
+  github: 'GitHub',
+  gmail: 'Gmail',
+  google_calendar: 'Google Calendar',
+  google_drive: 'Google Drive',
+  google_tasks: 'Google Tasks',
+  youtube: 'YouTube',
+};
+
+const OAUTH_ERROR_MESSAGES: Record<string, string> = {
+  invalid_state: 'Your connection session expired. Please try connecting again.',
+  pending_expired: 'Connection timed out. Please try connecting again.',
+  state_user_mismatch: 'Security check failed. Please sign in again and try connecting.',
+  slug_mismatch: 'Security check failed. Please try connecting again.',
+  account_already_linked: 'This account is already linked to a different user.',
+  token_exchange_failed: 'Could not complete the connection. Please try again.',
+  pending_corrupt: 'Connection session could not be read. Please try connecting again.',
+  internal_error: 'An unexpected error occurred. Please try again.',
+  integration_save_failed: 'Your account was linked. Click Connect once more to finish.',
+  provider_not_configured: 'This provider is not configured on the server yet.',
+  provider_email_unverified:
+    'Verify your primary email with the provider, then try connecting again.',
+  session_expired: 'Your session expired. Please sign in again and reconnect.',
+  access_denied: 'Connection cancelled: access was not granted.',
+  missing_pending_params: 'The connection link was incomplete. Please try again.',
+};
+
+function displayNameFor(slug: string): string {
+  return SLUG_NAMES[slug] ?? slug;
+}
+
+function oauthErrorMessage(code: string): string {
+  return OAUTH_ERROR_MESSAGES[code] ?? `Connection failed (${code}). Please try again.`;
+}
+
 export default function Integrations() {
   const [items, setItems] = useState<IntegrationItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,6 +107,7 @@ export default function Integrations() {
   const [shopDomainDraft, setShopDomainDraft] = useState('');
   const [shopDomainErr, setShopDomainErr] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
   // personal_push providers (e.g. Apple Health) hand back a one-time
   // ingest token on connect. Without this, the generic connect flow
   // below silently dropped it after showing a "connected" toast — the
@@ -103,6 +142,26 @@ export default function Integrations() {
     fetchAll();
   }, []);
 
+  // Return trip from the provider / attach flow: surface the outcome, then
+  // strip the params so a refresh does not replay the toast.
+  useEffect(() => {
+    const connected = searchParams.get('connected');
+    const errorCode = searchParams.get('error');
+    const reason = searchParams.get('reason');
+    if (!connected && !errorCode && !reason) return;
+    if (connected) {
+      flashToast(`${displayNameFor(connected)} connected successfully`);
+      void fetchAll();
+    } else if (errorCode) {
+      flashToast(oauthErrorMessage(errorCode), ERROR_TOAST_MS);
+    } else if (reason) {
+      const slug = reason.replace(/^missing_/, '').replace(/_scope$/, '');
+      flashToast(`Connect ${displayNameFor(slug)} to continue.`);
+    }
+    setSearchParams({}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once per arrival
+  }, [searchParams]);
+
   const grouped = useMemo(() => {
     const sections: Record<string, IntegrationItem[]> = {};
     for (const it of items) {
@@ -111,9 +170,9 @@ export default function Integrations() {
     return Object.entries(sections).sort(([a], [b]) => a.localeCompare(b));
   }, [items]);
 
-  const flashToast = (msg: string) => {
+  const flashToast = (msg: string, durationMs = 3000) => {
     setToast(msg);
-    setTimeout(() => setToast(null), 3000);
+    setTimeout(() => setToast(null), durationMs);
   };
 
   const onConnect = async (item: IntegrationItem) => {

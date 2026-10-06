@@ -241,7 +241,10 @@ async def health():
     return {"status": "ok"}
 
 
-from src.integrations.routers import router as integrations_router  # noqa: E402
+from src.integrations.routers import (  # noqa: E402
+    github_attach_alias_router,
+    router as integrations_router,
+)
 
 app.include_router(auth_router)
 app.include_router(tools_router)
@@ -257,3 +260,4 @@ app.include_router(whoop_router)
 app.include_router(shopify_router)
 app.include_router(apple_health_router)
 app.include_router(integrations_router)
+app.include_router(github_attach_alias_router)

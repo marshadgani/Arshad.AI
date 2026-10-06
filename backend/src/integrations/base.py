@@ -75,6 +75,10 @@ class ConnectResult:
     integration_id: str | None = None
     redirect_url: str | None = None
     ingest_token: str | None = field(default=None, repr=False)
+    # True when a personal provider has no oauth_account for the signed-in
+    # user and must start the authenticated attach flow (personal/_attach.py).
+    # Carries no URL, so it never interacts with the redirect/ingest invariant.
+    needs_oauth_attach: bool = False
 
     def __post_init__(self) -> None:
         if self.redirect_url is not None and self.ingest_token is not None:

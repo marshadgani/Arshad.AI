@@ -470,6 +470,10 @@ Arshad.AI/
 | `JWT_EXPIRY_HOURS` | Phase C+ | JWT lifetime; default 24 |
 | `BACKEND_URL` / `FRONTEND_URL` | Phase C+ | Public URLs — used to build provider redirect URIs and post-login frontend redirect |
 
+**Personal OAuth attach callbacks (FEAT-156):** GitHub needs no console change, because its attach callback
+`${BACKEND_URL}/api/v1/auth/github/callback/attach` sits under the registered login callback. Add
+`${BACKEND_URL}/api/v1/integrations/personal/attach/google/callback` to the Google OAuth client's authorized redirect URIs.
+
 Never hard-code secrets. Always add new vars to `backend/.env.example`.
 
 ---

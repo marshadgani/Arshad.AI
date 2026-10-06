@@ -1,45 +1,42 @@
 # Arshad.AI Quality Gate Report
 
-**Branch:** `dev-team/feat-167-ontology-visibility-control-path` -> `claude/ai-personal-assistant-main`
-**Feature:** FEAT-167, vault publish control. Lets the user publish or unpublish ontology entities (private to public) through an authenticated API and a phone-friendly page. It is the only code path that loosens visibility. Pipeline verdict: Enterprise Architect approved with caveats.
+**Branch:** `fix/feat-156-connect` -> `claude/ai-personal-assistant-main`
+**Feature:** FEAT-156, personal integration Connect fix. A signed-in user can now connect GitHub, Gmail, Calendar, Drive, Tasks and YouTube through an authenticated OAuth flow. The server remembers who started each connection and accepts it only from that same user. Two earlier designs were rejected for account-linking CSRF. This one reuses the existing server-side state pattern.
 **Date:** 2026-10-06
 
 ## Gate Summary
 
 | # | Agent | Result |
 |---|---|---|
-| 1 | code-reviewer | WARN, 0 Critical. Page issues fixed (see below) |
-| 2 | security-auditor | PASS, 0 Critical or High. 4 low or info findings: 3 fixed, 2 deferred (see below) |
-| 3 | debugger | WARN, 0 crash-level bugs. DB error mapping and ordering fixed |
-| 4 | test-writer | PASS. Estimated coverage 97 percent (service), 95 percent (API), 27 frontend tests |
-| 5 | refactorer | WARN, 0 Critical. Redundant visibility guard kept on purpose |
-| 6 | doc-writer | WARN. Route docstring and rollback reasoning added. Login-name warning made permanent |
-| 7 | silent-failure-hunter | WARN, 0 Critical. Stale banner and stale row state fixed |
-| 8 | pr-test-analyzer | WARN. The permission-switch leak test is real. Gaps logged |
+| 1 | code-reviewer | WARN, 0 Critical. Found that GitHub would reject the new return address. Fixed |
+| 2 | security-auditor | PASS, 0 Critical or High. Account-linking CSRF confirmed closed. 5 low findings: 3 fixed, 2 deferred |
+| 3 | debugger | WARN, 0 crash-level. Provider setup, malformed reply and partial-save handling fixed |
+| 4 | test-writer | Reported FAIL on `IntegrationsOAuthComplete.tsx` (about 65 percent). Fixed with 4 new tests |
+| 5 | refactorer | WARN, 0 Critical. Duplicated sync code logged for later |
+| 6 | doc-writer | WARN. Docstrings and TTL reasoning added, docs corrected |
+| 7 | silent-failure-hunter | WARN, 0 Critical. Partial-save case fixed |
+| 8 | pr-test-analyzer | WARN. Its 4 database errors ran without Postgres, manual cross-check passes. Gaps logged |
 
 ## Verdict: WARN, mergeable
 
 **GATE PASSED WITH WARNINGS**
 
-Manual verification: backend 919 pass and 8 fail. The same 8 fail on main, so they predate this change. Frontend 338 of 338 pass. Type check clean. The 88 FEAT-167 backend tests all pass on real Postgres 16, including tenant isolation and the permission-switch leak tests.
+Manual verification: backend 963 pass and 8 fail. The same 8 fail on main, so they predate this change (auth, token and extraction tests). Frontend 356 of 356 pass. Type check clean. The 44 attach-flow tests pass on real Postgres 16.
 
 ## Fixed in this PR (from gate findings)
 
-- A database error or lock clash now returns a structured 409 `visibility_update_failed`, with rollback. The commit moved inside the guarded block. Any other error also rolls back before it propagates.
-- Entity list ordering has `id` as a tie-breaker, so pages cannot repeat or skip rows.
-- Paging clears the selection, so a publish click cannot act on rows no longer in view.
-- Stale row overrides are cleared on paging, filter change and after a failed change.
-- Bulk Publish and Unpublish are disabled while a request is in flight.
-- The "Visibility saved" banner clears when a later change fails.
-- A 422 shows a plain message. A 404 message needs the `entity_not_found` code.
-- "Back to first page" appears when the offset ends up past the total.
-- The always-visible help text says a person's GitHub login name is written to the vault.
-- Route docstring and tests added: DB error 409, commit failure 409, unexpected error rollback, paging clears selection, in-flight buttons, banner on failure, 422 message, persistent warning.
+- GitHub OAuth Apps accept a return address only under the one registered callback. The GitHub attach callback now lives at `/api/v1/auth/github/callback/attach`, under the existing login callback, so no GitHub console change is needed. A route alias serves it.
+- A missing provider setting, a non-JSON or incomplete provider reply, and an unverified GitHub email now map to clear codes, not a bare 500.
+- If saving the integration fails after tokens are stored, the user gets "Your account was linked. Click Connect once more to finish". The existing-account Connect path completes it.
+- The generic OAuth callback encodes every redirect value and caps the provider error text (a pre-existing flaw on main, found by the pipeline Security Auditor).
+- An expired session during the return trip shows a clear message.
+- Docstrings and the TTL reasoning added. CLAUDE.md and `.env.example` corrected: only Google needs the new return address registered.
 
-## Deferred (non-blocking, security notes)
+## Deferred (non-blocking)
 
-- [ ] SEC-1 (Low): the database trigger does not itself check that both ends of a link are public when a link is promoted. The rule lives only in application SQL. Needs a new migration, never an edit of the old one.
-- [ ] SEC-2 (Low): no rate limit on the PATCH route. Impact is limited to the caller's own rows.
-- [ ] Report how many links changed in the response and the log.
-- [ ] Two-connection test for the neighbour locking, and a test that a bare link promotion is rejected by the trigger.
-- [ ] Optional: lock timeout on the neighbour lock query.
+- [ ] Unique `(user_id, provider)` constraint on `oauth_accounts` via a new migration (rare double-click race).
+- [ ] Duplicated `sync()` code in the Drive, Tasks and YouTube providers.
+- [ ] Token exchange failures return 400, not 502.
+- [ ] Redis outage on connect and complete returns a plain 500.
+- [ ] Fake Redis ignores TTLs in tests. Add a TTL assertion and a real-Redis test.
+- [ ] Operator action: add `${BACKEND_URL}/api/v1/integrations/personal/attach/google/callback` to the Google OAuth client. GitHub needs nothing.

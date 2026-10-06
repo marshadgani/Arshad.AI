@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useSearchParams } from 'react-router-dom';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import AppLayout from './components/AppLayout';
 import AuthCallback from './pages/AuthCallback';
@@ -11,6 +11,7 @@ import Dashboard from './dashboard/Dashboard';
 import HealthFitness from './pages/HealthFitness';
 import HomeIoT from './pages/HomeIoT';
 import Integrations from './pages/Integrations';
+import IntegrationsOAuthComplete from './pages/IntegrationsOAuthComplete';
 import Learning from './pages/Learning';
 import Login from './pages/Login';
 import PersonalFinance from './pages/PersonalFinance';
@@ -78,6 +79,7 @@ function ProtectedRoutes() {
         <Route path="/home-iot"           element={<HomeIoT />} />
         <Route path="/travel"             element={<Travel />} />
         <Route path="/integrations"       element={<Integrations />} />
+        <Route path="/integrations/oauth-complete" element={<IntegrationsOAuthComplete />} />
         <Route path="/ai-ecosystem"       element={<AiEcosystem />} />
         <Route path="/obsidian"           element={<Obsidian />} />
         <Route path="/ontology-visibility" element={<OntologyVisibility />} />
@@ -87,9 +89,20 @@ function ProtectedRoutes() {
   );
 }
 
+const REASON_PATTERN = /^[a-z0-9_]{1,64}$/;
+
+function parseReason(raw: string | null): string | null {
+  return raw !== null && REASON_PATTERN.test(raw) ? raw : null;
+}
+
 function LoginRoute() {
   const { token } = useAuth();
-  if (token) return <Navigate to="/" replace />;
+  const [params] = useSearchParams();
+  if (token) {
+    // Keep the reason so the user is not silently bounced to the dashboard.
+    const reason = parseReason(params.get('reason'));
+    return <Navigate to={reason ? `/integrations?reason=${reason}` : '/'} replace />;
+  }
   return <Login />;
 }
 
