@@ -6,6 +6,7 @@ import AuthCallback from './pages/AuthCallback';
 import AiEcosystem from './pages/AiEcosystem';
 import Chat from './pages/Chat';
 import Obsidian from './pages/Obsidian';
+import OntologyVisibility from './pages/OntologyVisibility';
 import Dashboard from './dashboard/Dashboard';
 import HealthFitness from './pages/HealthFitness';
 import HomeIoT from './pages/HomeIoT';
@@ -79,6 +80,7 @@ function ProtectedRoutes() {
         <Route path="/integrations"       element={<Integrations />} />
         <Route path="/ai-ecosystem"       element={<AiEcosystem />} />
         <Route path="/obsidian"           element={<Obsidian />} />
+        <Route path="/ontology-visibility" element={<OntologyVisibility />} />
         <Route path="*"                   element={<Navigate to="/" replace />} />
       </Routes>
     </AppLayout>

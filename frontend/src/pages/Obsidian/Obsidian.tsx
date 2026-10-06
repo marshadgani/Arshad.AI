@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { clearToken, getToken } from '../../auth/tokenStorage';
 import { useFetch } from '../../hooks/useFetch';
 import styles from './Obsidian.module.css';
@@ -109,6 +110,9 @@ export default function Obsidian() {
             {stats
               ? `${stats.total_notes.toLocaleString()} notes · ${formatWords(stats.total_words)} words · synced ${formatDate(stats.last_synced_at)}`
               : 'Loading vault…'}
+          </p>
+          <p className={styles.subtitle}>
+            <Link to="/ontology-visibility">Manage entity visibility</Link>
           </p>
         </div>
         <div>
