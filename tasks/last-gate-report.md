@@ -1,6 +1,10 @@
 # Gate report: FEAT-168 skip bot authors in the ontology extractor
 
-Verdict: WARN (no Critical findings, no security findings)
+## Verdict: WARN, mergeable
+
+**GATE PASSED WITH WARNINGS**
+
+No Critical findings and no security findings.
 
 | Agent | Verdict |
 |---|---|
