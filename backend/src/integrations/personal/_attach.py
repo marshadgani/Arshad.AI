@@ -67,7 +67,6 @@ def attach_redirect_uri(oauth_provider: str) -> str:
 
 
 def _get_provider_for_attach(oauth_provider: str) -> OAuthProvider:
-    provider: GitHubOAuthProvider | GoogleOAuthProvider
     if oauth_provider == "github":
         provider = GitHubOAuthProvider()
     elif oauth_provider == "google":
@@ -132,6 +131,7 @@ async def _attach_account_to_user(
             "account_already_linked",
             f"This {oauth_provider} account is already linked to a different user.",
         )
+    is_new_account = account is None
     if account is None:
         # No unique (user_id, provider) constraint exists, so a second
         # distinct provider account would make later per-user lookups
@@ -158,6 +158,11 @@ async def _attach_account_to_user(
             await db.flush()
         except IntegrityError as exc:
             await db.rollback()
+            _log.warning(
+                "attach account insert conflict for %s: %s",
+                oauth_provider,
+                type(exc.orig).__name__,
+            )
             raise IntegrationError(
                 "account_already_linked",
                 f"This {oauth_provider} account is already linked to a different user.",
@@ -167,8 +172,12 @@ async def _attach_account_to_user(
 
     encrypted_access = encrypt(bundle.access_token)
     encrypted_refresh = encrypt(bundle.refresh_token) if bundle.refresh_token else None
-    token_row = await db.scalar(
-        select(OAuthToken).where(OAuthToken.oauth_account_id == account.id)
+    token_row = (
+        None
+        if is_new_account
+        else await db.scalar(
+            select(OAuthToken).where(OAuthToken.oauth_account_id == account.id)
+        )
     )
     if token_row is None:
         db.add(
@@ -190,6 +199,11 @@ async def _attach_account_to_user(
         await db.commit()
     except IntegrityError as exc:
         await db.rollback()
+        _log.warning(
+            "attach token commit conflict for %s: %s",
+            oauth_provider,
+            type(exc.orig).__name__,
+        )
         raise IntegrationError(
             "account_already_linked",
             f"This {oauth_provider} account is already linked to a different user.",
@@ -228,6 +242,9 @@ async def complete_personal_attach(
         user=user, db=db, slug=slug, oauth_provider=oauth_provider
     )
     if result.needs_oauth_attach:
+        _log.error(
+            "attach for %s stored tokens but account row not visible", oauth_provider
+        )
         raise IntegrationError("attach_failed", "Account was not linked.")
     return info.email
 

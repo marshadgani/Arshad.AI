@@ -87,4 +87,30 @@ describe('Integrations return-from-provider handling', () => {
       expect(loc.href).toBe('https://github.com/login/oauth/authorize?state=s'),
     );
   });
+  it('Connect failure shows a message and does not navigate', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (init?.method === 'POST' && url.endsWith('/connect')) {
+          return {
+            ok: false,
+            status: 400,
+            json: async () => ({ error: { code: 'x', message: 'GitHub OAuth is misconfigured.' } }),
+          } as Response;
+        }
+        return { ok: true, json: async () => ({ data: [ITEM] }) } as Response;
+      }),
+    );
+    const loc = { href: 'http://localhost/integrations' };
+    vi.stubGlobal('location', loc);
+    renderAt('/integrations');
+    await userEvent.click(await screen.findByRole('button', { name: /connect/i }));
+    expect(await screen.findByText(/Connect failed/)).toBeInTheDocument();
+    expect(loc.href).toBe('http://localhost/integrations');
+  });
+
+  it('shows a message for a forwarded ?reason', async () => {
+    renderAt('/integrations?reason=missing_github_scope');
+    expect(await screen.findByText(/Connect GitHub to continue/)).toBeInTheDocument();
+  });
 });

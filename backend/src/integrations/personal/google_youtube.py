@@ -25,9 +25,9 @@ from ..base import (
     SyncResult,
 )
 from ..registry import register
+from ._attach import connect_personal_oauth
 from ._shared import (
     status_from_oauth_account,
-    upsert_personal_integration,
 )
 
 
@@ -46,7 +46,7 @@ class YouTubeIntegration(IntegrationProvider):
     ) -> ConnectResult:
         if user is None:
             raise PermissionError("personal integrations require an authenticated user")
-        return await upsert_personal_integration(
+        return await connect_personal_oauth(
             user=user, db=db, slug=self.slug, oauth_provider="google"
         )
 

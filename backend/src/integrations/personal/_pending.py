@@ -18,10 +18,13 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 import secrets
 
 from ...auth.crypto import decrypt, encrypt
 from ...middleware.cache import get_redis
+
+_log = logging.getLogger(__name__)
 
 PENDING_TTL_SECONDS = 300
 
@@ -58,9 +61,13 @@ async def peek_attach_pending(pending_id: str) -> dict[str, str] | None:
     try:
         record = json.loads(_as_text(raw))
     except json.JSONDecodeError:
+        _log.error(
+            "attach pending record is not valid JSON (id suffix %s)", pending_id[-6:]
+        )
         return None
     needed = {"user_id", "slug", "oauth_provider", "code_enc"}
-    if not isinstance(record, dict) or not needed <= record.keys():
+    if not isinstance(record, dict) or not needed.issubset(record):
+        _log.error("attach pending record is malformed (id suffix %s)", pending_id[-6:])
         return None
     return {k: str(record[k]) for k in needed}
 

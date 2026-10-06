@@ -35,6 +35,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..api.errors import http_error
 from ..auth.allowlist import is_email_allowed
+from ..auth.crypto import TokenDecryptError
 from ..auth.dependencies import get_current_user
 from ..models.database import get_db
 from ..models.integration import Integration
@@ -308,37 +309,21 @@ async def oauth_callback(
         upsert_oauth_integration,
     )
 
-    frontend = _frontend_url_env()
-
     if error:
-        return RedirectResponse(
-            f"{frontend}/integrations?error={error}&slug={slug}", status_code=302
-        )
+        return _integrations_redirect(error=error, slug=slug)
     if not code or not state:
-        return RedirectResponse(
-            f"{frontend}/integrations?error=missing_code_or_state&slug={slug}",
-            status_code=302,
-        )
+        return _integrations_redirect(error="missing_code_or_state", slug=slug)
 
     triple = await consume_oauth_state(state)
     if triple is None:
-        return RedirectResponse(
-            f"{frontend}/integrations?error=invalid_state&slug={slug}",
-            status_code=302,
-        )
+        return _integrations_redirect(error="invalid_state", slug=slug)
     user_id, recorded_slug, stored_ctx = triple
     if recorded_slug != slug:
-        return RedirectResponse(
-            f"{frontend}/integrations?error=slug_mismatch&slug={slug}",
-            status_code=302,
-        )
+        return _integrations_redirect(error="slug_mismatch", slug=slug)
 
     provider = get_provider(slug)
     if not isinstance(provider, OAuthIntegrationProvider):
-        return RedirectResponse(
-            f"{frontend}/integrations?error=not_oauth_provider&slug={slug}",
-            status_code=302,
-        )
+        return _integrations_redirect(error="not_oauth_provider", slug=slug)
 
     try:
         callback_ctx = OAuthCallbackContext(
@@ -360,19 +345,12 @@ async def oauth_callback(
         )
     except IntegrationError as exc:
         _log.exception("OAuth callback for %s failed", slug)
-        return RedirectResponse(
-            f"{frontend}/integrations?error={exc.code}&slug={slug}", status_code=302
-        )
+        return _integrations_redirect(error=str(exc.code), slug=slug)
     except Exception:  # noqa: BLE001
         _log.exception("OAuth callback for %s crashed", slug)
-        return RedirectResponse(
-            f"{frontend}/integrations?error=callback_crashed&slug={slug}",
-            status_code=302,
-        )
+        return _integrations_redirect(error="callback_crashed", slug=slug)
 
-    return RedirectResponse(
-        f"{frontend}/integrations?connected={slug}", status_code=302
-    )
+    return _integrations_redirect(connected=slug)
 
 
 # ── Personal OAuth attach (signed-in user connects a new provider) ───────
@@ -414,10 +392,19 @@ async def personal_attach_callback(
             "Unsupported OAuth provider.",
         )
     if not state:
+        _log.warning("attach callback for %s without state", oauth_provider)
         return _integrations_redirect(error="invalid_state")
 
-    triple = await consume_oauth_state(state)
+    try:
+        triple = await consume_oauth_state(state)
+    except Exception:  # noqa: BLE001 — browser nav: show an error page, not raw JSON
+        _log.exception("attach state lookup failed for %s", oauth_provider)
+        return _integrations_redirect(error="internal_error")
     if triple is None or triple[2].get("oauth_provider") != oauth_provider:
+        _log.warning(
+            "attach callback for %s rejected: unknown, replayed or mismatched state",
+            oauth_provider,
+        )
         return _integrations_redirect(error="invalid_state")
     user_id, slug, _ctx = triple
 
@@ -490,11 +477,20 @@ async def complete_oauth_attach(
             "OAuth session expired or already used.",
         )
     try:
+        code = decrypt_pending_code(pending["code_enc"])
+    except (TokenDecryptError, ValueError) as exc:
+        _log.error("attach pending code undecryptable: %s", type(exc).__name__)
+        raise http_error(
+            status.HTTP_400_BAD_REQUEST,
+            "pending_corrupt",
+            "OAuth session could not be read. Please try connecting again.",
+        ) from exc
+    try:
         email = await complete_personal_attach(
             user=user,
             slug=pending["slug"],
             oauth_provider=pending["oauth_provider"],
-            code=decrypt_pending_code(pending["code_enc"]),
+            code=code,
             db=db,
         )
     except IntegrationError as exc:
