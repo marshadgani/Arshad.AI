@@ -183,3 +183,22 @@ def test_vocabulary_constants_match_migration():
             f"{migration_files[0].name}. "
             "ORM constants and migration CHECK constraints have drifted."
         )
+
+
+# ── bot authors ────────────────────────────────────────────────────────────────
+
+
+def test_bot_login_gets_no_person_or_edge_but_project_is_kept():
+    graph = derive_graph([_row("github-actions[bot]", "owner/repo#1"), _row("alice")])
+    assert graph.persons == {"alice"}
+    assert graph.projects == {"owner/repo"}
+    assert [e.person_key for e in graph.edges] == ["alice"]
+
+
+def test_user_type_bot_is_skipped_even_without_bot_suffix():
+    row = _row("dependabot")
+    row["raw"]["user"]["type"] = "Bot"
+    graph = derive_graph([row])
+    assert graph.persons == set()
+    assert graph.edges == []
+    assert graph.projects == {"owner/repo"}
