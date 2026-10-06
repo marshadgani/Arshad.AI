@@ -17,6 +17,7 @@ from src.api.v1.chat import router as chat_router
 from src.api.v1.dashboard import router as dashboard_router
 from src.api.v1.domains import router as domains_router
 from src.api.v1.obsidian import router as obsidian_router
+from src.api.v1.ontology import router as ontology_router
 from src.api.v1.shopify import router as shopify_router
 from src.api.v1.whoop import router as whoop_router
 from src.auth.routers import router as auth_router
@@ -251,6 +252,7 @@ app.include_router(domains_router)
 app.include_router(ai_ecosystem_router)
 app.include_router(ai_ecosystem_skills_router)
 app.include_router(obsidian_router)
+app.include_router(ontology_router)
 app.include_router(whoop_router)
 app.include_router(shopify_router)
 app.include_router(apple_health_router)
