@@ -156,7 +156,7 @@ async def test_connect_without_account_returns_authorize_url_bound_to_user(redis
     assert url.startswith("https://github.com/login/oauth/authorize")
     q = parse_qs(urlparse(url).query)
     assert q["redirect_uri"] == [
-        f"{BACKEND}/api/v1/integrations/personal/attach/github/callback"
+        f"{BACKEND}/api/v1/auth/github/callback/attach"
     ]
     stored = redis.store[f"int_oauth_state:{q['state'][0]}"]
     assert str(user.id) in stored and "github" in stored
@@ -691,3 +691,108 @@ async def test_generic_oauth_callback_error_is_encoded_and_cannot_inject_params(
     assert set(q) == {"error", "slug"}
     assert q["error"] == [evil]
     assert "connected" not in q
+
+
+# ── GitHub redirect URI sits under the registered login callback ─────────
+
+
+def test_github_attach_redirect_uri_is_under_login_callback():
+    uri = attach.attach_redirect_uri("github")
+    assert uri == f"{BACKEND}/api/v1/auth/github/callback/attach"
+    assert uri.startswith(f"{BACKEND}/api/v1/auth/github/callback")
+
+
+def test_google_attach_redirect_uri_unchanged():
+    assert attach.attach_redirect_uri("google") == (
+        f"{BACKEND}/api/v1/integrations/personal/attach/google/callback"
+    )
+
+
+@pytest.mark.asyncio
+async def test_github_alias_callback_parks_pending_and_redirects(redis):
+    user = _User()
+    state, _ = await _begin_attach(redis, user)
+    async with _client() as c:
+        r = await c.get(
+            "/api/v1/auth/github/callback/attach",
+            params={"code": "abc", "state": state},
+            follow_redirects=False,
+        )
+    assert r.status_code == 302
+    loc = r.headers["location"]
+    assert loc.startswith(f"{FRONTEND}/integrations/oauth-complete?pending=")
+    assert "abc" not in loc
+
+
+@pytest.mark.asyncio
+async def test_github_alias_callback_rejects_unknown_state(redis):
+    async with _client() as c:
+        r = await c.get(
+            "/api/v1/auth/github/callback/attach",
+            params={"code": "abc", "state": "nope"},
+            follow_redirects=False,
+        )
+    assert parse_qs(urlparse(r.headers["location"]).query)["error"] == ["invalid_state"]
+
+
+# ── failure handling around the exchange and the final save ──────────────
+
+
+@pytest.mark.asyncio
+async def test_missing_provider_env_is_provider_not_configured(monkeypatch):
+    monkeypatch.delenv("GITHUB_OAUTH_CLIENT_ID", raising=False)
+    with pytest.raises(IntegrationError) as exc:
+        await attach.complete_personal_attach(
+            user=_User(), slug="github", oauth_provider="github", code="c", db=_fake_db()
+        )
+    assert exc.value.code == "provider_not_configured"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("err", [ValueError("not json"), KeyError("id")])
+async def test_malformed_provider_reply_maps_to_token_exchange_failed(monkeypatch, err):
+    class Bad(FakeProvider):
+        async def fetch_user_info(self, access_token):
+            raise err
+
+    monkeypatch.setattr(attach, "_get_provider_for_attach", lambda p: Bad())
+    with pytest.raises(IntegrationError) as exc:
+        await attach.complete_personal_attach(
+            user=_User(), slug="github", oauth_provider="github", code="c", db=_fake_db()
+        )
+    assert exc.value.code == "token_exchange_failed"
+
+
+@pytest.mark.asyncio
+async def test_unverified_provider_email_gets_its_own_code(monkeypatch):
+    class NoEmail(FakeProvider):
+        async def fetch_user_info(self, access_token):
+            raise OAuthError("no_verified_email", "no verified primary email")
+
+    monkeypatch.setattr(attach, "_get_provider_for_attach", lambda p: NoEmail())
+    with pytest.raises(IntegrationError) as exc:
+        await attach.complete_personal_attach(
+            user=_User(), slug="github", oauth_provider="github", code="c", db=_fake_db()
+        )
+    assert exc.value.code == "provider_email_unverified"
+
+
+@pytest.mark.asyncio
+async def test_integration_save_failure_after_tokens_is_clear_and_rolls_back(monkeypatch):
+    from sqlalchemy.exc import DBAPIError
+
+    monkeypatch.setattr(attach, "_get_provider_for_attach", lambda p: FakeProvider())
+    monkeypatch.setattr(attach, "_attach_account_to_user", AsyncMock())
+    monkeypatch.setattr(
+        attach,
+        "upsert_personal_integration",
+        AsyncMock(side_effect=DBAPIError("x", {}, Exception("boom"))),
+    )
+    db = _fake_db()
+    db.rollback = AsyncMock()
+    with pytest.raises(IntegrationError) as exc:
+        await attach.complete_personal_attach(
+            user=_User(), slug="github", oauth_provider="github", code="c", db=db
+        )
+    assert exc.value.code == "integration_save_failed"
+    db.rollback.assert_awaited()

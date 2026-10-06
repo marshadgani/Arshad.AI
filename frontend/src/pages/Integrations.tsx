@@ -75,6 +75,11 @@ const OAUTH_ERROR_MESSAGES: Record<string, string> = {
   token_exchange_failed: 'Could not complete the connection. Please try again.',
   pending_corrupt: 'Connection session could not be read. Please try connecting again.',
   internal_error: 'An unexpected error occurred. Please try again.',
+  integration_save_failed: 'Your account was linked. Click Connect once more to finish.',
+  provider_not_configured: 'This provider is not configured on the server yet.',
+  provider_email_unverified:
+    'Verify your primary email with the provider, then try connecting again.',
+  session_expired: 'Your session expired. Please sign in again and reconnect.',
   access_denied: 'Connection cancelled: access was not granted.',
   missing_pending_params: 'The connection link was incomplete. Please try again.',
 };

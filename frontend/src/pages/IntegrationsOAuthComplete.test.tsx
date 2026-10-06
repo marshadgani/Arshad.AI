@@ -72,4 +72,49 @@ describe('IntegrationsOAuthComplete', () => {
     );
     expect(fetch).not.toHaveBeenCalled();
   });
+
+  it('navigates with internal_error when the request itself fails', async () => {
+    vi.mocked(fetch).mockRejectedValue(new TypeError('network down'));
+    renderAt('/integrations/oauth-complete?pending=p1&slug=github');
+    await waitFor(() =>
+      expect(screen.getByTestId('where')).toHaveTextContent('error=internal_error'),
+    );
+  });
+
+  it('falls back to internal_error when the error body is not JSON', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: false,
+      status: 502,
+      json: async () => {
+        throw new SyntaxError('bad json');
+      },
+    } as unknown as Response);
+    renderAt('/integrations/oauth-complete?pending=p1&slug=github');
+    await waitFor(() =>
+      expect(screen.getByTestId('where')).toHaveTextContent('error=internal_error'),
+    );
+  });
+
+  it('reports an expired session on a 401', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({}),
+    } as Response);
+    renderAt('/integrations/oauth-complete?pending=p1&slug=github');
+    await waitFor(() =>
+      expect(screen.getByTestId('where')).toHaveTextContent('error=session_expired'),
+    );
+  });
+
+  it('sends no Authorization header when there is no stored token', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({}) } as Response);
+    renderAt('/integrations/oauth-complete?pending=p1&slug=github');
+    await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalled());
+    const headers = (vi.mocked(fetch).mock.calls[0][1] as RequestInit).headers as Record<
+      string,
+      string
+    >;
+    expect(headers.Authorization).toBeUndefined();
+  });
 });

@@ -26,6 +26,8 @@ from ...middleware.cache import get_redis
 
 _log = logging.getLogger(__name__)
 
+# Five minutes: long enough for the browser hop from the provider to the
+# signed-in page, short enough to keep the replay window small.
 PENDING_TTL_SECONDS = 300
 
 

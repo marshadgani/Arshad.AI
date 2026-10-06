@@ -23,6 +23,7 @@ import os
 import uuid
 
 import httpx
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -58,23 +59,39 @@ ATTACH_PROVIDERS = frozenset({"github", "google"})
 
 
 def attach_redirect_uri(oauth_provider: str) -> str:
+    """Redirect URI for the attach flow; the same value goes into the authorize
+    URL and the token exchange, and must be registered with the provider.
+
+    GitHub OAuth Apps accept a redirect_uri only at or below the single
+    callback URL registered for the app, so GitHub's attach callback lives
+    under the login callback path and needs no extra console change.
+    """
     backend = os.getenv("BACKEND_URL", "").rstrip("/")
     if not backend:
         raise IntegrationError(
             "backend_url_not_configured", "OAuth redirect is not configured."
         )
+    if oauth_provider == "github":
+        return f"{backend}/api/v1/auth/github/callback/attach"
     return f"{backend}/api/v1/integrations/personal/attach/{oauth_provider}/callback"
 
 
 def _get_provider_for_attach(oauth_provider: str) -> OAuthProvider:
-    if oauth_provider == "github":
-        provider = GitHubOAuthProvider()
-    elif oauth_provider == "google":
-        provider = GoogleOAuthProvider()
-    else:
+    try:
+        if oauth_provider == "github":
+            provider = GitHubOAuthProvider()
+        elif oauth_provider == "google":
+            provider = GoogleOAuthProvider()
+        else:
+            raise IntegrationError(
+                "unsupported_oauth_provider",
+                f"Unsupported provider '{oauth_provider}'.",
+            )
+    except RuntimeError as exc:
+        _log.error("attach provider %s is not configured", oauth_provider)
         raise IntegrationError(
-            "unsupported_oauth_provider", f"Unsupported provider '{oauth_provider}'."
-        )
+            "provider_not_configured", "This provider is not configured on the server."
+        ) from exc
     # Same redirect_uri must be used for the authorize URL and the token
     # exchange; both go through this factory.
     provider.redirect_uri = attach_redirect_uri(oauth_provider)
@@ -87,6 +104,7 @@ def _get_provider_for_attach(oauth_provider: str) -> OAuthProvider:
 async def start_personal_oauth_attach(
     *, user_id: str, slug: str, oauth_provider: str
 ) -> ConnectResult:
+    """Step 1: build the provider authorize URL with a server-side state."""
     provider = _get_provider_for_attach(oauth_provider)
     state = await store_oauth_state(
         user_id=user_id, slug=slug, ctx={"oauth_provider": oauth_provider}
@@ -119,6 +137,12 @@ async def _attach_account_to_user(
     bundle: OAuthTokenBundle,
     db: AsyncSession,
 ) -> None:
+    """Store the provider account and encrypted tokens for user_id only.
+
+    Raises IntegrationError("account_already_linked") if the provider account
+    belongs to another user or the user already has a different one for this
+    provider.
+    """
     uid = uuid.UUID(user_id)
     account = await db.scalar(
         select(OAuthAccount).where(
@@ -223,11 +247,16 @@ async def complete_personal_attach(
     try:
         bundle = await provider.exchange_code(code)
         info = await provider.fetch_user_info(bundle.access_token)
-    except (OAuthError, httpx.HTTPError) as exc:
+    except (OAuthError, httpx.HTTPError, ValueError, KeyError) as exc:
         # Log the exception type only: messages/URLs may echo secrets.
         _log.warning(
             "attach exchange failed for %s: %s", oauth_provider, type(exc).__name__
         )
+        if isinstance(exc, OAuthError) and "email" in str(exc).lower():
+            raise IntegrationError(
+                "provider_email_unverified",
+                "The provider account has no verified primary email.",
+            ) from exc
         raise IntegrationError(
             "token_exchange_failed", "Could not complete the connection."
         ) from exc
@@ -238,9 +267,20 @@ async def complete_personal_attach(
         bundle=bundle,
         db=db,
     )
-    result = await upsert_personal_integration(
-        user=user, db=db, slug=slug, oauth_provider=oauth_provider
-    )
+    try:
+        result = await upsert_personal_integration(
+            user=user, db=db, slug=slug, oauth_provider=oauth_provider
+        )
+    except SQLAlchemyError as exc:
+        # Tokens are already committed and the one-time code is spent, so a
+        # plain retry cannot work. The existing-account path of Connect
+        # finishes this step without another provider round trip.
+        await db.rollback()
+        _log.error("attach integration save failed for %s", oauth_provider)
+        raise IntegrationError(
+            "integration_save_failed",
+            "Your account was linked. Click Connect once more to finish.",
+        ) from exc
     if result.needs_oauth_attach:
         _log.error(
             "attach for %s stored tokens but account row not visible", oauth_provider

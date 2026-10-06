@@ -42,7 +42,7 @@ export default function IntegrationsOAuthComplete() {
           navigate(`/integrations?connected=${encodeURIComponent(slug)}`, { replace: true });
           return;
         }
-        let code = 'internal_error';
+        let code = res.status === 401 ? 'session_expired' : 'internal_error';
         try {
           const body = (await res.json()) as { error?: { code?: string } };
           code = body?.error?.code ?? code;

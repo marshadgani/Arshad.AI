@@ -310,7 +310,7 @@ async def oauth_callback(
     )
 
     if error:
-        return _integrations_redirect(error=error, slug=slug)
+        return _integrations_redirect(error=error[:64], slug=slug)
     if not code or not state:
         return _integrations_redirect(error="missing_code_or_state", slug=slug)
 
@@ -428,12 +428,38 @@ async def personal_attach_callback(
     )
 
 
+# GitHub OAuth Apps only accept a redirect_uri at or below the one registered
+# callback URL (the login callback), so GitHub's attach callback is exposed
+# under /api/v1/auth/github/callback/ and shares the handler above.
+github_attach_alias_router = APIRouter(prefix="/api/v1/auth", tags=["integrations"])
+
+
+@github_attach_alias_router.get(
+    "/github/callback/attach",
+    summary="GitHub attach callback (under the registered login callback path)",
+)
+async def github_attach_callback(
+    code: str | None = Query(None),
+    state: str | None = Query(None),
+    error: str | None = Query(None),
+) -> RedirectResponse:
+    return await personal_attach_callback("github", code, state, error)
+
+
 @router.post("/oauth-complete", summary="Complete a personal OAuth attach")
 async def complete_oauth_attach(
     body: CompleteOAuthAttachRequest,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
+    """Link the provider account to the signed-in user.
+
+    Requires the JWT of the user who started the flow. The pending record is
+    peeked and checked against that user before it is consumed, so another
+    user cannot burn it, and consuming it is single-use. The authorization
+    code is spent either way, so any failure after the consume means the user
+    restarts the connect.
+    """
     from .personal._attach import complete_personal_attach
     from .personal._pending import (
         consume_attach_pending,
