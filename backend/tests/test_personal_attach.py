@@ -96,6 +96,14 @@ def redis(monkeypatch) -> FakeRedis:
     return fake
 
 
+_REAL_GOOGLE_LOGIN_REVOKED = attach._google_login_revoked
+
+
+@pytest.fixture(autouse=True)
+def _google_login_not_revoked(monkeypatch):
+    monkeypatch.setattr(attach, "_google_login_revoked", AsyncMock(return_value=False))
+
+
 @pytest.fixture(autouse=True)
 def _clear_overrides():
     yield
@@ -196,6 +204,131 @@ async def test_connect_with_existing_account_unchanged(redis):
     assert r.status_code == 200
     assert data["redirect_url"] is None
     assert not [k for k in redis.store if k.startswith("int_oauth_state:")]
+
+
+@pytest.mark.asyncio
+async def test_connect_google_with_revoked_login_starts_attach(redis, monkeypatch):
+    monkeypatch.setattr(attach, "_google_login_revoked", AsyncMock(return_value=True))
+    _use(_User(), _fake_db())
+    async with _client() as c:
+        r = await c.post("/api/v1/integrations/google_calendar/connect", json={})
+    url = r.json()["data"]["redirect_url"]
+    assert r.status_code == 200
+    assert urlparse(url).netloc == "accounts.google.com"
+    assert [k for k in redis.store if k.startswith("int_oauth_state:")]
+
+
+def _row_db(expires_at=None, row_present=True):
+    db = _fake_db()
+    result = MagicMock()
+    result.first.return_value = (uuid.uuid4(), expires_at) if row_present else None
+    db.execute = AsyncMock(return_value=result)
+    db.rollback = AsyncMock()
+    return db
+
+
+class _ExpiringUser:
+    """Mimics a session instance that a rollback has expired."""
+
+    def __init__(self) -> None:
+        self._id = uuid.uuid4()
+        self.expired = False
+
+    @property
+    def id(self):
+        if self.expired:
+            raise RuntimeError("MissingGreenlet: user expired by rollback")
+        return self._id
+
+
+@pytest.mark.asyncio
+async def test_connect_reads_user_id_before_probe_expires_the_user(redis, monkeypatch):
+    user = _ExpiringUser()
+
+    async def probe(*, user, db):
+        user.expired = True
+        return True
+
+    monkeypatch.setattr(attach, "_google_login_revoked", probe)
+    result = await attach.connect_personal_oauth(
+        user=user, db=_fake_db(), slug="google_calendar", oauth_provider="google"
+    )
+    assert urlparse(result.redirect_url).netloc == "accounts.google.com"
+    assert [k for k in redis.store if k.startswith("int_oauth_state:")]
+
+
+@pytest.mark.asyncio
+async def test_google_login_revoked_true_when_refresh_rejected(monkeypatch):
+    monkeypatch.setattr(
+        attach,
+        "refresh_google_token",
+        AsyncMock(side_effect=attach.ProviderReauthRequired("google")),
+    )
+    db = _row_db()
+    assert await _REAL_GOOGLE_LOGIN_REVOKED(user=_User(), db=db) is True
+    db.rollback.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_google_login_revoked_false_when_refresh_works(monkeypatch):
+    monkeypatch.setattr(attach, "refresh_google_token", AsyncMock(return_value="tok"))
+    db = _row_db()
+    assert await _REAL_GOOGLE_LOGIN_REVOKED(user=_User(), db=db) is False
+    db.rollback.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_google_login_revoked_false_when_no_account(monkeypatch):
+    refresh = AsyncMock()
+    monkeypatch.setattr(attach, "refresh_google_token", refresh)
+    assert (
+        await _REAL_GOOGLE_LOGIN_REVOKED(user=_User(), db=_row_db(row_present=False))
+        is False
+    )
+    refresh.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_google_login_probe_skipped_while_access_token_valid(monkeypatch):
+    from datetime import datetime, timedelta, timezone
+
+    refresh = AsyncMock()
+    monkeypatch.setattr(attach, "refresh_google_token", refresh)
+    future = datetime.now(timezone.utc) + timedelta(minutes=30)
+    assert (
+        await _REAL_GOOGLE_LOGIN_REVOKED(user=_User(), db=_row_db(expires_at=future))
+        is False
+    )
+    refresh.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "exc",
+    [
+        httpx.ConnectTimeout("t"),
+        RuntimeError("missing env"),
+        KeyError("access_token"),
+        attach.TokenDecryptError("bad key"),
+    ],
+)
+async def test_google_login_probe_fails_open_on_other_errors(monkeypatch, exc):
+    monkeypatch.setattr(attach, "refresh_google_token", AsyncMock(side_effect=exc))
+    db = _row_db()
+    user = _User()
+    assert await _REAL_GOOGLE_LOGIN_REVOKED(user=user, db=db) is False
+    db.rollback.assert_awaited_once()
+    db.refresh.assert_awaited_once_with(user)
+
+
+@pytest.mark.asyncio
+async def test_connect_github_never_probes_google(monkeypatch, redis):
+    probe = AsyncMock(return_value=True)
+    monkeypatch.setattr(attach, "_google_login_revoked", probe)
+    _use(_User(), _fake_db([MagicMock(), None]))
+    async with _client() as c:
+        await c.post("/api/v1/integrations/github/connect", json={})
+    probe.assert_not_awaited()
 
 
 # ── anonymous callback ───────────────────────────────────────────────────
