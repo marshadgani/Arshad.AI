@@ -217,3 +217,20 @@ describe('dashboard widgets distinguish loading from empty', () => {
     expect(screen.getByText('GDP grew')).toBeInTheDocument();
   });
 });
+
+describe('FocusCard link safety', () => {
+  it.each([
+    'javascript:alert(1)',
+    'data:text/html,hi',
+    'http://github.com/me/app',
+    'https://github.com.evil.test/x',
+    'not a url',
+  ])('never renders %s as a link, even if the backend sent it', (url) => {
+    render(
+      <FocusCard focus={{ title: 't', subtitle: 's', context: 'c', action: 'Open', url }} />,
+    );
+    const link = screen.getByRole('link', { name: 'Open' });
+    expect(link).toHaveAttribute('href', '/integrations');
+    expect(link).not.toHaveAttribute('target');
+  });
+});

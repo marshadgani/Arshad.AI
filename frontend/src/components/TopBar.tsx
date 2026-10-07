@@ -85,7 +85,7 @@ export default function TopBar({ onMenuClick, isNavOpen }: TopBarProps) {
           ⚙
         </button>
         <span
-          className={styles.iconBtn}
+          className={styles.avatar}
           role="img"
           aria-label={user?.name ?? user?.email ?? 'Profile'}
           title={user?.email ?? 'Profile'}
