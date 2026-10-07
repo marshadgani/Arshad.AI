@@ -125,7 +125,12 @@ async def ingest(
     if not items:
         await event_bus.publish(
             "events.calendar.ingested",
-            {"user_id": str(user.id), "ingested_count": 0, "skipped_count": 0},
+            {
+                "user_id": str(user.id),
+                "ingested_count": 0,
+                "skipped_count": 0,
+                "truncated": truncated,
+            },
         )
         return {"ingested_count": 0, "skipped_count": 0, "truncated": truncated}
 
