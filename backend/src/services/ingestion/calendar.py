@@ -6,7 +6,9 @@ keyed by (user_id, provider_id), publishes
 ``events.calendar.ingested`` with batch counts.
 
 Window: by default the next 30 days. ``payload.full_refresh=true`` widens
-to (now - 90d, now + 365d).
+to (now - 90d, now + 365d). ``payload.history_days=N`` reads from N days ago
+(capped at 10 years) to now + 365d and follows Google's page links, so a long
+history is not cut off at one batch; other runs read a single batch.
 """
 
 from __future__ import annotations
@@ -22,8 +24,11 @@ from ...models.ingested import IngestedCalendarEvent
 from ...models.user import User
 from ...tools.calendar.list_events import CalendarListEvents, ListEventsInput
 from .. import event_bus
+from .errors import IngestionError
 
 _DEFAULT_LOOKAHEAD_DAYS = 30
+_MAX_HISTORY_DAYS = 3650
+_MAX_HISTORY_PAGES = 40
 
 
 def _max_batch() -> int:
@@ -54,28 +59,53 @@ def _parse_event_start(raw: dict[str, Any]) -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _history_days(payload: dict[str, Any]) -> int | None:
+    raw = payload.get("history_days")
+    if raw is None:
+        return None
+    try:
+        days = int(raw)
+    except (TypeError, ValueError):
+        raise IngestionError(f"invalid_history_days: {raw!r}") from None
+    if days < 1:
+        raise IngestionError(f"invalid_history_days: {raw!r}")
+    return min(days, _MAX_HISTORY_DAYS)
+
+
 async def ingest(
     *, user: User, db: AsyncSession, payload: dict[str, Any]
 ) -> dict[str, Any]:
     full_refresh = bool(payload.get("full_refresh", False))
+    history_days = _history_days(payload)
     now = datetime.now(timezone.utc)
-    if full_refresh:
+    if history_days is not None:
+        time_min = now - timedelta(days=history_days)
+        time_max = now + timedelta(days=365)
+    elif full_refresh:
         time_min = now - timedelta(days=90)
         time_max = now + timedelta(days=365)
     else:
         time_min = now
         time_max = now + timedelta(days=_DEFAULT_LOOKAHEAD_DAYS)
 
-    result = await CalendarListEvents()(
-        user=user,
-        db=db,
-        payload=ListEventsInput(
-            time_min=time_min.isoformat(),
-            time_max=time_max.isoformat(),
-            max_results=_max_batch(),
-        ),
-    )
-    items: list[dict[str, Any]] = (result.data or {}).get("items", [])
+    items: list[dict[str, Any]] = []
+    page_token: str | None = None
+    for _ in range(_MAX_HISTORY_PAGES if history_days is not None else 1):
+        result = await CalendarListEvents()(
+            user=user,
+            db=db,
+            payload=ListEventsInput(
+                time_min=time_min.isoformat(),
+                time_max=time_max.isoformat(),
+                max_results=_max_batch(),
+                page_token=page_token,
+            ),
+        )
+        data = result.data or {}
+        items.extend(data.get("items", []))
+        page_token = data.get("nextPageToken")
+        if not page_token:
+            break
 
     if not items:
         await event_bus.publish(
@@ -84,15 +114,17 @@ async def ingest(
         )
         return {"ingested_count": 0, "skipped_count": 0}
 
+    # One INSERT .. ON CONFLICT cannot touch the same row twice, so keep the
+    # last copy of any id repeated across pages.
+    by_id = {item["id"]: item for item in items if item.get("id")}
     rows = [
         {
             "user_id": user.id,
             "occurred_at": _parse_event_start(item),
-            "provider_id": item["id"],
+            "provider_id": item_id,
             "raw": item,
         }
-        for item in items
-        if item.get("id")
+        for item_id, item in by_id.items()
     ]
     skipped = len(items) - len(rows)
 

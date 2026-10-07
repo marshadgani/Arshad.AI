@@ -23,6 +23,10 @@ class ListEventsInput(BaseModel):
         default="primary",
         description="Calendar ID; 'primary' for the user's main calendar",
     )
+    page_token: str | None = Field(
+        default=None,
+        description="nextPageToken from a previous response, to fetch the next page",
+    )
 
 
 class EventSummary(BaseModel):
@@ -80,6 +84,7 @@ class CalendarListEvents(Tool):
                 "maxResults": payload.max_results,
                 "singleEvents": "true",
                 "orderBy": "startTime",
+                **({"pageToken": payload.page_token} if payload.page_token else {}),
             },
         )
         items = data.get("items", []) if isinstance(data, dict) else []
