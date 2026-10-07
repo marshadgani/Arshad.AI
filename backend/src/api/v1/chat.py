@@ -6,6 +6,7 @@ event stream to the frontend. Other endpoints are plain JSON.
 
 from __future__ import annotations
 
+import logging
 import uuid
 from typing import Any
 
@@ -20,6 +21,8 @@ from ...models.conversation import ConversationMessage, ConversationSession
 from ...models.database import get_db
 from ...models.user import User
 from ...services import chat as chat_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/chat", tags=["chat"])
 
@@ -174,11 +177,33 @@ async def send_message(
             f"No chat session with id {session_id}.",
         )
 
+    # Persist before streaming so a database failure is a real 500, not a
+    # truncated 200 stream (the status line cannot change once sent).
+    await chat_service.persist_user_message(session=session, db=db, user_text=body.text)
+
     async def event_stream():
-        async for sse_chunk in chat_service.chat_turn(
-            session=session, user=user, db=db, user_text=body.text
-        ):
-            yield sse_chunk
+        try:
+            async for sse_chunk in chat_service.chat_turn(
+                session=session,
+                user=user,
+                db=db,
+                user_text=body.text,
+                user_message_persisted=True,
+            ):
+                yield sse_chunk
+        except Exception:
+            # Headers are already sent, so signal the failure in-band and
+            # close the stream cleanly instead of leaving the client hanging.
+            logger.exception("Chat stream failed for session %s", session_id)
+            yield chat_service._sse(
+                {
+                    "error": {
+                        "code": "stream_failed",
+                        "message": "The response was interrupted. Please retry.",
+                    }
+                }
+            )
+            yield chat_service._sse("[DONE]")
 
     return StreamingResponse(
         event_stream(),

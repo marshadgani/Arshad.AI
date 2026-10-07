@@ -267,18 +267,15 @@ async def _load_session_history(db: AsyncSession, session_id) -> list[dict[str, 
     return history
 
 
-async def chat_turn(
-    *,
-    session: ConversationSession,
-    user: User,
-    db: AsyncSession,
-    user_text: str,
-) -> AsyncIterator[str]:
-    """Drive one user → assistant turn. Yields SSE-shaped strings.
+async def persist_user_message(
+    *, session: ConversationSession, db: AsyncSession, user_text: str
+) -> None:
+    """Commit the user's message before any response bytes are sent.
 
-    Persists every message (user + each tool_use + tool_result + final
-    assistant text) to ``conversation_messages`` so the next turn can
-    reload the full history.
+    Callers that stream (the HTTP route) must await this *before* building
+    the StreamingResponse: an exception raised inside the response body
+    arrives after the 200 and headers are already on the wire, so the client
+    would see a silently truncated stream instead of an error status.
     """
     db.add(
         ConversationMessage(
@@ -291,6 +288,25 @@ async def chat_turn(
         session.title = user_text[:60]
     session.updated_at = datetime.now(timezone.utc)
     await db.commit()
+
+
+async def chat_turn(
+    *,
+    session: ConversationSession,
+    user: User,
+    db: AsyncSession,
+    user_text: str,
+    user_message_persisted: bool = False,
+) -> AsyncIterator[str]:
+    """Drive one user → assistant turn. Yields SSE-shaped strings.
+
+    Persists every message (user + each tool_use + tool_result + final
+    assistant text) to ``conversation_messages`` so the next turn can
+    reload the full history. Pass ``user_message_persisted=True`` when the
+    caller already awaited :func:`persist_user_message`.
+    """
+    if not user_message_persisted:
+        await persist_user_message(session=session, db=db, user_text=user_text)
 
     history = await _load_session_history(db, session.id)
     history = _compress_history(history)
