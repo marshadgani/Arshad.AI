@@ -78,10 +78,37 @@ for, and it doesn't hit the nesting restriction. The canonical script lives at
 **Arshad will NEVER type `/dev-team`. He gives prompts directly, in this same chat
 window, as he analyses and discusses features over time.**
 
-**You must analyse every prompt and decide: is this a change, feature, or bug?**
-If yes → immediately queue it into the pipeline. Do NOT ask for confirmation. Do NOT
-write code yourself. Just dispatch. Pure questions/explanations that request no code
-change are the only exception — answer those directly.
+**You must analyse every prompt and decide: is this a NEW feature, or a fix/modification to an existing one?**
+
+**Bug-fix carve-out (PERMANENT, per Arshad's explicit instruction 2026-10-07):**
+A bug fix, or a modification to a feature that already exists, does **NOT** go through
+the dev-team pipeline. Apply the fix directly: make the change, test it, verify it
+against real behavior, and iterate (retrospective loop) until the feature works end to
+end. Only a genuinely **new** feature goes through the pipeline. This overrides the
+"no too-small carve-out" and "when in doubt → queue it" language below for bug fixes.
+Arshad may still ask for the pipeline on a specific fix — then use it.
+Still log the fix as a `FEAT-{N}` row in `tasks/pipeline-queue.md` (status `done directly`)
+so the history stays complete. The Merge-to-Main gate is unchanged.
+
+**Bug-fix auto-loop (PERMANENT, per Arshad's explicit instruction 2026-10-07):**
+Same standing-rule behaviour as features. After each bug fix is applied and tested:
+1. **Merge it to main automatically**, no "Merge to Main" phrase needed. Run §20 Trigger 2
+   in full (squash-divergence repair, 8-agent gate, auto-fix criticals, gate report, push,
+   `auto-pr.yml` merges). A BLOCKED gate stops the loop for that fix, report the blockers.
+2. **Validate the fix in the deployed system**, not just in unit tests: follow §23 (Render
+   logs, `/health`, no new errors) and exercise the fixed behaviour against production
+   where access allows (read-only Supabase queries, public endpoints, authenticated checks
+   when credentials are available as environment variables). If a check cannot be done,
+   say exactly which one and why. Never claim "validated" without evidence.
+3. If validation fails, fix the root cause and repeat from the top (retrospective loop).
+4. When the fix is validated, **continue to the next open bug** in `tasks/pipeline-queue.md`
+   without waiting for Arshad. Keep going until no open bug or modification rows remain.
+   New features in the register still go through the pipeline per the rules below.
+Never stop between fixes to ask for permission to merge or to continue.
+
+For a new feature → immediately queue it into the pipeline. Do NOT ask for confirmation.
+Do NOT write code yourself. Just dispatch. Pure questions/explanations that request no
+code change are answered directly.
 
 **Protocol, every time:**
 1. Read `tasks/.feature-counter`, increment it, assign `FEAT-{N}`.

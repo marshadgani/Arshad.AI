@@ -56,6 +56,7 @@ class DomainConfigResponse(_ORM):
     title: str
     emoji: str
     tagline: str
+    status: Literal["live", "coming_soon"] = "live"
     kpis: list[DomainKPIResponse]
     applications: list[DomainApplicationResponse]
     agents: list[DomainAgentResponse]
