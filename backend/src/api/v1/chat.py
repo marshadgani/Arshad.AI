@@ -195,7 +195,11 @@ async def send_message(
             # Headers are already sent, so signal the failure in-band and
             # close the stream cleanly instead of leaving the client hanging.
             logger.exception("Chat stream failed for session %s", session_id)
-            yield chat_service._sse(
+            try:
+                await db.rollback()
+            except Exception:
+                logger.exception("Rollback after chat stream failure also failed")
+            yield chat_service.sse_event(
                 {
                     "error": {
                         "code": "stream_failed",
@@ -203,7 +207,7 @@ async def send_message(
                     }
                 }
             )
-            yield chat_service._sse("[DONE]")
+            yield chat_service.sse_event("[DONE]")
 
     return StreamingResponse(
         event_stream(),

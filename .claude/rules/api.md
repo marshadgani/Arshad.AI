@@ -123,6 +123,7 @@ Default `limit` is 20, max is 100. Enforce the max in the route handler.
 - Chat responses stream via `StreamingResponse` with `media_type="text/event-stream"`.
 - Each event is a JSON-encoded chunk: `data: {"delta": "..."}\n\n`
 - Send a final `data: [DONE]\n\n` event when the stream closes.
+- If the stream fails after headers are sent, emit `data: {"error": {"code": "stream_failed", "message": "..."}}\n\n` and then `[DONE]`. Failures before the first byte (for example saving the user message) must be a normal error status instead.
 - Always set `Cache-Control: no-cache` on streaming responses.
 
 ## Versioning
