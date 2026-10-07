@@ -61,9 +61,6 @@ export default function DomainPage({ slug, children }: DomainPageProps) {
               <div className={styles.appDesc}>{app.description}</div>
               <div className={styles.appFoot}>
                 <span className={`${styles.statusTag} ${statusClass[app.status]}`}>{app.status}</span>
-                {app.status !== 'planned' ? (
-                  <button className={styles.appOpen}>Open →</button>
-                ) : null}
               </div>
             </article>
           ))}
@@ -97,7 +94,6 @@ export default function DomainPage({ slug, children }: DomainPageProps) {
               <div className={styles.agentLast}>↳ {a.lastAction}</div>
               <div className={styles.agentFoot}>
                 <span className={styles.agentRun}>{a.lastRun}</span>
-                <button className={styles.agentConfig}>Configure</button>
               </div>
             </article>
           ))}

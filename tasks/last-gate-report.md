@@ -1,7 +1,7 @@
 # Arshad.AI Quality Gate Report
 
 **Branch:** `claude/chat-mobile-health-integration-if20cp` -> `claude/ai-personal-assistant-main`
-**Change:** FEAT-146, bug fix done directly (no pipeline, per the bug-fix rule). When Slack rejected a token it answered HTTP 200 with `ok: false`, and the provider raised a bare `Exception`, which turned Connect into a 500. It now raises a clean integration error. A rejected token during sync is also recorded on the integration so its status shows the failure.
+**Change:** FEAT-148, FEAT-152 and FEAT-153, bug fixes done directly (no pipeline, per the bug-fix rule). Controls that did nothing are removed or wired. Removed: the "Open" and "Configure" buttons on domain pages and the sidebar "Settings" and "Activity log" links (no destination exists). Wired: the top-bar bell goes to the dashboard, the gear to Integrations, quick capture opens a new chat with your text prefilled (never sent on its own), Cmd or Ctrl+K focuses it, the Focus card button opens the GitHub item it describes. The avatar is now a label and the always-on notification dot is gone.
 **Date:** 2026-10-07
 
 ### ⚠️ GATE PASSED WITH WARNINGS — Ready for merge
@@ -10,27 +10,27 @@
 
 | # | Agent | Result |
 |---|---|---|
-| 1 | code-reviewer | WARN, 0 Critical. Confirmed Connect and Sync now map to 400, not 500. Sync failure was not recorded on the integration. Fixed |
-| 2 | security-auditor | PASS. The token never reaches the error message or stored error. Reason string is now length-capped |
-| 3 | debugger | WARN, 0 Critical. Non-dict JSON bodies would still 500, and a failed sync left status "connected". Both fixed |
-| 4 | test-writer | PASS. 100 percent of the changed lines covered |
-| 5 | refactorer | WARN. Pre-existing duplication in other provider specs (a duplicate `_slack_bearer`, repeated lambdas). Deferred |
-| 6 | doc-writer | PASS. No docs need a change |
-| 7 | silent-failure-hunter | WARN. A failing sync parse skipped `mark_error`. Fixed in `_factory.py` |
-| 8 | pr-test-analyzer | WARN. Added tests for the sync path through the factory, non-dict bodies, the length cap and the HTTP 500 path |
+| 1 | code-reviewer | WARN, 0 Critical. A second quick capture during session creation could start a second session. Fixed with a ref guard |
+| 2 | security-auditor | PASS. The backend only sends github.com links. Added a browser-side check as defence in depth |
+| 3 | debugger | PASS, 0 Critical. TopBar always renders inside the Router, no listener leak |
+| 4 | test-writer | WARN. Its one failing test came from the new draft-clearing behaviour and a mock that showed the prop directly. Test corrected, plus a real ChatPanel to composer test added |
+| 5 | refactorer | WARN. Removed the dead `.dot` CSS, gave the avatar its own style, merged the two Focus anchors into one |
+| 6 | doc-writer | PASS. Comments and docs are accurate |
+| 7 | silent-failure-hunter | WARN. The captured text is now shown if the chat cannot start, the real error is logged, and the draft is cleared from history once used |
+| 8 | pr-test-analyzer | WARN. Added tests for unsafe Focus links, the failure path, one-session-per-capture and draft clearing |
 
 ## Verdict: WARN, mergeable
 
-Backend: 1024 pass, 9 fail. The same 9 fail without these changes (they need a database or auth setup, in `test_auth`, `test_auth_password`, `test_ontology_extraction`, `test_token_service`). 16 new Slack tests pass. Lint clean on changed files.
+Frontend: 381 of 381 tests pass, type check clean, production build clean. Backend: 1027 pass, 9 fail. The same 9 fail without these changes (they need a database or auth setup, in `test_auth`, `test_auth_password`, `test_ontology_extraction`, `test_token_service`).
 
 ## Fixed in this PR
 
-- `_slack_parse_probe` and `_slack_parse_sync` raise `IntegrationError` (`invalid_key` on Connect, `sync_failed` on Sync).
-- A non-dict JSON body from Slack is a clean error, not an `AttributeError`.
-- The factory's `sync()` now records a parser rejection with `mark_error` and keeps the parser's error code.
-- Slack's reason string is capped at 100 characters.
+- Quick capture: one chat per capture, text kept and shown if the chat cannot be created, draft cleared from history after use, real error logged.
+- The Focus link is validated on the server and again in the browser. Anything that is not `https://github.com/` falls back to Integrations.
+- The `.dot` CSS and the `.appOpen` and `.agentConfig` CSS are removed. The avatar no longer highlights like a button.
 
 ## Deferred (non-blocking)
 
-- [ ] Remove the duplicate `_slack_bearer` (identical to `_bearer`) and share the repeated parse lambdas.
-- [ ] Extract the inline Anthropic auth-header lambda to a named function.
+- [ ] Use a router `Link` for the Focus fallback to Integrations (it does a full page load now).
+- [ ] The bell goes to the dashboard with a tooltip only. A real unread indicator needs a notifications source.
+- [ ] A rule-compliant role query for the hamburger test (it is hidden by CSS in jsdom).

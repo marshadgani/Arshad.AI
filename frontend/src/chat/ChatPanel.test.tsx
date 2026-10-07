@@ -79,3 +79,14 @@ describe('ChatPanel — four states', () => {
     expect(await screen.findByLabelText(/message/i)).toBeInTheDocument();
   });
 });
+
+describe('ChatPanel — quick-capture draft', () => {
+  it('prefills the real composer with the captured text and does not send it', async () => {
+    global.fetch = mockFetchOnce({ ok: true });
+    render(<ChatPanel sessionId="s1" initialDraft="buy milk" />);
+    await waitFor(() =>
+      expect(screen.getByRole('textbox', { name: 'Message' })).toHaveValue('buy milk'),
+    );
+    expect(mockStream.send).not.toHaveBeenCalled();
+  });
+});

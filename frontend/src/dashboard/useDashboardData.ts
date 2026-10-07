@@ -12,7 +12,14 @@ import { useFetch } from '../hooks/useFetch';
 // declare the fields the dashboard actually reads, not the full row — the
 // exhaustive domain types live in data/mockData.
 export interface BriefingRes { greeting: string; date: string; summary: string }
-export interface FocusRes { title: string; subtitle: string; context: string; action: string }
+export interface FocusRes {
+  title: string;
+  subtitle: string;
+  context: string;
+  action: string;
+  /** https GitHub link for the focus item; absent when there is nothing to open. */
+  url?: string | null;
+}
 export interface WeatherRes { temp: string; condition: string; city: string }
 export interface CommuteRes { eta: string; mode: string; dest: string }
 export interface NewsRes { id: string; title: string; source: string }
