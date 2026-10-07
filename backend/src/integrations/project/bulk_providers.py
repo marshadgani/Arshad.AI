@@ -30,9 +30,9 @@ def _slack_bearer(api_key: str) -> dict[str, str]:
 def _slack_identity(body: dict | None, error_code: str) -> dict[str, str | None]:
     """Slack answers HTTP 200 with ``ok: false`` for a bad token, so the status
     check alone never catches it; turn that into a clean integration error."""
-    body = body or {}
-    if not body.get("ok"):
-        reason = body.get("error", "slack_auth_failed")
+    if not isinstance(body, dict) or not body.get("ok"):
+        reason = body.get("error") if isinstance(body, dict) else None
+        reason = str(reason or "slack_auth_failed")[:100]
         raise IntegrationError(error_code, f"Slack rejected the token: {reason}")
     return {"team": body.get("team"), "user": body.get("user")}
 

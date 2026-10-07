@@ -67,3 +67,88 @@ def test_connect_with_a_rejected_token_raises_a_clean_error_end_to_end(monkeypat
         asyncio.run(go())
     assert exc.value.code == "invalid_key"
     assert "xoxp-bad" not in exc.value.message
+
+
+@pytest.mark.parametrize("body", [[], ["ok"], "ok", 5])
+def test_non_dict_bodies_are_a_clean_error_not_an_attribute_error(body):
+    with pytest.raises(IntegrationError):
+        bp._slack_parse_probe(body)
+    with pytest.raises(IntegrationError):
+        bp._slack_parse_sync(body)
+
+
+def test_slack_error_reason_is_length_capped():
+    with pytest.raises(IntegrationError) as exc:
+        bp._slack_parse_probe({"ok": False, "error": "x" * 5000})
+    assert len(exc.value.message) < 200
+
+
+def _slack_sync_harness(monkeypatch, status_code, json_body):
+    import asyncio
+    from types import SimpleNamespace
+
+    import httpx
+    from src.integrations.project import _factory
+    from src.integrations.registry import get_provider
+
+    real = httpx.AsyncClient
+
+    def client(*args, **kwargs):
+        kwargs["transport"] = httpx.MockTransport(
+            lambda request: httpx.Response(status_code, json=json_body)
+        )
+        return real(*args, **kwargs)
+
+    marked = []
+
+    async def fake_mark_error(*, integration, db, err):
+        marked.append(err)
+
+    class DB:
+        async def scalar(self, _stmt):
+            return SimpleNamespace(encrypted_key="enc")
+
+    monkeypatch.setattr(_factory.httpx, "AsyncClient", client)
+    monkeypatch.setattr(_factory, "mark_error", fake_mark_error)
+    monkeypatch.setattr(_factory, "decrypt", lambda _value: "xoxp-token")
+    integration = SimpleNamespace(id="i1", config={"team": "old"})
+
+    def run():
+        return asyncio.run(get_provider("slack").sync(integration=integration, db=DB()))
+
+    return run, integration, marked
+
+
+def test_sync_with_a_rejected_token_marks_the_integration_failed(monkeypatch):
+    run, integration, marked = _slack_sync_harness(
+        monkeypatch, 200, {"ok": False, "error": "token_revoked"}
+    )
+    with pytest.raises(IntegrationError) as exc:
+        run()
+    assert exc.value.code == "sync_failed"
+    assert len(marked) == 1 and isinstance(marked[0], IntegrationError)
+    assert integration.config == {"team": "old"}
+
+
+def test_sync_http_failure_is_also_marked_and_wrapped(monkeypatch):
+    run, _integration, marked = _slack_sync_harness(monkeypatch, 500, {})
+    with pytest.raises(IntegrationError) as exc:
+        run()
+    assert exc.value.code == "sync_failed"
+    assert len(marked) == 1
+
+
+def test_sync_success_stores_identity_and_marks_synced(monkeypatch):
+    from src.integrations.project import _factory
+
+    run, integration, marked = _slack_sync_harness(
+        monkeypatch, 200, {"ok": True, "team": "Acme", "user": "arshad"}
+    )
+
+    async def fake_mark_synced(*, integration, db, summary, started):
+        return summary
+
+    monkeypatch.setattr(_factory, "mark_synced", fake_mark_synced)
+    assert "Slack" in run()
+    assert integration.config == {"team": "Acme", "user": "arshad"}
+    assert marked == []
