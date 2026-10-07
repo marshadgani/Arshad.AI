@@ -2,7 +2,8 @@
 
 Used by the six personal providers (GitHub, Gmail, Google Calendar/Drive/
 Tasks/YouTube) when the signed-in user has no oauth_account for the
-provider (e.g. they logged in with Google and now connect GitHub).
+provider (e.g. they logged in with Google and now connect GitHub), or when
+their stored Google login was revoked and needs a fresh consent.
 
 Flow (identity is NEVER taken from a URL-borne value alone):
   1. POST /{slug}/connect (JWT)  -> state stored in Redis bound to user_id.
@@ -21,6 +22,7 @@ from __future__ import annotations
 import logging
 import os
 import uuid
+from datetime import datetime, timezone
 
 import httpx
 from sqlalchemy.exc import SQLAlchemyError
@@ -28,7 +30,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...auth.crypto import encrypt
+from ...auth.crypto import TokenDecryptError, encrypt
 from ...auth.providers.base import (
     OAuthError,
     OAuthProvider,
@@ -117,20 +119,27 @@ async def start_personal_oauth_attach(
 async def connect_personal_oauth(
     *, user: User, db: AsyncSession, slug: str, oauth_provider: str
 ) -> ConnectResult:
-    """Existing-account path, unless its Google login was revoked; otherwise
-    start the attach flow."""
-    if oauth_provider == "google" and await _google_login_revoked(user=user, db=db):
-        return await start_personal_oauth_attach(
-            user_id=str(user.id), slug=slug, oauth_provider=oauth_provider
-        )
-    result = await upsert_personal_integration(
-        user=user, db=db, slug=slug, oauth_provider=oauth_provider
+    """Connect a personal OAuth provider for the signed-in user.
+
+    The attach flow starts when the user has no account for the provider, or
+    when their Google login was revoked (see ``_google_login_revoked``).
+    Otherwise the existing account is promoted into an integration row.
+    """
+    # Read before any rollback: rolling back expires ``user``, and a lazy
+    # refresh on an AsyncSession raises MissingGreenlet.
+    user_id = str(user.id)
+    needs_attach = oauth_provider == "google" and await _google_login_revoked(
+        user=user, db=db
     )
-    if result.needs_oauth_attach:
-        return await start_personal_oauth_attach(
-            user_id=str(user.id), slug=slug, oauth_provider=oauth_provider
+    if not needs_attach:
+        result = await upsert_personal_integration(
+            user=user, db=db, slug=slug, oauth_provider=oauth_provider
         )
-    return result
+        if not result.needs_oauth_attach:
+            return result
+    return await start_personal_oauth_attach(
+        user_id=user_id, slug=slug, oauth_provider=oauth_provider
+    )
 
 
 async def _google_login_revoked(*, user: User, db: AsyncSession) -> bool:
@@ -140,19 +149,43 @@ async def _google_login_revoked(*, user: User, db: AsyncSession) -> bool:
     Connected and never sends the user to Google, so a revoked login stays
     broken forever. The attach flow's account-update branch then stores the
     fresh tokens on the same account.
+
+    Fails open: any other error (Google outage, timeout, missing config)
+    returns False so Connect keeps its previous behaviour instead of
+    returning a 500. A still-valid access token skips the probe, which also
+    avoids a row lock and a token write on every Connect click.
     """
-    account_id = await db.scalar(
-        select(OAuthAccount.id).where(
-            OAuthAccount.user_id == user.id, OAuthAccount.provider == "google"
+    row = (
+        await db.execute(
+            select(OAuthAccount.id, OAuthToken.token_expires_at)
+            .outerjoin(OAuthToken, OAuthToken.oauth_account_id == OAuthAccount.id)
+            .where(OAuthAccount.user_id == user.id, OAuthAccount.provider == "google")
         )
-    )
-    if account_id is None:
+    ).first()
+    if row is None:
+        return False
+    account_id, expires_at = row
+    if expires_at is not None and expires_at > datetime.now(timezone.utc):
         return False
     try:
         await refresh_google_token(db, account_id)
     except ProviderReauthRequired:
         await db.rollback()
         return True
+    except (
+        httpx.HTTPError,
+        RuntimeError,
+        KeyError,
+        ValueError,
+        TokenDecryptError,
+        SQLAlchemyError,
+    ) as exc:
+        await db.rollback()
+        # The caller goes on to read ``user`` (upsert_personal_integration),
+        # and the rollback just expired it.
+        await db.refresh(user)
+        _log.warning("google login probe failed: %s", type(exc).__name__)
+        return False
     return False
 
 
