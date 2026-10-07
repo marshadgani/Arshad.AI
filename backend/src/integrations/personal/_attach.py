@@ -40,6 +40,8 @@ from ...auth.providers.google import GoogleOAuthProvider
 from ...models.oauth_account import OAuthAccount
 from ...models.oauth_token import OAuthToken
 from ...models.user import User
+from ...tools.base import ProviderReauthRequired
+from ...tools.token_service import refresh_google_token
 from ..base import ConnectResult, IntegrationError
 from ._oauth_base import store_oauth_state
 from ._pending import (
@@ -115,7 +117,12 @@ async def start_personal_oauth_attach(
 async def connect_personal_oauth(
     *, user: User, db: AsyncSession, slug: str, oauth_provider: str
 ) -> ConnectResult:
-    """Existing-account path unchanged; otherwise start the attach flow."""
+    """Existing-account path, unless its Google login was revoked; otherwise
+    start the attach flow."""
+    if oauth_provider == "google" and await _google_login_revoked(user=user, db=db):
+        return await start_personal_oauth_attach(
+            user_id=str(user.id), slug=slug, oauth_provider=oauth_provider
+        )
     result = await upsert_personal_integration(
         user=user, db=db, slug=slug, oauth_provider=oauth_provider
     )
@@ -124,6 +131,29 @@ async def connect_personal_oauth(
             user_id=str(user.id), slug=slug, oauth_provider=oauth_provider
         )
     return result
+
+
+async def _google_login_revoked(*, user: User, db: AsyncSession) -> bool:
+    """True when the user's stored Google refresh token no longer works.
+
+    Without this, Connect on an existing account only flips the card to
+    Connected and never sends the user to Google, so a revoked login stays
+    broken forever. The attach flow's account-update branch then stores the
+    fresh tokens on the same account.
+    """
+    account_id = await db.scalar(
+        select(OAuthAccount.id).where(
+            OAuthAccount.user_id == user.id, OAuthAccount.provider == "google"
+        )
+    )
+    if account_id is None:
+        return False
+    try:
+        await refresh_google_token(db, account_id)
+    except ProviderReauthRequired:
+        await db.rollback()
+        return True
+    return False
 
 
 # ── Account and token persistence ────────────────────────────────────────

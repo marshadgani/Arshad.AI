@@ -96,6 +96,14 @@ def redis(monkeypatch) -> FakeRedis:
     return fake
 
 
+_REAL_GOOGLE_LOGIN_REVOKED = attach._google_login_revoked
+
+
+@pytest.fixture(autouse=True)
+def _google_login_not_revoked(monkeypatch):
+    monkeypatch.setattr(attach, "_google_login_revoked", AsyncMock(return_value=False))
+
+
 @pytest.fixture(autouse=True)
 def _clear_overrides():
     yield
@@ -196,6 +204,40 @@ async def test_connect_with_existing_account_unchanged(redis):
     assert r.status_code == 200
     assert data["redirect_url"] is None
     assert not [k for k in redis.store if k.startswith("int_oauth_state:")]
+
+
+@pytest.mark.asyncio
+async def test_connect_google_with_revoked_login_starts_attach(redis, monkeypatch):
+    monkeypatch.setattr(attach, "_google_login_revoked", AsyncMock(return_value=True))
+    _use(_User(), _fake_db())
+    async with _client() as c:
+        r = await c.post("/api/v1/integrations/google_calendar/connect", json={})
+    url = r.json()["data"]["redirect_url"]
+    assert r.status_code == 200
+    assert urlparse(url).netloc == "accounts.google.com"
+    assert [k for k in redis.store if k.startswith("int_oauth_state:")]
+
+
+@pytest.mark.asyncio
+async def test_google_login_revoked_true_when_refresh_rejected(monkeypatch):
+    monkeypatch.setattr(
+        attach, "refresh_google_token", AsyncMock(side_effect=attach.ProviderReauthRequired("google"))
+    )
+    db = _fake_db([uuid.uuid4()])
+    db.rollback = AsyncMock()
+    assert await _REAL_GOOGLE_LOGIN_REVOKED(user=_User(), db=db) is True
+    db.rollback.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_google_login_revoked_false_when_refresh_works(monkeypatch):
+    monkeypatch.setattr(attach, "refresh_google_token", AsyncMock(return_value="tok"))
+    assert await _REAL_GOOGLE_LOGIN_REVOKED(user=_User(), db=_fake_db([uuid.uuid4()])) is False
+
+
+@pytest.mark.asyncio
+async def test_google_login_revoked_false_when_no_account():
+    assert await _REAL_GOOGLE_LOGIN_REVOKED(user=_User(), db=_fake_db([None])) is False
 
 
 # ── anonymous callback ───────────────────────────────────────────────────
