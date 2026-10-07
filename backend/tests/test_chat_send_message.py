@@ -298,3 +298,23 @@ def test_disconnect_on_the_final_event_does_not_save_the_reply_twice(monkeypatch
 
     run(go())
     assert [m.content for m in db.added] == [{"text": "done text"}]
+
+
+def test_partial_save_without_text_still_commits_pending_rows():
+    session, db = new_session(), DB(None)
+    run(chat_service._persist_partial_reply(db, session, "", {}))
+    assert db.added == []
+    assert db.commits == 1
+
+
+def test_partial_save_never_raises_and_rolls_back_on_commit_failure():
+    session, db = new_session(), DB(None)
+    db.fail_commit = True
+    run(chat_service._persist_partial_reply(db, session, "some text", {}))
+    assert db.rollbacks == 1
+
+
+def test_partial_save_does_nothing_without_a_session_id():
+    session, db = SimpleNamespace(id=None), DB(None)
+    run(chat_service._persist_partial_reply(db, session, "text", {}))
+    assert db.added == [] and db.commits == 0

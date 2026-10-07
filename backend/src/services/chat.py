@@ -280,19 +280,22 @@ async def _persist_partial_reply(
     Never raises: it runs while a GeneratorExit is propagating and must not
     mask it with a different exception.
     """
-    if not assistant_text or session.id is None:
+    if session.id is None:
         return
     try:
-        db.add(
-            ConversationMessage(
-                session_id=session.id,
-                role="assistant",
-                content={"text": assistant_text, "_partial": True},
-                model=_CHAT_MODEL,
-                usage_input_tokens=usage.get("input_tokens"),
-                usage_output_tokens=usage.get("output_tokens"),
+        if assistant_text:
+            db.add(
+                ConversationMessage(
+                    session_id=session.id,
+                    role="assistant",
+                    content={"text": assistant_text, "_partial": True},
+                    model=_CHAT_MODEL,
+                    usage_input_tokens=usage.get("input_tokens"),
+                    usage_output_tokens=usage.get("output_tokens"),
+                )
             )
-        )
+        # Also flushes any tool_use / tool_result rows still pending from
+        # earlier hops, even when no text arrived before the disconnect.
         await db.commit()
     except Exception:
         # Roll back so the AsyncSession's dirty state doesn't leak into the
