@@ -108,13 +108,17 @@ def make_provider(spec: ProviderSpec) -> type[IntegrationProvider]:
                     resp = await client.get(url, headers=spec.auth_header(api_key))
                     resp.raise_for_status()
                     body = resp.json()
+                parsed = spec.parse_sync(body) if spec.parse_sync else {"ok": True}
+            except IntegrationError as exc:
+                # A parser rejected the provider's reply (for example Slack's
+                # HTTP 200 with ok:false). Record it on the integration so the
+                # status shows the failure, then keep the parser's error code.
+                await mark_error(integration=integration, db=db, err=exc)
+                raise
             except Exception as exc:  # noqa: BLE001
                 await mark_error(integration=integration, db=db, err=exc)
                 raise IntegrationError("sync_failed", f"{type(exc).__name__}: {exc}")
-            integration.config = {
-                **(integration.config or {}),
-                **(spec.parse_sync(body) if spec.parse_sync else {"ok": True}),
-            }
+            integration.config = {**(integration.config or {}), **parsed}
             return await mark_synced(
                 integration=integration,
                 db=db,
