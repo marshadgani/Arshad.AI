@@ -89,11 +89,9 @@ export default function Sidebar({ isOpen, onClose, overlayMode }: SidebarProps) 
 
         <div className={styles.section}>
           <div className={styles.label}>Account</div>
-          <a className={styles.item} href="#"><span className={styles.icon}>⚙</span>Settings</a>
           <NavLink to="/integrations" className={navItemClass}>
             <span className={styles.icon}>⌗</span>Integrations
           </NavLink>
-          <a className={styles.item} href="#"><span className={styles.icon}>📜</span>Activity log</a>
         </div>
 
         <div className={styles.footer}>

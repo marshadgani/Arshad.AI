@@ -88,6 +88,8 @@
 .focusContext { color: var(--text-secondary); margin-top: var(--s-3); font-size: 13px; line-height: 1.6; }
 .focusBtn {
   margin-top: var(--s-4);
+  text-decoration: none;
+  cursor: pointer;
   display: inline-block;
   padding: var(--s-2) var(--s-4);
   background: var(--accent);

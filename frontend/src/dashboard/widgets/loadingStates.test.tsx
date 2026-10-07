@@ -155,7 +155,43 @@ describe('dashboard widgets distinguish loading from empty', () => {
       />,
     );
     expect(screen.getByText('Reply to Sarah')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Open in Gmail' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open in Gmail' })).toBeInTheDocument();
+  });
+
+  it('FocusCard: the action opens the real GitHub link in a new tab', () => {
+    render(
+      <FocusCard
+        focus={{
+          title: 'Review x',
+          subtitle: 's',
+          context: 'c',
+          action: 'Open in GitHub',
+          url: 'https://github.com/me/app/pull/9',
+        }}
+      />,
+    );
+    const link = screen.getByRole('link', { name: 'Open in GitHub' });
+    expect(link).toHaveAttribute('href', 'https://github.com/me/app/pull/9');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
+  });
+
+  it('FocusCard: with no link the action leads to Integrations, never a dead control', () => {
+    render(
+      <FocusCard
+        focus={{
+          title: 'Nothing urgent',
+          subtitle: 's',
+          context: 'c',
+          action: 'Open Integrations',
+          url: null,
+        }}
+      />,
+    );
+    expect(screen.getByRole('link', { name: 'Open Integrations' })).toHaveAttribute(
+      'href',
+      '/integrations',
+    );
   });
 
   it('WeatherCommuteNewsCard: null props render skeletons/placeholders, not real values', () => {

@@ -17,7 +17,20 @@ export function FocusCard({ focus }: FocusCardProps) {
           <h2 className={styles.focusTitle}>{focus.title}</h2>
           <div className={styles.focusSubtitle}>{focus.subtitle}</div>
           <p className={styles.focusContext}>{focus.context}</p>
-          <button className={styles.focusBtn}>{focus.action}</button>
+          {focus.url ? (
+            <a
+              className={styles.focusBtn}
+              href={focus.url}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {focus.action}
+            </a>
+          ) : (
+            <a className={styles.focusBtn} href="/integrations">
+              {focus.action}
+            </a>
+          )}
         </>
       ) : (
         <div className={styles.cardSkeletonWrap}>

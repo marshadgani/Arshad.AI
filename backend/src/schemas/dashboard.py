@@ -102,6 +102,7 @@ class FocusBlockResponse(_ORM):
     subtitle: str
     context: str
     action: str
+    url: str | None = None
 
 
 class WeatherResponse(_ORM):

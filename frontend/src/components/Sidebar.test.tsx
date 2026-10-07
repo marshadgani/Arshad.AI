@@ -37,6 +37,18 @@ describe('Sidebar', () => {
     mockNavFetch();
   });
 
+  it('has no placeholder links that go nowhere', async () => {
+    setViewport(1280);
+    const { container } = renderSidebar(false, false);
+    await waitFor(() => expect(screen.getByText('Home')).toBeInTheDocument());
+    expect(container.querySelectorAll('a[href="#"]')).toHaveLength(0);
+    expect(screen.queryByText('Activity log')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /integrations/i })).toHaveAttribute(
+      'href',
+      '/integrations',
+    );
+  });
+
   it('renders nav items from mocked /api/v1/nav', async () => {
     setViewport(1280);
     renderSidebar(false, false);

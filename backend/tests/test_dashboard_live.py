@@ -168,3 +168,28 @@ def test_health_habits_apple_only_and_empty():
         )
         == []
     )
+
+
+def test_focus_link_is_only_ever_a_github_https_url():
+    row = gh("pr", 9, "fix", 30)
+    row.raw["html_url"] = "https://github.com/me/app/pull/9"
+    assert live.build_focus([row], NOW)["url"] == "https://github.com/me/app/pull/9"
+    for bad in (
+        "javascript:alert(1)",
+        "http://github.com/x",
+        "https://evil.test/x",
+        None,
+        5,
+    ):
+        row.raw["html_url"] = bad
+        assert live.build_focus([row], NOW)["url"] is None
+
+
+def test_focus_empty_state_has_no_link():
+    assert live.build_focus([], NOW)["url"] is None
+
+
+def test_focus_with_a_link_still_validates_against_the_schema():
+    row = gh("issue", 3, "bug", 5)
+    row.raw["html_url"] = "https://github.com/me/app/issues/3"
+    s.FocusBlockResponse.model_validate(live.build_focus([row], NOW))

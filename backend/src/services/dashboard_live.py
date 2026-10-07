@@ -104,6 +104,14 @@ def build_decisions(
     ]
 
 
+def _github_url(row: IngestedGitHubActivity) -> str | None:
+    url = (row.raw or {}).get("html_url")
+    # Only ever hand the browser a plain github.com link, never another scheme.
+    if isinstance(url, str) and url.startswith("https://github.com/"):
+        return url
+    return None
+
+
 def build_focus(
     github: Sequence[IngestedGitHubActivity], now: datetime | None = None
 ) -> dict[str, str]:
@@ -116,6 +124,7 @@ def build_focus(
             "subtitle": f"Waiting {age_label(r.occurred_at, now)} · GitHub · P1",
             "context": f"Oldest open pull request in {_repo(r)}.",
             "action": "Open in GitHub",
+            "url": _github_url(r),
         }
     issues = sorted(_gh_open(github, "issue"), key=lambda r: r.occurred_at)
     if issues:
@@ -125,6 +134,7 @@ def build_focus(
             "subtitle": f"Open {age_label(r.occurred_at, now)} · GitHub · P2",
             "context": f"Oldest open issue in {_repo(r)}.",
             "action": "Open in GitHub",
+            "url": _github_url(r),
         }
     return {
         "title": "Nothing urgent",
@@ -134,6 +144,7 @@ def build_focus(
             "to see your next priority here."
         ),
         "action": "Open Integrations",
+        "url": None,
     }
 
 
