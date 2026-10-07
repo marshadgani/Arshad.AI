@@ -1,7 +1,7 @@
 """Unit tests for pure helpers in services/chat.py.
 
 Tests:
-  _sse              — string and dict payloads
+  sse_event         — string and dict payloads
   _approx_tokens    — length-based estimation
   _history_token_budget — env var reading + defaults + floor
   _tool_subset      — tool/agent selection per intent
@@ -20,31 +20,31 @@ import pytest
 from pydantic import BaseModel
 
 # ---------------------------------------------------------------------------
-# _sse
+# sse_event
 # ---------------------------------------------------------------------------
 
 
 class TestSse:
     def test_string_payload_wrapped(self):
-        from src.services.chat import _sse
+        from src.services.chat import sse_event
 
-        result = _sse("[DONE]")
+        result = sse_event("[DONE]")
         assert result == "data: [DONE]\n\n"
 
     def test_dict_payload_json_encoded(self):
-        from src.services.chat import _sse
+        from src.services.chat import sse_event
 
-        result = _sse({"delta": "hello"})
+        result = sse_event({"delta": "hello"})
         assert result.startswith("data: ")
         assert result.endswith("\n\n")
         body = result[len("data: ") : -2]
         assert json.loads(body) == {"delta": "hello"}
 
     def test_nested_dict_round_trips(self):
-        from src.services.chat import _sse
+        from src.services.chat import sse_event
 
         payload = {"tool_use": {"id": "tu_1", "name": "foo", "input": {}}}
-        result = _sse(payload)
+        result = sse_event(payload)
         body = result[len("data: ") : -2]
         assert json.loads(body) == payload
 

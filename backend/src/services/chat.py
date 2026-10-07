@@ -7,7 +7,9 @@ A single ``chat_turn`` async generator drives:
   4. on tool_use, dispatch via the agent gateway / tool registry
   5. on tool_result, append to messages and re-stream
   6. on text delta, yield SSE delta events
-  7. on done, persist the turn (user msg + tool_use/tool_result rows + assistant msg)
+  7. persist as it goes: the user message before streaming starts
+     (persist_user_message), tool_use/tool_result rows as they happen, and the
+     assistant text when the stream finishes or the client disconnects
 
 The function yields SSE-shaped strings (each ending with `\\n\\n`) so the
 REST handler just relays them through StreamingResponse.
@@ -52,7 +54,7 @@ before invoking a tool.
 """
 
 
-def _sse(payload: dict[str, Any] | str) -> str:
+def sse_event(payload: dict[str, Any] | str) -> str:
     if isinstance(payload, str):
         return f"data: {payload}\n\n"
     return f"data: {json.dumps(payload, default=str)}\n\n"
@@ -267,18 +269,52 @@ async def _load_session_history(db: AsyncSession, session_id) -> list[dict[str, 
     return history
 
 
-async def chat_turn(
-    *,
-    session: ConversationSession,
-    user: User,
+async def _persist_partial_reply(
     db: AsyncSession,
-    user_text: str,
-) -> AsyncIterator[str]:
-    """Drive one user → assistant turn. Yields SSE-shaped strings.
+    session: ConversationSession,
+    assistant_text: str,
+    usage: dict[str, Any],
+) -> None:
+    """Best-effort save of a reply cut short by a client disconnect.
 
-    Persists every message (user + each tool_use + tool_result + final
-    assistant text) to ``conversation_messages`` so the next turn can
-    reload the full history.
+    Never raises: it runs while a GeneratorExit is propagating and must not
+    mask it with a different exception.
+    """
+    if session.id is None:
+        return
+    try:
+        if assistant_text:
+            db.add(
+                ConversationMessage(
+                    session_id=session.id,
+                    role="assistant",
+                    content={"text": assistant_text, "_partial": True},
+                    model=_CHAT_MODEL,
+                    usage_input_tokens=usage.get("input_tokens"),
+                    usage_output_tokens=usage.get("output_tokens"),
+                )
+            )
+        # Also flushes any tool_use / tool_result rows still pending from
+        # earlier hops, even when no text arrived before the disconnect.
+        await db.commit()
+    except Exception:
+        # Roll back so the AsyncSession's dirty state doesn't leak into the
+        # next request via connection-pool reuse.
+        try:
+            await db.rollback()
+        except Exception:
+            pass
+
+
+async def persist_user_message(
+    *, session: ConversationSession, db: AsyncSession, user_text: str
+) -> None:
+    """Commit the user's message before any response bytes are sent.
+
+    Callers that stream (the HTTP route) must await this *before* building
+    the StreamingResponse: an exception raised inside the response body
+    arrives after the 200 and headers are already on the wire, so the client
+    would see a silently truncated stream instead of an error status.
     """
     db.add(
         ConversationMessage(
@@ -292,11 +328,30 @@ async def chat_turn(
     session.updated_at = datetime.now(timezone.utc)
     await db.commit()
 
+
+async def chat_turn(
+    *,
+    session: ConversationSession,
+    user: User,
+    db: AsyncSession,
+    user_text: str,
+    user_message_persisted: bool = False,
+) -> AsyncIterator[str]:
+    """Drive one user → assistant turn. Yields SSE-shaped strings.
+
+    Persists every message (user + each tool_use + tool_result + final
+    assistant text) to ``conversation_messages`` so the next turn can
+    reload the full history. Pass ``user_message_persisted=True`` when the
+    caller already awaited :func:`persist_user_message`.
+    """
+    if not user_message_persisted:
+        await persist_user_message(session=session, db=db, user_text=user_text)
+
     history = await _load_session_history(db, session.id)
     history = _compress_history(history)
 
     intent = await intent_classifier.classify(user_text, history)
-    yield _sse({"intent": intent})
+    yield sse_event({"intent": intent})
 
     tool_names, agent_slugs = _tool_subset(intent)
     # Build tool schemas regardless of intent — `general` carries the
@@ -312,102 +367,110 @@ async def chat_turn(
     assistant_text = ""
     final_usage = {"input_tokens": 0, "output_tokens": 0}
 
-    for hop in range(_MAX_AGENTIC_HOPS):
-        new_assistant_blocks: list[dict[str, Any]] = []
-        ran_a_tool = False
+    try:
+        for hop in range(_MAX_AGENTIC_HOPS):
+            new_assistant_blocks: list[dict[str, Any]] = []
+            ran_a_tool = False
 
-        async for event_type, payload in ai.stream(
-            system=_SYSTEM_PROMPT_BASE,
-            messages=history,
-            tools=tool_schemas,
-            model=_CHAT_MODEL,
-        ):
-            if event_type == "delta":
-                assistant_text += payload
-                yield _sse({"delta": payload})
-            elif event_type == "tool_use":
-                yield _sse(
-                    {
-                        "tool_use": {
-                            "id": payload["id"],
-                            "name": payload["name"],
-                            "input": payload["input"],
+            async for event_type, payload in ai.stream(
+                system=_SYSTEM_PROMPT_BASE,
+                messages=history,
+                tools=tool_schemas,
+                model=_CHAT_MODEL,
+            ):
+                if event_type == "delta":
+                    assistant_text += payload
+                    yield sse_event({"delta": payload})
+                elif event_type == "tool_use":
+                    yield sse_event(
+                        {
+                            "tool_use": {
+                                "id": payload["id"],
+                                "name": payload["name"],
+                                "input": payload["input"],
+                            }
                         }
-                    }
-                )
-                db.add(
-                    ConversationMessage(
-                        session_id=session.id,
-                        role="tool_use",
-                        content={
-                            "tool_use_id": payload["id"],
-                            "tool": payload["name"],
-                            "input": payload["input"],
-                        },
                     )
-                )
-                output, is_error = await _dispatch_tool(
-                    payload["name"], payload["input"], user=user, db=db
-                )
-                yield _sse(
-                    {
-                        "tool_result": {
-                            "id": payload["id"],
-                            "name": payload["name"],
-                            "output": output,
-                            "is_error": is_error,
-                        }
-                    }
-                )
-                db.add(
-                    ConversationMessage(
-                        session_id=session.id,
-                        role="tool_result",
-                        content={
-                            "tool_use_id": payload["id"],
-                            "output": output,
-                            "is_error": is_error,
-                        },
-                    )
-                )
-                new_assistant_blocks.append(
-                    {
-                        "type": "tool_use",
-                        "id": payload["id"],
-                        "name": payload["name"],
-                        "input": payload["input"],
-                    }
-                )
-                history.append(
-                    {"role": "assistant", "content": list(new_assistant_blocks)}
-                )
-                history.append(
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "tool_result",
+                    db.add(
+                        ConversationMessage(
+                            session_id=session.id,
+                            role="tool_use",
+                            content={
                                 "tool_use_id": payload["id"],
-                                "content": json.dumps(output, default=str),
+                                "tool": payload["name"],
+                                "input": payload["input"],
+                            },
+                        )
+                    )
+                    output, is_error = await _dispatch_tool(
+                        payload["name"], payload["input"], user=user, db=db
+                    )
+                    yield sse_event(
+                        {
+                            "tool_result": {
+                                "id": payload["id"],
+                                "name": payload["name"],
+                                "output": output,
                                 "is_error": is_error,
                             }
-                        ],
-                    }
-                )
-                ran_a_tool = True
-            elif event_type == "usage":
-                final_usage = payload
-            elif event_type == "done":
-                pass
+                        }
+                    )
+                    db.add(
+                        ConversationMessage(
+                            session_id=session.id,
+                            role="tool_result",
+                            content={
+                                "tool_use_id": payload["id"],
+                                "output": output,
+                                "is_error": is_error,
+                            },
+                        )
+                    )
+                    new_assistant_blocks.append(
+                        {
+                            "type": "tool_use",
+                            "id": payload["id"],
+                            "name": payload["name"],
+                            "input": payload["input"],
+                        }
+                    )
+                    history.append(
+                        {"role": "assistant", "content": list(new_assistant_blocks)}
+                    )
+                    history.append(
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "tool_result",
+                                    "tool_use_id": payload["id"],
+                                    "content": json.dumps(output, default=str),
+                                    "is_error": is_error,
+                                }
+                            ],
+                        }
+                    )
+                    ran_a_tool = True
+                elif event_type == "usage":
+                    final_usage = payload
+                elif event_type == "done":
+                    pass
 
-        if not ran_a_tool:
-            break  # Claude returned a final text answer; we're done
+            if not ran_a_tool:
+                break  # Claude returned a final text answer; we're done
+    except GeneratorExit:
+        # Client dropped while the model was still streaming (or between
+        # tool hops): keep what was generated so far, then let the
+        # generator close.
+        await _persist_partial_reply(db, session, assistant_text, final_usage)
+        raise
 
     # Persist the assistant text even if the client disconnects mid-stream.
     # We wrap the final commit in a try/finally so the generator's GeneratorExit
     # (raised by FastAPI when the SSE consumer drops) still triggers persistence.
-    # Without this, the user message commits at line 277 but partial assistant
+    # Without this, the user message is already committed but partial assistant
     # text is lost — DEF-028-01 from the audit.
+    reply_saved = False
     try:
         if assistant_text:
             db.add(
@@ -422,31 +485,11 @@ async def chat_turn(
             )
         session.updated_at = datetime.now(timezone.utc)
         await db.commit()
-        yield _sse("[DONE]")
+        reply_saved = True
+        yield sse_event("[DONE]")
     except GeneratorExit:
-        # Client disconnected mid-stream. Commit whatever we have so far so
-        # the partial assistant_text survives. Re-raise so FastAPI cleans up
-        # the response cleanly.
-        if assistant_text and session.id is not None:
-            try:
-                db.add(
-                    ConversationMessage(
-                        session_id=session.id,
-                        role="assistant",
-                        content={"text": assistant_text, "_partial": True},
-                        model=_CHAT_MODEL,
-                        usage_input_tokens=final_usage.get("input_tokens"),
-                        usage_output_tokens=final_usage.get("output_tokens"),
-                    )
-                )
-                await db.commit()
-            except Exception:
-                # Best-effort persistence on disconnect; don't mask the
-                # original GeneratorExit by raising a different exception.
-                # Roll back so the AsyncSession's dirty state doesn't leak
-                # into the next request via connection-pool reuse.
-                try:
-                    await db.rollback()
-                except Exception:
-                    pass
+        # Client disconnected on the final event. Commit what we have so the
+        # partial assistant_text survives, and re-raise so FastAPI cleans up.
+        if not reply_saved:
+            await _persist_partial_reply(db, session, assistant_text, final_usage)
         raise
