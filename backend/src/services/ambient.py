@@ -68,13 +68,17 @@ async def fetch_weather(latitude: float, longitude: float, city: str) -> dict[st
                 },
             )
             resp.raise_for_status()
-            current = (resp.json() or {}).get("current") or {}
+            body = resp.json()
     except (httpx.HTTPError, ValueError) as exc:
         raise AmbientUnavailable(f"open-meteo: {type(exc).__name__}") from exc
 
+    current = body.get("current") if isinstance(body, dict) else None
+    if not isinstance(current, dict):
+        raise AmbientUnavailable("open-meteo: unexpected response shape")
+
     temp = current.get("temperature_2m")
-    if temp is None:
-        raise AmbientUnavailable("open-meteo: no temperature in response")
+    if not isinstance(temp, (int, float)):
+        raise AmbientUnavailable("open-meteo: no numeric temperature in response")
     return {
         "temp": f"{round(temp)} °C",
         "condition": condition_label(current.get("weather_code")),
@@ -95,6 +99,8 @@ async def _fetch_story(
 
 
 async def fetch_news() -> list[dict[str, str]]:
+    """Top stories, cached 10 minutes. On upstream failure serve the last good
+    list if there is one, otherwise raise AmbientUnavailable."""
     global _news_cache
     now = time.monotonic()
     if _news_cache and now - _news_cache[0] < _NEWS_TTL_SECONDS:
@@ -103,13 +109,22 @@ async def fetch_news() -> list[dict[str, str]]:
         async with httpx.AsyncClient(timeout=8.0) as client:
             top = await client.get(f"{_HN}/topstories.json")
             top.raise_for_status()
-            ids = (top.json() or [])[:_NEWS_COUNT]
-            stories = await asyncio.gather(*(_fetch_story(client, i) for i in ids))
+            ids = top.json()
+            if not isinstance(ids, list):
+                raise ValueError("topstories is not a list")
+            results = await asyncio.gather(
+                *(_fetch_story(client, i) for i in ids[:_NEWS_COUNT]),
+                return_exceptions=True,
+            )
     except (httpx.HTTPError, ValueError) as exc:
+        if _news_cache:
+            return _news_cache[1]
         raise AmbientUnavailable(f"hacker-news: {type(exc).__name__}") from exc
 
-    items = [s for s in stories if s]
+    items = [r for r in results if isinstance(r, dict)]
     if not items:
+        if _news_cache:
+            return _news_cache[1]
         raise AmbientUnavailable("hacker-news: no stories returned")
     _news_cache = (now, items)
     return items

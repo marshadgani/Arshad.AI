@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from typing import Any, Sequence
 
 from ..models.ai_ecosystem import AgentUsageLog
-from ..models.ingested import IngestedGitHubActivity, IngestedGmailThread
+from ..models.ingested import IngestedGitHubActivity
 from ..models.integration import Integration
 
 _MAX_ITEMS = 8
@@ -29,23 +29,21 @@ def age_label(then: datetime, now: datetime | None = None) -> str:
     return f"{seconds // 86400} d"
 
 
-def _due_label(then: datetime, now: datetime) -> str:
+def _updated_label(then: datetime, now: datetime) -> str:
+    # These are ages, not due dates, so never start with "Today"/"Yesterday":
+    # the Tasks card styles those prefixes as overdue/due-today urgency.
     days = (now.date() - then.date()).days
     if days <= 0:
-        return "Today"
+        return "Updated today"
     if days == 1:
-        return "Yesterday"
-    return f"{days} d ago"
+        return "Updated yesterday"
+    return f"Updated {days} d ago"
 
 
 def _gh_open(
     rows: Sequence[IngestedGitHubActivity], kind: str
 ) -> list[IngestedGitHubActivity]:
-    return [
-        r
-        for r in rows
-        if r.kind == kind and (r.raw or {}).get("state", "open") == "open"
-    ]
+    return [r for r in rows if r.kind == kind and (r.raw or {}).get("state") == "open"]
 
 
 def _repo(row: IngestedGitHubActivity) -> str:
@@ -54,13 +52,11 @@ def _repo(row: IngestedGitHubActivity) -> str:
 
 def _gh_title(row: IngestedGitHubActivity) -> str:
     raw = row.raw or {}
-    return f"{row.provider_id} {raw.get('title', '')}".strip()
+    return f"{row.provider_id} {raw.get('title') or ''}".strip()
 
 
 def build_tasks(
-    github: Sequence[IngestedGitHubActivity],
-    gmail: Sequence[IngestedGmailThread],
-    now: datetime | None = None,
+    github: Sequence[IngestedGitHubActivity], now: datetime | None = None
 ) -> list[dict[str, Any]]:
     now = now or datetime.now(timezone.utc)
     tasks: list[dict[str, Any]] = []
@@ -72,7 +68,7 @@ def build_tasks(
                 "id": f"gh-pr-{row.id}",
                 "title": f"Review {_gh_title(row)}",
                 "source": "github",
-                "due": _due_label(row.occurred_at, now),
+                "due": _updated_label(row.occurred_at, now),
                 "priority": "p1",
             }
         )
@@ -84,21 +80,8 @@ def build_tasks(
                 "id": f"gh-issue-{row.id}",
                 "title": _gh_title(row),
                 "source": "github",
-                "due": _due_label(row.occurred_at, now),
+                "due": _updated_label(row.occurred_at, now),
                 "priority": "p2",
-            }
-        )
-    for row in sorted(gmail, key=lambda r: r.occurred_at, reverse=True):
-        snippet = ((row.raw or {}).get("snippet") or "").strip()
-        if not snippet:
-            continue
-        tasks.append(
-            {
-                "id": f"gm-{row.id}",
-                "title": snippet[:90],
-                "source": "gmail",
-                "due": _due_label(row.occurred_at, now),
-                "priority": "p3",
             }
         )
     return tasks[:_MAX_ITEMS]

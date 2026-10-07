@@ -25,8 +25,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.auth.dependencies import get_current_user
 from src.models import dashboard as m
 from src.models.ai_ecosystem import AgentUsageLog
+from src.models.conversation import ConversationSession
 from src.models.database import get_db
-from src.models.ingested import IngestedGitHubActivity, IngestedGmailThread
+from src.models.ingested import IngestedGitHubActivity
 from src.models.integration import Integration
 from src.models.user import User
 from src.schemas import dashboard as s
@@ -71,19 +72,12 @@ def _singleton(obj: Any | None, schema, name: str) -> dict[str, Any]:
 async def _github_rows(db: AsyncSession, user_id) -> list[IngestedGitHubActivity]:
     stmt = (
         select(IngestedGitHubActivity)
-        .where(IngestedGitHubActivity.user_id == user_id)
+        .where(
+            IngestedGitHubActivity.user_id == user_id,
+            IngestedGitHubActivity.raw["state"].astext == "open",
+        )
         .order_by(IngestedGitHubActivity.occurred_at.desc())
         .limit(200)
-    )
-    return list((await db.execute(stmt)).scalars().all())
-
-
-async def _gmail_rows(db: AsyncSession, user_id) -> list[IngestedGmailThread]:
-    stmt = (
-        select(IngestedGmailThread)
-        .where(IngestedGmailThread.user_id == user_id)
-        .order_by(IngestedGmailThread.occurred_at.desc())
-        .limit(50)
     )
     return list((await db.execute(stmt)).scalars().all())
 
@@ -171,9 +165,19 @@ async def get_weather(
                 "city": "",
             }
         }
-    city = cfg.get("city") or f"{float(lat):.2f}, {float(lon):.2f}"
     try:
-        data = await ambient.fetch_weather(float(lat), float(lon), city)
+        lat_f, lon_f = float(lat), float(lon)
+    except (TypeError, ValueError):
+        return {
+            "data": {
+                "temp": "—",
+                "condition": "Open-Meteo location is invalid",
+                "city": "",
+            }
+        }
+    city = cfg.get("city") or f"{lat_f:.2f}, {lon_f:.2f}"
+    try:
+        data = await ambient.fetch_weather(lat_f, lon_f, city)
     except ambient.AmbientUnavailable as exc:
         logger.warning("Live weather unavailable (%s)", exc)
         data = {"temp": "—", "condition": "Weather unavailable right now", "city": city}
@@ -195,8 +199,7 @@ async def list_tasks(
     db: AsyncSession = Depends(get_db),
 ):
     github = await _github_rows(db, current_user.id)
-    gmail = await _gmail_rows(db, current_user.id)
-    items = live.build_tasks(github, gmail)
+    items = live.build_tasks(github)
     return {
         "data": [
             s.TaskResponse.model_validate(i).model_dump(by_alias=True) for i in items
@@ -218,7 +221,7 @@ async def list_events(
     try:
         events = await fetch_todays_events(token)
     except Exception as exc:
-        logger.warning("Live calendar fetch failed (%s)", exc)
+        logger.warning("Live calendar fetch failed (%s)", exc, exc_info=True)
         return {"data": [], "total": 0}
 
     return {
@@ -257,8 +260,19 @@ async def list_decisions(
 
 
 @router.get("/agent-activity", summary="Recent agent runs")
-async def list_agent_activity(db: AsyncSession = Depends(get_db)):
-    stmt = select(AgentUsageLog).order_by(AgentUsageLog.invoked_at.desc()).limit(8)
+async def list_agent_activity(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    # AgentUsageLog has no user_id, so attribute runs through the chat
+    # session they belong to; runs with no session are not shown.
+    stmt = (
+        select(AgentUsageLog)
+        .join(ConversationSession, ConversationSession.id == AgentUsageLog.session_id)
+        .where(ConversationSession.user_id == current_user.id)
+        .order_by(AgentUsageLog.invoked_at.desc())
+        .limit(8)
+    )
     logs = list((await db.execute(stmt)).scalars().all())
     items = live.build_agent_activity(logs)
     return {
@@ -318,7 +332,9 @@ async def _read_json_route(route, current_user: User, db: AsyncSession, label: s
         response = await route(current_user=current_user, db=db)
         return json.loads(response.body).get("data")
     except Exception as exc:  # noqa: BLE001
-        logger.warning("%s unavailable for health habits (%s)", label, exc)
+        logger.warning(
+            "%s unavailable for health habits (%s)", label, exc, exc_info=True
+        )
         return None
 
 

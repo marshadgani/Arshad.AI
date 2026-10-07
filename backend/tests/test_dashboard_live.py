@@ -20,14 +20,6 @@ def gh(kind, number, title, hours_ago, state="open", repo="me/app"):
     )
 
 
-def gm(snippet, hours_ago=1):
-    return SimpleNamespace(
-        id=uuid.uuid4(),
-        occurred_at=NOW - timedelta(hours=hours_ago),
-        raw={"snippet": snippet},
-    )
-
-
 def test_age_label_units():
     assert live.age_label(NOW - timedelta(minutes=5), NOW) == "5 m"
     assert live.age_label(NOW - timedelta(hours=3), NOW) == "3 h"
@@ -49,18 +41,36 @@ def test_decisions_are_open_prs_oldest_first_and_schema_valid():
     assert dumped[0]["waitingSince"] == "2 d"
 
 
-def test_tasks_mix_sources_and_validate():
-    out = live.build_tasks(
-        [gh("pr", 1, "p", 1), gh("issue", 2, "i", 1)], [gm("Please confirm")], NOW
-    )
-    assert [t["source"] for t in out] == ["github", "github", "gmail"]
-    assert [t["priority"] for t in out] == ["p1", "p2", "p3"]
+def test_tasks_are_open_prs_then_issues_and_validate():
+    out = live.build_tasks([gh("issue", 2, "i", 1), gh("pr", 1, "p", 1)], NOW)
+    assert [t["priority"] for t in out] == ["p1", "p2"]
+    assert all(t["source"] == "github" for t in out)
     for t in out:
         s.TaskResponse.model_validate(t)
 
 
+def test_task_age_label_never_looks_like_urgency():
+    out = live.build_tasks(
+        [gh("pr", 1, "a", 1), gh("pr", 2, "b", 30), gh("pr", 3, "c", 72)], NOW
+    )
+    labels = {t["due"] for t in out}
+    assert labels == {"Updated today", "Updated yesterday", "Updated 3 d ago"}
+    assert not any(label.startswith(("Today", "Yesterday")) for label in labels)
+
+
+def test_rows_without_explicit_open_state_are_not_listed():
+    rows = [gh("pr", 1, "x", 1, state=None), gh("issue", 2, "y", 1, state="closed")]
+    assert live.build_tasks(rows, NOW) == []
+    assert live.build_decisions(rows, NOW) == []
+
+
+def test_null_title_does_not_render_none():
+    row = gh("pr", 5, None, 1)
+    assert live.build_decisions([row], NOW)[0]["title"] == "Review me/app#5"
+
+
 def test_tasks_skip_empty_gmail_snippets_and_cap():
-    out = live.build_tasks([gh("issue", n, "x", n) for n in range(20)], [gm("")], NOW)
+    out = live.build_tasks([gh("issue", n, "x", n) for n in range(20)], NOW)
     assert len(out) == 8
     assert all(t["source"] == "github" for t in out)
 
@@ -77,7 +87,7 @@ def test_focus_prefers_oldest_pr_then_issue_then_honest_empty():
 
 
 def test_empty_inputs_yield_empty_lists_not_fake_rows():
-    assert live.build_tasks([], [], NOW) == []
+    assert live.build_tasks([], NOW) == []
     assert live.build_decisions([], NOW) == []
     assert live.build_notifications([], NOW) == []
     assert live.build_agent_activity([], NOW) == []

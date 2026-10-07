@@ -177,3 +177,46 @@ def test_events_empty_when_live_fetch_fails(monkeypatch):
         "data": [],
         "total": 0,
     }
+
+
+def test_weather_rejects_non_numeric_temperature(monkeypatch):
+    _patch_client(
+        monkeypatch,
+        lambda req: httpx.Response(200, json={"current": {"temperature_2m": "hot"}}),
+    )
+    with pytest.raises(ambient.AmbientUnavailable):
+        asyncio.run(ambient.fetch_weather(1, 1, "x"))
+
+
+@pytest.mark.parametrize("body", [None, [], {"current": None}, {"current": "x"}])
+def test_weather_rejects_unexpected_shapes(monkeypatch, body):
+    _patch_client(monkeypatch, lambda req: httpx.Response(200, json=body))
+    with pytest.raises(ambient.AmbientUnavailable):
+        asyncio.run(ambient.fetch_weather(1, 1, "x"))
+
+
+def test_news_rejects_non_list_topstories(monkeypatch):
+    _patch_client(monkeypatch, lambda req: httpx.Response(200, json={"a": 1}))
+    with pytest.raises(ambient.AmbientUnavailable):
+        asyncio.run(ambient.fetch_news())
+
+
+def test_one_failed_story_does_not_drop_the_rest(monkeypatch):
+    def handler(req):
+        if req.url.path.endswith("topstories.json"):
+            return httpx.Response(200, json=[1, 2, 3])
+        if req.url.path.endswith("/2.json"):
+            return httpx.Response(500)
+        return httpx.Response(200, json={"title": f"S{req.url.path[-6]}"})
+
+    _patch_client(monkeypatch, handler)
+    items = asyncio.run(ambient.fetch_news())
+    assert [i["title"] for i in items] == ["S1", "S3"]
+
+
+def test_stale_news_served_when_upstream_later_fails(monkeypatch):
+    _patch_client(monkeypatch, _hn_handler)
+    first = asyncio.run(ambient.fetch_news())
+    ambient._news_cache = (ambient._news_cache[0] - 10_000, ambient._news_cache[1])
+    _patch_client(monkeypatch, lambda req: httpx.Response(503))
+    assert asyncio.run(ambient.fetch_news()) == first
