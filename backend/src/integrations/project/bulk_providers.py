@@ -6,6 +6,7 @@ provider = adding a ProviderSpec block.
 
 from __future__ import annotations
 
+from ..base import IntegrationError
 from ..registry import register
 from ._factory import ProviderSpec, make_provider
 
@@ -24,6 +25,24 @@ def _bearer_v2022(api_key: str) -> dict[str, str]:
 
 def _slack_bearer(api_key: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {api_key}"}
+
+
+def _slack_identity(body: dict | None, error_code: str) -> dict[str, str | None]:
+    """Slack answers HTTP 200 with ``ok: false`` for a bad token, so the status
+    check alone never catches it; turn that into a clean integration error."""
+    body = body or {}
+    if not body.get("ok"):
+        reason = body.get("error", "slack_auth_failed")
+        raise IntegrationError(error_code, f"Slack rejected the token: {reason}")
+    return {"team": body.get("team"), "user": body.get("user")}
+
+
+def _slack_parse_probe(body: dict | None) -> dict[str, str | None]:
+    return _slack_identity(body, "invalid_key")
+
+
+def _slack_parse_sync(body: dict | None) -> dict[str, str | None]:
+    return _slack_identity(body, "sync_failed")
 
 
 def _api_key_header(name: str):
@@ -227,17 +246,8 @@ class _SlackProvider(
             icon="slack",
             probe_url="https://slack.com/api/auth.test",
             auth_header=_slack_bearer,
-            parse_probe=lambda body: (
-                {"team": (body or {}).get("team"), "user": (body or {}).get("user")}
-                if (body or {}).get("ok")
-                else (_ for _ in ()).throw(
-                    Exception((body or {}).get("error", "slack_auth_failed"))
-                )
-            ),
-            parse_sync=lambda body: {
-                "team": (body or {}).get("team"),
-                "user": (body or {}).get("user"),
-            },
+            parse_probe=_slack_parse_probe,
+            parse_sync=_slack_parse_sync,
             scopes=["channels:read"],
             per_user=True,
         )
