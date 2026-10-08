@@ -6,6 +6,6 @@ describe('FundFlowMap', () => {
   it('labels the map as a static diagram, not live data', () => {
     render(<FundFlowMap />);
     expect(screen.getByText('Fund Flow')).toBeInTheDocument();
-    expect(screen.getByText(/static diagram/i)).toBeInTheDocument();
+    expect(screen.getByText(/static diagram.*not linked to live balances/i)).toBeInTheDocument();
   });
 });
