@@ -25,7 +25,8 @@ class TimestampedMixin:
     """created_at / updated_at columns with PG-side defaults.
 
     Declares naive TIMESTAMP WITHOUT TIME ZONE, which is what most legacy
-    tables have. Tables created as timestamptz use TimestampedTZMixin.
+    tables have. Tables created as timestamptz use TimestampedTZMixin, and
+    new tables should use TimestampedTZMixin.
     """
 
     created_at: Mapped[datetime] = mapped_column(

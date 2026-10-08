@@ -14,10 +14,16 @@ applies_to:
 - Model files live in `backend/src/models/`. One model class per file is preferred for large models.
 - Table names are **snake_case plural**: `conversation_messages`, `user_preferences`.
 - Column names are **snake_case**.
-- Every table has a `created_at` and `updated_at` timestamp, set automatically:
+- Every table has a `created_at` and `updated_at` timestamp, set automatically. New tables
+  inherit `TimestampedTZMixin` from `backend/src/models/base.py` (timezone-aware, with
+  `server_default=func.now()` and `onupdate=func.now()`). The older `TimestampedMixin` is
+  naive and exists only for legacy tables; the declared type must match Postgres, or
+  `alembic revision --autogenerate` proposes a harmful ALTER.
+- Add the new table to `AWARE_TABLES` in `backend/tests/test_timestamp_column_types.py`.
+  That test fails for any table that is not classified.
   ```python
-  created_at: Mapped[datetime] = mapped_column(default=func.now())
-  updated_at: Mapped[datetime] = mapped_column(default=func.now(), onupdate=func.now())
+  class Thing(Base, TimestampedTZMixin):
+      __tablename__ = "things"
   ```
 - Primary keys use `uuid4` by default — not auto-increment integers.
   ```python

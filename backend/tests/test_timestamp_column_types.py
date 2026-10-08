@@ -18,6 +18,33 @@ AWARE_TABLES = {
     "skill_registry",
 }
 
+NAIVE_TABLES = {
+    "agent_activity",
+    "agents_global",
+    "commute",
+    "daily_briefing",
+    "decisions",
+    "domain_agents",
+    "domain_applications",
+    "domain_feed_rows",
+    "domain_kpis",
+    "domains",
+    "events",
+    "focus_now",
+    "health_habits",
+    "integration_ingest_tokens",
+    "knowledge_suggestions",
+    "nav_items",
+    "news_items",
+    "notifications",
+    "oauth_accounts",
+    "oauth_tokens",
+    "quick_actions",
+    "tasks",
+    "users",
+    "weather",
+}
+
 TABLES_WITH_MIXIN_COLUMNS = sorted(
     name
     for name, table in Base.metadata.tables.items()
@@ -53,3 +80,25 @@ def test_both_mixins_keep_server_side_defaults():
     for model in (ApiKeyCredential, User):
         for column in ("created_at", "updated_at"):
             assert model.__table__.c[column].server_default is not None
+
+
+def test_every_table_is_explicitly_classified_as_aware_or_naive():
+    """A new table must be added to AWARE_TABLES or NAIVE_TABLES on purpose, so
+    the timestamp type is a decision (and checked against Postgres), never a
+    default that silently drifts."""
+    unclassified = set(TABLES_WITH_MIXIN_COLUMNS) - AWARE_TABLES - NAIVE_TABLES
+    assert not unclassified, (
+        f"Classify {sorted(unclassified)} in AWARE_TABLES or NAIVE_TABLES. "
+        "New tables should use TimestampedTZMixin."
+    )
+    assert not (AWARE_TABLES & NAIVE_TABLES)
+
+
+def test_updated_at_refreshes_on_update_for_both_mixins():
+    from src.models.integration import ApiKeyCredential
+    from src.models.user import User
+
+    for model in (ApiKeyCredential, User):
+        column = model.__table__.c.updated_at
+        assert column.onupdate is not None
+        assert column.server_default is not None
