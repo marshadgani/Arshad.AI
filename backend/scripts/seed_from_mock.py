@@ -20,7 +20,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import delete
+from sqlalchemy import delete, func
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from src.models import dashboard as dm
 from src.models import domain as dom
@@ -1114,14 +1114,9 @@ async def sync_skills_from_manifest(s: Any, manifest: Path = SKILLS_MANIFEST) ->
     .claude/skills is outside the Docker build context, so the manifest is the
     only skills source available at startup.
     """
-    if not manifest.is_file():
-        _log.warning(
-            "skills manifest missing at %s — skill_registry not synced", manifest
-        )
-        return 0
     rows = json.loads(manifest.read_text(encoding="utf-8"))
     if not rows:
-        return 0
+        raise ValueError(f"skills manifest {manifest} is empty")
     stmt = pg_insert(SkillRegistry).values(rows)
     stmt = stmt.on_conflict_do_update(
         index_elements=["skill_name"],
@@ -1130,6 +1125,7 @@ async def sync_skills_from_manifest(s: Any, manifest: Path = SKILLS_MANIFEST) ->
             "description": stmt.excluded.description,
             "source_repo": stmt.excluded.source_repo,
             "category": stmt.excluded.category,
+            "updated_at": func.now(),
         },
     )
     await s.execute(stmt)

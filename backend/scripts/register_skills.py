@@ -175,45 +175,26 @@ async def _sync_skills(skills_dir: Path, registry_path: Path) -> None:
         )
         sys.exit(1)
 
-    repo_map = _build_repo_map(registry_path)
+    manifest = build_manifest(skills_dir, registry_path)
+    log.info("Found %d skills to sync", len(manifest))
     engine = create_async_engine(db_url, echo=False)
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-
-    skill_dirs = [
-        d for d in skills_dir.iterdir() if d.is_dir() and (d / "SKILL.md").exists()
-    ]
-    log.info("Found %d skills to sync", len(skill_dirs))
 
     registered = updated = 0
     async with async_session() as session:
         async with session.begin():
-            for skill_dir in sorted(skill_dirs):
-                slug = skill_dir.name
-                skill_md = skill_dir / "SKILL.md"
-                display_name, description = _parse_skill_md(skill_md)
-                source_repo = repo_map.get(slug, "unknown")
-                category = _infer_category(slug)
-
+            for row in manifest:
                 existing = await session.scalar(
-                    select(SkillRegistry).where(SkillRegistry.skill_name == slug)
+                    select(SkillRegistry).where(
+                        SkillRegistry.skill_name == row["skill_name"]
+                    )
                 )
                 if existing:
-                    existing.display_name = display_name
-                    existing.description = description
-                    existing.source_repo = source_repo
-                    existing.category = category
+                    for key, value in row.items():
+                        setattr(existing, key, value)
                     updated += 1
                 else:
-                    session.add(
-                        SkillRegistry(
-                            id=uuid.uuid4(),
-                            skill_name=slug,
-                            display_name=display_name,
-                            description=description,
-                            source_repo=source_repo,
-                            category=category,
-                        )
-                    )
+                    session.add(SkillRegistry(id=uuid.uuid4(), **row))
                     registered += 1
 
     log.info("Skills sync complete — registered: %d, updated: %d", registered, updated)
@@ -256,6 +237,7 @@ def main() -> None:
 
     if args.export:
         rows = build_manifest(skills_dir, registry_path)
+        Path(args.export).parent.mkdir(parents=True, exist_ok=True)
         Path(args.export).write_text(
             json.dumps(rows, indent=1, ensure_ascii=False) + "\n", encoding="utf-8"
         )
