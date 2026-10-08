@@ -44,7 +44,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import TIMESTAMP, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from .base import Base, TimestampedMixin
+from .base import Base, TimestampedTZMixin
 from .ontology_vocabulary import (  # noqa: F401 — re-exported public API
     ENTITY_TYPES,
     PRIVATE,
@@ -59,7 +59,7 @@ def _check_in(column: str, values: tuple[str, ...], name: str) -> CheckConstrain
     return CheckConstraint(f"{column} IN ({quoted})", name=name)
 
 
-class OntologyEntity(Base, TimestampedMixin):
+class OntologyEntity(Base, TimestampedTZMixin):
     __tablename__ = "ontology_entities"
     __table_args__ = (
         UniqueConstraint(
@@ -92,7 +92,7 @@ class OntologyEntity(Base, TimestampedMixin):
     )
 
 
-class OntologyRelationship(Base, TimestampedMixin):
+class OntologyRelationship(Base, TimestampedTZMixin):
     __tablename__ = "ontology_relationships"
     __table_args__ = (
         UniqueConstraint(
