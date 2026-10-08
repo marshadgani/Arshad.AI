@@ -18,7 +18,7 @@ const LEGEND = [
 /* The SVG is authored in raw SVG and embedded via dangerouslySetInnerHTML.
    It uses Space Mono + Syne fonts (loaded in index.html) and hardcodes
    pixel coordinates — converting to JSX camelCase would be error-prone
-   for a 200-element diagram. The content is static and fully trusted. */
+   for a diagram with hundreds of elements. The content is static and fully trusted. */
 const MAP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="1820" height="1580" viewBox="0 0 1820 1580">
 <defs>
   <marker id="a-vnd"  markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto"><path d="M0,0 L0,7 L7,3.5 z" fill="#fb923c"/></marker>
