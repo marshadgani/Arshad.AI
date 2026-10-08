@@ -6,6 +6,11 @@ Usage:
     python3 scripts/register_skills.py --skills-dir /path/to/.claude/skills --registry /path/to/github-repos.json
 
 Idempotent — safe to run repeatedly. Fails gracefully when the DB is unreachable.
+
+The production image does not contain .claude/skills, so regenerate the bundled
+manifest after skills change:
+    python3 backend/scripts/register_skills.py --skills-dir .claude/skills \\
+        --export backend/src/data/skills_manifest.json
 """
 
 from __future__ import annotations
@@ -120,6 +125,27 @@ def _build_repo_map(registry_path: Path) -> dict[str, str]:
     return mapping
 
 
+def build_manifest(skills_dir: Path, registry_path: Path) -> list[dict[str, str]]:
+    """Return one row per top-level skill, ready to upsert into skill_registry."""
+    repo_map = _build_repo_map(registry_path)
+    rows: list[dict[str, str]] = []
+    for skill_dir in sorted(skills_dir.iterdir()):
+        skill_md = skill_dir / "SKILL.md"
+        if not (skill_dir.is_dir() and skill_md.exists()):
+            continue
+        display_name, description = _parse_skill_md(skill_md)
+        rows.append(
+            {
+                "skill_name": skill_dir.name,
+                "display_name": display_name[:200],
+                "description": description,
+                "source_repo": repo_map.get(skill_dir.name, "unknown")[:100],
+                "category": _infer_category(skill_dir.name),
+            }
+        )
+    return rows
+
+
 # ── DB upsert ─────────────────────────────────────────────────────────────────
 
 
@@ -200,15 +226,24 @@ def main() -> None:
     )
     parser.add_argument(
         "--skills-dir",
-        default=str(Path(__file__).resolve().parent.parent / ".claude" / "skills"),
+        default=str(
+            Path(__file__).resolve().parent.parent.parent / ".claude" / "skills"
+        ),
         help="Path to .claude/skills/ directory",
     )
     parser.add_argument(
         "--registry",
         default=str(
-            Path(__file__).resolve().parent.parent / ".claude" / "github-repos.json"
+            Path(__file__).resolve().parent.parent.parent
+            / ".claude"
+            / "github-repos.json"
         ),
         help="Path to .claude/github-repos.json",
+    )
+    parser.add_argument(
+        "--export",
+        metavar="PATH",
+        help="Write the skills manifest JSON to PATH instead of syncing the DB",
     )
     args = parser.parse_args()
 
@@ -218,6 +253,14 @@ def main() -> None:
     if not skills_dir.exists():
         log.error("Skills directory not found: %s", skills_dir)
         sys.exit(1)
+
+    if args.export:
+        rows = build_manifest(skills_dir, registry_path)
+        Path(args.export).write_text(
+            json.dumps(rows, indent=1, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+        log.info("Wrote %d skills to %s", len(rows), args.export)
+        return
 
     try:
         asyncio.run(_sync_skills(skills_dir, registry_path))
