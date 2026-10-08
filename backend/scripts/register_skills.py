@@ -5,10 +5,11 @@ Usage:
     python3 scripts/register_skills.py
     python3 scripts/register_skills.py --skills-dir /path/to/.claude/skills --registry /path/to/github-repos.json
 
-Idempotent — safe to run repeatedly. Fails gracefully when the DB is unreachable.
+Idempotent — safe to run repeatedly. Exits with code 1 when the DB is unreachable.
 
 The production image does not contain .claude/skills, so regenerate the bundled
-manifest after skills change:
+manifest after skills change, then commit the result (production only sees
+the committed file; a drift test fails CI if it is stale):
     python3 backend/scripts/register_skills.py --skills-dir .claude/skills \\
         --export backend/src/data/skills_manifest.json
 """
@@ -126,7 +127,13 @@ def _build_repo_map(registry_path: Path) -> dict[str, str]:
 
 
 def build_manifest(skills_dir: Path, registry_path: Path) -> list[dict[str, str]]:
-    """Return one row per top-level skill, ready to upsert into skill_registry."""
+    """Return one row per top-level skill, ready to upsert into skill_registry.
+
+    Only direct children of skills_dir that contain a SKILL.md are read; nested
+    skills and loose files are skipped. registry_path is github-repos.json, used
+    to fill source_repo. Each row has skill_name, display_name, description,
+    source_repo and category.
+    """
     repo_map = _build_repo_map(registry_path)
     rows: list[dict[str, str]] = []
     for skill_dir in sorted(skills_dir.iterdir()):
@@ -224,7 +231,10 @@ def main() -> None:
     parser.add_argument(
         "--export",
         metavar="PATH",
-        help="Write the skills manifest JSON to PATH instead of syncing the DB",
+        help=(
+            "Write the skills manifest JSON to PATH instead of syncing the DB "
+            "(commit the file so production picks it up)"
+        ),
     )
     args = parser.parse_args()
 

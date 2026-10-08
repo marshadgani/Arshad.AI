@@ -1112,7 +1112,9 @@ async def sync_skills_from_manifest(s: Any, manifest: Path = SKILLS_MANIFEST) ->
     """Upsert the bundled skills manifest into SkillRegistry.
 
     .claude/skills is outside the Docker build context, so the manifest is the
-    only skills source available at startup.
+    only skills source available at startup. Returns the number of rows upserted.
+    Raises FileNotFoundError if the manifest is missing and ValueError if it is
+    empty, so a broken bundle fails the seed instead of leaving the table empty.
     """
     rows = json.loads(manifest.read_text(encoding="utf-8"))
     if not rows:
