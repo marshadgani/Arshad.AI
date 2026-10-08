@@ -518,7 +518,7 @@ export default function FundFlowMap() {
     <section className={styles.section}>
       <div className={styles.sectionHead}>
         <div className={styles.sectionTitle}>Fund Flow</div>
-        <div className={styles.sectionMeta}>Static diagram · not linked to live balances</div>
+        <div className={styles.sectionMeta}>Static diagram · not linked to live balances · account status maintained by hand</div>
       </div>
 
       <div className={styles.legend}>
@@ -532,6 +532,8 @@ export default function FundFlowMap() {
 
       <div
         className={styles.canvasWrap}
+        role="img"
+        aria-label="Fund flow diagram (static, hand-maintained)"
         dangerouslySetInnerHTML={{ __html: MAP_SVG }}
       />
     </section>
