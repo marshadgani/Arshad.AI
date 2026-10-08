@@ -11,7 +11,8 @@ POST   /api/v1/integrations/{slug}/sync
        Triggers a sync. Returns {rows_written, summary, duration_ms}.
 
 POST   /api/v1/integrations/{slug}/disconnect
-       Marks integration disconnected; revokes upstream where possible.
+       Deletes the stored credentials (OAuth tokens, API keys) and marks the
+       integration disconnected. Revokes upstream where the provider supports it.
 
 GET    /api/v1/integrations/{slug}/status
        Returns the latest status snapshot.

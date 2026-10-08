@@ -141,3 +141,104 @@ def test_apple_health_disconnect_handles_a_missing_ingest_token(monkeypatch, has
     item = integration()
     run(provider.disconnect(integration=item, db=DB(scalar_result=token)))
     assert item.status == "disconnected"
+
+
+# ── route level: POST /{slug}/disconnect ──────────────────────────────
+
+
+class RecordingProvider:
+    def __init__(self):
+        self.disconnected = []
+
+    async def disconnect(self, *, integration, db):
+        self.disconnected.append(integration)
+
+
+def _route(monkeypatch, found, user_email_allowed=True):
+    from src.integrations import routers
+
+    provider = RecordingProvider()
+
+    async def fake_find(_slug, _user, _db):
+        return found
+
+    monkeypatch.setattr(routers, "_require_provider", lambda _slug: provider)
+    monkeypatch.setattr(routers, "_find_user_integration", fake_find)
+    monkeypatch.setattr(routers, "is_email_allowed", lambda _email: user_email_allowed)
+    return routers, provider
+
+
+USER = SimpleNamespace(email="owner@example.com")
+
+
+def test_route_reports_already_disconnected_when_there_is_nothing_to_disconnect(
+    monkeypatch,
+):
+    routers, provider = _route(monkeypatch, None)
+    out = run(routers.disconnect_integration("github", USER, DB()))
+    assert out == {"data": {"status": "already_disconnected"}}
+    assert provider.disconnected == []
+
+
+def test_route_disconnects_the_callers_own_integration(monkeypatch):
+    item = integration(user_id=uuid.uuid4())
+    routers, provider = _route(monkeypatch, item)
+    out = run(routers.disconnect_integration("github", USER, DB()))
+    assert out == {"data": {"status": "disconnected"}}
+    assert provider.disconnected == [item]
+
+
+def test_route_refuses_a_shared_integration_for_a_user_who_is_not_the_owner(
+    monkeypatch,
+):
+    from fastapi import HTTPException
+
+    shared = integration(user_id=None)
+    routers, provider = _route(monkeypatch, shared, user_email_allowed=False)
+    with pytest.raises(HTTPException):
+        run(routers.disconnect_integration("stripe", USER, DB()))
+    assert provider.disconnected == []
+
+
+def test_route_lets_the_owner_disconnect_a_shared_integration(monkeypatch):
+    shared = integration(user_id=None)
+    routers, provider = _route(monkeypatch, shared)
+    run(routers.disconnect_integration("stripe", USER, DB()))
+    assert provider.disconnected == [shared]
+
+
+def test_apple_health_revokes_the_token_before_clearing_the_cache(monkeypatch):
+    order = []
+
+    class OrderedRedis:
+        async def delete(self, _key):
+            order.append("purge")
+
+    class OrderedDB(DB):
+        async def commit(self):
+            order.append("commit")
+            await super().commit()
+
+    token_row = SimpleNamespace(revoked_at=None)
+    provider = _apple(monkeypatch, OrderedRedis())
+    run(
+        provider.disconnect(
+            integration=integration(), db=OrderedDB(scalar_result=token_row)
+        )
+    )
+    assert token_row.revoked_at is not None
+    assert order == ["commit", "purge"]
+
+
+def test_apple_health_purge_survives_a_non_redis_error(monkeypatch):
+    async def broken_get_redis():
+        raise RuntimeError("no redis configured")
+
+    monkeypatch.setattr(apple_health, "get_redis", broken_get_redis)
+    item = integration()
+    run(
+        get_provider("apple_health").disconnect(
+            integration=item, db=DB(scalar_result=None)
+        )
+    )
+    assert item.status == "disconnected"
