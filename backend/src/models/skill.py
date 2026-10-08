@@ -8,10 +8,10 @@ from sqlalchemy import Index, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from .base import Base, TimestampedMixin
+from .base import Base, TimestampedTZMixin
 
 
-class SkillRegistry(TimestampedMixin, Base):
+class SkillRegistry(TimestampedTZMixin, Base):
     __tablename__ = "skill_registry"
 
     id: Mapped[uuid.UUID] = mapped_column(

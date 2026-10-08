@@ -15,10 +15,10 @@ from sqlalchemy import ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import ARRAY, BYTEA, JSONB, TIMESTAMP, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from .base import Base, TimestampedMixin
+from .base import Base, TimestampedMixin, TimestampedTZMixin
 
 
-class Integration(Base, TimestampedMixin):
+class Integration(Base, TimestampedTZMixin):
     __tablename__ = "integrations"
     __table_args__ = (
         UniqueConstraint("user_id", "slug", name="uq_integrations_user_slug"),
@@ -48,7 +48,7 @@ class Integration(Base, TimestampedMixin):
     config: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
 
 
-class IntegrationOAuthToken(Base, TimestampedMixin):
+class IntegrationOAuthToken(Base, TimestampedTZMixin):
     """OAuth tokens for a Phase-H integration. Stored encrypted (AES-GCM)
     using the same OAUTH_ENCRYPTION_KEY as oauth_tokens.
 
@@ -126,7 +126,7 @@ class IntegrationIngestToken(Base, TimestampedMixin):
     )
 
 
-class ApiKeyCredential(Base, TimestampedMixin):
+class ApiKeyCredential(Base, TimestampedTZMixin):
     __tablename__ = "api_key_credentials"
     __table_args__ = (
         UniqueConstraint("integration_id", name="uq_apikey_one_per_integration"),

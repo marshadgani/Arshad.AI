@@ -1,8 +1,8 @@
 # Arshad.AI Quality Gate Report
 
 **Branch:** `claude/chat-mobile-health-integration-if20cp` -> `claude/ai-personal-assistant-main`
-**Change:** FEAT-148, FEAT-152 and FEAT-153, bug fixes done directly (no pipeline, per the bug-fix rule). Controls that did nothing are removed or wired. Removed: the "Open" and "Configure" buttons on domain pages and the sidebar "Settings" and "Activity log" links (no destination exists). Wired: the top-bar bell goes to the dashboard, the gear to Integrations, quick capture opens a new chat with your text prefilled (never sent on its own), Cmd or Ctrl+K focuses it, the Focus card button opens the GitHub item it describes. The avatar is now a label and the always-on notification dot is gone.
-**Date:** 2026-10-07
+**Change:** FEAT-162, bug fix done directly (no pipeline, per the bug-fix rule). Seven database tables store `created_at` and `updated_at` with a timezone, but the shared model mixin declared them without one. With `compare_type` on in Alembic, the next `alembic revision --autogenerate` would have proposed an `ALTER` that drops the timezone. Those tables now use a new timezone-aware mixin. No migration is needed because the database already matches.
+**Date:** 2026-10-08
 
 ### ⚠️ GATE PASSED WITH WARNINGS — Ready for merge
 
@@ -10,27 +10,30 @@
 
 | # | Agent | Result |
 |---|---|---|
-| 1 | code-reviewer | WARN, 0 Critical. A second quick capture during session creation could start a second session. Fixed with a ref guard |
-| 2 | security-auditor | PASS. The backend only sends github.com links. Added a browser-side check as defence in depth |
-| 3 | debugger | PASS, 0 Critical. TopBar always renders inside the Router, no listener leak |
-| 4 | test-writer | WARN. Its one failing test came from the new draft-clearing behaviour and a mock that showed the prop directly. Test corrected, plus a real ChatPanel to composer test added |
-| 5 | refactorer | WARN. Removed the dead `.dot` CSS, gave the avatar its own style, merged the two Focus anchors into one |
-| 6 | doc-writer | PASS. Comments and docs are accurate |
-| 7 | silent-failure-hunter | WARN. The captured text is now shown if the chat cannot start, the real error is logged, and the draft is cleared from history once used |
-| 8 | pr-test-analyzer | WARN. Added tests for unsafe Focus links, the failure path, one-session-per-capture and draft clearing |
+| 1 | code-reviewer | PASS, no findings. Column names, nullability, defaults and update behaviour are unchanged. No migration needed |
+| 2 | security-auditor | PASS. A model change without a migration cannot alter the production schema |
+| 3 | debugger | PASS, 0 Critical. No code does arithmetic between these columns and naive datetimes |
+| 4 | test-writer | PASS. 93 percent coverage of the changed file. The update default was not asserted, now fixed |
+| 5 | refactorer | WARN. Mixin duplication is deliberate, a shared factory could silently apply the wrong type. It could not check assignments, the new test does |
+| 6 | doc-writer | WARN. Updated `.claude/rules/database.md` and the mixin docstring. Its claim that the test file does not exist is wrong, the file exists and runs |
+| 7 | silent-failure-hunter | WARN. A new table could silently default to the naive mixin. Fixed with a test that fails for any unclassified table |
+| 8 | pr-test-analyzer | WARN. Added the update-default assertion and the classification test |
 
 ## Verdict: WARN, mergeable
 
-Frontend: 381 of 381 tests pass, type check clean, production build clean. Backend: 1027 pass, 9 fail. The same 9 fail without these changes (they need a database or auth setup, in `test_auth`, `test_auth_password`, `test_ontology_extraction`, `test_token_service`).
+Backend: 1064 pass, 9 fail. The same 9 fail without these changes (they need a database or auth setup, in `test_auth`, `test_auth_password`, `test_ontology_extraction`, `test_token_service`). 37 timestamp tests pass. Lint clean on changed files.
+
+## Subagent claim refuted (manual cross-check)
+
+- Doc-writer said `tests/test_timestamp_column_types.py` does not exist. HALLUCINATED -> manual: PASS. The file exists, the debugger, test-writer and pr-test-analyzer all ran it, and it has 37 passing tests.
 
 ## Fixed in this PR
 
-- Quick capture: one chat per capture, text kept and shown if the chat cannot be created, draft cleared from history after use, real error logged.
-- The Focus link is validated on the server and again in the browser. Anything that is not `https://github.com/` falls back to Integrations.
-- The `.dot` CSS and the `.appOpen` and `.agentConfig` CSS are removed. The avatar no longer highlights like a button.
+- New `TimestampedTZMixin` (timezone-aware). `Integration`, `IntegrationOAuthToken`, `ApiKeyCredential`, `AgentRegistry`, `OntologyEntity`, `OntologyRelationship` and `SkillRegistry` use it. Every other table keeps the naive mixin, as production has it.
+- A test pins every table to its real column type, read from production's `information_schema` on 2026-10-08, and fails for any table that is not classified as aware or naive.
+- New tables are directed to the aware mixin in the docstring and in `.claude/rules/database.md`, which also now shows the `server_default` and `onupdate` behaviour.
 
 ## Deferred (non-blocking)
 
-- [ ] Use a router `Link` for the Focus fallback to Integrations (it does a full page load now).
-- [ ] The bell goes to the dashboard with a tooltip only. A real unread indicator needs a notifications source.
-- [ ] A rule-compliant role query for the hamburger test (it is hidden by CSS in jsdom).
+- [ ] Run an Alembic autogenerate drift check in CI against a real database.
+- [ ] Convert the remaining naive tables to timestamptz in a two-phase migration, if wanted.

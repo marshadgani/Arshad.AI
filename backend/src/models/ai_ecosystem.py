@@ -15,10 +15,10 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 
-from .base import Base, TimestampedMixin
+from .base import Base, TimestampedTZMixin
 
 
-class AgentRegistry(TimestampedMixin, Base):
+class AgentRegistry(TimestampedTZMixin, Base):
     __tablename__ = "agent_registry"
 
     id: Mapped[uuid.UUID] = mapped_column(
