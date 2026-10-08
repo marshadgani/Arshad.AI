@@ -14,17 +14,19 @@ Usage::
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import re
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import delete
+from sqlalchemy import delete, func
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from src.models import dashboard as dm
 from src.models import domain as dom
 from src.models.ai_ecosystem import AgentRegistry
 from src.models.database import AsyncSessionLocal
+from src.models.skill import SkillRegistry
 
 _log = logging.getLogger(__name__)
 
@@ -1103,6 +1105,35 @@ async def sync_agents_from_disk(s: Any) -> int:
     return len(rows)
 
 
+SKILLS_MANIFEST = Path(__file__).parent.parent / "src" / "data" / "skills_manifest.json"
+
+
+async def sync_skills_from_manifest(s: Any, manifest: Path = SKILLS_MANIFEST) -> int:
+    """Upsert the bundled skills manifest into SkillRegistry.
+
+    .claude/skills is outside the Docker build context, so the manifest is the
+    only skills source available at startup. Returns the number of rows upserted.
+    Raises FileNotFoundError if the manifest is missing and ValueError if it is
+    empty, so a broken bundle fails the seed instead of leaving the table empty.
+    """
+    rows = json.loads(manifest.read_text(encoding="utf-8"))
+    if not rows:
+        raise ValueError(f"skills manifest {manifest} is empty")
+    stmt = pg_insert(SkillRegistry).values(rows)
+    stmt = stmt.on_conflict_do_update(
+        index_elements=["skill_name"],
+        set_={
+            "display_name": stmt.excluded.display_name,
+            "description": stmt.excluded.description,
+            "source_repo": stmt.excluded.source_repo,
+            "category": stmt.excluded.category,
+            "updated_at": func.now(),
+        },
+    )
+    await s.execute(stmt)
+    return len(rows)
+
+
 # ── Seed runner ────────────────────────────────────────────────────
 async def seed() -> None:
     async with AsyncSessionLocal() as s:
@@ -1180,12 +1211,13 @@ async def seed() -> None:
 
         # Sync all agent .md files from disk into AgentRegistry (upsert)
         agent_count = await sync_agents_from_disk(s)
+        skill_count = await sync_skills_from_manifest(s)
         await s.commit()
 
         print(
             f"Seed complete: {len(DOMAINS)} domains, {len(TASKS)} tasks, "
             f"{len(EVENTS)} events, {len(NAV_ITEMS)} nav items, "
-            f"{agent_count} agents synced."
+            f"{agent_count} agents and {skill_count} skills synced."
         )
 
 
