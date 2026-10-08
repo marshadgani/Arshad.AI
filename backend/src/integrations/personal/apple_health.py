@@ -206,9 +206,10 @@ class AppleHealthIntegration(IntegrationProvider):
         )
 
     async def disconnect(self, *, integration: Integration, db: AsyncSession) -> None:
-        """Revoke the ingest token too — the default base implementation
-        only flips integration.status, which would leave a still-valid
-        bearer token able to keep authenticating POSTs after 'disconnect'.
+        """Revoke the ingest token, run the default disconnect, then drop the
+        cached snapshot. Without the revoke, a still-valid bearer token could
+        keep authenticating POSTs after 'disconnect'; without the purge, the
+        last biometric snapshot would stay readable until its TTL.
         """
         token_row = await db.scalar(
             select(IntegrationIngestToken).where(
@@ -217,6 +218,16 @@ class AppleHealthIntegration(IntegrationProvider):
         )
         if token_row is not None:
             token_row.revoked_at = datetime.now(timezone.utc)
-        integration.status = "disconnected"
-        integration.last_error = None
-        await db.commit()
+        # Commit the revoke and credential delete first, so a Redis problem can
+        # never undo them. The purge is best effort: the snapshot also expires
+        # on its own TTL.
+        await super().disconnect(integration=integration, db=db)
+        try:
+            redis_client = await get_redis()
+            await snapshot_store.delete(redis_client, str(integration.id))
+        except Exception:
+            _log.warning(
+                "apple_health: could not purge the cached snapshot on disconnect; "
+                "it will expire on its own TTL",
+                exc_info=True,
+            )

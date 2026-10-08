@@ -103,3 +103,13 @@ async def has_snapshot(redis_client: Redis, integration_id: str) -> bool:
     Lets RedisError propagate — see the module docstring.
     """
     return bool(await redis_client.get(snapshot_cache_key(integration_id)))
+
+
+async def delete(redis_client: Redis, integration_id: str) -> None:
+    """Drop the cached snapshot so disconnecting really removes the health data.
+
+    Lets RedisError propagate; the caller decides whether a failed purge may
+    block a disconnect (it should not, because the snapshot also expires on
+    its own TTL).
+    """
+    await redis_client.delete(snapshot_cache_key(integration_id))

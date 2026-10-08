@@ -19,9 +19,10 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, ClassVar, Literal
 
+from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.integration import Integration
+from ..models.integration import ApiKeyCredential, Integration, IntegrationOAuthToken
 from ..models.user import User
 
 IntegrationKind = Literal[
@@ -140,8 +141,17 @@ class IntegrationProvider(ABC):
         """Health check + most recent sync metadata."""
 
     async def disconnect(self, *, integration: Integration, db: AsyncSession) -> None:
-        """Default: mark integration disconnected. Subclasses can override
-        to revoke tokens upstream when the provider supports it."""
+        """Default: delete the locally stored credentials (OAuth tokens and API
+        keys) and mark the integration disconnected. Subclasses can override
+        to also revoke tokens upstream when the provider supports it, and
+        should call this afterwards so the local credentials are still removed.
+
+        The user's own login tokens (oauth_tokens) are separate and untouched,
+        so disconnecting Gmail never signs you out."""
+        for credential in (IntegrationOAuthToken, ApiKeyCredential):
+            await db.execute(
+                delete(credential).where(credential.integration_id == integration.id)
+            )
         integration.status = "disconnected"
         integration.last_error = None
         await db.commit()
