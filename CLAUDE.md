@@ -46,6 +46,12 @@
 
 ---
 
+## Time zones in replies (PERMANENT, per Arshad's instruction 2026-10-09)
+
+When you state a time or date in a reply, give it in Saudi time (AST, UTC+3) and India time (IST, UTC+5:30), for example "02:38 AST / 05:08 IST". Never give UTC alone. Convert every log, deploy and merge timestamp before you report it. Commit messages, code and tracker files may keep UTC.
+
+---
+
 ## 🚨 DEVELOPMENT STRATEGY — READ THIS FIRST, EVERY SESSION
 
 > **This is the non-negotiable rule for ALL feature development on this project.**
