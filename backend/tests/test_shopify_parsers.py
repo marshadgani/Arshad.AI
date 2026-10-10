@@ -647,3 +647,37 @@ def test_parse_dashboard_currency_code_propagated():
     result = parse_dashboard(raw, "GBP")
 
     assert result.currency_code == "GBP"
+
+
+# ── providers.list_* request params (Decision A / B at the real seam) ─────
+
+from unittest.mock import AsyncMock  # noqa: E402
+
+
+@pytest.mark.asyncio
+async def test_list_gmail_threads_sends_prefilter_query_and_page_cap(monkeypatch):
+    from src.services.shopify import providers
+    from src.tools.clients import gmail
+
+    req = AsyncMock(return_value={"threads": []})
+    monkeypatch.setattr(gmail, "request", req)
+    await providers.list_gmail_threads(object(), object())
+    kw = req.await_args.kwargs
+    assert kw["method"] == "GET"
+    assert kw["params"]["q"] == "in:inbox -from:me older_than:24h"
+    assert kw["params"]["maxResults"] == providers.GMAIL_PAGE_SIZE == 100
+
+
+@pytest.mark.asyncio
+async def test_list_calendar_events_expands_recurring_on_primary(monkeypatch):
+    from src.services.shopify import providers
+    from src.tools.clients import google_calendar
+
+    req = AsyncMock(return_value={"items": []})
+    monkeypatch.setattr(google_calendar, "request", req)
+    await providers.list_calendar_events(object(), object(), "2026-10-10T00:00:00Z", "2027-01-08T00:00:00Z")
+    kw = req.await_args.kwargs
+    assert kw["path"] == "calendars/primary/events"
+    assert kw["params"]["singleEvents"] == "true"
+    assert kw["params"]["timeMin"] == "2026-10-10T00:00:00Z"
+    assert kw["params"]["timeMax"] == "2027-01-08T00:00:00Z"

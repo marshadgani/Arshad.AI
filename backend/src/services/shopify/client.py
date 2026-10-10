@@ -38,6 +38,13 @@ REQUEST_TIMEOUT_SECONDS = 15.0
 # is defined relative to it — see parsers.parse_dashboard.
 ORDERS_PAGE_LIMIT = 250
 VARIANTS_PAGE_LIMIT = 250
+# Orders with line items are far costlier than the dashboard's lineItems(first:1):
+# Shopify prices a connection as first x its children, and a single query may
+# not exceed 1000 points. 50 orders x 10 line items stays well under that, so
+# the velocity window is a bounded sample and the result reports truncation
+# (orders_has_next_page / line_items_truncated) instead of a confident number.
+VELOCITY_ORDERS_PAGE_LIMIT = 50
+LINE_ITEMS_PAGE_LIMIT = 10
 
 # Shopify's leaky-bucket capacity for a standard (non-Plus) app, used only
 # to scale the THROTTLED back-off — a wrong value slows retries, it does not
@@ -76,6 +83,58 @@ query DashboardData($ordersQuery: String!, $ordersFirst: Int!, $variantsFirst: I
         }
       }
     }
+  }
+}
+"""
+
+
+_ORDERS_QUERY = """
+query OrdersSince(
+  $ordersQuery: String!, $first: Int!, $withLines: Boolean!, $linesFirst: Int!
+) {
+  orders(first: $first, query: $ordersQuery, sortKey: CREATED_AT, reverse: true) {
+    pageInfo { hasNextPage }
+    edges {
+      node {
+        id
+        name
+        customer { displayName }
+        lineItems(first: $linesFirst) @include(if: $withLines) {
+          pageInfo { hasNextPage }
+          edges { node { quantity variant { id } } }
+        }
+      }
+    }
+  }
+}
+"""
+
+# No product price here on purpose: inventory cover never uses it, and it
+# would spend leaky-bucket points on every one of the page's variants.
+_VARIANT_INVENTORY_QUERY = """
+query VariantInventory($variantsFirst: Int!) {
+  productVariants(first: $variantsFirst) {
+    pageInfo { hasNextPage }
+    edges {
+      node {
+        id
+        inventoryItem {
+          tracked
+          inventoryLevels(first: 10) {
+            edges { node { quantities(names: ["available"]) { name quantity } } }
+          }
+        }
+      }
+    }
+  }
+}
+"""
+
+_DISCOUNT_VARIANT_QUERY = """
+query DiscountVariant($id: ID!) {
+  productVariant(id: $id) {
+    price
+    inventoryItem { unitCost { amount currencyCode } }
   }
 }
 """
@@ -192,6 +251,124 @@ async def execute_dashboard_query(
     }
 
 
+def _log_cost(body: dict[str, Any], shop: str) -> None:
+    cost = (body.get("extensions") or {}).get("cost") or {}
+    if cost:
+        _log.info(
+            "Shopify GraphQL cost shop_hash=%s requested=%s actual=%s",
+            _shop_hash(shop),
+            cost.get("requestedQueryCost"),
+            cost.get("actualQueryCost"),
+        )
+
+
+async def execute_orders_query(
+    shop: str,
+    token: str,
+    since_iso: str,
+    *,
+    with_line_items: bool = True,
+    max_retries: int = MAX_THROTTLE_RETRIES,
+) -> dict[str, Any]:
+    """Orders created at/after `since_iso`, newest first.
+
+    `since_iso` is a caller-supplied anchor (never read from the clock here)
+    so tests can pin the window, as with execute_dashboard_query. Without
+    line items (service-debt only needs order names and customers) a full
+    ORDERS_PAGE_LIMIT page is cheap enough to fetch.
+
+    Returns orders (nodes), orders_has_next_page, line_items_truncated,
+    partial_failures, throttled (True when the final attempt was THROTTLED,
+    in which case orders is empty).
+    """
+    page = VELOCITY_ORDERS_PAGE_LIMIT if with_line_items else ORDERS_PAGE_LIMIT
+    variables = {
+        "ordersQuery": f"created_at:>='{since_iso}' test:false",
+        "first": page,
+        "withLines": with_line_items,
+        "linesFirst": LINE_ITEMS_PAGE_LIMIT,
+    }
+    body = await _post_with_retry(
+        _graphql_url(shop),
+        _auth_headers(token),
+        _ORDERS_QUERY,
+        variables,
+        shop,
+        max_retries=max_retries,
+    )
+    partial_failures = _log_graphql_errors(body, shop, context="orders")
+    _log_cost(body, shop)
+
+    block = (body.get("data") or {}).get("orders") or {}
+    nodes = [e.get("node") or {} for e in (block.get("edges") or [])]
+    return {
+        "orders": nodes,
+        "orders_has_next_page": bool((block.get("pageInfo") or {}).get("hasNextPage")),
+        "line_items_truncated": any(
+            ((n.get("lineItems") or {}).get("pageInfo") or {}).get("hasNextPage")
+            for n in nodes
+        ),
+        "partial_failures": partial_failures,
+        "throttled": _throttled_error(body) is not None,
+    }
+
+
+async def execute_variant_inventory_query(
+    shop: str, token: str, *, max_retries: int = MAX_THROTTLE_RETRIES
+) -> dict[str, Any]:
+    """One VARIANTS_PAGE_LIMIT page of variants with available quantities.
+
+    Returns variants (nodes), variants_has_next_page, partial_failures,
+    throttled.
+    """
+    body = await _post_with_retry(
+        _graphql_url(shop),
+        _auth_headers(token),
+        _VARIANT_INVENTORY_QUERY,
+        {"variantsFirst": VARIANTS_PAGE_LIMIT},
+        shop,
+        max_retries=max_retries,
+    )
+    partial_failures = _log_graphql_errors(body, shop, context="variant_inventory")
+    _log_cost(body, shop)
+
+    block = (body.get("data") or {}).get("productVariants") or {}
+    return {
+        "variants": [e.get("node") or {} for e in (block.get("edges") or [])],
+        "variants_has_next_page": bool(
+            (block.get("pageInfo") or {}).get("hasNextPage")
+        ),
+        "partial_failures": partial_failures,
+        "throttled": _throttled_error(body) is not None,
+    }
+
+
+async def execute_discount_variant_query(
+    shop: str, token: str, variant_id: str, *, max_retries: int = MAX_THROTTLE_RETRIES
+) -> dict[str, Any]:
+    """Price and unit cost of one variant. `variant_id` must already be
+    validated (schemas.shopify.DiscountSimulatorRequest) — it is a GraphQL
+    variable, not interpolated into the query.
+
+    Returns variant (node or None), partial_failures, throttled.
+    """
+    body = await _post_with_retry(
+        _graphql_url(shop),
+        _auth_headers(token),
+        _DISCOUNT_VARIANT_QUERY,
+        {"id": variant_id},
+        shop,
+        max_retries=max_retries,
+    )
+    partial_failures = _log_graphql_errors(body, shop, context="discount_variant")
+    _log_cost(body, shop)
+    return {
+        "variant": (body.get("data") or {}).get("productVariant"),
+        "partial_failures": partial_failures,
+        "throttled": _throttled_error(body) is not None,
+    }
+
+
 _SHOP_METADATA_QUERY = "{ shop { name ianaTimezone currencyCode } }"
 
 
@@ -276,10 +453,15 @@ async def _post_with_retry(
     query: str,
     variables: dict[str, Any],
     shop: str,
+    *,
+    max_retries: int = MAX_THROTTLE_RETRIES,
 ) -> dict[str, Any]:
-    """POST the GraphQL request. One retry, with jitter, on THROTTLED."""
+    """POST the GraphQL request. Up to `max_retries` retries, with jitter, on
+    THROTTLED. Callers that are already a fallback for a throttled call pass
+    0 so retry budgets do not multiply.
+    """
     async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT_SECONDS) as client:
-        for attempt in range(MAX_THROTTLE_RETRIES + 1):
+        for attempt in range(max_retries + 1):
             resp = await client.post(
                 url, json={"query": query, "variables": variables}, headers=headers
             )
@@ -287,7 +469,7 @@ async def _post_with_retry(
             body = resp.json()
 
             throttled = _throttled_error(body)
-            if throttled is None or attempt == MAX_THROTTLE_RETRIES:
+            if throttled is None or attempt == max_retries:
                 return body
 
             delay = _throttle_delay(throttled)

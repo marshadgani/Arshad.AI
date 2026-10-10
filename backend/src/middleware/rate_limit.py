@@ -23,11 +23,41 @@ from __future__ import annotations
 import logging
 
 import redis.exceptions
+from fastapi import HTTPException
 
 from ..api.errors import http_error
 from .cache import get_redis
 
 _log = logging.getLogger(__name__)
+
+
+class RateLimitExceeded(HTTPException):
+    """HTTPException(429) with the standard error envelope.
+
+    `enforce_rate_limit` raises ``HTTPException`` via ``http_error``; this
+    subclass exists so tests can inject a 429 via
+    ``monkeypatch.setattr(..., AsyncMock(side_effect=RateLimitExceeded(...)))``
+    without constructing a bare ``HTTPException`` manually.  The detail
+    structure is identical to what ``http_error(429, ...)`` produces, so
+    ``main.py``'s ``http_exception_handler`` returns ``{"error": {...}}`` with
+    status 429 in both cases.
+    """
+
+    def __init__(self, bucket: str, limit: int, window_seconds: int) -> None:
+        super().__init__(
+            status_code=429,
+            detail={
+                "error": {
+                    "code": "rate_limit_exceeded",
+                    "message": (
+                        f"Rate limit exceeded for {bucket!r}: "
+                        f"max {limit} requests per {window_seconds}s."
+                    ),
+                    "details": {"retry_after": window_seconds},
+                }
+            },
+            headers={"Retry-After": str(window_seconds)},
+        )
 
 
 async def enforce_rate_limit(

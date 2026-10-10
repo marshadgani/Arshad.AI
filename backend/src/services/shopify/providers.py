@@ -115,7 +115,7 @@ def parse_calendar_result(result: Any) -> CalendarResult:
     if isinstance(result, ProviderReauthRequired):
         return CalendarResult(needs_reauth=True, partial_failures=["calendar"])
     if isinstance(result, (ToolError, httpx.HTTPError)):
-        _log.warning("Calendar fetch failed: %s", result)
+        _log.warning("Calendar fetch failed: %s", result, exc_info=result)
         return CalendarResult(partial_failures=["calendar"])
     if isinstance(result, BaseException):
         raise result
@@ -138,7 +138,7 @@ def parse_gmail_result(result: Any) -> GmailResult:
     if isinstance(result, ProviderReauthRequired):
         return GmailResult(needs_reauth=True, partial_failures=["gmail"])
     if isinstance(result, (ToolError, httpx.HTTPError)):
-        _log.warning("Gmail fetch failed: %s", result)
+        _log.warning("Gmail fetch failed: %s", result, exc_info=result)
         return GmailResult(partial_failures=["gmail"])
     if isinstance(result, BaseException):
         raise result

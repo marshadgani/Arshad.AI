@@ -1,0 +1,108 @@
+.card {
+  background: linear-gradient(160deg, var(--bg-elevated) 0%, var(--bg-panel) 100%);
+  border: 1px solid var(--border-faint);
+  border-radius: var(--radius-lg);
+  padding: var(--s-5);
+  grid-column: 1 / -1;
+}
+
+.title {
+  margin: 0 0 var(--s-3);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.table th,
+.table td {
+  padding: var(--s-2) var(--s-2);
+  border-bottom: 1px solid var(--border-faint);
+  text-align: left;
+  color: var(--text-secondary);
+}
+
+.table thead th {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.variant {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.num {
+  text-align: right;
+  font-family: var(--font-mono);
+}
+
+.badge {
+  color: var(--text-secondary);
+}
+
+.badgeAlert {
+  color: var(--status-danger);
+  font-weight: 700;
+}
+
+.alertRow {
+  background: var(--status-warn-bg);
+}
+
+.bannerWarn,
+.bannerInfo {
+  margin: 0 0 var(--s-3);
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+}
+
+.bannerWarn {
+  color: var(--status-warn);
+  background: var(--status-warn-bg);
+  border: 1px solid var(--status-warn-faint);
+}
+
+.bannerInfo {
+  color: var(--text-muted);
+  background: var(--bg-panel);
+  border: 1px solid var(--border-faint);
+}
+
+.retry {
+  margin-top: var(--s-3);
+  padding: var(--s-2) var(--s-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.skeletonBar {
+  height: 0.9rem;
+  margin-bottom: var(--s-3);
+  border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, var(--bg-panel) 25%, var(--border-strong) 50%, var(--bg-panel) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonBar {
+    animation: none;
+    background: var(--border-strong);
+  }
+}

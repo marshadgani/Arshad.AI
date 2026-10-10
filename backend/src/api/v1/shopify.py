@@ -123,6 +123,16 @@ async def _execute_discount_query(
     )
 
 
+async def _list_calendar_events(
+    db: AsyncSession, user: User, time_min: str, time_max: str
+) -> dict | None:
+    return await providers.list_calendar_events(db, user, time_min, time_max)
+
+
+async def _list_gmail_threads(db: AsyncSession, user: User) -> dict | None:
+    return await providers.list_gmail_threads(db, user)
+
+
 async def _get_cached_intel(kind: str, user_id: str) -> dict | None:
     return await cache.get_cached_intelligence(kind, user_id)
 
@@ -164,6 +174,13 @@ def _utc_stamp(moment: datetime) -> str:
     # No colons beyond the time part, matching parsers.day_window, so
     # Shopify's search syntax cannot mis-split on a "+00:00" offset.
     return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _cacheable(failures: list[str]) -> bool:
+    """A degraded response must not be cached: for the 120s TTL it would hide
+    recovery from a transient Shopify/Gmail failure. Truncation is a stable
+    property of the data, so it does not block caching."""
+    return all(f == "calendar_truncated" for f in failures)
 
 
 async def _failure_response(
@@ -261,6 +278,12 @@ async def get_inventory_cover(
         token = await _get_token(integration, db)
     except gather.FETCH_ERRORS as exc:
         needs_reauth, _ = _classify_error(exc)
+        _log.warning(
+            "Shopify inventory-cover setup failed (needs_reauth=%s): %s",
+            needs_reauth,
+            exc,
+            exc_info=exc,
+        )
         await _apply_error_status(integration, exc, needs_reauth, db)
         return _ok_model(
             InventoryCoverResponse(
@@ -274,7 +297,7 @@ async def get_inventory_cover(
         partial(_execute_variants_query, ctx.shop, token),
         partial(_execute_orders_query, ctx.shop, token, since_iso),
         partial(
-            providers.list_calendar_events,
+            _list_calendar_events,
             db,
             current_user,
             as_of.isoformat(),
@@ -287,8 +310,12 @@ async def get_inventory_cover(
         return _ok_model(InventoryCoverResponse(connected=True, needs_reauth=True))
 
     failures: list[str] = []
-    variants = gather.gather_result(variants_result, "variants", failures)
-    orders = gather.gather_result(orders_result, "orders", failures)
+    variants = gather.gather_result(
+        variants_result, "variants", failures, root_field="productVariants"
+    )
+    orders = gather.gather_result(
+        orders_result, "orders", failures, root_field="orders"
+    )
 
     cal = providers.parse_calendar_result(calendar_result)
     failures.extend(f for f in cal.partial_failures if f not in failures)
@@ -306,9 +333,10 @@ async def get_inventory_cover(
     if variants is not None or orders is not None:
         await _mark_healthy(integration, db)
     payload = response.model_dump()
-    await _set_cached_intel(
-        "inventory-cover", user_id, {**payload, "cached_at": as_of.isoformat()}
-    )
+    if _cacheable(failures):
+        await _set_cached_intel(
+            "inventory-cover", user_id, {**payload, "cached_at": as_of.isoformat()}
+        )
     return JSONResponse({"data": payload})
 
 
@@ -336,6 +364,12 @@ async def simulate_discount(
         raw = await _execute_discount_query(ctx.shop, token, body.variant_id)
     except gather.FETCH_ERRORS as exc:
         needs_reauth, _ = _classify_error(exc)
+        _log.warning(
+            "Shopify discount-simulator fetch failed (needs_reauth=%s): %s",
+            needs_reauth,
+            exc,
+            exc_info=exc,
+        )
         await _apply_error_status(integration, exc, needs_reauth, db)
         return _ok_model(
             DiscountSimulatorResponse(
@@ -361,6 +395,7 @@ async def simulate_discount(
         )
     price, unit_cost = discount.parse_variant_pricing(variant)
     if price is None:
+        _log.warning("Shopify variant returned no usable price: %s", body.variant_id)
         return _ok_model(DiscountSimulatorResponse(partial_failures=["variant"]))
     await _mark_healthy(integration, db)
     return _ok_model(
@@ -389,24 +424,37 @@ async def get_service_debt(
     needs_reauth = False
     shopify_connected = integration is not None
 
-    async def _orders() -> dict:
-        ctx = state.shop_context(integration)
-        token = await _get_token(integration, db)
-        return await _execute_orders_query(
-            ctx.shop, token, since_iso, with_line_items=False
-        )
-
     shopify_live = integration is not None and integration.status != "expired"
-    if integration is not None and not shopify_live:
+    if shopify_connected and not shopify_live:
         needs_reauth = True
         failures.append("shopify")
 
-    coroutines: list[Any] = [providers.list_gmail_threads(db, current_user)]
+    # Shop context and token are resolved BEFORE the gather: the token lookup
+    # reads (and may refresh and commit) through `db`, and Gmail uses the same
+    # AsyncSession. An AsyncSession allows one operation at a time, so running
+    # both concurrently raises InvalidRequestError and 500s the endpoint.
+    orders_coro: Any = None
+    orders_setup_error: BaseException | None = None
     if shopify_live:
-        coroutines.append(_orders())
+        try:
+            ctx = state.shop_context(integration)
+            token = await _get_token(integration, db)
+            orders_coro = _execute_orders_query(
+                ctx.shop, token, since_iso, with_line_items=False
+            )
+        except gather.FETCH_ERRORS as exc:
+            orders_setup_error = exc
+
+    coroutines: list[Any] = [_list_gmail_threads(db, current_user)]
+    if orders_coro is not None:
+        coroutines.append(orders_coro)
     results = await asyncio.gather(*coroutines, return_exceptions=True)
     gmail_result = results[0]
-    orders_result = results[1] if shopify_live else None
+    orders_result = (
+        orders_setup_error
+        if orders_setup_error is not None
+        else (results[1] if orders_coro is not None else None)
+    )
 
     gmail = providers.parse_gmail_result(gmail_result)
     if gmail.needs_reauth:
@@ -420,7 +468,9 @@ async def get_service_debt(
             needs_reauth = True
             failures.append("shopify")
         else:
-            payload = gather.gather_result(orders_result, "orders", failures)
+            payload = gather.gather_result(
+                orders_result, "orders", failures, root_field="orders"
+            )
             if payload is not None:
                 orders = payload.get("orders") or []
                 orders_truncated = bool(payload.get("orders_has_next_page"))
@@ -437,7 +487,8 @@ async def get_service_debt(
         partial_failures=failures,
     )
     payload_out = response.model_dump()
-    await _set_cached_intel(
-        "service-debt", user_id, {**payload_out, "cached_at": now.isoformat()}
-    )
+    if _cacheable(failures) and not needs_reauth:
+        await _set_cached_intel(
+            "service-debt", user_id, {**payload_out, "cached_at": now.isoformat()}
+        )
     return JSONResponse({"data": payload_out})

@@ -58,3 +58,44 @@ async def del_dashboard_cache(integration_id: str) -> None:
         await redis_client.delete(dashboard_cache_key(integration_id))
     except redis.exceptions.RedisError as exc:
         _log.warning("Shopify dashboard cache delete failed: %s", exc)
+
+
+# ── Intelligence-layer caches (inventory-cover, service-debt) ────────────
+# Keyed by user id, not integration id: service-debt must cache for a user
+# whose Shopify is not linked (Gmail threads still render).
+
+INTELLIGENCE_KINDS = frozenset({"inventory-cover", "service-debt"})
+
+
+def intelligence_cache_key(kind: str, user_id: str) -> str:
+    if kind not in INTELLIGENCE_KINDS:
+        raise ValueError(f"unknown Shopify cache kind: {kind}")
+    return f"shopify:{kind}:{user_id}"
+
+
+async def get_cached_intelligence(kind: str, user_id: str) -> dict[str, Any] | None:
+    key = intelligence_cache_key(kind, user_id)
+    try:
+        redis_client = await get_redis()
+        raw = await redis_client.get(key)
+    except redis.exceptions.RedisError as exc:
+        _log.warning("Shopify %s cache read failed: %s", kind, exc)
+        return None
+    if not raw:
+        return None
+    try:
+        return json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return None
+
+
+async def set_cached_intelligence(
+    kind: str, user_id: str, data: dict[str, Any], ttl: int = DASHBOARD_TTL_SECONDS
+) -> None:
+    try:
+        redis_client = await get_redis()
+        await redis_client.set(
+            intelligence_cache_key(kind, user_id), json.dumps(data), ex=ttl
+        )
+    except redis.exceptions.RedisError as exc:
+        _log.warning("Shopify %s cache write failed: %s", kind, exc)

@@ -54,21 +54,32 @@ def reraise_unexpected(result: object) -> None:
         raise result
 
 
-def gather_result(result: Any, alias: str, failures: list[str]) -> dict | None:
+def gather_result(
+    result: Any, alias: str, failures: list[str], *, root_field: str | None = None
+) -> dict | None:
     """One Shopify gather result → its payload, or None with the reason
-    recorded in `failures`."""
+    recorded in `failures`.
+
+    GraphQL reports a failed root field (missing scope, access denied) as
+    HTTP 200 with that field null, which the client turns into an empty list.
+    Pass `root_field` so that case returns None: an empty list from a failed
+    fetch must never be read as "nothing there" (e.g. "no recent sales").
+    """
     reraise_unexpected(result)
     if is_fetch_error(result):
-        _log.warning("Shopify %s fetch failed: %s", alias, result)
+        _log.warning(
+            "Shopify %s fetch failed: %s", alias, result, exc_info=result
+        )
         failures.append(alias)
         return None
     if result.get("throttled"):
         if "throttled" not in failures:
             failures.append("throttled")
         return None
-    failures.extend(
-        f for f in result.get("partial_failures") or [] if f not in failures
-    )
+    reported = result.get("partial_failures") or []
+    failures.extend(f for f in reported if f not in failures)
+    if root_field is not None and root_field in reported:
+        return None
     return result
 
 
