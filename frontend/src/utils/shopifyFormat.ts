@@ -40,3 +40,9 @@ export function shopSubtitle(
   if (!shopName) return today;
   return today ? `${shopName} · ${today}` : shopName;
 }
+
+/** "gid://shopify/ProductVariant/123" -> "Variant 123"; unknown shapes pass through. */
+export function variantLabel(gid: string): string {
+  const tail = gid.split('/').pop();
+  return tail && tail !== gid ? `Variant ${tail}` : gid;
+}

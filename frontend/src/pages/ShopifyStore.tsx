@@ -1,5 +1,6 @@
 import {
   ShopifyErrorPanel,
+  ShopifyIntelligence,
   ShopifyKpiGrid,
   ShopifyKpiGridSkeleton,
   ShopifyNoticePanel,
@@ -99,6 +100,7 @@ export default function ShopifyStore() {
         </p>
       )}
       <ShopifyKpiGrid dashboard={dashboard} />
+      <ShopifyIntelligence />
     </div>
   );
 }

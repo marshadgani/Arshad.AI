@@ -20,6 +20,9 @@ import type { ShopifyDashboard } from '../types/shopify';
 import ShopifyStore from './ShopifyStore';
 
 vi.mock('../hooks/useShopifyDashboard');
+vi.mock('../components/shopify/ShopifyIntelligence', () => ({
+  ShopifyIntelligence: () => null,
+}));
 vi.mock('../utils/shopifyFormat', async (importOriginal) => {
   const real = await importOriginal<typeof import('../utils/shopifyFormat')>();
   return real;

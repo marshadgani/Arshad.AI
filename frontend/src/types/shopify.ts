@@ -37,3 +37,71 @@ export interface ShopifyDashboard {
   recent_orders: ShopifyOrder[];
   partial_failures: string[];
 }
+
+// ── Intelligence layer (FEAT-125) ──────────────────────────────────────
+
+export interface DaysCoverItem {
+  variant_id: string;
+  available_qty: number;
+  velocity_30d: string | null;
+  days_of_cover: string | null;
+  no_recent_sales: boolean;
+  is_alert: boolean;
+  projected_stockout_date: string | null;
+}
+
+export interface StockoutAlert {
+  variant_id: string;
+  projected_stockout_date: string;
+  travel_event_title: string;
+}
+
+export interface InventoryCoverResponse {
+  connected: boolean;
+  needs_reauth: boolean;
+  days_of_cover: DaysCoverItem[];
+  alerts: StockoutAlert[];
+  variants_truncated: boolean;
+  orders_truncated: boolean;
+  calendar_connected: boolean;
+  calendar_needs_reauth: boolean;
+  partial_failures: string[];
+  cached_at: string | null;
+}
+
+export interface DiscountSimulatorResult {
+  connected: boolean;
+  needs_reauth: boolean;
+  /** true: margin holds. false: sells below cost. null: cannot tell. */
+  valid: boolean | null;
+  cost_unavailable: boolean;
+  variant_found: boolean;
+  base_price: string | null;
+  discounted_price: string | null;
+  unit_cost: string | null;
+  margin_remaining: string | null;
+  reason: string | null;
+  max_safe_discount_pct: string | null;
+  partial_failures: string[];
+}
+
+export type MatchConfidence = 'high' | 'low';
+
+export interface ThreadMeta {
+  id: string;
+  snippet: string;
+  matched_order_id: string | null;
+  matched_order_name: string | null;
+  match_confidence: MatchConfidence | null;
+}
+
+export interface ServiceDebtResponse {
+  gmail_connected: boolean;
+  shopify_connected: boolean;
+  needs_reauth: boolean;
+  threads: ThreadMeta[];
+  threads_truncated: boolean;
+  orders_truncated: boolean;
+  partial_failures: string[];
+  cached_at: string | null;
+}

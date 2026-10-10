@@ -1,0 +1,1 @@
+export { ShopifyIntelligence } from './ShopifyIntelligence';

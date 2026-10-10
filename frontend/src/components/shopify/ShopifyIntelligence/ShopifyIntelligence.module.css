@@ -1,0 +1,6 @@
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-5);
+  margin-top: var(--s-5);
+}
