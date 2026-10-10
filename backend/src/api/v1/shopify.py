@@ -179,7 +179,10 @@ def _utc_stamp(moment: datetime) -> str:
 def _cacheable(failures: list[str]) -> bool:
     """A degraded response must not be cached: for the 120s TTL it would hide
     recovery from a transient Shopify/Gmail failure. Truncation is a stable
-    property of the data, so it does not block caching."""
+    property of the data, so `calendar_truncated` does not block caching (Gmail
+    truncation is a separate response field and never enters `failures`).
+    Callers also skip caching a not-connected Gmail or Calendar so a fresh
+    connect shows at once."""
     return all(f == "calendar_truncated" for f in failures)
 
 
@@ -260,7 +263,8 @@ async def get_inventory_cover(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JSONResponse:
-    """Days of cover per tracked variant, with stockouts that land inside a
+    """Days of cover per tracked variant (Calendar looked at 90 days ahead,
+    `gather.TRAVEL_LOOKAHEAD_DAYS`), with stockouts that land inside a
     multi-day all-day Google Calendar event escalated as alerts. Always 200.
     """
     user_id = str(current_user.id)
@@ -336,7 +340,7 @@ async def get_inventory_cover(
     if variants is not None or orders is not None:
         await _mark_healthy(integration, db)
     payload = response.model_dump()
-    if _cacheable(failures):
+    if _cacheable(failures) and cal.connected:
         await _set_cached_intel(
             "inventory-cover", user_id, {**payload, "cached_at": as_of.isoformat()}
         )
@@ -489,7 +493,7 @@ async def get_service_debt(
         partial_failures=failures,
     )
     payload_out = response.model_dump()
-    if _cacheable(failures) and not needs_reauth:
+    if _cacheable(failures) and not needs_reauth and gmail.connected:
         await _set_cached_intel(
             "service-debt", user_id, {**payload_out, "cached_at": now.isoformat()}
         )

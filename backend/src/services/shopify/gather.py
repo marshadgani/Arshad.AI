@@ -28,6 +28,8 @@ _log = logging.getLogger(__name__)
 # without touching the HTTP layer, and tests can pin them independently.
 
 VELOCITY_WINDOW_DAYS = 30
+# How far ahead a multi-day all-day Calendar event counts as a travel window
+# (Arshad's decision, 2026-10-09); a stockout beyond it raises no alert.
 TRAVEL_LOOKAHEAD_DAYS = 90
 # Shopify's read_orders scope only exposes the last 60 days to non-Plus apps.
 SERVICE_DEBT_ORDER_DAYS = 60
