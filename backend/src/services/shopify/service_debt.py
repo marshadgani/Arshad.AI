@@ -25,24 +25,25 @@ def _order_key(name: str | None) -> str | None:
     return key or None
 
 
-def _customer_in(snippet: str, display_name: str) -> bool:
-    return (
-        re.search(
-            r"(?<!\w)" + re.escape(display_name) + r"(?!\w)", snippet, re.IGNORECASE
-        )
-        is not None
+def _name_pattern(display_name: str) -> re.Pattern[str]:
+    return re.compile(
+        r"(?<!\w)" + re.escape(display_name) + r"(?!\w)", re.IGNORECASE
     )
 
 
-def _match_one(snippet: str, by_number: dict[str, dict], named: list[dict]):
+def _match_one(
+    snippet: str,
+    by_number: dict[str, dict],
+    named: list[tuple[re.Pattern[str], dict]],
+):
     for number in _HASH_NUMBER.findall(snippet):
         if number in by_number:
             return by_number[number], "high"
     for number in _ORDER_WORD_NUMBER.findall(snippet):
         if number in by_number:
             return by_number[number], "low"
-    for order in named:
-        if _customer_in(snippet, order["_customer"]):
+    for pattern, order in named:
+        if pattern.search(snippet):
             return order, "low"
     return None, None
 
@@ -67,14 +68,20 @@ def match_threads_to_orders(
     threads.get calls.
     """
     by_number: dict[str, dict] = {}
-    named: list[dict] = []
+    # Patterns are compiled once per distinct customer, not once per
+    # thread x order: up to 100 threads against hundreds of orders would
+    # otherwise overflow re's 512-entry cache and recompile on every search.
+    named: list[tuple[re.Pattern[str], dict]] = []
+    seen_names: set[str] = set()
     for order in orders:
         key = _order_key(order.get("name"))
         if key and key not in by_number:
             by_number[key] = order
         customer = ((order.get("customer") or {}).get("displayName") or "").strip()
-        if len(customer.split()) >= _MIN_NAME_TOKENS:
-            named.append({**order, "_customer": customer})
+        folded = customer.casefold()
+        if len(customer.split()) >= _MIN_NAME_TOKENS and folded not in seen_names:
+            seen_names.add(folded)
+            named.append((_name_pattern(customer), order))
 
     result: list[ThreadMeta] = []
     for thread in threads:

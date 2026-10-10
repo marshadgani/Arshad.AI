@@ -82,6 +82,7 @@ async def list_calendar_events(
             "timeMax": time_max,
             "maxResults": CALENDAR_PAGE_SIZE,
             "orderBy": "startTime",
+            "fields": "nextPageToken,items(status,summary,start/date,end/date)",
         },
     )
 
@@ -99,7 +100,11 @@ async def list_gmail_threads(db: AsyncSession, user: User) -> dict | None:
         user=user,
         method="GET",
         path="users/me/threads",
-        params={"q": GMAIL_UNANSWERED_QUERY, "maxResults": GMAIL_PAGE_SIZE},
+        params={
+            "q": GMAIL_UNANSWERED_QUERY,
+            "maxResults": GMAIL_PAGE_SIZE,
+            "fields": "nextPageToken,threads(id,snippet)",
+        },
     )
 
 
