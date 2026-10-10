@@ -111,4 +111,27 @@ describe('ShopifyDiscountSimulator', () => {
     submit('v1', '10');
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not run the check');
   });
+
+  // valid stays true in every case: the failure state must win over a stale "valid".
+  const failureCases: [string, Partial<DiscountSimulatorResult>, RegExp][] = [
+    ['needs reauth', { needs_reauth: true }, /Reconnect Shopify/],
+    ['not connected', { connected: false }, /Shopify is not connected/],
+    [
+      'a failed lookup',
+      { partial_failures: ['throttled'] },
+      /could not be reached/,
+    ],
+    [
+      'an unknown variant',
+      { variant_found: false, reason: 'No variant with that ID exists.' },
+      /No variant with that ID exists/,
+    ],
+  ];
+  it.each(failureCases)('never shows "Margin OK" when the result is %s', async (_name, overrides, text) => {
+    mockFetch(200, { data: result({ ...overrides, valid: true }) });
+    render(<ShopifyDiscountSimulator />);
+    submit('gid://shopify/ProductVariant/1', '10');
+    expect(await screen.findByText(text)).toBeInTheDocument();
+    expect(screen.queryByText(/Margin OK/)).not.toBeInTheDocument();
+  });
 });

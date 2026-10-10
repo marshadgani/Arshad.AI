@@ -1,115 +1,42 @@
-# Gate Report — FEAT-125 Shopify Intelligence Layer
+# Arshad.AI Quality Gate Report
 
-**Branch:** `claude/chat-mobile-health-integration-if20cp`
-**Target:** `claude/ai-personal-assistant-main`
-**Verdict:** ✅ GATE PASSED
-**Date:** 2026-10-10 (02:08 AST / 04:38 IST)
+**Branch:** `dev-team/feat-125-feat-125` -> `claude/ai-personal-assistant-main`
+**Change:** FEAT-125, Shopify intelligence layer, built by the dev-team pipeline (run wf_fa9f62a9-d89, Enterprise Architect approved). Most of it merged earlier in PR 122. This push carries the last pipeline fixes plus the findings from the 8-agent gate. The feature adds days-of-cover with stockout alerts tied to multi-day all-day Calendar events, a discount-code simulator that rejects codes below cost, and a service-debt tracker that matches never-answered Gmail threads to Shopify orders.
+**Date:** 2026-10-10
 
----
+### ⚠️ GATE PASSED WITH WARNINGS — Ready for merge
 
-## Agent Results
+## Gate Summary
 
-| Agent | Status | Findings |
+| # | Agent | Result |
 |---|---|---|
-| code-reviewer | ✅ PASS | No issues |
-| security-auditor | ✅ PASS | No issues |
-| debugger | ✅ PASS | 1 bug found and fixed (discount.py max_safe_discount_pct format) |
-| test-writer | ✅ PASS | 285 backend + 430 frontend tests passing; coverage well above 70% |
-| refactorer | ✅ PASS | No structural concerns |
-| doc-writer | ✅ PASS | All public APIs documented |
-| silent-failure-hunter | ✅ PASS | No swallowed exceptions; degraded responses not cached |
-| pr-test-analyzer | ✅ PASS | Full happy/error/edge/negative coverage; behaviour-first tests |
+| 1 | code-reviewer | PASS. No Critical or Warning. Name de-dup and field masks verified against the callers |
+| 2 | security-auditor | PASS after a fix. All routes need auth and rate limiting, data is scoped to the user, variant_id is validated, regex input is escaped. The merchant shop domain no longer reaches the logs |
+| 3 | debugger | PASS. The Gmail and Calendar field masks keep every field the code reads |
+| 4 | test-writer | PASS. Changed lines are covered. A test now checks the field masks are sent and that duplicate customer names match the first order |
+| 5 | refactorer | WARN. Whitespace in customer names is now normalised. The Gmail and Calendar parsers still share a copied dispatch block and the two truncation signals differ in shape. Both deferred |
+| 6 | doc-writer | WARN. The Gmail rule is now described correctly (never-replied threads, not last-sender), plus the 90-day look-ahead, return values and cache note |
+| 7 | silent-failure-hunter | WARN. A malformed Google reply now flags a partial failure instead of a 500, and a not-connected result is no longer cached. Gmail reauth sharing the top-level flag, 403 scope errors and a null body are deferred |
+| 8 | pr-test-analyzer | WARN. Added failure-path tests for the discount, service-debt and cover routes and for the discount simulator screen. Remaining gaps are deferred |
 
----
+## Verdict: WARN, mergeable
 
-## Changes Reviewed
+Backend: 1219 pass, 9 fail and 55 errors. The same failures and errors occur without these changes, because they need a database or auth setup. Frontend: `tsc` is clean and 434 tests pass.
 
-FEAT-125 Shopify intelligence layer: inventory days-of-cover with travel-window
-stockout alerts, discount-code break-even simulator, and customer-service debt
-tracker joining Shopify orders against Gmail threads.
+## Fixed in this push
 
-### New backend service modules
+- A malformed or undecodable Google reply no longer returns a 500 from the always-200 endpoints.
+- Not-connected Gmail or Calendar results are not cached, so a fresh connect shows at once.
+- Shopify failure logs carry the exception type and HTTP status only.
+- Customer names with extra spaces match again.
+- New tests: discount expired, throttled, HTTP error, GraphQL error and malformed price. Cover and service-debt degraded responses are not cached. Safe maximum discount never lands below cost. The simulator screen never shows "Margin OK" for a failed, unconnected or unknown lookup.
 
-- `backend/src/services/shopify/discount.py` — break-even check (pure, no I/O)
-- `backend/src/services/shopify/inventory_cover.py` — days-of-cover + travel windows (pure)
-- `backend/src/services/shopify/service_debt.py` — thread-to-order matcher (pure)
-- `backend/src/services/shopify/providers.py` — Calendar/Gmail fetch + result dispatch
-- `backend/src/services/shopify/gather.py` — concurrent fetch orchestration + throttle fallback
+## Deferred (non-blocking)
 
-### New routes (always-200 contract, same as /dashboard)
-
-- `GET /api/v1/shopify/inventory-cover`
-- `POST /api/v1/shopify/discount-simulator`
-- `GET /api/v1/shopify/service-debt`
-
-### New tests
-
-- `backend/tests/test_shopify_feat125_unit.py` — 80 pure-function edge-case tests
-- `backend/tests/test_shopify_intelligence.py` — 35 route-level integration tests
-- `frontend/src/hooks/useShopifyInventoryCover.test.ts` — 6 hook delegation tests
-- `frontend/src/hooks/useShopifyServiceDebt.test.ts` — 6 hook delegation tests
-- `frontend/src/hooks/useShopifyDiscountSimulator.test.ts` — 11 mutation hook tests
-
-### New frontend components
-
-- `ShopifyInventoryCover` — days-of-cover table with travel-window alert badges
-- `ShopifyServiceDebt` — unanswered thread list with order match indicators
-- `ShopifyDiscountSimulator` — break-even form with per-field 422 errors
-
----
-
-## Bugs Fixed During Debugger Stage (6 root causes)
-
-1. **discount.py** — `max_safe = Decimal(0)` (base_price==0 branch) was not
-   quantized; `str(Decimal(0))` returned `"0"` instead of `"0.00"`, breaking
-   the two-decimal-place contract. Fixed with `.quantize(_CENT, rounding=ROUND_DOWN)`.
-
-2. **rate_limit.py** — `RateLimitExceeded(HTTPException)` class was absent,
-   causing ImportError in all FEAT-125 endpoint tests. Added class with
-   status_code=429 and standard error envelope.
-
-3. **Test file naming** — Task-provided content for `test_shopify_parsers.py` and
-   `test_shopify_endpoints.py` targeted FEAT-125 symbols not in those modules.
-   Created as `test_shopify_feat125_unit.py` and `test_shopify_intelligence.py`.
-
-4. **Provider reauth in route tests** — `ProviderReauthRequired` inherits from
-   `ToolError`, not `IntegrationError`, so raising it inside `_get_token` would
-   escape `except gather.FETCH_ERRORS` → 500. Route tests use
-   `IntegrationError("refresh_failed", ...)` instead.
-
-5. **Hook tests Authorization header** — `getToken()` reads `localStorage` which
-   is empty in jsdom by default. Tests set `window.localStorage.setItem('arshad.ai:jwt', 'test-token')` in `beforeEach`.
-
-6. **Component test architecture** — Task-provided replacement tests mocked hooks and
-   passed no props, but components use explicit props API. Existing correct component
-   tests preserved; only missing hook test files were created.
-
----
-
-## Arshad's Decisions (A/B/C) — All Honoured
-
-- **Decision A**: `GMAIL_UNANSWERED_QUERY = "in:inbox -from:me older_than:24h"` ✓;
-  no per-thread `threads.get` calls ✓; `threads_truncated: bool` in ServiceDebtResponse ✓;
-  `ThreadMeta` has no `last_message_from`/`last_message_date` ✓.
-
-- **Decision B**: `singleEvents=true`, `timeMin=now`, `timeMax=now+90d` on primary calendar ✓;
-  explicit isinstance dispatch: `ProviderNotLinked` → `calendar_connected=False`,
-  `ProviderReauthRequired` → `needs_reauth=True, partial_failures=['calendar']` ✓.
-
-- **Decision C**: `since_iso` (date anchor) passed into `_execute_orders_query` from route ✓;
-  leaky-bucket throttle documented in gather.py docstring ✓; throttled queries re-run
-  serially with `max_retries=0` ✓; `variant_id` constrained with
-  `Field(pattern=r'^[a-zA-Z0-9_/:-]{1,100}$')` ✓.
-
----
-
-## Test Counts
-
-| Suite | Tests |
-|---|---|
-| All Shopify backend tests | 285 passed |
-| All frontend tests | 430 passed |
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
-
-https://claude.ai/code/session_01S3fJzZzJykfHRA9jhMycuk
+- [ ] Add `gmail_needs_reauth` so the UI can tell Gmail reauth from Shopify reauth.
+- [ ] Report a Google 403 for missing scope as a reconnect request.
+- [ ] Treat a null provider body as a failure and not as an empty result.
+- [ ] Use one convention for Gmail and Calendar truncation.
+- [ ] Frontend tests for the remaining Inventory Cover and Service Debt states, the wiring test for the Intelligence panel, and tests for 422 and abort handling in the discount hook.
+- [ ] Route tests for the 401 and rate limit paths, and merging duplicate tests between the two backend files.
+- [ ] Shopify shop domain no longer logged. The 120 second Redis cache of Gmail snippets stays, and is documented as acceptable.

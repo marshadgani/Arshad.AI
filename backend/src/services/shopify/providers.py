@@ -82,6 +82,7 @@ async def list_calendar_events(
             "timeMax": time_max,
             "maxResults": CALENDAR_PAGE_SIZE,
             "orderBy": "startTime",
+            "fields": "nextPageToken,items(status,summary,start/date,end/date)",
         },
     )
 
@@ -89,8 +90,9 @@ async def list_calendar_events(
 async def list_gmail_threads(db: AsyncSession, user: User) -> dict | None:
     """Raw Gmail threads response — suitable as a gather() coroutine.
 
-    Callers pass the result to parse_gmail_result; they never inspect it
-    directly.
+    Fetches only threads older than 24 hours that contain no message sent by
+    the user (`GMAIL_UNANSWERED_QUERY`). Callers pass the result to
+    parse_gmail_result; they never inspect it directly.
     """
     from src.tools.clients import gmail  # deferred: see module docstring
 
@@ -99,7 +101,11 @@ async def list_gmail_threads(db: AsyncSession, user: User) -> dict | None:
         user=user,
         method="GET",
         path="users/me/threads",
-        params={"q": GMAIL_UNANSWERED_QUERY, "maxResults": GMAIL_PAGE_SIZE},
+        params={
+            "q": GMAIL_UNANSWERED_QUERY,
+            "maxResults": GMAIL_PAGE_SIZE,
+            "fields": "nextPageToken,threads(id,snippet)",
+        },
     )
 
 
@@ -114,7 +120,7 @@ def parse_calendar_result(result: Any) -> CalendarResult:
         return CalendarResult(connected=False)
     if isinstance(result, ProviderReauthRequired):
         return CalendarResult(needs_reauth=True, partial_failures=["calendar"])
-    if isinstance(result, (ToolError, httpx.HTTPError)):
+    if isinstance(result, (ToolError, httpx.HTTPError, ValueError, KeyError)):
         _log.warning("Calendar fetch failed: %s", result, exc_info=result)
         return CalendarResult(partial_failures=["calendar"])
     if isinstance(result, BaseException):
@@ -137,7 +143,7 @@ def parse_gmail_result(result: Any) -> GmailResult:
         return GmailResult(connected=False)
     if isinstance(result, ProviderReauthRequired):
         return GmailResult(needs_reauth=True, partial_failures=["gmail"])
-    if isinstance(result, (ToolError, httpx.HTTPError)):
+    if isinstance(result, (ToolError, httpx.HTTPError, ValueError, KeyError)):
         _log.warning("Gmail fetch failed: %s", result, exc_info=result)
         return GmailResult(partial_failures=["gmail"])
     if isinstance(result, BaseException):

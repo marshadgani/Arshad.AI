@@ -14,16 +14,6 @@ import { useShopifyDiscountSimulator } from './useShopifyDiscountSimulator';
 const VALID_VARIANT = 'gid://shopify/ProductVariant/123';
 const TOKEN_KEY = 'arshad.ai:jwt';
 
-function mockFetch(status: number, body: unknown) {
-  return vi.fn().mockResolvedValue({
-    ok: status >= 200 && status < 300,
-    status,
-    statusText: status === 200 ? 'OK' : String(status),
-    json: () => Promise.resolve(body),
-    text: () => Promise.resolve(JSON.stringify(body)),
-  });
-}
-
 beforeEach(() => {
   // Ensure a token is present so Authorization header tests are deterministic.
   window.localStorage.setItem(TOKEN_KEY, 'test-token');
