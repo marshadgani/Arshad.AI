@@ -199,7 +199,11 @@ async def _failure_response(
     if needs_reauth:
         return _degraded(integration, needs_reauth=True)
 
-    _log.warning("Shopify dashboard fetch failed (status=%s): %s", fallback_status, exc)
+    _log.warning(
+        "Shopify dashboard fetch failed (status=%s): %s",
+        fallback_status,
+        gather.describe_error(exc),
+    )
     dashboard = dashboards.shell_dashboard(integration, needs_reauth=False)
     dashboard.partial_failures = ["dashboard"]
     return _ok(dashboard)
@@ -281,8 +285,7 @@ async def get_inventory_cover(
         _log.warning(
             "Shopify inventory-cover setup failed (needs_reauth=%s): %s",
             needs_reauth,
-            exc,
-            exc_info=exc,
+            gather.describe_error(exc),
         )
         await _apply_error_status(integration, exc, needs_reauth, db)
         return _ok_model(
@@ -367,8 +370,7 @@ async def simulate_discount(
         _log.warning(
             "Shopify discount-simulator fetch failed (needs_reauth=%s): %s",
             needs_reauth,
-            exc,
-            exc_info=exc,
+            gather.describe_error(exc),
         )
         await _apply_error_status(integration, exc, needs_reauth, db)
         return _ok_model(

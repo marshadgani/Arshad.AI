@@ -32,9 +32,20 @@ TRAVEL_LOOKAHEAD_DAYS = 90
 # Shopify's read_orders scope only exposes the last 60 days to non-Plus apps.
 SERVICE_DEBT_ORDER_DAYS = 60
 
+
 # Upstream failures absorbed into degraded 200 responses.
 # ValueError also covers json.JSONDecodeError from resp.json() in client.py —
 # a malformed Shopify body must never crash the always-200 endpoints.
+def describe_error(exc: BaseException) -> str:
+    """Log-safe summary of a fetch failure.
+
+    httpx error strings embed the full request URL, which carries the merchant's
+    shop domain, so only the exception type and HTTP status are logged.
+    """
+    status = getattr(getattr(exc, "response", None), "status_code", None)
+    return type(exc).__name__ if status is None else f"{type(exc).__name__} {status}"
+
+
 FETCH_ERRORS: tuple[type[BaseException], ...] = (
     httpx.HTTPError,
     IntegrationError,
@@ -67,9 +78,7 @@ def gather_result(
     """
     reraise_unexpected(result)
     if is_fetch_error(result):
-        _log.warning(
-            "Shopify %s fetch failed: %s", alias, result, exc_info=result
-        )
+        _log.warning("Shopify %s fetch failed: %s", alias, describe_error(result))
         failures.append(alias)
         return None
     if result.get("throttled"):
