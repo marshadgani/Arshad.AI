@@ -1,51 +1,73 @@
-"""Shopify Admin API dashboard endpoint.
+"""Shopify Admin API endpoints.
 
-Single GET /dashboard, always returns HTTP 200 — same documented deviation
-as /api/v1/whoop/dashboard (see .claude/rules/api.md): this endpoint backs
-an always-visible page tile, and frontend/src/hooks/useFetch.ts treats ANY
-401 as an Arshad.AI session expiry and clears the JWT, which must never
-happen because of an unrelated third-party integration.
+Single source of HTTP concerns for the Shopify integration: auth, rate
+limiting, caching policy, error policy, and status codes. All domain logic
+lives in src/services/shopify/:
 
-Routing, caching policy and error policy only. Everything it coordinates
-lives in src/services/shopify/: transport in client.py, wire parsing in
-parsers.py, response assembly in dashboard.py, integration-state rules in
-state.py, the OAuth-provider seam in tokens.py, Redis in cache.py.
+  transport        client.py
+  wire parsing     parsers.py
+  response models  dashboard.py
+  integration state state.py
+  OAuth token      tokens.py
+  Redis            cache.py
+  concurrent fetch gather.py   ← new FEAT-125
+  Calendar/Gmail   providers.py ← new FEAT-125
+  days-of-cover    inventory_cover.py
+  break-even check discount.py
+  thread matching  service_debt.py
 
 The thin module-level `_`-prefixed wrappers below are an intentional seam,
 mirroring src/api/v1/whoop.py: routes call them as module globals, which
 keeps every collaborator substitutable from a test via monkeypatch without
 the router taking a constructor or a DI container.
+
+Always returns HTTP 200 for the dashboard and intelligence endpoints — see
+.claude/rules/api.md "Documented deviation" for why the dashboard tile
+endpoints never return 4xx.
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from functools import partial
+from typing import Any
 
-import httpx
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.auth.dependencies import get_current_user
-from src.integrations.base import IntegrationError
 from src.middleware.rate_limit import enforce_rate_limit
 from src.models.database import get_db
 from src.models.integration import Integration
 from src.models.user import User
-from src.schemas.shopify import ShopifyDashboard
-from src.services.shopify import cache, client, parsers, state, tokens
+from src.schemas.shopify import (
+    DiscountSimulatorRequest,
+    DiscountSimulatorResponse,
+    InventoryCoverResponse,
+    ServiceDebtResponse,
+    ShopifyDashboard,
+)
+from src.services.shopify import (
+    cache,
+    client,
+    discount,
+    gather,
+    inventory_cover,
+    parsers,
+    providers,
+    service_debt,
+    state,
+    tokens,
+)
 from src.services.shopify import dashboard as dashboards
 
 router = APIRouter(prefix="/api/v1/shopify", tags=["shopify"])
 
 _RATE_LIMIT = 30
 _RATE_WINDOW_SECONDS = 60
-
-# Upstream failures the endpoint absorbs into a degraded 200. ValueError
-# also covers json.JSONDecodeError from resp.json() in client.py — Shopify
-# returning a malformed/non-JSON body must not crash this endpoint into an
-# uncaught 500 (see module docstring: this always returns 200).
-_FETCH_ERRORS = (httpx.HTTPError, IntegrationError, ValueError)
 
 _log = logging.getLogger(__name__)
 
@@ -83,6 +105,32 @@ async def _execute_query(shop: str, token: str, day_start: str, day_end: str) ->
     return await client.execute_dashboard_query(shop, token, day_start, day_end)
 
 
+async def _execute_variants_query(shop: str, token: str, **kwargs: Any) -> dict:
+    return await client.execute_variant_inventory_query(shop, token, **kwargs)
+
+
+async def _execute_orders_query(
+    shop: str, token: str, since_iso: str, **kwargs: Any
+) -> dict:
+    return await client.execute_orders_query(shop, token, since_iso, **kwargs)
+
+
+async def _execute_discount_query(
+    shop: str, token: str, variant_id: str, **kwargs: Any
+) -> dict:
+    return await client.execute_discount_variant_query(
+        shop, token, variant_id, **kwargs
+    )
+
+
+async def _get_cached_intel(kind: str, user_id: str) -> dict | None:
+    return await cache.get_cached_intelligence(kind, user_id)
+
+
+async def _set_cached_intel(kind: str, user_id: str, data: dict) -> None:
+    await cache.set_cached_intelligence(kind, user_id, data)
+
+
 def _classify_error(exc: Exception) -> tuple[bool, int]:
     return state.classify_error(exc)
 
@@ -104,8 +152,18 @@ def _ok(dashboard: ShopifyDashboard) -> JSONResponse:
     return JSONResponse({"data": dashboard.model_dump()})
 
 
+def _ok_model(model: BaseModel) -> JSONResponse:
+    return JSONResponse({"data": model.model_dump()})
+
+
 def _degraded(integration: Integration, *, needs_reauth: bool) -> JSONResponse:
     return _ok(dashboards.shell_dashboard(integration, needs_reauth=needs_reauth))
+
+
+def _utc_stamp(moment: datetime) -> str:
+    # No colons beyond the time part, matching parsers.day_window, so
+    # Shopify's search syntax cannot mis-split on a "+00:00" offset.
+    return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 async def _failure_response(
@@ -164,9 +222,222 @@ async def get_dashboard(
         # malformed wire payload must degrade to the always-200 contract
         # this endpoint promises, not surface as an uncaught 500.
         payload = dashboards.build_dashboard(raw, ctx, as_of=day_end).model_dump()
-    except _FETCH_ERRORS as exc:
+    except gather.FETCH_ERRORS as exc:
         return await _failure_response(integration, exc, db)
 
     await _mark_healthy(integration, db)
     await _set_cached(str(integration.id), {**payload, "cached_at": now.isoformat()})
     return JSONResponse({"data": payload})
+
+
+# ── Intelligence layer (FEAT-125) ────────────────────────────────────────
+# Same always-200 contract as /dashboard: provider state lives in body flags.
+
+
+@router.get("/inventory-cover")
+async def get_inventory_cover(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Days of cover per tracked variant, with stockouts that land inside a
+    multi-day all-day Google Calendar event escalated as alerts. Always 200.
+    """
+    user_id = str(current_user.id)
+    await _check_rate_limit(user_id)
+    integration = await _find_integration(user_id, db)
+    if not integration:
+        return _ok_model(InventoryCoverResponse(connected=False))
+    if integration.status == "expired":
+        return _ok_model(InventoryCoverResponse(connected=True, needs_reauth=True))
+
+    cached = await _get_cached_intel("inventory-cover", user_id)
+    if cached is not None:
+        return JSONResponse({"data": cached})
+
+    as_of = datetime.now(timezone.utc)
+    since_iso = _utc_stamp(as_of - timedelta(days=gather.VELOCITY_WINDOW_DAYS))
+    try:
+        ctx = state.shop_context(integration)
+        token = await _get_token(integration, db)
+    except gather.FETCH_ERRORS as exc:
+        needs_reauth, _ = _classify_error(exc)
+        await _apply_error_status(integration, exc, needs_reauth, db)
+        return _ok_model(
+            InventoryCoverResponse(
+                connected=True,
+                needs_reauth=needs_reauth,
+                partial_failures=[] if needs_reauth else ["shopify"],
+            )
+        )
+
+    results = await gather.gather_shopify_pair(
+        partial(_execute_variants_query, ctx.shop, token),
+        partial(_execute_orders_query, ctx.shop, token, since_iso),
+        partial(
+            providers.list_calendar_events,
+            db,
+            current_user,
+            as_of.isoformat(),
+            (as_of + timedelta(days=gather.TRAVEL_LOOKAHEAD_DAYS)).isoformat(),
+        ),
+    )
+    variants_result, orders_result, calendar_result = results
+
+    if await gather.reauth_if_needed(integration, [variants_result, orders_result], db):
+        return _ok_model(InventoryCoverResponse(connected=True, needs_reauth=True))
+
+    failures: list[str] = []
+    variants = gather.gather_result(variants_result, "variants", failures)
+    orders = gather.gather_result(orders_result, "orders", failures)
+
+    cal = providers.parse_calendar_result(calendar_result)
+    failures.extend(f for f in cal.partial_failures if f not in failures)
+
+    response = inventory_cover.build_inventory_cover(
+        variants,
+        orders,
+        cal.events,
+        as_of=as_of,
+        window_days=gather.VELOCITY_WINDOW_DAYS,
+        calendar_connected=cal.connected,
+        calendar_needs_reauth=cal.needs_reauth,
+        partial_failures=failures,
+    )
+    if variants is not None or orders is not None:
+        await _mark_healthy(integration, db)
+    payload = response.model_dump()
+    await _set_cached_intel(
+        "inventory-cover", user_id, {**payload, "cached_at": as_of.isoformat()}
+    )
+    return JSONResponse({"data": payload})
+
+
+@router.post("/discount-simulator")
+async def simulate_discount(
+    body: DiscountSimulatorRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Would this discount percent still cover the variant's unit cost?
+    Computed on demand and never cached: price and cost change at any time.
+    Always 200 except 422 for a malformed request body.
+    """
+    user_id = str(current_user.id)
+    await _check_rate_limit(user_id)
+    integration = await _find_integration(user_id, db)
+    if not integration:
+        return _ok_model(DiscountSimulatorResponse(connected=False))
+    if integration.status == "expired":
+        return _ok_model(DiscountSimulatorResponse(needs_reauth=True))
+
+    try:
+        ctx = state.shop_context(integration)
+        token = await _get_token(integration, db)
+        raw = await _execute_discount_query(ctx.shop, token, body.variant_id)
+    except gather.FETCH_ERRORS as exc:
+        needs_reauth, _ = _classify_error(exc)
+        await _apply_error_status(integration, exc, needs_reauth, db)
+        return _ok_model(
+            DiscountSimulatorResponse(
+                needs_reauth=needs_reauth,
+                partial_failures=[] if needs_reauth else ["variant"],
+            )
+        )
+
+    if raw.get("throttled"):
+        return _ok_model(DiscountSimulatorResponse(partial_failures=["throttled"]))
+    variant = raw.get("variant")
+    if variant is None:
+        # A GraphQL error (e.g. missing scope) also yields a null variant; it
+        # is reported as a failure, not as "variant does not exist".
+        failures = raw.get("partial_failures") or []
+        if failures:
+            return _ok_model(DiscountSimulatorResponse(partial_failures=failures))
+        return _ok_model(
+            DiscountSimulatorResponse(
+                variant_found=False,
+                reason="No variant with that ID exists in this store.",
+            )
+        )
+    price, unit_cost = discount.parse_variant_pricing(variant)
+    if price is None:
+        return _ok_model(DiscountSimulatorResponse(partial_failures=["variant"]))
+    await _mark_healthy(integration, db)
+    return _ok_model(
+        discount.evaluate_discount(price, unit_cost, body.discount_percent)
+    )
+
+
+@router.get("/service-debt")
+async def get_service_debt(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JSONResponse:
+    """Inbox threads older than 24h that the user has not replied to, matched
+    to Shopify orders by snippet text. Always 200.
+    """
+    user_id = str(current_user.id)
+    await _check_rate_limit(user_id)
+    cached = await _get_cached_intel("service-debt", user_id)
+    if cached is not None:
+        return JSONResponse({"data": cached})
+
+    integration = await _find_integration(user_id, db)
+    now = datetime.now(timezone.utc)
+    since_iso = _utc_stamp(now - timedelta(days=gather.SERVICE_DEBT_ORDER_DAYS))
+    failures: list[str] = []
+    needs_reauth = False
+    shopify_connected = integration is not None
+
+    async def _orders() -> dict:
+        ctx = state.shop_context(integration)
+        token = await _get_token(integration, db)
+        return await _execute_orders_query(
+            ctx.shop, token, since_iso, with_line_items=False
+        )
+
+    shopify_live = integration is not None and integration.status != "expired"
+    if integration is not None and not shopify_live:
+        needs_reauth = True
+        failures.append("shopify")
+
+    coroutines: list[Any] = [providers.list_gmail_threads(db, current_user)]
+    if shopify_live:
+        coroutines.append(_orders())
+    results = await asyncio.gather(*coroutines, return_exceptions=True)
+    gmail_result = results[0]
+    orders_result = results[1] if shopify_live else None
+
+    gmail = providers.parse_gmail_result(gmail_result)
+    if gmail.needs_reauth:
+        needs_reauth = True
+    failures.extend(f for f in gmail.partial_failures if f not in failures)
+
+    orders: list[dict] = []
+    orders_truncated = False
+    if shopify_live:
+        if await gather.reauth_if_needed(integration, [orders_result], db):
+            needs_reauth = True
+            failures.append("shopify")
+        else:
+            payload = gather.gather_result(orders_result, "orders", failures)
+            if payload is not None:
+                orders = payload.get("orders") or []
+                orders_truncated = bool(payload.get("orders_has_next_page"))
+                await _mark_healthy(integration, db)
+
+    matched = service_debt.match_threads_to_orders(gmail.threads, orders)
+    response = ServiceDebtResponse(
+        gmail_connected=gmail.connected,
+        shopify_connected=shopify_connected,
+        needs_reauth=needs_reauth,
+        threads=service_debt.rank_threads(matched),
+        threads_truncated=gmail.threads_truncated,
+        orders_truncated=orders_truncated,
+        partial_failures=failures,
+    )
+    payload_out = response.model_dump()
+    await _set_cached_intel(
+        "service-debt", user_id, {**payload_out, "cached_at": now.isoformat()}
+    )
+    return JSONResponse({"data": payload_out})
