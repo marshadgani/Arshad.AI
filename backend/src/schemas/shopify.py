@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Literal, Optional
+from datetime import date
+from typing import Literal, Optional, Self
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 ConversionRateStatus = Literal["ok", "unavailable", "error"]
 
@@ -115,3 +116,101 @@ class ServiceDebtResponse(BaseModel):
     orders_truncated: bool = False
     partial_failures: list[str] = []
     cached_at: Optional[str] = None
+
+
+# ── Trip feasibility (FEAT-129) ──────────────────────────────────────────
+
+TRIP_MAX_DAYS = 60
+
+
+class TripFeasibilityRequest(BaseModel):
+    """Inclusive travel window. `date` fields reject non-ISO strings (422)."""
+
+    start_date: date
+    end_date: date
+
+    @model_validator(mode="after")
+    def _check_window(self) -> Self:
+        if self.end_date < self.start_date:
+            raise ValueError("end_date must not be before start_date")
+        if (self.end_date - self.start_date).days + 1 > TRIP_MAX_DAYS:
+            raise ValueError(f"window must be at most {TRIP_MAX_DAYS} days")
+        return self
+
+
+class TripConflict(BaseModel):
+    """Flat on the wire; the validator makes each `type` carry its own fields
+    and none of the other type's."""
+
+    type: Literal["stockout", "calendar_event"]
+    variant_id: Optional[str] = None
+    projected_stockout_date: Optional[str] = None
+    event_title: Optional[str] = None
+    event_start: Optional[str] = None
+    event_end: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _check_fields_match_type(self) -> Self:
+        stockout = (self.variant_id, self.projected_stockout_date)
+        event = (self.event_title, self.event_start, self.event_end)
+        wanted, forbidden = (
+            (stockout, event) if self.type == "stockout" else (event, stockout)
+        )
+        if any(v is None for v in wanted) or any(v is not None for v in forbidden):
+            raise ValueError(f"fields do not match conflict type {self.type!r}")
+        return self
+
+
+class TripAllDayEvent(BaseModel):
+    """Informational only: an all-day event overlapping the window is listed
+    but is not a conflict."""
+
+    title: str
+    start_date: str
+
+
+UnavailableSourceName = Literal[
+    "booking_com_pricing", "calendly_availability", "deploy_windows"
+]
+
+
+class UnavailableSource(BaseModel):
+    name: UnavailableSourceName
+    reason: Literal["not_connected"] = "not_connected"
+
+
+class TripFeasibilityResponse(BaseModel):
+    verdict: Literal["go", "no-go", "unknown"]
+    conflicts: list[TripConflict] = []
+    all_day_events: list[TripAllDayEvent] = []
+    unavailable_sources: list[UnavailableSource] = []
+    shopify_connected: bool = False
+    shopify_needs_reauth: bool = False
+    calendar_connected: bool = False
+    calendar_needs_reauth: bool = False
+    variants_truncated: bool = False
+    orders_truncated: bool = False
+    calendar_truncated: bool = False
+    partial_failures: list[str] = []
+
+    @model_validator(mode="after")
+    def _check_verdict_invariants(self) -> Self:
+        """A "go" can never coexist with a conflict or a degraded source, and
+        a "no-go" always carries the conflict that drove it."""
+        if self.verdict == "no-go" and not self.conflicts:
+            raise ValueError("no-go requires at least one conflict")
+        if self.verdict == "go":
+            degraded = (
+                self.conflicts
+                or not self.shopify_connected
+                or self.shopify_needs_reauth
+                or not self.calendar_connected
+                or self.calendar_needs_reauth
+                or self.variants_truncated
+                or self.orders_truncated
+                or self.calendar_truncated
+                or self.partial_failures
+            )
+            if degraded:
+                raise ValueError("go requires clean, fully connected sources")
+        return self

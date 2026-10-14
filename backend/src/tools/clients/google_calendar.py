@@ -21,6 +21,9 @@ from ..token_service import get_access_token, refresh_google_token
 
 _BASE = "https://www.googleapis.com/calendar/v3"
 _TIMEOUT = 15.0
+# A 403 carrying one of these markers means the token lacks the Calendar scope:
+# only reconnecting fixes it. Other 403s (quota, rate limit) stay generic.
+_SCOPE_ERROR_MARKERS = ("insufficientPermissions", "ACCESS_TOKEN_SCOPE_INSUFFICIENT")
 
 
 async def request(
@@ -64,6 +67,8 @@ def _resolve(resp: httpx.Response) -> Any:
             "provider_http_error",
             f"Google returned {resp.status_code}: {resp.text[:200]}",
         )
+    if resp.status_code == 403 and any(m in resp.text for m in _SCOPE_ERROR_MARKERS):
+        raise ProviderReauthRequired("google")
     if resp.status_code >= 400:
         raise ToolError(
             "provider_request_failed",

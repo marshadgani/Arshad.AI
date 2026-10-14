@@ -27,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...models.user import User
 from ...tools.base import ProviderNotLinked, ProviderReauthRequired, ToolError
+from .gather import describe_error
 
 _log = logging.getLogger(__name__)
 
@@ -43,6 +44,7 @@ class CalendarResult:
     events: list[dict[str, Any]] = field(default_factory=list)
     connected: bool = True
     needs_reauth: bool = False
+    calendar_truncated: bool = False
     partial_failures: list[str] = field(default_factory=list)
 
 
@@ -82,7 +84,10 @@ async def list_calendar_events(
             "timeMax": time_max,
             "maxResults": CALENDAR_PAGE_SIZE,
             "orderBy": "startTime",
-            "fields": "nextPageToken,items(status,summary,start/date,end/date)",
+            "fields": (
+                "nextPageToken,items(status,summary,"
+                "start(date,dateTime),end(date,dateTime))"
+            ),
         },
     )
 
@@ -121,15 +126,24 @@ def parse_calendar_result(result: Any) -> CalendarResult:
     if isinstance(result, ProviderReauthRequired):
         return CalendarResult(needs_reauth=True, partial_failures=["calendar"])
     if isinstance(result, (ToolError, httpx.HTTPError, ValueError, KeyError)):
-        _log.warning("Calendar fetch failed: %s", result, exc_info=result)
+        _log.warning("Calendar fetch failed: %s", describe_error(result))
         return CalendarResult(partial_failures=["calendar"])
     if isinstance(result, BaseException):
         raise result
-    body = result or {}
-    failures: list[str] = []
-    if body.get("nextPageToken"):
-        failures.append("calendar_truncated")
-    return CalendarResult(events=body.get("items") or [], partial_failures=failures)
+    # A null or non-dict body is a failed fetch, never an empty calendar.
+    if not isinstance(result, dict):
+        _log.warning("Calendar fetch returned %s body", type(result).__name__)
+        return CalendarResult(partial_failures=["calendar"])
+    items = result.get("items") or []
+    if not isinstance(items, list):
+        _log.warning("Calendar fetch returned non-list items: %s", type(items).__name__)
+        return CalendarResult(partial_failures=["calendar"])
+    truncated = bool(result.get("nextPageToken"))
+    return CalendarResult(
+        events=items,
+        calendar_truncated=truncated,
+        partial_failures=["calendar_truncated"] if truncated else [],
+    )
 
 
 def parse_gmail_result(result: Any) -> GmailResult:
@@ -144,7 +158,7 @@ def parse_gmail_result(result: Any) -> GmailResult:
     if isinstance(result, ProviderReauthRequired):
         return GmailResult(needs_reauth=True, partial_failures=["gmail"])
     if isinstance(result, (ToolError, httpx.HTTPError, ValueError, KeyError)):
-        _log.warning("Gmail fetch failed: %s", result, exc_info=result)
+        _log.warning("Gmail fetch failed: %s", describe_error(result))
         return GmailResult(partial_failures=["gmail"])
     if isinstance(result, BaseException):
         raise result
