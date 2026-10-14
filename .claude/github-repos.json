@@ -3802,7 +3802,7 @@
     "headroom": {
       "url": "https://github.com/headroomlabs-ai/headroom.git",
       "name": "headroom",
-      "last_fetched": "2026-10-05 19:32 UTC",
+      "last_fetched": "2026-10-14 21:13 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -3813,19 +3813,19 @@
           "agno.md",
           "ccr.md",
           "transforms.md",
+          "learn.md",
           "langchain.md",
           "ARCHITECTURE.md",
           "index.md",
           "README.md",
-          "benchmark.py",
-          "scenarios.py"
+          "benchmark.py"
         ]
       }
     },
     "agent-browser": {
       "url": "https://github.com/vercel-labs/agent-browser.git",
       "name": "agent-browser",
-      "last_fetched": "2026-10-05 19:32 UTC",
+      "last_fetched": "2026-10-14 21:13 UTC",
       "components": {
         "skills": [
           "agent-browser",
@@ -3848,7 +3848,7 @@
     "andrej-karpathy-skills": {
       "url": "https://github.com/multica-ai/andrej-karpathy-skills.git",
       "name": "andrej-karpathy-skills",
-      "last_fetched": "2026-10-05 19:32 UTC",
+      "last_fetched": "2026-10-14 21:13 UTC",
       "components": {
         "skills": [
           "karpathy-guidelines"
@@ -3862,7 +3862,7 @@
     "ui-ux-pro-max-skill": {
       "url": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git",
       "name": "ui-ux-pro-max-skill",
-      "last_fetched": "2026-10-14 21:11 UTC",
+      "last_fetched": "2026-10-14 21:13 UTC",
       "components": {
         "skills": [
           "banner-design",
