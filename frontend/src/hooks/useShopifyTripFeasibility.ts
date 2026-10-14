@@ -90,8 +90,8 @@ export function useShopifyTripFeasibility(): UseShopifyTripFeasibilityResult {
         throw new Error('Too many checks. Wait a minute and try again.');
       }
       if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`${res.status} ${res.statusText}: ${text.slice(0, 200)}`);
+        // The raw body may carry proxy or server internals, so only the status is shown.
+        throw new Error(`The check failed (status ${res.status}). Try again shortly.`);
       }
       const body = (await res.json()) as { data?: TripFeasibilityResult } | null;
       const data = body?.data;

@@ -258,4 +258,12 @@ describe('ShopifyTripFeasibility', () => {
     expect(abort).toHaveBeenCalled();
     abort.mockRestore();
   });
+
+  it('shows a generic message and never the raw server body on a 5xx', async () => {
+    mockFetch(502, '<html>nginx/1.25 internal host 10.0.0.7</html>');
+    render(<ShopifyTripFeasibility />);
+    submit();
+    expect(await screen.findByText(/The check failed \(status 502\)/)).toBeInTheDocument();
+    expect(screen.queryByText(/nginx|10\.0\.0\.7/)).not.toBeInTheDocument();
+  });
 });

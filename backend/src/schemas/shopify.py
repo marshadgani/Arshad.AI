@@ -138,16 +138,20 @@ class TripFeasibilityRequest(BaseModel):
         return self
 
 
+# Google event titles can run past 1000 characters; the service truncates to this.
+EVENT_TITLE_MAX = 1024
+
+
 class TripConflict(BaseModel):
     """Flat on the wire; the validator makes each `type` carry its own fields
     and none of the other type's."""
 
     type: Literal["stockout", "calendar_event"]
-    variant_id: Optional[str] = None
-    projected_stockout_date: Optional[str] = None
-    event_title: Optional[str] = None
-    event_start: Optional[str] = None
-    event_end: Optional[str] = None
+    variant_id: Optional[str] = Field(None, max_length=255)
+    projected_stockout_date: Optional[str] = Field(None, max_length=10)
+    event_title: Optional[str] = Field(None, max_length=EVENT_TITLE_MAX)
+    event_start: Optional[str] = Field(None, max_length=64)
+    event_end: Optional[str] = Field(None, max_length=64)
 
     @model_validator(mode="after")
     def _check_fields_match_type(self) -> Self:
@@ -165,8 +169,8 @@ class TripAllDayEvent(BaseModel):
     """Informational only: an all-day event overlapping the window is listed
     but is not a conflict."""
 
-    title: str
-    start_date: str
+    title: str = Field(max_length=EVENT_TITLE_MAX)
+    start_date: str = Field(max_length=10)
 
 
 UnavailableSourceName = Literal[

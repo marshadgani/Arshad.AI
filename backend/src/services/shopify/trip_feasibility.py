@@ -27,6 +27,7 @@ from datetime import date, datetime, time, timedelta, timezone
 from typing import Any
 
 from ...schemas.shopify import (
+    EVENT_TITLE_MAX,
     TripAllDayEvent,
     TripConflict,
     TripFeasibilityResponse,
@@ -99,7 +100,7 @@ def _stockout_conflicts(
                     stockout,
                     TripConflict(
                         type="stockout",
-                        variant_id=variant_id,
+                        variant_id=variant_id[:255],
                         projected_stockout_date=stockout.isoformat(),
                     ),
                 )
@@ -125,7 +126,7 @@ def _calendar_findings(
             continue
         if event.get("status") == "cancelled":
             continue
-        title = str(event.get("summary") or "(no title)")
+        title = str(event.get("summary") or "(no title)")[:EVENT_TITLE_MAX]
         start = event.get("start") if isinstance(event.get("start"), dict) else {}
         end = event.get("end") if isinstance(event.get("end"), dict) else {}
         if start.get("dateTime"):
@@ -196,7 +197,14 @@ def _determine_verdict(
     *,
     degraded: bool,
 ) -> str:
-    """Map conflicts + degradation state to the wire verdict string."""
+    """Map conflicts + degradation state to the wire verdict string.
+
+    Deliberate deviation from the original spec, which said any degraded source
+    gives "unknown": a conflict actually found in healthy data stays "no-go".
+    Hiding it behind "unknown" because an unrelated source failed would be the
+    less cautious answer. "go" is returned only when nothing conflicts and
+    nothing was degraded.
+    """
     if conflicts:
         return "no-go"
     if degraded:

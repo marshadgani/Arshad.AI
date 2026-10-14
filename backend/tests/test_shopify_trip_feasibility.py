@@ -188,6 +188,33 @@ def test_non_string_event_title_is_coerced_not_a_crash():
     assert r.conflicts[0].event_title == "12345"
 
 
+def test_overlong_event_title_is_truncated_not_a_validation_error():
+    event = timed_event(
+        "2026-06-11T10:00:00Z", "2026-06-11T11:00:00Z", title="x" * 5000
+    )
+    r = run(cal=CalendarResult(events=[event]))
+    assert r.verdict == "no-go"
+    assert len(r.conflicts[0].event_title) == 1024
+
+
+def test_overlong_all_day_title_is_truncated_not_a_validation_error():
+    cal = CalendarResult(
+        events=[all_day_event("2026-06-11", "2026-06-12", title="y" * 5000)]
+    )
+    r = run(cal=cal)
+    assert len(r.all_day_events[0].title) == 1024
+
+
+def test_a_conflict_in_healthy_data_stays_no_go_when_another_source_failed():
+    # Documented deviation from the spec's "any degradation gives unknown": a
+    # conflict that was really found is not hidden by an unrelated failure.
+    event = timed_event("2026-06-11T10:00:00Z", "2026-06-11T11:00:00Z")
+    cal = CalendarResult(events=[event])
+    r = run(cal=cal, orders=None, partial_failures=["orders"])
+    assert r.verdict == "no-go"
+    assert "orders" in r.partial_failures
+
+
 def test_cancelled_timed_event_is_ignored():
     cal = CalendarResult(
         events=[
@@ -844,9 +871,7 @@ def test_route_setup_failure_log_has_no_shop_domain(client, monkeypatch, caplog)
 def test_route_calendar_event_titles_never_logged(client, monkeypatch, caplog):
     cal = {
         "items": [
-            timed_event(
-                "2026-06-11T09:00:00Z", "2026-06-11T10:00:00Z", "SECRET-TITLE"
-            )
+            timed_event("2026-06-11T09:00:00Z", "2026-06-11T10:00:00Z", "SECRET-TITLE")
         ]
     }
     monkeypatch.setattr(route, "_list_calendar_events", AsyncMock(return_value=cal))
