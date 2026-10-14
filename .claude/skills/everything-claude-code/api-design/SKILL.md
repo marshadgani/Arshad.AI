@@ -1,8 +1,7 @@
 ---
 name: api-design
 description: REST API design patterns including resource naming, status codes, pagination, filtering, error responses, versioning, and rate limiting for production APIs. Use when designing or reviewing REST endpoints, resource names, status codes, pagination, or versioning.
-metadata:
-  origin: ECC
+license: MIT
 ---
 
 # API Design Patterns
@@ -304,7 +303,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
 
 # API key (for server-to-server)
 GET /api/v1/data
-X-API-Key: sk_live_...
+X-API-Key: sk_live_abc123
 ```
 
 ### Authorization Patterns
