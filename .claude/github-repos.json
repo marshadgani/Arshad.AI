@@ -201,7 +201,7 @@
     "claude-mem": {
       "url": "https://github.com/thedotmack/claude-mem.git",
       "name": "claude-mem",
-      "last_fetched": "2026-10-05 19:30 UTC",
+      "last_fetched": "2026-10-14 18:08 UTC",
       "components": {
         "skills": [
           "mem-setup",
@@ -223,6 +223,7 @@
           "wowerpoint",
           "make-plan",
           "ccs-align",
+          "screenpipe",
           "version-bump",
           "how-it-works",
           "do",
