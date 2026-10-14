@@ -117,10 +117,23 @@ export interface TripInfrastructureConflict {
   event_end: null;
 }
 
+export interface TripCalendlyConflict {
+  type: 'calendly_event';
+  calendly_event_title: string;
+  calendly_event_start: string;
+  calendly_event_end: string;
+  variant_id: null;
+  projected_stockout_date: null;
+  event_title: null;
+  event_start: null;
+  event_end: null;
+}
+
 export type TripConflict =
   | TripStockoutConflict
   | TripCalendarConflict
-  | TripInfrastructureConflict;
+  | TripInfrastructureConflict
+  | TripCalendlyConflict;
 
 export interface TripAllDayEvent {
   title: string;
@@ -129,7 +142,6 @@ export interface TripAllDayEvent {
 
 export type UnavailableSourceName =
   | 'booking_com_pricing'
-  | 'calendly_availability'
   | 'render_health'
   | 'supabase_health';
 
@@ -159,6 +171,9 @@ export interface TripFeasibilityResult {
   supabase_needs_sync: boolean;
   supabase_stale: boolean;
   supabase_sync_error: boolean;
+  calendly_connected: boolean;
+  calendly_needs_reauth: boolean;
+  calendly_truncated: boolean;
   partial_failures: string[];
 }
 

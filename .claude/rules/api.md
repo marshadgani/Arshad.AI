@@ -90,6 +90,12 @@ The infrastructure check adds nine flags: `render_connected`, `render_needs_sync
 `supabase_needs_sync`, `supabase_stale` and `supabase_sync_error`. Any of the
 needs-sync, stale, error or truncated flags on a connected provider degrades the
 verdict to `unknown`.
+Calendly is a required live source: the body adds `calendly_connected`,
+`calendly_needs_reauth` and `calendly_truncated`. A Calendly 401/403 is reported
+as `calendly_needs_reauth`, never as an HTTP 401. A meeting in the window is a
+`calendly_event` conflict (`calendly_event_title/start/end`); not connected,
+reauth, a failed read (`partial_failures` gains `calendly`) or a read at the
+100-event cap (`calendly_truncated`) is `unknown`, never `go`.
 
 ## Error Responses
 

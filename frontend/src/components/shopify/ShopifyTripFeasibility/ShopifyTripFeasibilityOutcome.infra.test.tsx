@@ -23,6 +23,9 @@ const BASE: TripFeasibilityResult = {
   supabase_needs_sync: false,
   supabase_stale: false,
   supabase_sync_error: false,
+  calendly_connected: true,
+  calendly_needs_reauth: false,
+  calendly_truncated: false,
   partial_failures: [],
 };
 

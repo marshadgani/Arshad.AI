@@ -13,7 +13,6 @@ function result(overrides: Partial<TripFeasibilityResult> = {}): TripFeasibility
     all_day_events: [],
     unavailable_sources: [
       { name: 'booking_com_pricing', reason: 'not_connected' },
-      { name: 'calendly_availability', reason: 'not_connected' },
       { name: 'render_health', reason: 'not_connected' },
       { name: 'supabase_health', reason: 'not_connected' },
     ],
@@ -33,6 +32,9 @@ function result(overrides: Partial<TripFeasibilityResult> = {}): TripFeasibility
     supabase_needs_sync: false,
     supabase_stale: false,
     supabase_sync_error: false,
+    calendly_connected: true,
+    calendly_needs_reauth: false,
+    calendly_truncated: false,
     partial_failures: [],
     ...overrides,
   };

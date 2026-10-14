@@ -176,7 +176,7 @@ export default function Integrations() {
   };
 
   const onConnect = async (item: IntegrationItem) => {
-    if (item.kind === 'project_apikey') {
+    if (item.kind === 'project_apikey' || item.kind === 'personal_apikey') {
       setApiKeyModal(item);
       setApiKeyDraft('');
       setApiKeyErr(null);

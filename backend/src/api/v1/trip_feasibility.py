@@ -10,12 +10,15 @@ never show stale or degraded data as current.
 
 The `_`-prefixed wrappers are the same monkeypatch seam used by
 src/api/v1/shopify.py.
+
+Calendly fetch logic (CalendlyFetchResult, resolve_calendly, calendar_time_bounds)
+lives in services/shopify/providers.py alongside CalendarResult.
 """
 
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from functools import partial
 from typing import Any
 
@@ -45,7 +48,6 @@ _RATE_LIMIT = 10
 _RATE_WINDOW_SECONDS = 60
 
 _log = logging.getLogger(__name__)
-
 
 # ── Collaborator seams (monkeypatchable module globals) ──────────────────
 
@@ -143,22 +145,6 @@ async def _mark_healthy(integration: Integration, db: AsyncSession) -> None:
 # ── Calendar helpers ──────────────────────────────────────────────────────
 
 
-def _calendar_time_bounds(start_date: date, end_date: date) -> tuple[str, str]:
-    """ISO strings bracketing the travel window with one day of margin each side.
-
-    The extra margin ensures a timed event near a boundary is fetched; the
-    service layer performs the precise overlap test.
-    """
-    time_min = datetime.combine(
-        start_date - timedelta(days=1), time.min, tzinfo=timezone.utc
-    )
-    # +2 days at midnight is the exclusive bound that covers all of end_date + 1.
-    time_max = datetime.combine(
-        end_date + timedelta(days=2), time.min, tzinfo=timezone.utc
-    )
-    return time_min.isoformat(), time_max.isoformat()
-
-
 async def _resolve_calendar(calendar_call: Any) -> providers.CalendarResult:
     """Invoke `calendar_call` and parse the outcome.
 
@@ -195,6 +181,7 @@ def _verdict(
     orders: dict | None = None,
     failures: list[str] | None = None,
     infra: tuple[Integration | None, Integration | None] = (None, None),
+    calendly: providers.CalendlyFetchResult,
 ) -> JSONResponse:
     render, supabase = infra
     return _ok(
@@ -213,6 +200,11 @@ def _verdict(
             render_status=render.status if render else None,
             supabase_config=_config_dict(supabase),
             supabase_status=supabase.status if supabase else None,
+            calendly_events=calendly.events,
+            calendly_connected=calendly.connected,
+            calendly_needs_reauth=calendly.needs_reauth,
+            calendly_truncated=calendly.truncated,
+            calendly_partial_failure=calendly.partial_failure,
         )
     )
 
@@ -231,13 +223,19 @@ async def check_trip_feasibility(
     await _check_rate_limit(user_id)
     as_of = datetime.now(timezone.utc)
 
-    cal_time_min, cal_time_max = _calendar_time_bounds(body.start_date, body.end_date)
+    cal_time_min, cal_time_max = providers.calendar_time_bounds(
+        body.start_date, body.end_date
+    )
     calendar_call = partial(
         _list_calendar_events,
         db,
         current_user,
         cal_time_min,
         cal_time_max,
+    )
+
+    calendly_call = partial(
+        providers.resolve_calendly, user_id, db, body.start_date, body.end_date
     )
 
     infra = await _find_infra_integrations(user_id, db)
@@ -248,6 +246,7 @@ async def check_trip_feasibility(
             infra=infra,
             body=body,
             cal=await _resolve_calendar(calendar_call),
+            calendly=await calendly_call(),
             shopify_connected=False,
         )
     if integration.status == "expired":
@@ -256,6 +255,7 @@ async def check_trip_feasibility(
             infra=infra,
             body=body,
             cal=await _resolve_calendar(calendar_call),
+            calendly=await calendly_call(),
             shopify_connected=True,
             shopify_needs_reauth=True,
         )
@@ -276,6 +276,7 @@ async def check_trip_feasibility(
             infra=infra,
             body=body,
             cal=await _resolve_calendar(calendar_call),
+            calendly=await calendly_call(),
             shopify_connected=True,
             shopify_needs_reauth=needs_reauth,
             failures=[] if needs_reauth else ["shopify"],
@@ -284,6 +285,9 @@ async def check_trip_feasibility(
     since_iso = (as_of - timedelta(days=gather.VELOCITY_WINDOW_DAYS)).strftime(
         "%Y-%m-%dT%H:%M:%SZ"
     )
+    # Sequential on purpose: the calendar call and the Calendly read both use the
+    # request's AsyncSession, which must never run two operations at once.
+    calendly = await calendly_call()
     variants_result, orders_result, calendar_result = await gather.gather_shopify_pair(
         partial(_execute_variants_query, ctx.shop, token),
         partial(_execute_orders_query, ctx.shop, token, since_iso),
@@ -297,6 +301,7 @@ async def check_trip_feasibility(
             infra=infra,
             body=body,
             cal=cal,
+            calendly=calendly,
             shopify_connected=True,
             shopify_needs_reauth=True,
         )
@@ -315,6 +320,7 @@ async def check_trip_feasibility(
         infra=infra,
         body=body,
         cal=cal,
+        calendly=calendly,
         shopify_connected=True,
         variants=variants,
         orders=orders,
