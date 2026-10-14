@@ -9,11 +9,10 @@ Scope: GitHub person/project entities only (no calendar/email), write-only
 (Arshad.AI never reads the vault back), no Maps of Content, and no
 Obsidian Local REST API.
 
-Stale file pruning: when an entity is demoted to private or deleted, its vault
-note is removed by the git layer (``git rm --cached``) in the same commit as
-new/changed files. This is why ``push_vault`` is always called, even when the
-public entity set is empty — the git layer must be given the opportunity to
-prune any managed-prefix files that remain in the vault repo.
+Additive only: the export never deletes anything from the vault. A note stays
+after its entity is demoted or removed, and an existing note is never rewritten
+(see ``obsidian_vault_git._detect_changed_files``). Demoting an entity to private
+therefore does not remove a note that was already exported: delete it by hand.
 """
 
 from __future__ import annotations
@@ -41,6 +40,7 @@ class ExportSummary:
     relationships_exported: int
     files_written: int
     commit_sha: str | None
+    files_skipped: int = 0
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -77,10 +77,7 @@ def _to_relationships(rows: list[dict[str, Any]]) -> list[Relationship]:
 async def export(
     *, user: User, db: AsyncSession, payload: dict[str, Any]
 ) -> dict[str, Any]:
-    """Export the user's public ontology to the vault repo and return an ExportSummary dict.
-
-    Never deletes by itself on an empty result: that needs ``allow_empty_prune``.
-    """
+    """Export the user's public ontology to the vault repo and return an ExportSummary dict."""
     entity_rows = await repo.fetch_public_entities(db, user.id)
     rel_rows = await repo.fetch_public_relationships(db, user.id)
     # Reads are done: end the transaction now so no DB connection is held
@@ -89,14 +86,7 @@ async def export(
     await db.commit()
 
     if not entity_rows:
-        # An empty set prunes every managed note, so a wrong user id or a bulk
-        # demotion bug would wipe the vault with a success status.
-        if not payload.get("allow_empty_prune"):
-            raise IngestionError(
-                "vault_export_refused: no public entities; pass "
-                "allow_empty_prune=true in the trigger payload to prune the vault"
-            )
-        logger.warning("No public entities for user %s; pruning vault by request.", user.id)
+        logger.warning("No public entities for user %s; nothing to export.", user.id)
     elif not rel_rows:
         logger.warning(
             "No public relationships for user %s: relationships default to "
@@ -125,4 +115,5 @@ async def export(
         relationships_exported=len(relationships),
         files_written=result.files_written,
         commit_sha=result.commit_sha,
+        files_skipped=result.files_skipped,
     ).as_dict()
