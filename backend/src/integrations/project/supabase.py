@@ -3,8 +3,9 @@
 API: https://api.supabase.com (management API).
 Auth: Bearer <PAT>  — Personal Access Token from supabase.com/dashboard/account/tokens.
 
-connect() probes /v1/projects to validate the token, stores it, and
-records the project list in integration.config.
+connect() probes /v1/projects to validate the token and stores it, recording
+the project count in ApiKeyCredential.extra. sync() writes the project list to
+integration.config. The management API lists at most 10 projects here.
 """
 
 from __future__ import annotations

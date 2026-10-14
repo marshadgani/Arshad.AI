@@ -86,6 +86,12 @@ async def store_api_key(
             creds.extra = extra
     integration.status = "connected"
     integration.last_error = None
+    # A new key says nothing about the old snapshot's freshness: drop its
+    # timestamp so the trip check reads "needs sync" until the next real sync.
+    if isinstance(integration.config, dict) and "synced_at" in integration.config:
+        integration.config = {
+            k: v for k, v in integration.config.items() if k != "synced_at"
+        }
     await db.commit()
     await db.refresh(integration)
     return ConnectResult(integration_id=str(integration.id), redirect_url=None)

@@ -48,7 +48,7 @@ def _make_project(
 # REQ-179-2 AC-1,2,3
 @pytest.mark.asyncio
 async def test_sync_stores_project_status_and_synced_at(monkeypatch):
-    """TC-008: config contains projects with status field and synced_at ISO UTC timestamp."""
+    """TC-008: config holds projects with status and an ISO synced_at."""
     projects = [_make_project("ref-1", "prod-db", "ACTIVE_HEALTHY")]
     resp = _fake_response(200, projects)
 
@@ -164,17 +164,19 @@ async def test_sync_unhealthy_projects_sorted_first(monkeypatch):
     )
 
 
-# TC-012: fetch failure -> mark_error called, IntegrationError message is type name only, no project name
+# TC-012: fetch failure -> mark_error, message is the type name only
 # REQ-179-2 AC-4 / REQ-179-11
 @pytest.mark.asyncio
 async def test_sync_failure_marks_error_type_name_only(monkeypatch, caplog):
-    """TC-012: network failure -> IntegrationError code='sync_failed'; message is type name only."""
+    """TC-012: network failure -> sync_failed, message is type name only."""
     import httpx as _httpx
 
     SECRET_PROJECT = "secret-project-name"
 
     async def fake_get(url, **kwargs):
-        raise _httpx.TimeoutException("timeout")
+        raise _httpx.TimeoutException(
+            f"timeout https://api.supabase.com/v1/projects {SECRET_PROJECT}"
+        )
 
     fake_client = MagicMock()
     fake_client.__aenter__ = AsyncMock(return_value=fake_client)
@@ -190,16 +192,19 @@ async def test_sync_failure_marks_error_type_name_only(monkeypatch, caplog):
     monkeypatch.setattr(sb_mod, "decrypt", lambda _: "test-pat")
     monkeypatch.setattr(sb_mod.httpx, "AsyncClient", lambda **kw: fake_client)
     monkeypatch.setattr(sb_mod, "mark_error", mock_mark_error)
+    caplog.set_level("DEBUG")
 
     with pytest.raises(IntegrationError) as exc_info:
         await SupabaseIntegration().sync(integration=integration, db=db)
 
     mock_mark_error.assert_awaited_once()
+    # mark_error receives the real exception, so the secret is in its text; the
+    # message raised to the caller and every log line must not carry it.
+    assert SECRET_PROJECT in str(mock_mark_error.await_args.kwargs["err"])
     msg = exc_info.value.message
-    assert SECRET_PROJECT not in msg
-    assert "api.supabase.com" not in msg
-    for record in caplog.records:
-        assert SECRET_PROJECT not in record.message
+    assert msg == "TimeoutException"
+    assert SECRET_PROJECT not in caplog.text
+    assert "api.supabase.com" not in caplog.text
 
 
 # TC-013: config excludes API key and raw response

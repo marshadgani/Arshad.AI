@@ -1087,17 +1087,26 @@ def test_infra_suspended_service_is_no_go():
 
 
 @pytest.mark.parametrize(
-    "deploy", ["build_failed", "update_failed", "canceled", "pre_deploy_failed"]
+    "deploy", ["build_failed", "update_failed", "pre_deploy_failed"]
 )
 def test_infra_failed_deploy_is_conflict(deploy):
     conflicts, _ = infra(rc=render_cfg([svc(deploy=deploy)]))
     assert [c.infra_state for c in conflicts] == [deploy]
 
 
-@pytest.mark.parametrize("deploy", ["live", "build_in_progress"])
+@pytest.mark.parametrize(
+    "deploy", ["live", "build_in_progress", "created", "deactivated", "canceled"]
+)
 def test_infra_other_deploy_states_are_not_conflicts(deploy):
     conflicts, _, unreadable = infra_full(rc=render_cfg([svc(deploy=deploy)]))
     assert conflicts == [] and unreadable == []
+
+
+@pytest.mark.parametrize("deploy", ["unchecked", "brand_new_status", 5, ""])
+def test_infra_unchecked_or_unknown_deploy_status_is_unreadable_never_healthy(deploy):
+    conflicts, _, unreadable = infra_full(rc=render_cfg([svc(deploy=deploy)]))
+    assert conflicts == []
+    assert "render_health" in unreadable
 
 
 def test_infra_unhealthy_supabase_project_is_conflict():
@@ -1280,3 +1289,23 @@ async def test_find_infra_integrations_scopes_to_caller_or_shared_row():
     assert "integrations.user_id = " in sql
     assert "integrations.user_id IS NULL" in sql
     assert "integrations.status IN" in sql
+    assert "integrations.slug IN" in sql
+    # The caller's own row must sort before the shared (NULL owner) row.
+    assert "ORDER BY integrations.user_id IS NULL" in sql
+    assert "error" in route.ACTIVE_STATUSES
+    assert "11111111-1111-1111-1111-111111111111" in str(
+        seen[0].compile().params.values()
+    )
+
+
+def test_non_object_stored_config_reads_as_empty_not_a_crash():
+    class _Row:
+        config = ["not", "an", "object"]
+
+    assert route._config_dict(_Row()) == {}
+    assert route._config_dict(None) is None
+
+    class _Good:
+        config = {"services": []}
+
+    assert route._config_dict(_Good()) == {"services": []}

@@ -77,7 +77,9 @@ def test_deploy_fetches_never_exceed_three_in_flight_and_only_ten_are_fetched(
     assert state["deploy_calls"] == 10
 
 
-def test_service_without_id_and_non_string_status_store_none_not_a_guess(monkeypatch):
+def test_service_without_id_and_non_string_status_are_unchecked_not_healthy(
+    monkeypatch,
+):
     class _C:
         def __init__(self, *a, **k):
             pass
@@ -100,7 +102,10 @@ def test_service_without_id_and_non_string_status_store_none_not_a_guess(monkeyp
 
     row, db = _setup(monkeypatch, _C)
     asyncio.run(RenderIntegration().sync(integration=row, db=db))
-    assert [s["latest_deploy_status"] for s in row.config["services"]] == [None, None]
+    assert [s["latest_deploy_status"] for s in row.config["services"]] == [
+        "unchecked",
+        "unchecked",
+    ]
 
 
 def _row(slug, user_id):

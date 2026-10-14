@@ -12,6 +12,7 @@ from datetime import datetime
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
+import httpx
 import pytest
 from src.integrations.base import IntegrationError
 from src.integrations.project import render as render_mod
@@ -62,7 +63,7 @@ def _make_deploy(status: str) -> list:
 # REQ-179-1 AC-1,2,3
 @pytest.mark.asyncio
 async def test_sync_stores_health_fields_and_synced_at(monkeypatch):
-    """TC-001: config contains suspended, latest_deploy_status per service and synced_at ISO timestamp."""
+    """TC-001: config holds per-service state and an ISO synced_at."""
     services_payload = [_make_service("srv-1", "api")]
     deploy_payload = _make_deploy("live")
 
@@ -162,17 +163,17 @@ async def test_sync_no_deploys_stores_none(monkeypatch):
     assert integration.config["services"][0]["latest_deploy_status"] is None
 
 
-# TC-004: deploy fetch per-service failure -> sync fails, mark_error called, message is type name only
-# REQ-179-1 AC-4,5 / REQ-179-11
+# TC-004: one failed per-service deploy lookup does not discard the snapshot
 @pytest.mark.asyncio
-async def test_sync_deploy_fetch_failure_marks_error_and_raises(monkeypatch, caplog):
-    """TC-004: deploy fetch timeout -> IntegrationError('sync_failed', type_name); no URL or service name in message."""
+async def test_sync_deploy_fetch_failure_is_unchecked_and_leaks_nothing(
+    monkeypatch, caplog
+):
     services_payload = [_make_service("srv-1", "SECRET-SERVICE-NAME")]
 
     async def fake_get(url, **kwargs):
         if "/services?" in url:
             return _fake_response(200, services_payload)
-        raise asyncio.TimeoutError()
+        raise httpx.ConnectError("boom SECRET-SERVICE-NAME https://api.render.com/x")
 
     fake_client = MagicMock()
     fake_client.__aenter__ = AsyncMock(return_value=fake_client)
@@ -184,28 +185,26 @@ async def test_sync_deploy_fetch_failure_marks_error_and_raises(monkeypatch, cap
     db = MagicMock()
     db.scalar = AsyncMock(return_value=MagicMock(encrypted_key=b"enc"))
     mock_mark_error = AsyncMock()
+    mock_mark_synced = AsyncMock()
 
     monkeypatch.setattr(render_mod, "decrypt", lambda _: "test-key")
     monkeypatch.setattr(render_mod.httpx, "AsyncClient", lambda **kw: fake_client)
     monkeypatch.setattr(render_mod, "mark_error", mock_mark_error)
+    monkeypatch.setattr(render_mod, "mark_synced", mock_mark_synced)
+    caplog.set_level("DEBUG")
 
-    with pytest.raises(IntegrationError) as exc_info:
-        await RenderIntegration().sync(integration=integration, db=db)
+    await RenderIntegration().sync(integration=integration, db=db)
 
-    mock_mark_error.assert_awaited_once()
-    err = exc_info.value
-    assert err.code == "sync_failed"
-    assert "SECRET-SERVICE-NAME" not in err.message
-    assert "render.com" not in err.message
-    for record in caplog.records:
-        assert "SECRET-SERVICE-NAME" not in record.message
+    mock_mark_error.assert_not_awaited()
+    assert integration.config["services"][0]["latest_deploy_status"] == "unchecked"
+    assert "SECRET-SERVICE-NAME" not in caplog.text
 
 
 # TC-005: services-list fetch failure -> mark_error called, IntegrationError raised
 # REQ-179-1 AC-4,5
 @pytest.mark.asyncio
 async def test_sync_services_list_failure_marks_error(monkeypatch):
-    """TC-005: /services HTTP error -> mark_error called, IntegrationError with type name only."""
+    """TC-005: HTTP error -> mark_error, IntegrationError with type name only."""
     import httpx as _httpx
 
     async def fake_get(url, **kwargs):
@@ -305,3 +304,28 @@ async def test_sync_config_does_not_contain_api_key(monkeypatch):
     assert SECRET_KEY not in config_json
     allowed_keys = {"service_count", "services_truncated", "services", "synced_at"}
     assert set(integration.config.keys()) <= allowed_keys
+
+
+def test_deploy_value_reraises_cancellation():
+    with pytest.raises(asyncio.CancelledError):
+        render_mod._deploy_value(asyncio.CancelledError())
+
+
+def test_deploy_value_maps_failure_to_unchecked():
+    assert render_mod._deploy_value(RuntimeError("x")) == render_mod.DEPLOY_UNCHECKED
+    assert render_mod._deploy_value("live") == "live"
+
+
+@pytest.mark.asyncio
+async def test_mark_error_records_type_and_http_status_only():
+    from src.integrations.project._shared import mark_error
+
+    class _Err(Exception):
+        response = MagicMock(status_code=503)
+
+    integ = MagicMock()
+    db = MagicMock()
+    db.commit = AsyncMock()
+    await mark_error(integration=integ, db=db, err=_Err("secret srv-abc"))
+    assert integ.last_error == "_Err (HTTP 503)"
+    assert integ.status == "error"

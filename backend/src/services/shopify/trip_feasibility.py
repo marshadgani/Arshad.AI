@@ -54,7 +54,21 @@ UNAVAILABLE_SOURCE_NAMES = (
 
 INFRA_STALENESS_HOURS = 24
 INFRA_FAILED_DEPLOY_STATUSES = frozenset(
-    {"build_failed", "update_failed", "canceled", "pre_deploy_failed"}
+    {"build_failed", "update_failed", "pre_deploy_failed"}
+)
+# A deploy status that is neither failed nor in this set is unknown to us and
+# makes the Render source unreadable. "canceled" is a deliberate stop that leaves
+# the previous deploy serving, so it is not an outage.
+INFRA_HEALTHY_DEPLOY_STATUSES = frozenset(
+    {
+        "live",
+        "created",
+        "build_in_progress",
+        "update_in_progress",
+        "pre_deploy_in_progress",
+        "deactivated",
+        "canceled",
+    }
 )
 INFRA_HEALTHY_PROJECT_STATUS = "ACTIVE_HEALTHY"
 
@@ -264,6 +278,12 @@ def _infrastructure_findings(
                 )
             elif isinstance(deploy, str) and deploy in INFRA_FAILED_DEPLOY_STATUSES:
                 conflicts.append(_infra_conflict("render", svc.get("name"), deploy))
+            elif deploy is not None and (
+                not isinstance(deploy, str)
+                or deploy not in INFRA_HEALTHY_DEPLOY_STATUSES
+            ):
+                # "unchecked", an unrecognised status, or a bad value: unknown.
+                render_unreadable = True
             elif suspended != "not_suspended":
                 # Unknown suspended state: cannot determine service health.
                 # Note: suspended="not_suspended" with deploy=None means the

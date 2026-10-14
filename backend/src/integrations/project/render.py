@@ -4,7 +4,8 @@ API: https://api.render.com/v1/services
 Auth: Bearer rnd_xxx (Render API key)
 
 connect() probes /v1/services?limit=1 to validate the key, then stores it.
-sync()    refreshes a small status snapshot in integration.config.
+sync()    refreshes a small status snapshot in integration.config (first 10
+services only; the rest are counted and flagged as truncated).
 """
 
 from __future__ import annotations
@@ -39,6 +40,9 @@ from ._shared import (
 )
 
 _RENDER_API = "https://api.render.com/v1"
+# Stored when a service's latest deploy could not be read (odd id, failed lookup,
+# unreadable status). The trip check treats it as unknown, never as healthy.
+DEPLOY_UNCHECKED = "unchecked"
 _MAX_SERVICES = 10
 _DEPLOY_CONCURRENCY = 3
 _DEPLOY_TIMEOUT_SECONDS = 5.0
@@ -52,7 +56,8 @@ def _build_service_entries(
 
     `deploy_results` is a parallel sequence aligned to services that have
     an `id` field; services without an id still appear in the output, their
-    `latest_deploy_status` is None.
+    `latest_deploy_status` is DEPLOY_UNCHECKED. A failed lookup is stored the same
+    way, so one flaky service does not discard the rest of the snapshot.
     """
     with_id = iter(deploy_results)
     entries: list[dict[str, Any]] = []
@@ -63,15 +68,27 @@ def _build_service_entries(
                 "name": svc.get("name"),
                 "type": svc.get("type"),
                 "suspended": svc.get("suspended"),
-                "latest_deploy_status": next(with_id) if svc.get("id") else None,
+                "latest_deploy_status": _deploy_value(next(with_id))
+                if svc.get("id")
+                else DEPLOY_UNCHECKED,
             }
         )
     return entries
 
 
-# Render service ids look like "srv-" plus alphanumerics. The id goes into a URL
-# path, so anything else is refused rather than interpolated.
-_SERVICE_ID = re.compile(r"srv-[a-zA-Z0-9]+")
+def _deploy_value(result: Any) -> str | None:
+    """A deploy lookup result as stored: a failed lookup becomes DEPLOY_UNCHECKED."""
+    if isinstance(result, asyncio.CancelledError):
+        raise result
+    if isinstance(result, BaseException):
+        return DEPLOY_UNCHECKED
+    return result
+
+
+# Render web services use "srv-" ids and cron jobs "crn-", each followed by
+# alphanumerics. The id goes into a URL path, so anything else is refused rather
+# than interpolated.
+_SERVICE_ID = re.compile(r"(srv|crn)-[a-zA-Z0-9]+")
 
 
 async def _latest_deploy_status(
@@ -80,9 +97,10 @@ async def _latest_deploy_status(
     api_key: str,
     service_id: str,
 ) -> str | None:
-    """Status of the newest deploy, or None when there is none or the id is odd."""
+    """Status of the newest deploy, None when the service has never deployed, or
+    DEPLOY_UNCHECKED when the id or the status cannot be trusted."""
     if not _SERVICE_ID.fullmatch(service_id):
-        return None
+        return DEPLOY_UNCHECKED
     async with sem:
         resp = await asyncio.wait_for(
             client.get(
@@ -96,7 +114,7 @@ async def _latest_deploy_status(
     if not deploys:
         return None
     status = (deploys[0].get("deploy") or {}).get("status")
-    return status if isinstance(status, str) else None
+    return status if isinstance(status, str) and status else DEPLOY_UNCHECKED
 
 
 async def _probe(api_key: str) -> dict[str, Any]:
@@ -172,12 +190,8 @@ class RenderIntegration(IntegrationProvider):
         except Exception as exc:  # noqa: BLE001
             await mark_error(integration=integration, db=db, err=exc)
             raise IntegrationError("sync_failed", type(exc).__name__)
-        failed = next((r for r in deploy_results if isinstance(r, BaseException)), None)
-        if isinstance(failed, asyncio.CancelledError):
-            raise failed
-        if failed is not None:
-            await mark_error(integration=integration, db=db, err=failed)
-            raise IntegrationError("sync_failed", type(failed).__name__)
+        if any(isinstance(r, asyncio.CancelledError) for r in deploy_results):
+            raise asyncio.CancelledError
         entries = _build_service_entries(kept, deploy_results)
         integration.config = {
             "service_count": len(services),

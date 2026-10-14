@@ -64,6 +64,14 @@ async def _find_integration(user_id: str, db: AsyncSession) -> Integration | Non
     return await state.find_integration(user_id, db)
 
 
+def _config_dict(row: Integration | None) -> dict | None:
+    """The stored snapshot, or None without a row. A non-object value reads as an
+    empty snapshot, which the service reports as unreadable, never as healthy."""
+    if row is None:
+        return None
+    return row.config if isinstance(row.config, dict) else {}
+
+
 async def _find_infra_integrations(
     user_id: str, db: AsyncSession
 ) -> tuple[Integration | None, Integration | None]:
@@ -201,9 +209,9 @@ def _verdict(
             shopify_needs_reauth=shopify_needs_reauth,
             window_days=gather.VELOCITY_WINDOW_DAYS,
             partial_failures=failures or [],
-            render_config=(render.config or {}) if render else None,
+            render_config=_config_dict(render),
             render_status=render.status if render else None,
-            supabase_config=(supabase.config or {}) if supabase else None,
+            supabase_config=_config_dict(supabase),
             supabase_status=supabase.status if supabase else None,
         )
     )

@@ -122,38 +122,42 @@ async def test_sync_flags_truncation_and_caps_at_ten(monkeypatch, integration, d
 
 
 @_sync
-async def test_deploy_failure_fails_sync_without_leaking_names(
-    monkeypatch, integration, db
+async def test_one_failed_deploy_lookup_is_unchecked_and_the_rest_still_sync(
+    monkeypatch, integration, db, caplog
 ):
     def routes(url):
         if url.endswith("/services?limit=20"):
             return _Resp([_service(1), _service(2)])
         if "srv-1" in url:
-            raise httpx.ConnectError("boom secret-name-1")
+            raise httpx.ConnectError("boom secret-name-1 https://api.render.com/x")
         return _Resp([{"deploy": {"status": "live"}}])
 
     monkeypatch.setattr(render_mod.httpx, "AsyncClient", _client(routes))
-    with pytest.raises(IntegrationError) as exc:
-        await RenderIntegration().sync(integration=integration, db=db)
-    assert "secret-name" not in str(exc.value)
-    assert "ConnectError" in str(exc.value)
-    render_mod.mark_error.assert_awaited_once()
-    assert integration.config == {}
+    caplog.set_level("DEBUG")
+
+    await RenderIntegration().sync(integration=integration, db=db)
+
+    statuses = [s["latest_deploy_status"] for s in integration.config["services"]]
+    assert statuses == ["unchecked", "live"]
+    render_mod.mark_error.assert_not_awaited()
+    assert "secret-name" not in caplog.text
 
 
 @_sync
-async def test_deploy_timeout_fails_sync(monkeypatch, integration, db):
+async def test_deploy_timeout_is_unchecked_not_a_failed_sync(
+    monkeypatch, integration, db
+):
     def routes(url):
         if url.endswith("/services?limit=20"):
             return _Resp([_service(1)])
         raise TimeoutError()
 
     monkeypatch.setattr(render_mod.httpx, "AsyncClient", _client(routes))
-    with pytest.raises(IntegrationError) as exc:
-        await RenderIntegration().sync(integration=integration, db=db)
-    assert "TimeoutError" in str(exc.value)
-    render_mod.mark_error.assert_awaited_once()
-    assert integration.config == {}
+
+    await RenderIntegration().sync(integration=integration, db=db)
+
+    assert integration.config["services"][0]["latest_deploy_status"] == "unchecked"
+    render_mod.mark_error.assert_not_awaited()
 
 
 @_sync
@@ -185,4 +189,31 @@ async def test_odd_service_id_never_reaches_the_url(bad_id):
         client, asyncio.Semaphore(1), "key", bad_id
     )
 
-    assert status is None
+    assert status == "unchecked"
+
+
+@pytest.mark.asyncio
+async def test_reconnecting_with_a_new_key_clears_the_old_synced_at():
+    from src.integrations.project._shared import store_api_key
+
+    row = MagicMock()
+    row.id = uuid.uuid4()
+    row.config = {"services": [], "synced_at": "2026-10-14T10:00:00+00:00"}
+    db = MagicMock()
+    db.commit = AsyncMock()
+    db.refresh = AsyncMock()
+    db.scalar = AsyncMock(side_effect=[row, MagicMock()])
+    db.add = MagicMock()
+
+    await store_api_key(
+        db=db,
+        slug="render",
+        api_key="rnd_key",
+        extra={},
+        scopes=[],
+        user_id=None,
+        kind="project_apikey",
+    )
+
+    assert "synced_at" not in row.config
+    assert row.config["services"] == []
