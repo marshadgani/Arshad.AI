@@ -85,6 +85,58 @@ export interface DiscountSimulatorResult {
   partial_failures: string[];
 }
 
+export type TripVerdict = 'go' | 'no-go' | 'unknown';
+
+export interface TripStockoutConflict {
+  type: 'stockout';
+  variant_id: string;
+  projected_stockout_date: string;
+  event_title: null;
+  event_start: null;
+  event_end: null;
+}
+
+export interface TripCalendarConflict {
+  type: 'calendar_event';
+  variant_id: null;
+  projected_stockout_date: null;
+  event_title: string;
+  event_start: string;
+  event_end: string;
+}
+
+export type TripConflict = TripStockoutConflict | TripCalendarConflict;
+
+export interface TripAllDayEvent {
+  title: string;
+  start_date: string;
+}
+
+export type UnavailableSourceName =
+  | 'booking_com_pricing'
+  | 'calendly_availability'
+  | 'deploy_windows';
+
+export interface UnavailableSource {
+  name: UnavailableSourceName;
+  reason: 'not_connected';
+}
+
+export interface TripFeasibilityResult {
+  verdict: TripVerdict;
+  conflicts: TripConflict[];
+  all_day_events: TripAllDayEvent[];
+  unavailable_sources: UnavailableSource[];
+  shopify_connected: boolean;
+  shopify_needs_reauth: boolean;
+  calendar_connected: boolean;
+  calendar_needs_reauth: boolean;
+  variants_truncated: boolean;
+  orders_truncated: boolean;
+  calendar_truncated: boolean;
+  partial_failures: string[];
+}
+
 export type MatchConfidence = 'high' | 'low';
 
 export interface ThreadMeta {
