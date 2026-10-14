@@ -60,6 +60,7 @@ async def test_happy_path_pushes_rendered_files_and_reports_summary():
         "files_written": 2,
         "commit_sha": "sha1",
         "files_skipped": 0,
+        "stale_notes": 0,
     }
     assert msg.startswith("vault export: 2 notes, 1 relationships")
 
@@ -91,6 +92,13 @@ async def test_skipped_count_is_reported():
     push = AsyncMock(return_value=PushResult("no_changes", 0, None, "m", 2))
     _, _, result = await _run([PERSON], [], push=push)
     assert result["files_skipped"] == 2
+
+
+@pytest.mark.asyncio
+async def test_stale_count_is_reported():
+    push = AsyncMock(return_value=PushResult("no_changes", 0, None, "m", 0, 3))
+    _, _, result = await _run([PERSON], [], push=push)
+    assert result["stale_notes"] == 3
 
 
 @pytest.mark.asyncio

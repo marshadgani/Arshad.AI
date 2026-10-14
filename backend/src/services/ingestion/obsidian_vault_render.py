@@ -105,7 +105,7 @@ def _note(entity: Entity, heading: str, links: list[str]) -> str:
     return _frontmatter(entity) + "\n" + title + body
 
 
-_FRONTMATTER_RE = re.compile(r"\A---\n(.*?)\n---\n", re.DOTALL)
+_FRONTMATTER_RE = re.compile(r"\A---\r?\n(.*?)\r?\n---\r?\n", re.DOTALL)
 _LINK_LINE = "- [["
 
 
@@ -131,9 +131,12 @@ def _has_link(text: str, target: str) -> bool:
 def merge_additive(existing: str, rendered: str) -> str:
     """Return *existing* with any links from *rendered* that it lacks added.
 
-    Nothing already in *existing* is changed or removed, so text you added to an
-    exported note survives. New links go under the matching ``## `` heading, right
-    after its last list item, or in a new section at the end if it is gone.
+    Nothing already in *existing* is changed or removed, including its line
+    endings, so text you added to an exported note survives. New links go under
+    the matching ``## `` heading, right after its last list item (nested items
+    included), or in a new section at the end if that heading is gone. A link you
+    deleted on purpose is added back on the next export, because the note is
+    treated as additive.
     """
     wanted = [
         line[len(_LINK_LINE) : -2]
@@ -145,20 +148,26 @@ def merge_additive(existing: str, rendered: str) -> str:
         return existing
     heading = next((ln for ln in rendered.splitlines() if ln.startswith("## ")), None)
     new_lines = [f"{_LINK_LINE}{t}]]" for t in missing]
-    lines = existing.splitlines()
+    eol = "\r\n" if "\r\n" in existing else "\n"
+    lines = existing.split(eol)
     if heading in lines:
-        last = lines.index(heading)
-        for i in range(last + 1, len(lines)):
-            if lines[i].startswith("- "):
+        start = lines.index(heading)
+        last = start
+        for i in range(start + 1, len(lines)):
+            line = lines[i]
+            if line.startswith(("- ", " ", "\t")) and line.strip():
                 last = i
-            elif lines[i].strip():
+            elif line.strip():
                 break
-        if last == lines.index(heading):
+        if last == start:
             new_lines = ["", *new_lines]
         lines[last + 1 : last + 1] = new_lines
     else:
-        lines += ["", heading or "## Links", "", *new_lines]
-    return "\n".join(lines) + "\n"
+        if lines and lines[-1] == "":
+            lines.pop()
+        lines += ["", heading or "## Links", "", *new_lines, ""]
+        return eol.join(lines)
+    return eol.join(lines) if existing.endswith(eol) else eol.join(lines) + eol
 
 
 def _build_export_paths(

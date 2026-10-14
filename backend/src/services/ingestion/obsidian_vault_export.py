@@ -12,7 +12,8 @@ Obsidian Local REST API.
 Additive only: the export never deletes anything from the vault. A note stays
 after its entity is demoted or removed, and an existing note is never rewritten
 (see ``obsidian_vault_git._detect_changed_files``). Demoting an entity to private
-therefore does not remove a note that was already exported: delete it by hand.
+therefore does not remove a note that was already exported. Such notes are counted
+in ``stale_notes`` and listed in a warning: delete one by hand if you want it gone.
 """
 
 from __future__ import annotations
@@ -41,6 +42,7 @@ class ExportSummary:
     files_written: int
     commit_sha: str | None
     files_skipped: int = 0
+    stale_notes: int = 0
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -116,4 +118,5 @@ async def export(
         files_written=result.files_written,
         commit_sha=result.commit_sha,
         files_skipped=result.files_skipped,
+        stale_notes=result.stale_notes,
     ).as_dict()

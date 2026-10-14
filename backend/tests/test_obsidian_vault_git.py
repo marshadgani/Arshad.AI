@@ -150,6 +150,74 @@ async def test_nothing_is_ever_deleted_when_an_entity_leaves_the_render_set():
 
 
 @pytest.mark.asyncio
+async def test_stale_notes_are_kept_and_counted(caplog):
+    tree = (
+        _tree(b"hello\n")
+        + f"100644 blob {g.blob_sha(b'bye')}\tPeople/demoted.md\n"
+        + f"100644 blob {g.blob_sha(b'k')}\tNotes/mine.md\n"
+    )
+    fake = FakeGit(tree=tree)
+    with caplog.at_level(logging.WARNING):
+        res = await _push(fake)
+    assert (res.status, res.stale_notes) == ("no_changes", 1)
+    assert "People/demoted.md" in caplog.text and "Notes/mine.md" not in caplog.text
+    assert "rm" not in fake.subs
+
+
+@pytest.mark.asyncio
+async def test_a_note_that_is_not_utf8_is_skipped_not_fatal():
+    bad = "caf\udce9\n"  # a lone Latin-1 byte, as surrogateescape yields it
+    fake = FakeGit(tree=_tree(b"x"), blob=bad)
+    res = await _push(fake, {"People/alice.md": APP_NOTE + NEW_LINK})
+    assert (res.status, res.files_skipped) == ("no_changes", 1)
+
+
+@pytest.mark.asyncio
+async def test_cat_file_failure_aborts_with_a_clear_error():
+    fake = FakeGit(tree=_tree(b"x"), fail={"cat-file": "fatal: bad object"})
+    with pytest.raises(IngestionError, match="vault_git_cat_file_failed"):
+        await _push(fake, {"People/alice.md": APP_NOTE + NEW_LINK})
+
+
+@pytest.mark.asyncio
+async def test_many_new_notes_are_staged_in_batches():
+    files = {f"People/p{i}.md": "n\n" for i in range(g._PATH_BATCH_SIZE * 2 + 5)}
+    fake = FakeGit(tree=_tree(b"hello\n"))
+    res = await _push(fake, {**FILES, **files})
+    assert res.files_written == len(files)
+    assert fake.subs.count("add") == 3
+
+
+@pytest.mark.asyncio
+async def test_a_directory_in_the_way_gives_a_clear_error(tmp_path):
+    repo = tmp_path / "repo"
+    (repo / "People" / "alice.md").mkdir(parents=True)
+    with pytest.raises(IngestionError, match="vault_write_failed"):
+        g._write_files(repo, {"People/alice.md": "x\n"})
+
+
+@pytest.mark.skipif(not __import__("shutil").which("git"), reason="git missing")
+@pytest.mark.asyncio
+async def test_real_git_keeps_crlf_notes_byte_for_byte_and_adds_the_link(tmp_path):
+    bare = tmp_path / "bare.git"
+    subprocess.run(["git", "init", "--bare", "-b", "main", str(bare)], check=True, capture_output=True)
+    real_run = g._run_git
+
+    def local(args, **kw):
+        args = [str(bare) if a.startswith("https://github.com/") else a for a in args]
+        return real_run(args, **kw)
+
+    crlf = (APP_NOTE + "MY TEXT\n").replace("\n", "\r\n")
+    with patch.object(g, "_run_git", local):
+        await g.push_vault({"People/alice.md": crlf}, "one")
+        res = await g.push_vault({"People/alice.md": APP_NOTE + NEW_LINK}, "two")
+    shown = subprocess.run(["git", "-C", str(bare), "show", "HEAD:People/alice.md"], capture_output=True).stdout
+    assert res.status == "ok"
+    assert shown.startswith(crlf.encode()[:60]) and b"MY TEXT\r\n" in shown
+    assert b"- [[Projects/o-r]]" in shown and b"\n" not in shown.replace(b"\r\n", b"")
+
+
+@pytest.mark.asyncio
 async def test_new_notes_are_added_alongside_existing_ones():
     fake = FakeGit(tree=_tree(b"hello\n"))
     res = await _push(fake, {**FILES, "People/new.md": "n\n", "Projects/p.md": "p\n"})

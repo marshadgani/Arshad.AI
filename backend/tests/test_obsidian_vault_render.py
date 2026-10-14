@@ -261,3 +261,44 @@ def test_merge_additive_never_removes_existing_content():
     rendered = _FM + "\n# alice\n\n## Projects\n\n- [[Projects/a]]\n"
     out = merge_additive(existing, rendered)
     assert out == existing
+
+
+def test_merge_additive_keeps_crlf_line_endings():
+    from src.services.ingestion.obsidian_vault_render import is_app_note, merge_additive
+
+    existing = (_FM + "\n# alice\n\n## Projects\n\n- [[Projects/a]]\n").replace("\n", "\r\n")
+    rendered = _FM + "\n# alice\n\n## Projects\n\n- [[Projects/a]]\n- [[Projects/b]]\n"
+    assert is_app_note(existing)
+    out = merge_additive(existing, rendered)
+    assert "\n" not in out.replace("\r\n", "")
+    assert "- [[Projects/b]]" in out and out.startswith(existing[:40])
+
+
+def test_merge_additive_does_not_split_on_unicode_separators():
+    from src.services.ingestion.obsidian_vault_render import merge_additive
+
+    existing = _FM + "\n# alice\n\nsee\u2028this\x85line\n\n## Projects\n"
+    rendered = _FM + "\n# alice\n\n## Projects\n\n- [[Projects/b]]\n"
+    out = merge_additive(existing, rendered)
+    assert "see\u2028this\x85line" in out and "- [[Projects/b]]" in out
+
+
+def test_merge_additive_with_a_renamed_heading_keeps_user_text_and_adds_a_section():
+    from src.services.ingestion.obsidian_vault_render import merge_additive
+
+    existing = _FM + "\n# alice\n\n## My Projects\n\n- [[Projects/a]]\n"
+    rendered = _FM + "\n# alice\n\n## Projects\n\n- [[Projects/a]]\n- [[Projects/b]]\n"
+    out = merge_additive(existing, rendered)
+    assert "## My Projects" in out and out.count("[[Projects/a]]") == 1
+    assert out.rstrip().endswith("- [[Projects/b]]")
+    assert out.index("## My Projects") < out.index("## Projects")
+
+
+def test_merge_additive_puts_links_after_nested_items_and_is_idempotent():
+    from src.services.ingestion.obsidian_vault_render import merge_additive
+
+    existing = _FM + "\n# a\n\n## Projects\n\n- [[Projects/a]]\n  - my child note\n\nTAIL\n"
+    rendered = _FM + "\n# a\n\n## Projects\n\n- [[Projects/a]]\n- [[Projects/b]]\n- [[Projects/b]]\n"
+    once = merge_additive(existing, rendered)
+    assert once.index("my child note") < once.index("[[Projects/b]]") < once.index("TAIL")
+    assert merge_additive(once, rendered) == once
