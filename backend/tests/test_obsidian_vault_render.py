@@ -205,3 +205,59 @@ def test_entities_and_relationships_are_frozen():
         _person("a").external_key = "b"  # type: ignore[misc]
     with pytest.raises(Exception):
         _edge("a", "b").relationship_type = "x"  # type: ignore[misc]
+
+
+# ── additive merge ──────────────────────────────────────────────────────────
+
+_FM = (
+    '---\ntype: "person"\nvisibility: "public"\nsource: "github"\n'
+    'external_key: "alice"\n---\n'
+)
+
+
+def test_is_app_note_true_for_rendered_note_and_false_for_user_notes():
+    from src.services.ingestion.obsidian_vault_render import is_app_note
+
+    assert is_app_note(_FM + "\n# alice\n")
+    assert not is_app_note("# my own note\n")
+    assert not is_app_note('---\nsource: "web"\n---\n# x\n')
+    assert not is_app_note("")
+
+
+def test_merge_additive_adds_only_missing_links_after_the_last_list_item():
+    from src.services.ingestion.obsidian_vault_render import merge_additive
+
+    existing = _FM + "\n# alice\n\n## Projects\n\n- [[Projects/a]]\n\nMY OWN TEXT\n"
+    rendered = _FM + "\n# alice\n\n## Projects\n\n- [[Projects/a]]\n- [[Projects/b]]\n"
+    out = merge_additive(existing, rendered)
+    assert "MY OWN TEXT" in out and "- [[Projects/a]]" in out
+    assert out.index("- [[Projects/b]]") < out.index("MY OWN TEXT")
+    assert out.count("[[Projects/a]]") == 1
+
+
+def test_merge_additive_is_a_noop_when_nothing_is_missing():
+    from src.services.ingestion.obsidian_vault_render import merge_additive
+
+    note = _FM + "\n# alice\n\n## Projects\n\n- [[Projects/a|Alias]]\n"
+    rendered = _FM + "\n# alice\n\n## Projects\n\n- [[Projects/a]]\n"
+    assert merge_additive(note, rendered) == note
+
+
+def test_merge_additive_with_an_empty_section_and_with_a_removed_heading():
+    from src.services.ingestion.obsidian_vault_render import merge_additive
+
+    rendered = _FM + "\n# alice\n\n## Projects\n\n- [[Projects/a]]\n"
+    empty = _FM + "\n# alice\n\n## Projects\n"
+    assert "- [[Projects/a]]" in merge_additive(empty, rendered)
+    no_heading = _FM + "\n# alice\nmy text\n"
+    out = merge_additive(no_heading, rendered)
+    assert "my text" in out and out.rstrip().endswith("- [[Projects/a]]")
+
+
+def test_merge_additive_never_removes_existing_content():
+    from src.services.ingestion.obsidian_vault_render import merge_additive
+
+    existing = _FM + "\n# alice\n\n## Projects\n\n- [[Projects/old]]\n- [[Projects/a]]\n"
+    rendered = _FM + "\n# alice\n\n## Projects\n\n- [[Projects/a]]\n"
+    out = merge_additive(existing, rendered)
+    assert out == existing

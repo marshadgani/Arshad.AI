@@ -163,8 +163,8 @@ def _make_fake_git(active_sha, stale_path, diff_output):
 
 
 @pytest.mark.asyncio
-async def test_stale_people_file_triggers_git_rm_cached():
-    """A People/ file in HEAD but absent from the render set gets git rm --cached."""
+async def test_stale_people_file_is_never_removed():
+    """A People/ file in HEAD but absent from the render set is left alone."""
     from src.services.ingestion import obsidian_vault_git as g
 
     active_sha = g.blob_sha("active\n".encode())
@@ -178,20 +178,15 @@ async def test_stale_people_file_triggers_git_rm_cached():
         },
     ):
         with patch.object(g, "_run_git", fake):
-            res = await g.push_vault({"People/active.md": "active\n"}, "prune")
+            res = await g.push_vault({"People/active.md": "active\n"}, "no-delete")
 
-    rm_calls = [a for s, a in calls if s == "rm"]
-    assert rm_calls, "git rm --cached was never called for the stale People/ file"
-    assert "People/demoted.md" in rm_calls[0], "stale file not passed to git rm"
-    assert "People/active.md" not in rm_calls[0], (
-        "active file wrongly staged for removal"
-    )
-    assert res.status == "ok"
+    assert not [a for s, a in calls if s == "rm"], "the export must never delete"
+    assert res.status == "no_changes"
 
 
 @pytest.mark.asyncio
-async def test_prune_only_run_still_commits_and_pushes():
-    """A prune-only run (no changed files, only stale) still commits and pushes."""
+async def test_demotion_only_run_makes_no_commit_or_push():
+    """With nothing new to add, a run that would once have pruned does nothing."""
     from src.services.ingestion import obsidian_vault_git as g
 
     active_sha = g.blob_sha("active\n".encode())
@@ -205,17 +200,15 @@ async def test_prune_only_run_still_commits_and_pushes():
         },
     ):
         with patch.object(g, "_run_git", fake):
-            res = await g.push_vault({"People/active.md": "active\n"}, "prune-only")
+            res = await g.push_vault({"People/active.md": "active\n"}, "demotion-only")
 
     subs = [s for s, _ in calls]
-    assert "rm" in subs, "git rm --cached not called in prune-only run"
-    assert "commit" in subs, "commit not called in prune-only run"
-    assert "push" in subs, "push not called in prune-only run"
-    assert res.status == "ok"
+    assert not {"rm", "commit", "push"} & set(subs)
+    assert res.status == "no_changes"
 
 
 @pytest.mark.asyncio
-async def test_files_outside_managed_prefixes_not_pruned():
+async def test_files_outside_exported_folders_are_never_removed():
     """Files outside People/ and Projects/ in HEAD are never touched by pruning."""
     from src.services.ingestion import obsidian_vault_git as g
 
