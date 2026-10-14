@@ -15,10 +15,11 @@ in ``git ls-tree -r HEAD``; unchanged files are not written, and if nothing
 differs the push is skipped (``status='no_changes'``). ``git diff --cached``
 is a second check before committing.
 
-Stale file pruning: vault files under ``People/`` and ``Projects/`` that are
-present in HEAD but absent from the current render set (entities demoted to
-private or deleted) are removed via ``git rm --cached`` in the same commit,
-so the privacy invariant is maintained incrementally.
+Additive only: the push never deletes a file and never rewrites a note it did
+not write. New notes are added, and an existing exported note only gains the
+links it lacks (see ``_detect_changed_files``). Notes under ``People/`` and
+``Projects/`` that are no longer in the public set stay in place and are
+reported as ``stale_notes``.
 
 Rate limits: git subprocess output carries no HTTP headers, so a push failing
 with a rate-limit message waits ``RETRY_AFTER_CAP_SECONDS`` unconditionally
@@ -40,6 +41,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .errors import IngestionError
+from .obsidian_vault_render import is_app_note, merge_additive
 
 logger = logging.getLogger(__name__)
 
@@ -63,8 +65,9 @@ _ASKPASS_SCRIPT = (
     '  *) echo "$OBSIDIAN_VAULT_GIT_TOKEN" ;;\n'
     "esac\n"
 )
-# Managed directories — stale files in these prefixes are pruned each export.
-_MANAGED_PREFIXES = ("People/", "Projects/")
+
+# Folders the export writes into. Only used to report notes that left the public set.
+_EXPORT_DIRS = ("People/", "Projects/")
 
 
 @dataclass(frozen=True)
@@ -73,6 +76,8 @@ class PushResult:
     files_written: int
     commit_sha: str | None
     message: str
+    files_skipped: int = 0
+    stale_notes: int = 0
 
 
 def vault_repo_url() -> str:
@@ -117,14 +122,21 @@ def _run_git(
 ) -> subprocess.CompletedProcess[str]:
     logger.debug("git %s", args[0] if args else "")
     try:
-        return subprocess.run(  # noqa: S603
+        # Bytes in, str out: text mode would turn CRLF into LF and raise on bytes
+        # that are not UTF-8. ``surrogateescape`` keeps both intact.
+        proc = subprocess.run(  # noqa: S603
             ["git", *args],
             cwd=cwd,
             env=env,
             capture_output=True,
-            text=True,
             timeout=timeout,
             check=False,
+        )
+        return subprocess.CompletedProcess(
+            proc.args,
+            proc.returncode,
+            proc.stdout.decode("utf-8", errors="surrogateescape"),
+            proc.stderr.decode("utf-8", errors="surrogateescape"),
         )
     except subprocess.TimeoutExpired:
         raise IngestionError(f"git_timeout: git {args[0] if args else ''}") from None
@@ -161,8 +173,13 @@ def _write_files(repo: Path, files: dict[str, str]) -> None:
         target = (root / rel).resolve()
         if root not in target.parents:
             raise IngestionError("vault_path_escape: refusing to write outside repo")
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(content.encode("utf-8"))
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(content.encode("utf-8"))
+        except OSError as exc:
+            raise IngestionError(
+                f"vault_write_failed: {rel} ({type(exc).__name__})"
+            ) from None
 
 
 def _setup_git_env(tmp_dir: Path, token: str) -> dict[str, str]:
@@ -185,38 +202,60 @@ def _setup_git_env(tmp_dir: Path, token: str) -> dict[str, str]:
     }
 
 
+def _read_blob(sha: str, cwd: str, env: dict[str, str], token: str) -> str | None:
+    """Return the blob's text, or ``None`` when it is not valid UTF-8."""
+    proc = _run_git(["cat-file", "blob", sha], cwd=cwd, env=env)
+    if proc.returncode != 0:
+        raise _fail("cat_file", proc, token)
+    try:
+        proc.stdout.encode("utf-8")
+    except UnicodeEncodeError:
+        return None
+    return proc.stdout
+
+
 def _detect_changed_files(
     files: dict[str, str],
     cwd: str,
     env: dict[str, str],
     token: str,
     has_head: bool,
-) -> tuple[dict[str, str], list[str]]:
-    """Return ``(changed, stale)`` relative to the current HEAD.
+) -> tuple[dict[str, str], list[str], list[str]]:
+    """Return ``(changed, skipped, stale)`` relative to the current HEAD.
 
-    *changed* — files whose content differs from HEAD (or all files when the
-    repo has no HEAD).
-    *stale* — paths under the managed prefixes (``People/``, ``Projects/``)
-    that exist in HEAD but are absent from the current render set, meaning
-    the underlying entity was deleted or demoted to private.
+    The vault only ever grows. Nothing in HEAD is deleted, so a note stays when
+    its entity is later demoted or removed.
 
-    When the repo has no HEAD (first push into an empty repo), every file is
-    treated as changed and the stale list is empty.
+    *changed* maps a path to the content to write: a new file as rendered, or an
+    existing exported note with its missing links added (``merge_additive``).
+    *skipped* lists existing files that are not exported notes (a note of yours
+    with the same name, or a file that is not UTF-8). Those are never touched.
+    *stale* lists notes under the exported folders that are no longer in the
+    public set. They are kept, and reported so you can remove one by hand.
     """
     if not has_head:
-        return dict(files), []
+        return dict(files), [], []
     existing = _existing_blobs(cwd, env, token)
-    changed = {
-        path: content
-        for path, content in files.items()
-        if existing.get(path) != blob_sha(content.encode("utf-8"))
-    }
+    changed: dict[str, str] = {}
+    skipped: list[str] = []
+    for path, content in files.items():
+        sha = existing.get(path)
+        if sha is None:
+            changed[path] = content
+        elif sha != blob_sha(content.encode("utf-8")):
+            current = _read_blob(sha, cwd, env, token)
+            if current is None or not is_app_note(current):
+                skipped.append(path)
+                continue
+            merged = merge_additive(current, content)
+            if merged != current:
+                changed[path] = merged
     stale = [
         path
         for path in existing
-        if any(path.startswith(p) for p in _MANAGED_PREFIXES) and path not in files
+        if path.startswith(_EXPORT_DIRS) and path not in files
     ]
-    return changed, stale
+    return changed, skipped, stale
 
 
 def _run_chunked(
@@ -238,12 +277,11 @@ def _stage_and_commit(
     repo: Path,
     cwd: str,
     changed: dict[str, str],
-    stale: list[str],
     commit_message: str,
     env: dict[str, str],
     token: str,
 ) -> bool:
-    """Write changed files, remove stale files, stage both, and commit.
+    """Write changed files, stage them, and commit.
 
     Returns ``True`` if a commit was created, ``False`` if ``git diff --cached``
     shows nothing staged (second-line idempotency guard).
@@ -251,8 +289,6 @@ def _stage_and_commit(
     if changed:
         _write_files(repo, changed)
         _run_chunked(["add", "--"], list(changed), cwd, env, token, "add")
-    if stale:
-        _run_chunked(["rm", "--cached", "--"], stale, cwd, env, token, "rm")
     proc = _run_git(["diff", "--cached", "--name-only"], cwd=cwd, env=env)
     if proc.returncode != 0:
         raise _fail("diff", proc, token)
@@ -320,15 +356,30 @@ def _push_all_sync(
         )
         if not has_head:
             logger.info("vault repo %s has no commits; initial export", repo_slug)
-        changed, stale = _detect_changed_files(files, cwd, env, token, has_head)
-        if not changed and not stale:
-            return PushResult("no_changes", 0, None, commit_message)
+        changed, skipped, stale = _detect_changed_files(files, cwd, env, token, has_head)
+        if skipped:
+            logger.warning(
+                "vault export left %d existing non-exported note(s) untouched: %s",
+                len(skipped),
+                skipped,
+            )
+        if stale:
+            logger.warning(
+                "vault holds %d note(s) no longer in the public set; kept, never "
+                "deleted: %s",
+                len(stale),
+                stale,
+            )
+        if not changed:
+            return PushResult(
+                "no_changes", 0, None, commit_message, len(skipped), len(stale)
+            )
 
-        committed = _stage_and_commit(
-            repo, cwd, changed, stale, commit_message, env, token
-        )
+        committed = _stage_and_commit(repo, cwd, changed, commit_message, env, token)
         if not committed:
-            return PushResult("no_changes", 0, None, commit_message)
+            return PushResult(
+                "no_changes", 0, None, commit_message, len(skipped), len(stale)
+            )
 
         _push_with_retry(cwd, env, token, deadline)
         head = _run_git(["rev-parse", "HEAD"], cwd=cwd, env=env)
@@ -338,16 +389,18 @@ def _push_all_sync(
                 "vault push succeeded but commit sha could not be read: %s",
                 _scrub(head.stderr or "", token)[:200],
             )
-        return PushResult("ok", len(changed), sha or None, commit_message)
+        return PushResult(
+            "ok", len(changed), sha or None, commit_message, len(skipped), len(stale)
+        )
 
 
 async def push_vault(files: dict[str, str], commit_message: str) -> PushResult:
-    """Clone the vault repo, write changed files, prune stale managed notes, commit and push.
+    """Clone the vault repo, add new notes and missing links, commit and push.
 
-    The token is read at call time. Git work runs in a worker thread. A
-    ``no_changes`` status is a valid result and needs no retry. Pruning only
-    removes the tip: git history keeps earlier versions, so the vault repo
-    must stay private.
+    Additive only: it never deletes or rewrites existing content (see
+    ``_detect_changed_files``). The token is read at call time. Git work runs in
+    a worker thread. A ``no_changes`` status is a valid result and needs no
+    retry. Git history keeps every version, so the vault repo must stay private.
     """
     token = os.getenv(_TOKEN_ENV)
     if not token:

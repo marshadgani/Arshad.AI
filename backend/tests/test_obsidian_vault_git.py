@@ -26,15 +26,16 @@ def _cp(rc=0, out="", err=""):
 class FakeGit:
     """Records git subcommands; behaviour overridable per subcommand."""
 
-    def __init__(self, head=True, tree="", staged="People/alice.md", fail=None, push_errs=()):
+    def __init__(self, head=True, tree="", staged="People/alice.md", fail=None, push_errs=(), blob=""):
         self.calls, self.envs = [], []
+        self.blob = blob
         self.head, self.tree, self.staged = head, tree, staged
         self.fail = fail or {}
         self.push_errs = list(push_errs)
 
     def __call__(self, args, cwd=None, env=None, timeout=0):
         sub = next(a for a in args if a in
-                   {"clone", "rev-parse", "ls-tree", "add", "diff", "commit", "push"})
+                   {"clone", "rev-parse", "ls-tree", "cat-file", "add", "rm", "diff", "commit", "push"})
         self.calls.append((sub, list(args)))
         self.envs.append(env)
         if sub in self.fail:
@@ -45,6 +46,8 @@ class FakeGit:
             return _cp(0, "deadbeef\n")
         if sub == "ls-tree":
             return _cp(0, self.tree)
+        if sub == "cat-file":
+            return _cp(0, self.blob)
         if sub == "diff":
             return _cp(0, self.staged)
         if sub == "push" and self.push_errs:
@@ -109,13 +112,118 @@ async def test_only_changed_files_are_written_and_staged():
     assert add_args[-1] == "People/bob.md" and "People/alice.md" not in add_args
 
 
+APP_NOTE = (
+    '---\ntype: "person"\nvisibility: "public"\nsource: "github"\n'
+    'external_key: "alice"\n---\n\n# alice\n\n## Projects\n\n'
+)
+NEW_LINK = "- [[Projects/o-r]]\n"
+
+
 @pytest.mark.asyncio
-async def test_changed_content_commits_with_given_message():
-    tree = _tree(b'old')
-    fake = FakeGit(tree=tree)
-    res = await _push(fake, msg="vault export: x")
-    assert res.status == "ok"
+async def test_exported_note_missing_a_link_gets_it_added_and_committed():
+    fake = FakeGit(tree=_tree(APP_NOTE.encode()), blob=APP_NOTE)
+    res = await _push(fake, {"People/alice.md": APP_NOTE + NEW_LINK}, msg="vault export: x")
+    assert res.status == "ok" and res.files_written == 1
     assert "vault export: x" in next(a for s, a in fake.calls if s == "commit")
+
+
+@pytest.mark.asyncio
+async def test_existing_user_note_with_the_same_name_is_never_touched():
+    user_note = "my own notes about alice\n"
+    fake = FakeGit(tree=_tree(user_note.encode()), blob=user_note)
+    res = await _push(fake, {"People/alice.md": APP_NOTE + NEW_LINK})
+    assert (res.status, res.files_written, res.files_skipped) == ("no_changes", 0, 1)
+    assert not {"add", "commit", "push"} & set(fake.subs)
+
+
+@pytest.mark.asyncio
+async def test_nothing_is_ever_deleted_when_an_entity_leaves_the_render_set():
+    tree = (
+        _tree(b"hello\n")
+        + f"100644 blob {g.blob_sha(b'bye')}\tPeople/demoted.md\n"
+        + f"100644 blob {g.blob_sha(b'x')}\tProjects/gone.md\n"
+    )
+    fake = FakeGit(tree=tree)
+    res = await _push(fake)
+    assert res.status == "no_changes"
+    assert "rm" not in fake.subs and not {"commit", "push"} & set(fake.subs)
+
+
+@pytest.mark.asyncio
+async def test_stale_notes_are_kept_and_counted(caplog):
+    tree = (
+        _tree(b"hello\n")
+        + f"100644 blob {g.blob_sha(b'bye')}\tPeople/demoted.md\n"
+        + f"100644 blob {g.blob_sha(b'k')}\tNotes/mine.md\n"
+    )
+    fake = FakeGit(tree=tree)
+    with caplog.at_level(logging.WARNING):
+        res = await _push(fake)
+    assert (res.status, res.stale_notes) == ("no_changes", 1)
+    assert "People/demoted.md" in caplog.text and "Notes/mine.md" not in caplog.text
+    assert "rm" not in fake.subs
+
+
+@pytest.mark.asyncio
+async def test_a_note_that_is_not_utf8_is_skipped_not_fatal():
+    bad = "caf\udce9\n"  # a lone Latin-1 byte, as surrogateescape yields it
+    fake = FakeGit(tree=_tree(b"x"), blob=bad)
+    res = await _push(fake, {"People/alice.md": APP_NOTE + NEW_LINK})
+    assert (res.status, res.files_skipped) == ("no_changes", 1)
+
+
+@pytest.mark.asyncio
+async def test_cat_file_failure_aborts_with_a_clear_error():
+    fake = FakeGit(tree=_tree(b"x"), fail={"cat-file": "fatal: bad object"})
+    with pytest.raises(IngestionError, match="vault_git_cat_file_failed"):
+        await _push(fake, {"People/alice.md": APP_NOTE + NEW_LINK})
+
+
+@pytest.mark.asyncio
+async def test_many_new_notes_are_staged_in_batches():
+    files = {f"People/p{i}.md": "n\n" for i in range(g._PATH_BATCH_SIZE * 2 + 5)}
+    fake = FakeGit(tree=_tree(b"hello\n"))
+    res = await _push(fake, {**FILES, **files})
+    assert res.files_written == len(files)
+    assert fake.subs.count("add") == 3
+
+
+@pytest.mark.asyncio
+async def test_a_directory_in_the_way_gives_a_clear_error(tmp_path):
+    repo = tmp_path / "repo"
+    (repo / "People" / "alice.md").mkdir(parents=True)
+    with pytest.raises(IngestionError, match="vault_write_failed"):
+        g._write_files(repo, {"People/alice.md": "x\n"})
+
+
+@pytest.mark.skipif(not __import__("shutil").which("git"), reason="git missing")
+@pytest.mark.asyncio
+async def test_real_git_keeps_crlf_notes_byte_for_byte_and_adds_the_link(tmp_path):
+    bare = tmp_path / "bare.git"
+    subprocess.run(["git", "init", "--bare", "-b", "main", str(bare)], check=True, capture_output=True)
+    real_run = g._run_git
+
+    def local(args, **kw):
+        args = [str(bare) if a.startswith("https://github.com/") else a for a in args]
+        return real_run(args, **kw)
+
+    crlf = (APP_NOTE + "MY TEXT\n").replace("\n", "\r\n")
+    with patch.object(g, "_run_git", local):
+        await g.push_vault({"People/alice.md": crlf}, "one")
+        res = await g.push_vault({"People/alice.md": APP_NOTE + NEW_LINK}, "two")
+    shown = subprocess.run(["git", "-C", str(bare), "show", "HEAD:People/alice.md"], capture_output=True).stdout
+    assert res.status == "ok"
+    assert shown.startswith(crlf.encode()[:60]) and b"MY TEXT\r\n" in shown
+    assert b"- [[Projects/o-r]]" in shown and b"\n" not in shown.replace(b"\r\n", b"")
+
+
+@pytest.mark.asyncio
+async def test_new_notes_are_added_alongside_existing_ones():
+    fake = FakeGit(tree=_tree(b"hello\n"))
+    res = await _push(fake, {**FILES, "People/new.md": "n\n", "Projects/p.md": "p\n"})
+    assert res.files_written == 2
+    add_args = next(a for s, a in fake.calls if s == "add")
+    assert set(add_args[-2:]) == {"People/new.md", "Projects/p.md"}
 
 
 @pytest.mark.asyncio
@@ -245,8 +353,8 @@ async def test_temp_dir_removed_on_success_and_failure(monkeypatch):
 
 @pytest.mark.skipif(not __import__("shutil").which("git"), reason="git missing")
 @pytest.mark.asyncio
-async def test_real_git_round_trip_idempotent_and_update(tmp_path, monkeypatch):
-    """Real git against a local bare repo: first push, identical no-op, update."""
+async def test_real_git_round_trip_is_additive_only(tmp_path, monkeypatch):
+    """Real git against a local bare repo: add, identical no-op, add a link, no deletion."""
     bare = tmp_path / "bare.git"
     subprocess.run(["git", "init", "--bare", "-b", "main", str(bare)], check=True, capture_output=True)
     real_run = g._run_git
@@ -259,11 +367,18 @@ async def test_real_git_round_trip_idempotent_and_update(tmp_path, monkeypatch):
         return int(subprocess.run(["git", "-C", str(bare), "rev-list", "--count", "HEAD"],
                                   capture_output=True, text=True).stdout.strip() or 0)
 
+    def show(path):
+        return subprocess.run(["git", "-C", str(bare), "show", f"HEAD:{path}"],
+                              capture_output=True, text=True).stdout
+
+    plain = {"People/alice.md": APP_NOTE}
+    with_link = {"People/alice.md": APP_NOTE + NEW_LINK, "Projects/o-r.md": "new project\n"}
     with patch.object(g, "_run_git", local):
-        r1 = await g.push_vault(FILES, "one")
-        r2 = await g.push_vault(FILES, "two")
-        r3 = await g.push_vault({"People/alice.md": "changed\n"}, "three")
-    assert (r1.status, r2.status, r3.status) == ("ok", "no_changes", "ok")
+        r1 = await g.push_vault(plain, "one")
+        r2 = await g.push_vault(plain, "two")
+        r3 = await g.push_vault(with_link, "three")
+        r4 = await g.push_vault({}, "four")
+    assert (r1.status, r2.status, r3.status, r4.status) == ("ok", "no_changes", "ok", "no_changes")
     assert count() == 2
-    show = subprocess.run(["git", "-C", str(bare), "show", "HEAD:People/alice.md"], capture_output=True, text=True)
-    assert show.stdout == "changed\n"
+    assert "- [[Projects/o-r]]" in show("People/alice.md")
+    assert show("Projects/o-r.md") == "new project\n"

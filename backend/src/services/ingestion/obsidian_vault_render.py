@@ -105,6 +105,71 @@ def _note(entity: Entity, heading: str, links: list[str]) -> str:
     return _frontmatter(entity) + "\n" + title + body
 
 
+_FRONTMATTER_RE = re.compile(r"\A---\r?\n(.*?)\r?\n---\r?\n", re.DOTALL)
+_LINK_LINE = "- [["
+
+
+def is_app_note(text: str) -> bool:
+    """True when *text* is a note this exporter wrote.
+
+    Judged by the frontmatter the renderer always emits, so a note you wrote
+    yourself under the same name is never mistaken for an exported one.
+    """
+    match = _FRONTMATTER_RE.match(text)
+    if not match:
+        return False
+    lines = match.group(1).splitlines()
+    return f"source: {json.dumps(_SOURCE)}" in lines and any(
+        line.startswith("external_key: ") for line in lines
+    )
+
+
+def _has_link(text: str, target: str) -> bool:
+    return f"[[{target}]]" in text or f"[[{target}|" in text
+
+
+def merge_additive(existing: str, rendered: str) -> str:
+    """Return *existing* with any links from *rendered* that it lacks added.
+
+    Nothing already in *existing* is changed or removed, including its line
+    endings, so text you added to an exported note survives. New links go under
+    the matching ``## `` heading, right after its last list item (nested items
+    included), or in a new section at the end if that heading is gone. A link you
+    deleted on purpose is added back on the next export, because the note is
+    treated as additive.
+    """
+    wanted = [
+        line[len(_LINK_LINE) : -2]
+        for line in rendered.splitlines()
+        if line.startswith(_LINK_LINE) and line.endswith("]]")
+    ]
+    missing = [t for t in wanted if not _has_link(existing, t)]
+    if not missing:
+        return existing
+    heading = next((ln for ln in rendered.splitlines() if ln.startswith("## ")), None)
+    new_lines = [f"{_LINK_LINE}{t}]]" for t in missing]
+    eol = "\r\n" if "\r\n" in existing else "\n"
+    lines = existing.split(eol)
+    if heading in lines:
+        start = lines.index(heading)
+        last = start
+        for i in range(start + 1, len(lines)):
+            line = lines[i]
+            if line.startswith(("- ", " ", "\t")) and line.strip():
+                last = i
+            elif line.strip():
+                break
+        if last == start:
+            new_lines = ["", *new_lines]
+        lines[last + 1 : last + 1] = new_lines
+    else:
+        if lines and lines[-1] == "":
+            lines.pop()
+        lines += ["", heading or "## Links", "", *new_lines, ""]
+        return eol.join(lines)
+    return eol.join(lines) if existing.endswith(eol) else eol.join(lines) + eol
+
+
 def _build_export_paths(
     entities: list[Entity],
 ) -> dict[tuple[str, str], str]:

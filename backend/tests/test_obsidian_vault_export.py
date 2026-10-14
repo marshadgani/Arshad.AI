@@ -59,6 +59,8 @@ async def test_happy_path_pushes_rendered_files_and_reports_summary():
         "relationships_exported": 1,
         "files_written": 2,
         "commit_sha": "sha1",
+        "files_skipped": 0,
+        "stale_notes": 0,
     }
     assert msg.startswith("vault export: 2 notes, 1 relationships")
 
@@ -76,21 +78,27 @@ async def test_db_transaction_closed_before_git_push():
 
 
 @pytest.mark.asyncio
-async def test_no_public_entities_refuses_to_prune_by_default():
+async def test_no_public_entities_exports_nothing_and_does_not_raise():
     push = AsyncMock(return_value=PushResult("no_changes", 0, None, "m"))
-    with pytest.raises(IngestionError, match="vault_export_refused"):
-        await _run([], [], push=push)
-    push.assert_not_awaited()
-
-
-@pytest.mark.asyncio
-async def test_no_public_entities_prunes_when_explicitly_allowed():
-    push = AsyncMock(return_value=PushResult("no_changes", 0, None, "m"))
-    _, _, result = await _run([], [], push=push, payload={"allow_empty_prune": True})
+    _, _, result = await _run([], [], push=push)
     push.assert_awaited_once()
     files_arg, _ = push.await_args.args
     assert files_arg == {}
-    assert result["entities_exported"] == 0
+    assert result["entities_exported"] == 0 and result["status"] == "no_changes"
+
+
+@pytest.mark.asyncio
+async def test_skipped_count_is_reported():
+    push = AsyncMock(return_value=PushResult("no_changes", 0, None, "m", 2))
+    _, _, result = await _run([PERSON], [], push=push)
+    assert result["files_skipped"] == 2
+
+
+@pytest.mark.asyncio
+async def test_stale_count_is_reported():
+    push = AsyncMock(return_value=PushResult("no_changes", 0, None, "m", 0, 3))
+    _, _, result = await _run([PERSON], [], push=push)
+    assert result["stale_notes"] == 3
 
 
 @pytest.mark.asyncio
