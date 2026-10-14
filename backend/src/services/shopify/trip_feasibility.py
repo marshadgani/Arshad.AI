@@ -50,8 +50,27 @@ TRIP_STOCKOUT_LOOKAHEAD_DAYS = 7
 UNAVAILABLE_SOURCE_NAMES = (
     "booking_com_pricing",
     "calendly_availability",
-    "deploy_windows",
 )
+
+INFRA_STALENESS_HOURS = 24
+INFRA_FAILED_DEPLOY_STATUSES = frozenset(
+    {"build_failed", "update_failed", "pre_deploy_failed"}
+)
+# A deploy status that is neither failed nor in this set is unknown to us and
+# makes the Render source unreadable. "canceled" is a deliberate stop that leaves
+# the previous deploy serving, so it is not an outage.
+INFRA_HEALTHY_DEPLOY_STATUSES = frozenset(
+    {
+        "live",
+        "created",
+        "build_in_progress",
+        "update_in_progress",
+        "pre_deploy_in_progress",
+        "deactivated",
+        "canceled",
+    }
+)
+INFRA_HEALTHY_PROJECT_STATUS = "ACTIVE_HEALTHY"
 
 
 def _parse_date(value: Any) -> date | None:
@@ -182,6 +201,129 @@ def _calendar_findings(
     return [c for _, c in timed], all_day, unreadable
 
 
+def _snapshot_flags(
+    config: dict[str, Any] | None, status: str | None, as_of: datetime
+) -> dict[str, bool]:
+    """Connection and freshness flags for one infrastructure snapshot.
+
+    A missing, unparseable or future `synced_at` means never synced: it is
+    never read as fresh.
+    """
+    if config is None:
+        return {
+            "connected": False,
+            "needs_sync": False,
+            "stale": False,
+            "sync_error": False,
+        }
+    raw = config.get("synced_at")
+    synced = _parse_instant(raw) if raw else None
+    needs_sync = synced is None or synced > as_of
+    stale = not needs_sync and as_of - synced > timedelta(hours=INFRA_STALENESS_HOURS)
+    return {
+        "connected": True,
+        "needs_sync": needs_sync,
+        "stale": stale,
+        "sync_error": status != "connected",
+    }
+
+
+def _infra_conflict(provider: str, name: Any, state: str) -> TripConflict:
+    return TripConflict(
+        type="infrastructure",
+        provider=provider,
+        infra_name=str(name or "(unnamed)")[:255],
+        infra_state=state[:64],
+    )
+
+
+def _infrastructure_findings(
+    render_config: dict[str, Any] | None,
+    supabase_config: dict[str, Any] | None,
+    render_status: str | None,
+    supabase_status: str | None,
+    *,
+    as_of: datetime,
+) -> tuple[list[TripConflict], dict[str, bool], list[str]]:
+    """(conflicts, per-provider flags, unreadable-health labels). Pure: reads
+    the last synced snapshots only.
+
+    Conflicts come from whatever snapshot exists, even a stale one: a service
+    seen suspended is still worth reporting. Staleness, never-synced and
+    sync-error only degrade (verdict "unknown"), they never invent a conflict.
+    A missing or malformed list, entry, suspended state, deploy status or
+    project status is reported as `<provider>_health` in the third value: it
+    degrades the verdict, so unreadable data can never be read as healthy.
+    """
+    render = _snapshot_flags(render_config, render_status, as_of)
+    supabase = _snapshot_flags(supabase_config, supabase_status, as_of)
+    conflicts: list[TripConflict] = []
+    render_unreadable = False
+    supabase_unreadable = False
+
+    if render_config is not None:
+        services = render_config.get("services")
+        if not isinstance(services, list):
+            render_unreadable = True
+            services = []
+        for svc in services:
+            if not isinstance(svc, dict):
+                render_unreadable = True
+                continue
+            deploy = svc.get("latest_deploy_status")
+            suspended = svc.get("suspended")
+            if suspended == "suspended":
+                conflicts.append(
+                    _infra_conflict("render", svc.get("name"), "suspended")
+                )
+            elif isinstance(deploy, str) and deploy in INFRA_FAILED_DEPLOY_STATUSES:
+                conflicts.append(_infra_conflict("render", svc.get("name"), deploy))
+            elif deploy is not None and (
+                not isinstance(deploy, str)
+                or deploy not in INFRA_HEALTHY_DEPLOY_STATUSES
+            ):
+                # "unchecked", an unrecognised status, or a bad value: unknown.
+                render_unreadable = True
+            elif suspended != "not_suspended":
+                # Unknown suspended state: cannot determine service health.
+                # Note: suspended="not_suspended" with deploy=None means the
+                # service exists but has never been deployed — this is healthy,
+                # not unreadable.
+                render_unreadable = True
+
+    if supabase_config is not None:
+        projects = supabase_config.get("projects")
+        if not isinstance(projects, list):
+            supabase_unreadable = True
+            projects = []
+        for proj in projects:
+            state = proj.get("status") if isinstance(proj, dict) else None
+            if not isinstance(state, str) or not state:
+                supabase_unreadable = True
+            elif state != INFRA_HEALTHY_PROJECT_STATUS:
+                conflicts.append(_infra_conflict("supabase", proj.get("name"), state))
+
+    flags = {
+        "render_connected": render["connected"],
+        "render_needs_sync": render["needs_sync"],
+        "render_stale": render["stale"],
+        "render_sync_error": render["sync_error"],
+        "render_truncated": bool(
+            render_config and render_config.get("services_truncated") is True
+        ),
+        "supabase_connected": supabase["connected"],
+        "supabase_needs_sync": supabase["needs_sync"],
+        "supabase_stale": supabase["stale"],
+        "supabase_sync_error": supabase["sync_error"],
+    }
+    unreadable = []
+    if render_unreadable:
+        unreadable.append("render_health")
+    if supabase_unreadable:
+        unreadable.append("supabase_health")
+    return conflicts, flags, unreadable
+
+
 def _truncation_flags(
     variants_data: dict[str, Any] | None,
     orders_data: dict[str, Any] | None,
@@ -220,6 +362,30 @@ def _determine_verdict(
     return "go"
 
 
+def _compute_infra_degraded(infra: dict[str, bool]) -> bool:
+    """True when a connected infrastructure source has an unresolved sync issue.
+
+    Mirrors the degradation check in TripFeasibilityResponse._check_verdict_invariants
+    so the two stay in sync and neither hides a stale or unsynchronised source.
+    """
+    return (
+        infra["render_connected"]
+        and (
+            infra["render_needs_sync"]
+            or infra["render_stale"]
+            or infra["render_sync_error"]
+            or infra["render_truncated"]
+        )
+    ) or (
+        infra["supabase_connected"]
+        and (
+            infra["supabase_needs_sync"]
+            or infra["supabase_stale"]
+            or infra["supabase_sync_error"]
+        )
+    )
+
+
 def check_trip_feasibility(
     *,
     as_of: datetime,
@@ -232,6 +398,10 @@ def check_trip_feasibility(
     shopify_needs_reauth: bool,
     window_days: int,
     partial_failures: list[str],
+    render_config: dict[str, Any] | None = None,
+    supabase_config: dict[str, Any] | None = None,
+    render_status: str | None = None,
+    supabase_status: str | None = None,
 ) -> TripFeasibilityResponse:
     """Assemble the verdict from already-fetched data.
 
@@ -262,11 +432,22 @@ def check_trip_feasibility(
         )
         conflicts.extend(timed)
 
+    infra_conflicts, infra, infra_unreadable = _infrastructure_findings(
+        render_config,
+        supabase_config,
+        render_status,
+        supabase_status,
+        as_of=as_of,
+    )
+    conflicts.extend(infra_conflicts)
+    infra_degraded = _compute_infra_degraded(infra)
+
     failures = list(dict.fromkeys([*partial_failures, *cal.partial_failures]))
     if calendar_unreadable and "calendar" not in failures:
         failures.append("calendar")
     if levels_unreadable and "inventory_levels" not in failures:
         failures.append("inventory_levels")
+    failures.extend(f for f in infra_unreadable if f not in failures)
 
     degraded = (
         not shopify_usable
@@ -277,16 +458,21 @@ def check_trip_feasibility(
         or orders_truncated
         or cal.calendar_truncated
         or bool(failures)
+        or infra_degraded
     )
     verdict = _determine_verdict(conflicts, degraded=degraded)
+
+    unavail = list(UNAVAILABLE_SOURCE_NAMES)
+    if not infra["render_connected"]:
+        unavail.append("render_health")
+    if not infra["supabase_connected"]:
+        unavail.append("supabase_health")
 
     return TripFeasibilityResponse(
         verdict=verdict,
         conflicts=conflicts,
         all_day_events=all_day,
-        unavailable_sources=[
-            UnavailableSource(name=n) for n in UNAVAILABLE_SOURCE_NAMES
-        ],
+        unavailable_sources=[UnavailableSource(name=n) for n in unavail],
         shopify_connected=shopify_connected,
         shopify_needs_reauth=shopify_needs_reauth,
         calendar_connected=cal.connected,
@@ -295,4 +481,5 @@ def check_trip_feasibility(
         orders_truncated=orders_truncated,
         calendar_truncated=cal.calendar_truncated,
         partial_failures=failures,
+        **infra,
     )

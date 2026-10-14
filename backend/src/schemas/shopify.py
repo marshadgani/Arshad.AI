@@ -151,22 +151,29 @@ class TripConflict(BaseModel):
     """Flat on the wire; the validator makes each `type` carry its own fields
     and none of the other type's."""
 
-    type: Literal["stockout", "calendar_event"]
+    type: Literal["stockout", "calendar_event", "infrastructure"]
     variant_id: Optional[str] = Field(None, max_length=255)
     projected_stockout_date: Optional[str] = Field(None, max_length=10)
     event_title: Optional[str] = Field(None, max_length=EVENT_TITLE_MAX)
     event_start: Optional[str] = Field(None, max_length=64)
     event_end: Optional[str] = Field(None, max_length=64)
+    provider: Optional[Literal["render", "supabase"]] = None
+    infra_name: Optional[str] = Field(None, max_length=255)
+    infra_state: Optional[str] = Field(None, max_length=64)
 
     @model_validator(mode="after")
     def _check_fields_match_type(self) -> Self:
-        stockout = (self.variant_id, self.projected_stockout_date)
-        event = (self.event_title, self.event_start, self.event_end)
-        wanted, forbidden = (
-            (stockout, event) if self.type == "stockout" else (event, stockout)
-        )
-        if any(v is None for v in wanted) or any(v is not None for v in forbidden):
-            raise ValueError(f"fields do not match conflict type {self.type!r}")
+        groups = {
+            "stockout": (self.variant_id, self.projected_stockout_date),
+            "calendar_event": (self.event_title, self.event_start, self.event_end),
+            "infrastructure": (self.provider, self.infra_name, self.infra_state),
+        }
+        for kind, values in groups.items():
+            owned = kind == self.type
+            if owned and any(v is None for v in values):
+                raise ValueError(f"fields do not match conflict type {self.type!r}")
+            if not owned and any(v is not None for v in values):
+                raise ValueError(f"fields do not match conflict type {self.type!r}")
         return self
 
 
@@ -179,7 +186,10 @@ class TripAllDayEvent(BaseModel):
 
 
 UnavailableSourceName = Literal[
-    "booking_com_pricing", "calendly_availability", "deploy_windows"
+    "booking_com_pricing",
+    "calendly_availability",
+    "render_health",
+    "supabase_health",
 ]
 
 
@@ -200,6 +210,15 @@ class TripFeasibilityResponse(BaseModel):
     variants_truncated: bool = False
     orders_truncated: bool = False
     calendar_truncated: bool = False
+    render_connected: bool = False
+    render_needs_sync: bool = False
+    render_stale: bool = False
+    render_sync_error: bool = False
+    render_truncated: bool = False
+    supabase_connected: bool = False
+    supabase_needs_sync: bool = False
+    supabase_stale: bool = False
+    supabase_sync_error: bool = False
     partial_failures: list[str] = []
 
     @model_validator(mode="after")
@@ -219,6 +238,23 @@ class TripFeasibilityResponse(BaseModel):
                 or self.orders_truncated
                 or self.calendar_truncated
                 or self.partial_failures
+                or (
+                    self.render_connected
+                    and (
+                        self.render_needs_sync
+                        or self.render_stale
+                        or self.render_sync_error
+                        or self.render_truncated
+                    )
+                )
+                or (
+                    self.supabase_connected
+                    and (
+                        self.supabase_needs_sync
+                        or self.supabase_stale
+                        or self.supabase_sync_error
+                    )
+                )
             )
             if degraded:
                 raise ValueError("go requires clean, fully connected sources")

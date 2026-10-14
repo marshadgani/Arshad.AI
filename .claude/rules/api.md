@@ -85,6 +85,11 @@ Malformed dates return 422. The verdict is `go` only when nothing conflicts and
 no source was degraded. A conflict found in healthy data stays `no-go` even if
 another source failed, and a failed or missing source with no conflict is
 `unknown`, never `go`.
+The infrastructure check adds nine flags: `render_connected`, `render_needs_sync`,
+`render_stale`, `render_sync_error`, `render_truncated`, `supabase_connected`,
+`supabase_needs_sync`, `supabase_stale` and `supabase_sync_error`. Any of the
+needs-sync, stale, error or truncated flags on a connected provider degrades the
+verdict to `unknown`.
 
 ## Error Responses
 

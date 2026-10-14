@@ -131,7 +131,8 @@ def test_clean_sources_give_go_with_unavailable_sources_named():
     assert [(u.name, u.reason) for u in r.unavailable_sources] == [
         ("booking_com_pricing", "not_connected"),
         ("calendly_availability", "not_connected"),
-        ("deploy_windows", "not_connected"),
+        ("render_health", "not_connected"),
+        ("supabase_health", "not_connected"),
     ]
 
 
@@ -427,6 +428,7 @@ def client(monkeypatch):
     m(route, "_mark_healthy", AsyncMock())
     m(route, "_apply_error_status", AsyncMock())
     m(route, "_find_integration", AsyncMock(return_value=_FakeIntegration()))
+    m(route, "_find_infra_integrations", AsyncMock(return_value=(None, None)))
     m(route, "_execute_variants_query", AsyncMock(return_value=make_variants()))
     m(route, "_execute_orders_query", AsyncMock(return_value=make_orders()))
     m(route, "_list_calendar_events", AsyncMock(return_value={"items": []}))
@@ -449,7 +451,7 @@ def data(resp):
 def test_route_clean_go(client):
     d = data(post(client))
     assert d["verdict"] == "go"
-    assert len(d["unavailable_sources"]) == 3
+    assert len(d["unavailable_sources"]) == 4
 
 
 def test_route_never_asks_google_for_more_than_250_events(client, monkeypatch):
@@ -859,6 +861,9 @@ def test_route_rate_limit_uses_dedicated_bucket_and_user_identity(client, monkey
     monkeypatch.setattr(r, "enforce_rate_limit", seen)
     monkeypatch.setattr(r, "_find_integration", AsyncMock(return_value=None))
     monkeypatch.setattr(
+        r, "_find_infra_integrations", AsyncMock(return_value=(None, None))
+    )
+    monkeypatch.setattr(
         r, "_list_calendar_events", AsyncMock(return_value={"items": []})
     )
     post(client)
@@ -916,7 +921,7 @@ def test_route_both_sources_down_is_unknown_with_independent_flags(client, monke
     d = data(post(client))
     assert d["verdict"] == "unknown"
     assert d["shopify_connected"] is False and d["calendar_connected"] is False
-    assert len(d["unavailable_sources"]) == 3
+    assert len(d["unavailable_sources"]) == 4
 
 
 def test_route_setup_failure_log_has_no_shop_domain(client, monkeypatch, caplog):
@@ -948,3 +953,359 @@ def test_route_response_is_not_cached(client, monkeypatch):
     post(client)
     post(client)
     assert calls.await_count == 2
+
+
+# ── FEAT-179: infrastructure readiness ────────────────────────────────────
+
+from datetime import timedelta  # noqa: E402
+
+from src.schemas.shopify import TripConflict, TripFeasibilityResponse  # noqa: E402
+from src.services.shopify.trip_feasibility import (  # noqa: E402
+    _infrastructure_findings,
+)
+
+
+def render_cfg(services=None, synced=AS_OF - timedelta(hours=1), truncated=False):
+    cfg = {
+        "service_count": len(services or []),
+        "services_truncated": truncated,
+        "services": services or [],
+    }
+    if synced is not None:
+        cfg["synced_at"] = synced.isoformat()
+    return cfg
+
+
+def sb_cfg(projects=None, synced=AS_OF - timedelta(hours=1)):
+    cfg = {"project_count": len(projects or []), "projects": projects or []}
+    if synced is not None:
+        cfg["synced_at"] = synced.isoformat()
+    return cfg
+
+
+def svc(name="api", suspended="not_suspended", deploy="live"):
+    return {
+        "id": "srv-1",
+        "name": name,
+        "type": "web_service",
+        "suspended": suspended,
+        "latest_deploy_status": deploy,
+    }
+
+
+def infra_full(rc=None, sc=None, rs="connected", ss="connected"):
+    return _infrastructure_findings(rc, sc, rs, ss, as_of=AS_OF)
+
+
+def infra(rc=None, sc=None, rs="connected", ss="connected"):
+    return infra_full(rc, sc, rs, ss)[:2]
+
+
+def test_infra_not_connected_has_no_flags_or_conflicts():
+    conflicts, flags = infra()
+    assert conflicts == []
+    assert not any(flags.values())
+
+
+def test_infra_healthy_fresh_is_clean_go():
+    r = run(
+        render_config=render_cfg([svc()]),
+        render_status="connected",
+        supabase_config=sb_cfg([{"name": "db", "status": "ACTIVE_HEALTHY"}]),
+        supabase_status="connected",
+    )
+    assert r.verdict == "go"
+    assert r.render_connected and r.supabase_connected
+    assert [u.name for u in r.unavailable_sources] == [
+        "booking_com_pricing",
+        "calendly_availability",
+    ]
+
+
+def test_infra_never_synced_is_unknown():
+    r = run(render_config=render_cfg([svc()], synced=None), render_status="connected")
+    assert r.verdict == "unknown"
+    assert r.render_needs_sync and not r.render_stale
+
+
+def test_infra_unparseable_synced_at_is_not_synced():
+    cfg = render_cfg([svc()])
+    cfg["synced_at"] = "garbage"
+    _, flags = infra(rc=cfg)
+    assert flags["render_needs_sync"]
+
+
+def test_infra_future_synced_at_is_not_fresh():
+    _, flags = infra(rc=render_cfg([svc()], synced=AS_OF + timedelta(hours=3)))
+    assert flags["render_needs_sync"]
+
+
+def test_infra_stale_is_unknown_per_provider():
+    old = AS_OF - timedelta(hours=25)
+    r = run(
+        render_config=render_cfg([svc()], synced=old),
+        render_status="connected",
+        supabase_config=sb_cfg([{"name": "db", "status": "ACTIVE_HEALTHY"}]),
+        supabase_status="connected",
+    )
+    assert r.verdict == "unknown"
+    assert r.render_stale and not r.supabase_stale
+
+
+def test_infra_exactly_24h_is_not_stale():
+    _, flags = infra(sc=sb_cfg(synced=AS_OF - timedelta(hours=24)))
+    assert not flags["supabase_stale"]
+
+
+def test_infra_sync_error_is_unknown():
+    r = run(supabase_config=sb_cfg(), supabase_status="error")
+    assert r.verdict == "unknown"
+    assert r.supabase_sync_error
+
+
+def test_infra_render_truncated_is_unknown():
+    r = run(
+        render_config=render_cfg([svc()], truncated=True), render_status="connected"
+    )
+    assert r.verdict == "unknown"
+    assert r.render_truncated and not r.render_needs_sync
+
+
+def test_infra_suspended_service_is_no_go():
+    r = run(
+        render_config=render_cfg([svc("web", suspended="suspended")]),
+        render_status="connected",
+    )
+    assert r.verdict == "no-go"
+    c = r.conflicts[0]
+    assert (c.type, c.provider, c.infra_name, c.infra_state) == (
+        "infrastructure",
+        "render",
+        "web",
+        "suspended",
+    )
+
+
+@pytest.mark.parametrize(
+    "deploy", ["build_failed", "update_failed", "pre_deploy_failed"]
+)
+def test_infra_failed_deploy_is_conflict(deploy):
+    conflicts, _ = infra(rc=render_cfg([svc(deploy=deploy)]))
+    assert [c.infra_state for c in conflicts] == [deploy]
+
+
+@pytest.mark.parametrize(
+    "deploy", ["live", "build_in_progress", "created", "deactivated", "canceled"]
+)
+def test_infra_other_deploy_states_are_not_conflicts(deploy):
+    conflicts, _, unreadable = infra_full(rc=render_cfg([svc(deploy=deploy)]))
+    assert conflicts == [] and unreadable == []
+
+
+@pytest.mark.parametrize("deploy", ["unchecked", "brand_new_status", 5, ""])
+def test_infra_unchecked_or_unknown_deploy_status_is_unreadable_never_healthy(deploy):
+    conflicts, _, unreadable = infra_full(rc=render_cfg([svc(deploy=deploy)]))
+    assert conflicts == []
+    assert "render_health" in unreadable
+
+
+def test_infra_unhealthy_supabase_project_is_conflict():
+    conflicts, _ = infra(sc=sb_cfg([{"name": "db", "status": "INACTIVE"}]))
+    assert (conflicts[0].provider, conflicts[0].infra_state) == ("supabase", "INACTIVE")
+
+
+def test_infra_missing_supabase_status_is_unreadable_not_healthy():
+    conflicts, _, unreadable = infra_full(sc=sb_cfg([{"name": "db", "status": None}]))
+    assert conflicts == [] and unreadable == ["supabase_health"]
+
+
+def test_infra_conflict_survives_stale_snapshot_as_no_go():
+    r = run(
+        render_config=render_cfg(
+            [svc(suspended="suspended")], synced=AS_OF - timedelta(days=3)
+        ),
+        render_status="connected",
+    )
+    assert r.verdict == "no-go" and r.render_stale
+
+
+def test_infra_strings_are_truncated_not_rejected():
+    long = "x" * 1000
+    conflicts, _ = infra(
+        rc=render_cfg([svc(name=long, suspended="suspended")]),
+        sc=sb_cfg([{"name": long, "status": "S" * 500}]),
+    )
+    assert all(len(c.infra_name) == 255 and len(c.infra_state) <= 64 for c in conflicts)
+
+
+def test_infra_malformed_entries_are_unreadable():
+    cfg = render_cfg()
+    cfg["services"] = ["junk", None]
+    conflicts, _, unreadable = infra_full(rc=cfg)
+    assert conflicts == [] and unreadable == ["render_health"]
+
+
+@pytest.mark.parametrize("bad", [None, "live", 5])
+def test_infra_missing_or_malformed_lists_are_unreadable(bad):
+    rc = render_cfg()
+    rc["services"] = bad
+    sc = sb_cfg()
+    sc["projects"] = bad
+    _, _, unreadable = infra_full(rc=rc, sc=sc)
+    assert unreadable == ["render_health", "supabase_health"]
+
+
+@pytest.mark.parametrize(
+    "service",
+    [svc(suspended=None), svc(suspended="weird")],
+)
+def test_infra_unreadable_render_service_never_yields_go(service):
+    r = run(render_config=render_cfg([service]), render_status="connected")
+    assert r.verdict != "go" and "render_health" in r.partial_failures
+
+
+def test_infra_never_deployed_service_is_not_unreadable():
+    _, _, unreadable = infra_full(rc=render_cfg([svc(deploy=None)]))
+    assert unreadable == []
+
+
+def test_infra_unreadable_supabase_project_never_yields_go():
+    r = run(
+        supabase_config=sb_cfg([{"name": "db", "status": None}]),
+        supabase_status="connected",
+    )
+    assert r.verdict != "go" and "supabase_health" in r.partial_failures
+
+
+@pytest.mark.parametrize(
+    "flag",
+    ["render_needs_sync", "render_stale", "render_sync_error", "render_truncated"],
+)
+def test_schema_rejects_go_with_degraded_connected_render(flag):
+    with pytest.raises(ValidationError):
+        TripFeasibilityResponse(
+            verdict="go",
+            shopify_connected=True,
+            calendar_connected=True,
+            render_connected=True,
+            **{flag: True},
+        )
+
+
+def test_schema_rejects_go_with_degraded_connected_supabase():
+    with pytest.raises(ValidationError):
+        TripFeasibilityResponse(
+            verdict="go",
+            shopify_connected=True,
+            calendar_connected=True,
+            supabase_connected=True,
+            supabase_stale=True,
+        )
+
+
+def test_schema_infrastructure_conflict_field_exclusivity():
+    with pytest.raises(ValidationError):
+        TripConflict(type="infrastructure", provider="render", infra_name="a")
+    with pytest.raises(ValidationError):
+        TripConflict(
+            type="infrastructure",
+            provider="render",
+            infra_name="a",
+            infra_state="s",
+            variant_id="v",
+        )
+    with pytest.raises(ValidationError):
+        TripConflict(
+            type="stockout",
+            variant_id="v",
+            projected_stockout_date="2026-01-01",
+            provider="render",
+        )
+
+
+def test_infra_check_logs_nothing_with_names(caplog):
+    caplog.set_level("DEBUG")
+    run(
+        render_config=render_cfg([svc("secret-svc", suspended="suspended")]),
+        render_status="connected",
+    )
+    assert "secret-svc" not in caplog.text
+
+
+def test_route_passes_infra_snapshot_and_flags_stale(client, monkeypatch):
+    class _Row:
+        status = "connected"
+        config = render_cfg(
+            [svc()], synced=datetime.now(timezone.utc) - timedelta(days=2)
+        )
+
+    monkeypatch.setattr(
+        route, "_find_infra_integrations", AsyncMock(return_value=(_Row(), None))
+    )
+    d = data(post(client))
+    assert d["verdict"] == "unknown"
+    assert d["render_stale"] is True
+    assert [u["name"] for u in d["unavailable_sources"]].count("render_health") == 0
+    assert "secret" not in str(d)
+
+
+def test_route_infra_conflict_is_no_go_even_on_early_exit(client, monkeypatch):
+    class _Row:
+        status = "connected"
+        config = sb_cfg(
+            [{"name": "db", "status": "INACTIVE"}], synced=datetime.now(timezone.utc)
+        )
+
+    monkeypatch.setattr(
+        route, "_find_infra_integrations", AsyncMock(return_value=(None, _Row()))
+    )
+    monkeypatch.setattr(route, "_find_integration", AsyncMock(return_value=None))
+    d = data(post(client))
+    assert d["verdict"] == "no-go"
+    assert d["conflicts"][0]["provider"] == "supabase"
+
+
+@pytest.mark.asyncio
+async def test_find_infra_integrations_scopes_to_caller_or_shared_row():
+    from src.api.v1 import trip_feasibility as route
+
+    seen = []
+
+    class _Rows:
+        def all(self):
+            return []
+
+    class _Db:
+        async def scalars(self, stmt):
+            seen.append(stmt)
+            return _Rows()
+
+    render, supabase = await route._find_infra_integrations(
+        "11111111-1111-1111-1111-111111111111", _Db()
+    )
+    assert (render, supabase) == (None, None)
+    assert len(seen) == 1
+    sql = str(seen[0].compile(compile_kwargs={"literal_binds": False}))
+    assert "integrations.user_id = " in sql
+    assert "integrations.user_id IS NULL" in sql
+    assert "integrations.status IN" in sql
+    assert "integrations.slug IN" in sql
+    # The caller's own row must sort before the shared (NULL owner) row.
+    assert "ORDER BY integrations.user_id IS NULL" in sql
+    assert "error" in route.ACTIVE_STATUSES
+    assert "11111111-1111-1111-1111-111111111111" in str(
+        seen[0].compile().params.values()
+    )
+
+
+def test_non_object_stored_config_reads_as_empty_not_a_crash():
+    class _Row:
+        config = ["not", "an", "object"]
+
+    assert route._config_dict(_Row()) == {}
+    assert route._config_dict(None) is None
+
+    class _Good:
+        config = {"services": []}
+
+    assert route._config_dict(_Good()) == {"services": []}

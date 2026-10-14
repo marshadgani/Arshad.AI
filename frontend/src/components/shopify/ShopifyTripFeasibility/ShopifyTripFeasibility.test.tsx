@@ -14,7 +14,8 @@ function result(overrides: Partial<TripFeasibilityResult> = {}): TripFeasibility
     unavailable_sources: [
       { name: 'booking_com_pricing', reason: 'not_connected' },
       { name: 'calendly_availability', reason: 'not_connected' },
-      { name: 'deploy_windows', reason: 'not_connected' },
+      { name: 'render_health', reason: 'not_connected' },
+      { name: 'supabase_health', reason: 'not_connected' },
     ],
     shopify_connected: true,
     shopify_needs_reauth: false,
@@ -23,6 +24,15 @@ function result(overrides: Partial<TripFeasibilityResult> = {}): TripFeasibility
     variants_truncated: false,
     orders_truncated: false,
     calendar_truncated: false,
+    render_connected: false,
+    render_needs_sync: false,
+    render_stale: false,
+    render_sync_error: false,
+    render_truncated: false,
+    supabase_connected: false,
+    supabase_needs_sync: false,
+    supabase_stale: false,
+    supabase_sync_error: false,
     partial_failures: [],
     ...overrides,
   };
@@ -81,7 +91,7 @@ describe('ShopifyTripFeasibility', () => {
     expect(url).toBe('/api/v1/trip-feasibility');
     expect(JSON.parse(init.body)).toEqual({ start_date: '2026-06-10', end_date: '2026-06-14' });
     expect(screen.getByText(/booking com pricing \(not connected\)/)).toBeInTheDocument();
-    expect(screen.getByText(/deploy windows \(not connected\)/)).toBeInTheDocument();
+    expect(screen.getByText(/render health \(not connected\)/)).toBeInTheDocument();
   });
 
   it('renders conflicts on a no-go', async () => {
@@ -177,6 +187,59 @@ describe('ShopifyTripFeasibility', () => {
     submit();
     expect(await screen.findByText('Unknown')).toBeInTheDocument();
     expect(screen.queryByText(/^go$/i)).toBeNull();
+  });
+
+  it.each([
+    ['render_stale', 'Render snapshot is more than 24 hours old'],
+    ['render_needs_sync', 'Render has never been synced'],
+    ['render_sync_error', 'last Render sync failed'],
+    ['render_truncated', 'first 10 Render services'],
+    ['supabase_stale', 'Supabase snapshot is more than 24 hours old'],
+    ['supabase_needs_sync', 'Supabase has never been synced'],
+    ['supabase_sync_error', 'last Supabase sync failed'],
+  ] as const)('never shows Go when %s, even if the server says go', async (flag, text) => {
+    const provider = flag.startsWith('render') ? 'render' : 'supabase';
+    mockFetch(200, {
+      data: result({ verdict: 'go', [`${provider}_connected`]: true, [flag]: true }),
+    });
+    render(<ShopifyTripFeasibility />);
+    submit();
+    expect(await screen.findByText('Unknown')).toBeInTheDocument();
+    expect(screen.queryByText(/^go$/i)).toBeNull();
+    expect(await screen.findByRole('alert')).toHaveTextContent(text);
+  });
+
+  it('shows a connected, fresh infrastructure source as Go', async () => {
+    mockFetch(200, { data: result({ render_connected: true, supabase_connected: true }) });
+    render(<ShopifyTripFeasibility />);
+    submit();
+    expect(await screen.findByText('Go')).toBeInTheDocument();
+  });
+
+  it('lists an infrastructure conflict with provider, name and state', async () => {
+    mockFetch(200, {
+      data: result({
+        verdict: 'no-go',
+        render_connected: true,
+        conflicts: [
+          {
+            type: 'infrastructure',
+            provider: 'render',
+            infra_name: 'api',
+            infra_state: 'build_failed',
+            variant_id: null,
+            projected_stockout_date: null,
+            event_title: null,
+            event_start: null,
+            event_end: null,
+          },
+        ],
+      }),
+    });
+    render(<ShopifyTripFeasibility />);
+    submit();
+    expect(await screen.findByText('Render: api is build_failed')).toBeInTheDocument();
+    expect(screen.getByText('No-go')).toBeInTheDocument();
   });
 
   it('shows reauth prompts as alerts', async () => {

@@ -1,4 +1,4 @@
-import type { TripFeasibilityResult, TripVerdict } from '../../../types/shopify';
+import type { TripConflict, TripFeasibilityResult, TripVerdict } from '../../../types/shopify';
 import styles from './ShopifyTripFeasibility.module.css';
 
 const VERDICT_LABEL: Record<TripVerdict, string> = {
@@ -6,6 +6,24 @@ const VERDICT_LABEL: Record<TripVerdict, string> = {
   'no-go': 'No-go',
   unknown: 'Unknown',
 };
+
+const PROVIDER_LABEL = { render: 'Render', supabase: 'Supabase' } as const;
+
+function conflictKey(c: TripConflict, i: number): string {
+  if (c.type === 'infrastructure') return `infra-${c.provider}-${c.infra_name}-${i}`;
+  return `${c.type}-${c.variant_id ?? c.event_start ?? i}`;
+}
+
+function conflictText(c: TripConflict): string {
+  switch (c.type) {
+    case 'stockout':
+      return `Stock runs out on ${c.projected_stockout_date}: ${c.variant_id}`;
+    case 'calendar_event':
+      return `Calendar: ${c.event_title} (${c.event_start})`;
+    case 'infrastructure':
+      return `${PROVIDER_LABEL[c.provider]}: ${c.infra_name} is ${c.infra_state}`;
+  }
+}
 
 const VERDICT_CLASS: Record<TripVerdict, string> = {
   go: styles.go,
@@ -23,6 +41,17 @@ function degradations(r: TripFeasibilityResult): { text: string; severe: boolean
   if (r.variants_truncated) out.push({ text: 'Only part of the product list was checked.', severe: false });
   if (r.orders_truncated) out.push({ text: 'Only part of the recent sales history was checked.', severe: false });
   if (r.calendar_truncated) out.push({ text: 'Your calendar has more events than could be checked.', severe: false });
+  if (r.render_connected) {
+    if (r.render_sync_error) out.push({ text: 'The last Render sync failed, so service health is unknown. Re-sync Render from Integrations.', severe: true });
+    else if (r.render_needs_sync) out.push({ text: 'Render has never been synced, so service health was not checked. Sync it from Integrations.', severe: true });
+    else if (r.render_stale) out.push({ text: 'The Render snapshot is more than 24 hours old, so service health is unconfirmed. Re-sync Render from Integrations.', severe: true });
+    if (r.render_truncated) out.push({ text: 'Only the first 10 Render services were checked.', severe: true });
+  }
+  if (r.supabase_connected) {
+    if (r.supabase_sync_error) out.push({ text: 'The last Supabase sync failed, so project health is unknown. Re-sync Supabase from Integrations.', severe: true });
+    else if (r.supabase_needs_sync) out.push({ text: 'Supabase has never been synced, so project health was not checked. Sync it from Integrations.', severe: true });
+    else if (r.supabase_stale) out.push({ text: 'The Supabase snapshot is more than 24 hours old, so project health is unconfirmed. Re-sync Supabase from Integrations.', severe: true });
+  }
   if (r.partial_failures.length > 0) {
     out.push({
       text: `Some data could not be fetched (${r.partial_failures.join(', ')}). Try again shortly.`,
@@ -64,11 +93,7 @@ export function ShopifyTripFeasibilityOutcome({ result }: ShopifyTripFeasibility
       {result.conflicts.length > 0 && (
         <ul className={styles.list} aria-label="Conflicts">
           {result.conflicts.map((c, i) => (
-            <li key={`${c.type}-${c.variant_id ?? c.event_start ?? i}`}>
-              {c.type === 'stockout'
-                ? `Stock runs out on ${c.projected_stockout_date}: ${c.variant_id}`
-                : `Calendar: ${c.event_title} (${c.event_start})`}
-            </li>
+            <li key={conflictKey(c, i)}>{conflictText(c)}</li>
           ))}
         </ul>
       )}
