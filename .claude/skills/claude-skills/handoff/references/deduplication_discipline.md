@@ -1,196 +1,96 @@
-# Deduplication Discipline for Handoffs
+# Deduplication Discipline
 
-This reference answers exactly one decision: **what counts as duplication, and how do we replace it with a reference?**
+Matt's core rule, made operational:
 
-Pair with `scripts/artifact_deduplicator.py` for automated detection.
+> Do not duplicate content already captured in other artifacts (PRDs, plans, ADRs, issues, commits, diffs). Reference them by path or URL instead.
 
-## Matt Pocock's Non-Negotiable Rule
+This document turns that rule into a list of concrete *do-this-not-that* pairs the agent applies before saving.
 
-> "Do not duplicate content already captured in other artifacts (PRDs, plans, ADRs, issues, commits, diffs). Reference them by path or URL instead."
->
-> — Matt Pocock, handoff SKILL.md
+## Why this matters
 
-This is the most violated rule in handoffs. Duplication is seductive — copying content into the handoff feels comprehensive. But it creates 4 problems.
+A handoff that duplicates artifacts goes stale the moment the artifact updates. A handoff that references artifacts stays correct as long as the references resolve. The reader follows links to canonical sources; they don't trust the handoff to be the source of truth.
 
-## Why Duplication Is Bad
+A second reason: duplication grows the file, which grows the next session's context window, which costs tokens and attention. Every paragraph that isn't a link is a paragraph the next agent has to read.
 
-### Problem 1: Drift
+## The do-this-not-that pairs
 
-The handoff drifts from the source. If the PRD updates, the handoff is now wrong. The next agent reads stale info and makes wrong decisions.
+### 1. The diff
 
-### Problem 2: Bloat
+| Don't | Do |
+|---|---|
+| Paste the diff into the handoff. | Reference the branch (`feature/foo`) or PR (`#123`). |
+| List every file you touched. | "Touched 14 files across `src/auth/` and `tests/auth/` — see PR for full list." |
+| Quote a 40-line code block to "preserve context." | Link to the file path + line range: `src/auth/login.ts:42-87`. |
 
-Handoffs grow unbounded. A 500-line handoff is unusable — the next agent skims it and misses critical context.
+### 2. The PRD
 
-### Problem 3: Ownership
+| Don't | Do |
+|---|---|
+| Retype the PRD as bullet points. | Link to the PRD path. |
+| Summarise the PRD because "the next agent might not have access." | If they don't have access, the access is the bug — fix that. |
+| Paraphrase the user stories. | Reference them by ID. |
 
-When the handoff has its own version of the PRD content, ownership becomes unclear. Which version is canonical?
+### 3. The commit message
 
-### Problem 4: Erosion of upstream artifacts
+| Don't | Do |
+|---|---|
+| "I committed a fix for the redaction edge case." | "Fixed redaction edge case — `a1b2c3d`." |
+| Narrate the commits in order. | "5 commits on `feature/foo`. See `git log feature/foo`." |
 
-If handoffs duplicate PRD content, the PRD itself stops getting updated — "we'll just put it in the handoff." The upstream artifact rots.
+### 4. The issue / ticket
 
-## Five Categories of Common Duplication (How `artifact_deduplicator.py` Detects)
+| Don't | Do |
+|---|---|
+| Restate the bug from the issue body. | "See issue #456." |
+| Copy the acceptance criteria. | "Acceptance criteria in #456." |
+| Quote the latest comment. | "Latest comment from @teammate at issue #456." |
 
-### Category 1: PRD content
+### 5. The conversation itself
 
-**Signals:** headers like "Problem statement", "Solution", "Success metrics", "Out of scope", "User stories", "Acceptance criteria"
+| Don't | Do |
+|---|---|
+| Recap the conversation chronologically. | Compress to State of play + Open decisions. |
+| List every question the user asked. | Surface only the questions that became decisions. |
+| Include the back-and-forth that led to a conclusion. | Just the conclusion. |
 
-**Fix:** Replace the section with a link to the PRD file.
+### 6. Suggested skills
 
-**Before:**
-```markdown
-## Problem statement
-Users complain about slow auth. We need to make it fast.
+| Don't | Do |
+|---|---|
+| List 20 skills "in case any are useful." | Pick 3-5 and say *why each*. |
+| Recommend a skill without explaining the link to the goal. | "code-review — to review the PR before opening it." |
+| Re-explain what each skill does. | The next agent reads the SKILL.md if needed. |
 
-## Solution
-Implement OAuth2 with refresh tokens.
+### 7. Artifacts
 
-## Success metrics
-- Login p95 < 500ms
-- 0 OAuth errors per 10k requests
-```
+| Don't | Do |
+|---|---|
+| Embed the full PR description. | Link to the PR. |
+| Quote the relevant lines from an ADR. | Link to the ADR path + section. |
+| Paste a CI log to show what failed. | Link to the failing CI run + one-line summary ("type-check failed at L42 of `foo.ts`"). |
 
-**After:**
-```markdown
-## Context
-See full PRD: [docs/prd/auth-refactor.md](docs/prd/auth-refactor.md)
-```
+## What survives the rule
 
-### Category 2: ADR content
+Some content must live inline in the handoff because it doesn't exist anywhere else:
 
-**Signals:** "Status:", "Decision:", "Consequences:", "Context:", "Alternatives considered"
+- **Open decisions and your lean** — these are *new* information the conversation produced. Inline them.
+- **State of play prose** — the synthesis itself. The artifacts exist; the synthesis is the handoff.
+- **Forcing constraints** — "Deadline: EOD." These often live only in the conversation.
+- **Sub-text and known-unknowns** — "Reviewer hates verbose tests, so keep new tests short." This shapes the work and isn't in any artifact.
 
-**Fix:** Replace with a link to the ADR.
+If you're unsure, ask: *does removing this and replacing with a link lose any information?* If no, replace it. If yes, keep the inline content.
 
-**Before:**
-```markdown
-## Status: Accepted
-Decision: Use Auth0 over Okta.
-Consequences: $200/month cost; faster integration.
-```
+## Anti-pattern: defensive duplication
 
-**After:**
-```markdown
-## Decisions locked in
-See [ADR-0042](docs/adr/0042-auth-provider.md)
-```
+Defensive duplication looks like: *"I'll paste the diff inline too, just in case the link breaks."*
 
-### Category 3: Issue content
+Resist. If links can break, that's a separate problem — fix the link, don't duplicate. Defensive duplication causes the second failure mode this rule is designed to prevent: a handoff that contradicts the artifact it duplicates.
 
-**Signals:** "Steps to reproduce", "Expected behavior", "Actual behavior", "Environment:"
+## Sources
 
-**Fix:** Issue reference is enough.
-
-**Before:**
-```markdown
-## Bug
-### Steps to reproduce
-1. Login
-2. Wait 10 seconds
-3. Re-login
-### Expected behavior
-Stay logged in.
-### Actual behavior
-Session expires.
-```
-
-**After:**
-```markdown
-## Active bug
-[#142 — Session expires after 10 seconds](https://github.com/.../issues/142)
-```
-
-### Category 4: Commit-message style content
-
-**Signals:** Conventional Commit prefixes (feat:, fix:, docs:, chore:, refactor:) with multi-line body
-
-**Fix:** Replace with commit SHA + URL.
-
-**Before:**
-```markdown
-## What was shipped
-feat: add OAuth2 support
-This change adds OAuth2 to the auth middleware.
-- Added refresh token handling
-- Added expiry check
-```
-
-**After:**
-```markdown
-## What was shipped
-[abc1234](https://github.com/.../commit/abc1234) feat: add OAuth2 support
-```
-
-### Category 5: Long code blocks
-
-**Signals:** code blocks >20 lines — usually duplicating checked-in code
-
-**Fix:** Link to file + line range + commit SHA.
-
-**Before:**
-````markdown
-## The fix
-```python
-def authenticate(token):
-    # 30 lines of code...
-```
-````
-
-**After:**
-```markdown
-## The fix
-[src/auth.py:42-80 @ abc1234](https://github.com/.../blob/abc1234/src/auth.py#L42-L80)
-```
-
-## What's NOT Duplication
-
-Some content should live in the handoff and only the handoff:
-
-- **Synthesis** — your interpretation across multiple artifacts ("the PRD says X but the issue suggests Y; reconciling here")
-- **Current state** — "as of this moment, branch X is at commit Y" (changes too fast to capture elsewhere)
-- **Next-session-specific instruction** — the focus + prompts tailored to what comes next
-- **Open decisions** — decisions not yet captured in any artifact (because they're still open)
-- **Quick links** — paths/URLs are duplication-OK; they're indexes, not content
-
-## The "Could the Next Agent Find This Themselves?" Test
-
-For every paragraph in the handoff, ask:
-1. Is this content captured in a referenceable artifact (PRD, ADR, issue, commit, code)?
-2. If yes — replace with a reference. Duplication.
-3. If no — keep it in the handoff. This is original synthesis.
-
-## How `artifact_deduplicator.py` Helps
-
-The tool scans for the 5 signal categories above and flags candidates. It does NOT delete or rewrite — it surfaces findings for human review. The handoff author makes the final call (sometimes context demands a brief restatement; the tool's "FAIL" verdict is advisory).
-
-Verdict thresholds:
-- 0 findings → CLEAN
-- 1-3 findings → WARN (review; sometimes intentional)
-- >3 findings → FAIL (probably duplicating; refactor before handing off)
-
-## Anti-Patterns
-
-1. **Copying PRD content "for convenience"** — convenience for whom? The next agent has the PRD link.
-2. **"Quick summary" of an ADR** — if the ADR needs a summary, fix the ADR.
-3. **Inline code dumps** — git is the source of truth; commit SHA + path is enough.
-4. **Issue descriptions copy-pasted** — `#NNN` is enough.
-5. **Recreating diff content** — `git diff` is the source.
-
-## When This Reference Doesn't Help
-
-- **Standalone documentation** — handoff dedup rules don't apply to docs meant as primary sources
-- **Customer-facing summaries** — duplication may be necessary for accessibility
-- **Audit trails** — sometimes you need a frozen copy of content at a point in time
-
----
-
-**Source authorities (non-exhaustive):**
-
-- **Matt Pocock — handoff** (https://github.com/mattpocock/skills/, MIT) — the no-duplication rule
-- **Hunt & Thomas — "The Pragmatic Programmer"** (1999) — DRY (Don't Repeat Yourself)
-- **Fowler, M. — "Refactoring"** (1999, 2018) — duplication as code smell
-- **DocOps + Lean Documentation Movement** — references > copies; canonical sources
-- **Karpathy, A. — LLM Wiki pattern** — persistent vault as canonical store; sessions reference it
-- **Git as source of truth principle** — commits + diffs are the historical record
-- **API Versioning patterns (Stripe, Twilio)** — canonical-source + reference pattern at API level
+- Matt Pocock, *Handoff skill* (MIT) — the original rule.
+- Karpathy, *Software 3.0 talk* (2025) — context engineering: every duplicated paragraph is a future contradiction.
+- Cory Doctorow, *Writing for the machine that reads* (essay) — references over copies, durably.
+- Google SRE Workbook — postmortem hygiene: link to evidence, do not paraphrase it.
+- Atlassian, *Confluence handoff template guide* — the same discipline at organizational scale.
+- Edward Tufte, *Beautiful Evidence* — the principle of *information density*: one source of truth per fact.
