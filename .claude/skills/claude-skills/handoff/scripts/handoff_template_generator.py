@@ -1,254 +1,215 @@
 #!/usr/bin/env python3
-"""Handoff template generator.
+"""handoff_template_generator.py — Generate a handoff document scaffold tailored to next-session focus.
 
-Creates a 5-section scaffold at the configured save location. The agent
-fills in the bodies. Prints the resulting path to stdout.
+Stdlib-only. Outputs a markdown skeleton matching Matt Pocock's handoff structure:
+  - Goal of next session
+  - State of play
+  - Open decisions
+  - Skills to use
+  - Artifacts (references only — NO duplication of content)
 
-Stdlib-only.
+The "next focus" argument tailors which sections get emphasized + which prompts
+are included as placeholder hints.
+
+NO LLM CALLS. Stdlib only. Templating + sectional emphasis only.
+
+Usage:
+    python handoff_template_generator.py                                   # uses embedded sample
+    python handoff_template_generator.py --next-focus "ship PR to dev"
+    python handoff_template_generator.py --next-focus "debug auth" --output json
+    python handoff_template_generator.py --next-focus "review CI failures" --out /tmp/handoff-XXX.md
 """
 
-
 import argparse
-import datetime as dt
+import json
 import os
-import re
-import subprocess
 import sys
 import tempfile
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import config_loader  # noqa: E402
+from datetime import datetime
+from typing import Any, Dict
 
 
-def _slugify(text: str, max_len: int = 40) -> str:
-    text = re.sub(r"[^A-Za-z0-9]+", "-", text).strip("-").lower()
-    if not text:
-        text = "handoff"
-    return text[:max_len].rstrip("-")
+# Tag focuses to section emphasis
+FOCUS_EMPHASIS = [
+    ("ship", "deployment_emphasis"),
+    ("deploy", "deployment_emphasis"),
+    ("pr", "deployment_emphasis"),
+    ("review", "review_emphasis"),
+    ("audit", "review_emphasis"),
+    ("debug", "debug_emphasis"),
+    ("fix", "debug_emphasis"),
+    ("investigate", "debug_emphasis"),
+    ("design", "design_emphasis"),
+    ("plan", "design_emphasis"),
+    ("scope", "design_emphasis"),
+    ("test", "test_emphasis"),
+    ("qa", "test_emphasis"),
+]
 
 
-def _git_context(cwd: Path) -> str | None:
-    def _run(cmd: list[str]) -> str | None:
-        try:
-            result = subprocess.run(
-                cmd,
-                cwd=str(cwd),
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-        except (OSError, subprocess.SubprocessError):
-            return None
-        if result.returncode != 0:
-            return None
-        return result.stdout.strip()
+SECTION_PROMPTS = {
+    "deployment_emphasis": [
+        "What's the exact command to ship? `git push` + `mcp__github__create_pull_request`?",
+        "Which checks must be green before merge?",
+        "Who needs to approve?",
+        "What's the rollback plan if CI catches something?",
+    ],
+    "review_emphasis": [
+        "What's the review checklist for this PR?",
+        "Which files are sensitive (security/secrets)?",
+        "Where are existing similar patterns?",
+        "What past PRs reviewed this code path?",
+    ],
+    "debug_emphasis": [
+        "What's the exact symptom + reproduction steps?",
+        "What's been tried already?",
+        "Which logs / traces are most informative?",
+        "What's the smallest reproducing case?",
+    ],
+    "design_emphasis": [
+        "What's the user-facing outcome the design must achieve?",
+        "What's the non-negotiable constraint?",
+        "What are the rejected alternatives + why?",
+        "What's reversible vs irreversible in this design?",
+    ],
+    "test_emphasis": [
+        "What's the test plan?",
+        "Which existing tests cover this?",
+        "Where are edge cases hiding?",
+        "How is success measured?",
+    ],
+    "default": [
+        "What's the immediate next action?",
+        "What's blocking right now?",
+        "Where are the relevant files?",
+        "What decisions are still open?",
+    ],
+}
 
-    if _run(["git", "rev-parse", "--is-inside-work-tree"]) != "true":
-        return None
-    branch = _run(["git", "branch", "--show-current"]) or "(detached)"
-    last_commit = _run(["git", "log", "-1", "--oneline"]) or "(no commits)"
-    status = _run(["git", "status", "--porcelain"]) or ""
-    dirty_count = sum(1 for line in status.splitlines() if line.strip())
-    lines = [
-        "_Git context (auto-included from config)._",
-        "",
-        f"- Branch: `{branch}`",
-        f"- Last commit: `{last_commit}`",
-        f"- Dirty files: {dirty_count}",
-    ]
+
+def _detect_emphasis(focus: str) -> str:
+    if not focus:
+        return "default"
+    focus_lower = focus.lower()
+    for keyword, emphasis in FOCUS_EMPHASIS:
+        if keyword in focus_lower:
+            return emphasis
+    return "default"
+
+
+def generate_template(next_focus: str, session_id: str = "") -> str:
+    emphasis = _detect_emphasis(next_focus)
+    prompts = SECTION_PROMPTS.get(emphasis, SECTION_PROMPTS["default"])
+    timestamp = datetime.now().isoformat(timespec="seconds")
+    session_label = session_id or "<session_id>"
+
+    lines = []
+    lines.append(f"# Handoff — {next_focus or '(general)'}")
+    lines.append("")
+    lines.append(f"**Generated:** {timestamp}")
+    lines.append(f"**From session:** {session_label}")
+    lines.append(f"**Next focus:** {next_focus or '(unspecified — fill in)'}")
+    lines.append("")
+    lines.append("---")
+    lines.append("")
+    lines.append("## Goal of next session")
+    lines.append("")
+    lines.append(f"[Describe what the next session must accomplish. Tailored to: {next_focus or 'general'}]")
+    lines.append("")
+    lines.append("Prompts to answer:")
+    for p in prompts:
+        lines.append(f"- {p}")
+    lines.append("")
+    lines.append("## State of play")
+    lines.append("")
+    lines.append("**Done:**")
+    lines.append("- [list what's complete with paths/refs to artifacts]")
+    lines.append("")
+    lines.append("**In progress:**")
+    lines.append("- [list what's mid-flight + current branch/PR if applicable]")
+    lines.append("")
+    lines.append("**Blocking:**")
+    lines.append("- [list blockers + who/what unblocks each]")
+    lines.append("")
+    lines.append("## Open decisions")
+    lines.append("")
+    lines.append("- [Decision 1: options + current lean]")
+    lines.append("- [Decision 2: options + current lean]")
+    lines.append("")
+    lines.append("## Skills to use (next session)")
+    lines.append("")
+    lines.append("- [Skill 1 — when to invoke]")
+    lines.append("- [Skill 2 — when to invoke]")
+    lines.append("")
+    lines.append("## Artifacts (reference only — do NOT duplicate)")
+    lines.append("")
+    lines.append("- **PRD/Plan:** [path or URL]")
+    lines.append("- **ADRs:** [path]")
+    lines.append("- **Issues:** [#nnn]")
+    lines.append("- **Branch:** [name]")
+    lines.append("- **Open PRs:** [#nnn]")
+    lines.append("- **Recent commits:** [paths or SHAs]")
+    lines.append("- **Validators/tests run:** [results]")
+    lines.append("")
+    lines.append("---")
+    lines.append("")
+    lines.append("**Rule:** This document references existing artifacts. If you find yourself duplicating content from a PRD/plan/issue, replace it with a path/URL instead.")
     return "\n".join(lines)
 
 
-HANDOFF_FILENAME_TOKENS = ("handoff-", "handoff_", "handoff.md")
+def analyze(next_focus: str, session_id: str = "") -> Dict[str, Any]:
+    emphasis = _detect_emphasis(next_focus)
+    template = generate_template(next_focus, session_id)
+    return {
+        "next_focus": next_focus,
+        "emphasis_detected": emphasis,
+        "session_id": session_id,
+        "template_length_chars": len(template),
+        "template_length_lines": template.count("\n") + 1,
+        "template": template,
+    }
 
 
-def _save_dirs(config: dict) -> list[Path]:
-    """Directories where existing handoffs might live, in lookup order."""
-    save = config.get("save_location", {})
-    mode = save.get("mode", "temp")
-    raw_path = save.get("path")
-    dirs: list[Path] = []
-    if mode == "temp":
-        dirs.append(Path(tempfile.gettempdir()))
-    elif raw_path:
-        dirs.append(Path(raw_path))
-    proj = Path.cwd() / ".handoff"
-    if proj.exists() and proj not in dirs:
-        dirs.append(proj)
-    return [d for d in dirs if d.exists()]
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Generate a handoff document template per Matt Pocock's structure.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=__doc__,
+    )
+    parser.add_argument("--next-focus", default="", help="Description of what the next session will focus on")
+    parser.add_argument("--session-id", default="", help="Optional session ID for traceability")
+    parser.add_argument("--out", help="Write template to file (default: stdout)")
+    parser.add_argument("--mktemp", action="store_true", help="Write to a mktemp-style file (handoff-XXXXXX.md)")
+    parser.add_argument("--output", choices=("text", "json"), default="text", help="Output format")
+    args = parser.parse_args()
 
+    if not args.next_focus:
+        args.next_focus = "(embedded sample: continue Stream B Matt Pocock skills batch)"
+        args.session_id = args.session_id or "sample-session-001"
 
-def _find_latest_handoff(config: dict) -> Path | None:
-    latest: tuple[float, Path] | None = None
-    for d in _save_dirs(config):
-        try:
-            for entry in d.iterdir():
-                if not entry.is_file() or not entry.name.lower().endswith(".md"):
-                    continue
-                name = entry.name.lower()
-                if not any(t in name for t in HANDOFF_FILENAME_TOKENS):
-                    continue
-                try:
-                    mtime = entry.stat().st_mtime
-                except OSError:
-                    continue
-                if latest is None or mtime > latest[0]:
-                    latest = (mtime, entry)
-        except OSError:
-            continue
-    return latest[1] if latest else None
+    result = analyze(args.next_focus, args.session_id)
 
+    if args.mktemp:
+        fd, path = tempfile.mkstemp(prefix="handoff-", suffix=".md", text=True)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(result["template"])
+        result["written_to"] = path
 
-def _resolve_save_path(config: dict, goal: str, now: dt.datetime) -> Path:
-    save = config.get("save_location", {})
-    mode = save.get("mode", "temp")
-    raw_path = save.get("path")
-    filename_style = config.get("filename_style", "mktemp")
-    slug = _slugify(goal)
-    if mode == "temp" or filename_style == "mktemp":
-        fd, name = tempfile.mkstemp(prefix="handoff-", suffix=".md")
-        os.close(fd)
-        return Path(name)
-    if filename_style == "date_slug":
-        filename = f"{now.strftime('%Y-%m-%d')}-{slug}.md"
-    elif filename_style == "timestamp":
-        filename = f"handoff-{now.strftime('%Y%m%d-%H%M%S')}.md"
+    if args.out:
+        with open(args.out, "w", encoding="utf-8") as f:
+            f.write(result["template"])
+        result["written_to"] = args.out
+
+    if args.output == "json":
+        print(json.dumps({k: v for k, v in result.items() if k != "template"} | {"template_preview": result["template"][:500]}, indent=2))
     else:
-        filename = f"handoff-{now.strftime('%Y%m%d-%H%M%S')}.md"
-
-    if mode == "project":
-        base = Path(raw_path) if raw_path else (Path.cwd() / ".handoff")
-    elif mode == "home_visible":
-        base = Path(raw_path) if raw_path else (Path.home() / "handoffs")
-    elif mode == "home_hidden":
-        base = Path(raw_path) if raw_path else (Path.home() / ".handoff")
-    elif mode == "custom":
-        if not raw_path:
-            raise SystemExit("Custom save mode requires save_location.path in config.")
-        base = Path(raw_path)
-    else:
-        base = Path(tempfile.gettempdir())
-    base.mkdir(parents=True, exist_ok=True)
-    return base / filename
-
-
-def _scaffold(goal: str, git_block: str | None, now: dt.datetime) -> str:
-    iso = now.replace(microsecond=0).isoformat() + "Z"
-    git_section = git_block if git_block else "_<!-- git context disabled or not in a repo -->_"
-    return f"""---
-generated_at: {iso}
-goal: "{goal}"
----
-
-# Handoff — {now.strftime('%Y-%m-%d')}
-
-> A fresh agent reads this to continue the work.
-> Do not duplicate artifacts (PRDs, plans, ADRs, commits, diffs).
-> Reference them by path or URL.
-
-## Goal of next session
-
-{goal or "_<!-- one sentence: what the next session must accomplish -->_"}
-
-## State of play
-
-{git_section}
-
-_<!-- What's done, what's in flight, what's blocked. Reference artifacts; do not paste them. -->_
-
-- Done: _<!-- ... -->_
-- In flight: _<!-- ... -->_
-- Blocked: _<!-- ... -->_
-
-## Open decisions
-
-_<!-- What must the next agent decide before continuing? -->_
-
-- _<!-- decision 1, with options and any tradeoffs already considered -->_
-
-## Skills to use
-
-_<!-- 3-5 skills max. One-line why per skill. -->_
-
-- _<!-- skill name — why this session needs it -->_
-
-## Artifacts
-
-_<!-- Paths and URLs only. No duplicated content. -->_
-
-- _<!-- e.g. PR: https://github.com/org/repo/pull/123 -->_
-- _<!-- e.g. PRD: documentation/implementation/foo.md -->_
-
----
-
-_Inspired by Matt Pocock's handoff (MIT). See README for full credit._
-"""
-
-
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Generate a handoff scaffold.")
-    parser.add_argument("--goal", default="", help="Goal of the next session (from user argument).")
-    parser.add_argument(
-        "--print-path-only",
-        action="store_true",
-        help="Print only the generated path. Default prints path + brief summary.",
-    )
-    parser.add_argument(
-        "--sample",
-        action="store_true",
-        help="Render the scaffold to stdout instead of writing a file.",
-    )
-    parser.add_argument(
-        "--no-git",
-        action="store_true",
-        help="Skip git context even if enabled in config.",
-    )
-    parser.add_argument(
-        "--refresh",
-        action="store_true",
-        help="Reuse the most recent handoff in the configured location instead of creating a new file. The agent edits it in place.",
-    )
-    args = parser.parse_args(argv)
-
-    config = config_loader.load_config()
-    now = dt.datetime.utcnow()
-    goal = args.goal.strip()
-
-    if args.refresh and not args.sample:
-        existing = _find_latest_handoff(config)
-        if existing is not None:
-            if args.print_path_only:
-                print(str(existing))
-            else:
-                print(f"Refresh: reusing existing handoff at {existing}")
-                print("Edit the file in place to reflect the current state.")
-            return 0
-        # Fall through to creating a new one — refresh becomes create-if-missing.
-
-    git_block: str | None = None
-    if not args.no_git and config.get("include_git_context", True):
-        git_block = _git_context(Path.cwd())
-
-    content = _scaffold(goal=goal, git_block=git_block, now=now)
-
-    if args.sample:
-        sys.stdout.write(content)
-        return 0
-
-    save_path = _resolve_save_path(config, goal=goal, now=now)
-    try:
-        save_path.write_text(content, encoding="utf-8")
-    except OSError as exc:
-        print(f"Failed to write {save_path}: {exc}", file=sys.stderr)
-        return 2
-
-    if args.print_path_only:
-        print(str(save_path))
-    else:
-        print(f"Scaffold written: {save_path}")
-        print("Fill in the five sections, then run the redaction linter.")
+        if "written_to" in result:
+            print(f"Wrote handoff template to: {result['written_to']}")
+            print(f"  Focus: {result['next_focus']}")
+            print(f"  Emphasis: {result['emphasis_detected']}")
+            print(f"  Length: {result['template_length_lines']} lines")
+        else:
+            print(result["template"])
     return 0
 
 

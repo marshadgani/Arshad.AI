@@ -1,127 +1,163 @@
-# Handoff Structure — Five Sections, One Template
+# Handoff Document Structure
 
-The handoff doc has exactly five sections. Use these headers verbatim — the SessionStart hook and downstream tooling expect them.
+This reference answers exactly one decision: **what sections does a handoff document need, and what content belongs in each?**
 
-## 1. Goal of next session
+Pair with `scripts/handoff_template_generator.py` for the structured scaffold.
 
-One or two sentences. Either taken from the user's `argument-hint` value, or inferred from the most recent unresolved thread in the conversation.
+## Matt Pocock's Implicit Structure
 
-**Good:**
-> Finish wiring the redaction linter into `/cs:handoff` and ship a draft PR before EOD.
+Matt's SKILL.md names the components:
 
-**Bad:**
-> Continue working on the handoff skill.
+1. **Summary of current conversation** — what's been done
+2. **Skills suggested for next session**
+3. **References to artifacts** (PRDs, plans, ADRs, issues, commits, diffs) — NOT duplications
+4. **Next-session focus** — if user passed an argument
 
-The bad version gives the next agent no end-state. The good version tells them when to stop.
+This wrapper formalizes those into 5 standard sections.
 
-## 2. State of play
+## The Five Sections
 
-Three labelled lists. Every bullet references an artifact (commit hash, PR, branch, file path, issue).
+### 1. Goal of next session
 
+The single most important section. The next agent should be able to read this section alone and know what success looks like.
+
+Pattern:
 ```
-- Done:
-  - <thing> — <artifact: commit hash, PR, file path>
-- In flight:
-  - <thing> — <where it lives now>
-- Blocked:
-  - <thing> — <what's blocking + who/what unblocks>
-```
-
-If `include_git_context: true` in config, the template generator pre-fills a quick git block (current branch, last commit, dirty file count). That block is informational; you still write the prose bullets above it.
-
-## 3. Open decisions
-
-Each decision is a question. Format:
-
-```
-- Q: <one-sentence question>
-  - Options considered: <a>, <b>, <c>
-  - Lean: <option or "no lean yet"> — <one-line reason>
-  - Forcing constraint: <deadline / dependency / budget>
-```
-
-If there are no open decisions, write `- None.` Do not invent decisions to fill space.
-
-## 4. Skills to use
-
-Hard cap at 5. Each entry: skill name + one-line *why this session needs it*.
-
-```
-- <skill-name> — <why>
-- <skill-name> — <why>
-```
-
-The `skill_recommender.py` script generates a starter list scored against the goal text. Edit it. The recommender is a starting point, not the answer.
-
-## 5. Artifacts
-
-Paths and URLs. No bodies.
-
-```
-- PR: https://github.com/org/repo/pull/123
-- Branch: feature/handoff-skill
-- PRD: documentation/implementation/handoff.md
-- Issue: https://github.com/org/repo/issues/456
-- ADR: documentation/adr/0023-handoff-storage.md
-```
-
-## Worked example
-
-```markdown
----
-generated_at: 2026-05-21T17:42:00Z
-goal: "Finish wiring the redaction linter into /cs:handoff and ship a draft PR before EOD."
----
-
-# Handoff — 2026-05-21
-
 ## Goal of next session
 
-Finish wiring the redaction linter into `/cs:handoff` and ship a draft PR before EOD.
+[2-3 sentences describing the outcome the next session must produce.]
 
-## State of play
-
-- Done:
-  - Redaction linter implemented and unit-tested — commit `a1b2c3d`
-  - First-run setup walks 5 questions and writes config — commit `d4e5f6g`
-- In flight:
-  - Wiring `cs-handoff.md` command to call linter after template generator — uncommitted in `~/work/handoff/`
-- Blocked:
-  - SessionStart hook smoke test on macOS — need access to mac, waiting on @teammate
-
-## Open decisions
-
-- Q: Should the SessionStart hook surface the *latest* handoff or *all* handoffs from today?
-  - Options considered: latest only, all-from-today, user-configurable
-  - Lean: latest only — keeps context window small
-  - Forcing constraint: ships in v1.0, can change in v1.1
-- Q: Strict redaction mode by default, or warn?
-  - Options considered: strict, warn
-  - Lean: strict — Matt's redaction sentence implies hard enforcement
-  - Forcing constraint: none; reversible in config
-
-## Skills to use
-
-- handoff — to update this doc when work continues
-- code-review — to review the PR before opening it
-- security-scan — to confirm no secrets are committed alongside the linter
-- update-docs — to update README with the SessionStart hook installation step
-
-## Artifacts
-
-- Branch: claude/handoff-skill-review-LnSxe
-- Draft PR (not yet opened): will target same branch
-- SKILL.md: productivity/handoff/skills/handoff/SKILL.md
-- Linter: productivity/handoff/skills/handoff/scripts/redaction_linter.py
-- Inspired by: https://github.com/mattpocock/skills/tree/main/skills/productivity/handoff
+Prompts to answer:
+- [tailored to next-session focus: deployment / review / debug / design / test]
 ```
 
-That example is what a clean handoff looks like. Anything significantly longer is probably duplicating an artifact and should be trimmed.
+Bad: "Continue the work."
+Good: "Open PR for the 3-skill batch (caveman, grill-me, handoff). Validate against karpathy-coder gate. Address any CI failures or review comments. Aim for green merge by EOD."
 
-## Sources
+### 2. State of play
 
-- Matt Pocock, *Handoff skill* (MIT) — the no-duplication discipline and the original four content rules.
-- Karpathy, *Software 3.0 talk* (2025) — context engineering: optimize for what the next agent *cannot* recover.
-- Anthropic, *Claude Code SessionStart hooks documentation* — surfacing prior context as data, not instructions.
-- Google SRE Workbook, *Postmortem culture* — naming open decisions and their forcing constraints.
-- DORA / Forsgren et al., *Accelerate* — referencing artifacts rather than narrating work.
+What's done vs in-progress vs blocking. The next agent needs this to avoid re-doing work or starting blocked work.
+
+Pattern:
+```
+## State of play
+
+**Done:**
+- [list with paths/refs to artifacts]
+
+**In progress:**
+- [list mid-flight items + current branch/PR/file]
+
+**Blocking:**
+- [list blockers + who/what unblocks each]
+```
+
+Critical: be specific about paths + branches. "The auth refactor" is not enough; "`feature/auth-refactor` branch, last commit `abc1234`, blocked on CI" is.
+
+### 3. Open decisions
+
+Decisions the next agent must make (not "should consider" — must make). If a decision can be deferred, omit it.
+
+Pattern:
+```
+## Open decisions
+
+- [Decision 1: options + current lean + dependencies]
+- [Decision 2: options + current lean + dependencies]
+```
+
+Each decision includes the user's current lean — saves the next agent from re-deriving.
+
+### 4. Skills to use (next session)
+
+Concrete list. Not "consider using ..." — name the skills.
+
+Pattern:
+```
+## Skills to use (next session)
+
+- `karpathy-coder` — for code-quality validation before PR
+- `write-a-skill` — to validate any new SKILL.md against the 6-item checklist
+- `ship-gate` — pre-production audit before merge
+```
+
+Run `skill_recommender.py` against the handoff to auto-populate this section.
+
+### 5. Artifacts (reference only)
+
+Paths + URLs. No inline content. This is the section where Matt's no-duplication rule is most often violated.
+
+Pattern:
+```
+## Artifacts (reference only — do NOT duplicate)
+
+- **PRD/Plan:** [path or URL]
+- **ADRs:** [path]
+- **Issues:** [#NNN]
+- **Branch:** [name]
+- **Open PRs:** [#NNN]
+- **Recent commits:** [SHAs]
+- **Validators run:** [results + links]
+```
+
+The next agent should be able to follow every link without needing additional context from the handoff.
+
+## What Doesn't Belong in a Handoff
+
+- **The full PRD** — link to it
+- **The full ADR** — link to it
+- **Issue descriptions** — `#NNN` reference is enough
+- **Code snippets** — link to `file.py:42-80` with commit SHA
+- **Long code blocks** — same; the file is the source of truth
+- **The entire conversation history** — the next agent doesn't need every turn
+- **Implementation details already captured in commits** — `git log` is the source
+
+## How to Stay Within 100 Lines
+
+A good handoff is ~50-100 lines. Beyond that signals duplication.
+
+Tactics:
+- Use reference markers `[name](url)` aggressively
+- Compress "what's done" to bullet points with refs, not paragraphs
+- Move detailed reasoning into ADRs; reference them in handoff
+- Trust the next agent to read referenced docs
+
+## Tailoring to Next-Session Focus
+
+The `handoff_template_generator.py` detects keywords in the focus argument and tailors prompts:
+
+| Focus keyword | Section emphasis | Tailored prompts |
+|---|---|---|
+| ship/deploy/PR | Deployment | Commands to ship, checks required, approvers, rollback |
+| review/audit | Review | Checklist, sensitive files, similar patterns, past PR refs |
+| debug/fix/investigate | Debug | Symptom, repro steps, tried-already, smallest case |
+| design/plan/scope | Design | Outcome, constraints, rejected alternatives, reversibility |
+| test/qa | Test | Test plan, existing coverage, edge cases, success measure |
+| (other) | Default | Immediate action, blocker, files, open decisions |
+
+## Anti-Patterns
+
+1. **Handoff longer than the underlying PRD** — usually means duplication
+2. **Handoff with no artifact references** — what's done if not in git?
+3. **Handoff with vague decisions** — "should we use X?" without options + leans
+4. **Handoff without next-session goal** — what is the next agent supposed to do?
+5. **Handoff with stale paths** — branches deleted, files moved; verify before handing off
+6. **Re-handing-off a handoff** — if Session B produces a handoff that just summarizes Session A's handoff, neither session did real work
+
+## When This Reference Doesn't Help
+
+- **Code-review handoff** — different format; PR review comments are the artifact
+- **Customer-support handoff** — different domain; ticket templates apply
+- **Live-meeting handoff** — different mode; verbal handoff + linked doc
+
+---
+
+**Source authorities (non-exhaustive):**
+
+- **Matt Pocock — handoff** (https://github.com/mattpocock/skills/, MIT) — the 5-section structure (implicit)
+- **DRY principle** (Hunt & Thomas, "The Pragmatic Programmer", 1999) — references > copies
+- **Engineering runbook + playbook patterns** — on-call handoff discipline
+- **Atlassian — Confluence page templates** — handoff page conventions
+- **GitHub PR description templates** — what context goes where
+- **Anthropic — Multi-agent continuity patterns** (https://docs.claude.com/en/docs/agents) — session continuity guidance
+- **Kim et al. — "The Phoenix Project"** (2013) — shift-change handoff in DevOps
