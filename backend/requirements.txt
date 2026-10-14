@@ -2,6 +2,8 @@
 #   pip install --upgrade <pkg> && pip freeze > requirements.txt
 # then verify the diff before committing.
 
+# cryptography bumped again 2026-10-14, from 49.0.0 to 50.0.2, for PYSEC-2026-3552
+# (CVE-2026-69247, fixed in 50.0.0). Separate from the 2026-09-07 sweep below.
 # fastapi/authlib/cryptography/pyjwt/python-dotenv bumped 2026-09-07 — SEC-001,
 # pip-audit found 41 known CVEs across these pins (pyjwt alone: 11 open
 # advisories on the exact jwt.decode() path every authenticated request hits).
@@ -22,7 +24,7 @@ httpx==0.28.1
 
 # Phase C — OAuth + JWT auth
 authlib==1.6.12
-cryptography==49.0.0
+cryptography==50.0.2
 pyjwt==2.15.1
 
 # FEAT-143 — password login. bcrypt only (not passlib): passlib is
