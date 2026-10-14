@@ -99,9 +99,7 @@ async def _mark_healthy(integration: Integration, db: AsyncSession) -> None:
 # ── Calendar helpers ──────────────────────────────────────────────────────
 
 
-def _calendar_time_bounds(
-    start_date: date, end_date: date
-) -> tuple[str, str]:
+def _calendar_time_bounds(start_date: date, end_date: date) -> tuple[str, str]:
     """ISO strings bracketing the travel window with one day of margin each side.
 
     The extra margin ensures a timed event near a boundary is fetched; the
@@ -110,6 +108,7 @@ def _calendar_time_bounds(
     time_min = datetime.combine(
         start_date - timedelta(days=1), time.min, tzinfo=timezone.utc
     )
+    # +2 days at midnight is the exclusive bound that covers all of end_date + 1.
     time_max = datetime.combine(
         end_date + timedelta(days=2), time.min, tzinfo=timezone.utc
     )
@@ -117,7 +116,12 @@ def _calendar_time_bounds(
 
 
 async def _resolve_calendar(calendar_call: Any) -> providers.CalendarResult:
-    """Invoke `calendar_call`, absorb expected exceptions, parse the result.
+    """Invoke `calendar_call` and parse the outcome.
+
+    Every exception is captured here and handed to `parse_calendar_result`,
+    which turns the known failures (not linked, reauth, provider and parse
+    errors) into flags and re-raises anything else, so an unexpected bug is a
+    loud 500, never a silent empty calendar.
 
     Extracted from the route handler so the same three lines are not
     duplicated across every early-exit path.

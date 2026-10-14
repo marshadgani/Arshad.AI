@@ -32,16 +32,19 @@ function degradations(r: TripFeasibilityResult): { text: string; severe: boolean
   return out;
 }
 
-export interface OutcomeProps {
+export interface ShopifyTripFeasibilityOutcomeProps {
   result: TripFeasibilityResult;
 }
 
-export function Outcome({ result }: OutcomeProps) {
+export function ShopifyTripFeasibilityOutcome({ result }: ShopifyTripFeasibilityOutcomeProps) {
   const issues = degradations(result);
-  // Defence in depth: a "go" from the server is only shown as Go when every
-  // source answered cleanly; anything else is shown as Unknown.
+  // The backend validator (TripFeasibilityResponse._check_verdict_invariants)
+  // already refuses a "go" with a conflict or a degraded source. This repeats
+  // the rule so schema skew or a bad response can never show a green Go.
   const verdict: TripVerdict =
-    result.verdict === 'go' && issues.length > 0 ? 'unknown' : result.verdict;
+    result.verdict === 'go' && (issues.length > 0 || result.conflicts.length > 0)
+      ? 'unknown'
+      : result.verdict;
   const badgeClass = VERDICT_CLASS[verdict];
 
   return (

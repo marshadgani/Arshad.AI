@@ -56,9 +56,13 @@ def project_stockout_date(
 
 
 def _stockout_from_cover(as_of: datetime, cover: Decimal) -> date:
-    return as_of.date() + timedelta(
-        days=int(cover.to_integral_value(rounding=ROUND_FLOOR))
-    )
+    """Projected stockout day; a cover too large for a date clamps to date.max,
+    far outside any travel window, instead of raising OverflowError."""
+    days = int(cover.to_integral_value(rounding=ROUND_FLOOR))
+    try:
+        return as_of.date() + timedelta(days=days)
+    except OverflowError:
+        return date.max
 
 
 def velocity_and_cover(

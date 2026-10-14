@@ -2,7 +2,7 @@ import { useId, useState, type FormEvent } from 'react';
 
 import { useShopifyTripFeasibility } from '../../../hooks/useShopifyTripFeasibility';
 import styles from './ShopifyTripFeasibility.module.css';
-import { Outcome } from './ShopifyTripFeasibilityOutcome';
+import { ShopifyTripFeasibilityOutcome } from './ShopifyTripFeasibilityOutcome';
 
 export interface ShopifyTripFeasibilityProps {
   initialStartDate?: string;
@@ -89,7 +89,7 @@ export function ShopifyTripFeasibility({
           Could not run the check: {error.message}
         </p>
       )}
-      {result && <Outcome result={result} />}
+      {result && <ShopifyTripFeasibilityOutcome result={result} />}
     </section>
   );
 }

@@ -120,6 +120,9 @@ class ServiceDebtResponse(BaseModel):
 
 # ── Trip feasibility (FEAT-129) ──────────────────────────────────────────
 
+# Keeps date arithmetic (window margins, lookahead) far from date.min and date.max.
+TRIP_MIN_DATE = date(2000, 1, 1)
+TRIP_MAX_DATE = date(2100, 1, 1)
 TRIP_MAX_DAYS = 60
 
 
@@ -131,6 +134,8 @@ class TripFeasibilityRequest(BaseModel):
 
     @model_validator(mode="after")
     def _check_window(self) -> Self:
+        if self.start_date < TRIP_MIN_DATE or self.end_date > TRIP_MAX_DATE:
+            raise ValueError("dates must be between 2000-01-01 and 2100-01-01")
         if self.end_date < self.start_date:
             raise ValueError("end_date must not be before start_date")
         if (self.end_date - self.start_date).days + 1 > TRIP_MAX_DAYS:

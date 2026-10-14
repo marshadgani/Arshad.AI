@@ -139,12 +139,43 @@ describe('ShopifyTripFeasibility', () => {
     ['go with truncation', { verdict: 'go', calendar_truncated: true }, /more events/],
   ];
 
-  it.each(degraded)('never renders Go for %s', async (_name, overrides, notice) => {
+  // The same degradation with a server that wrongly says "go" must also never show Go.
+  const wronglyGo = degraded.map(
+    ([name, overrides, notice]): [string, Partial<TripFeasibilityResult>, RegExp] => [
+      `${name} (server says go)`,
+      { ...overrides, verdict: 'go' },
+      notice,
+    ],
+  );
+
+  it.each([...degraded, ...wronglyGo])('never renders Go for %s', async (_name, overrides, notice) => {
     mockFetch(200, { data: result(overrides) });
     render(<ShopifyTripFeasibility />);
     submit();
     expect(await screen.findByText(notice)).toBeInTheDocument();
     expect(screen.getByText('Unknown')).toBeInTheDocument();
+    expect(screen.queryByText(/^go$/i)).toBeNull();
+  });
+
+  it('never renders Go when the server says go but returns conflicts', async () => {
+    mockFetch(200, {
+      data: result({
+        verdict: 'go',
+        conflicts: [
+          {
+            type: 'stockout',
+            variant_id: 'v1',
+            projected_stockout_date: '2026-06-11',
+            event_title: null,
+            event_start: null,
+            event_end: null,
+          },
+        ],
+      }),
+    });
+    render(<ShopifyTripFeasibility />);
+    submit();
+    expect(await screen.findByText('Unknown')).toBeInTheDocument();
     expect(screen.queryByText(/^go$/i)).toBeNull();
   });
 

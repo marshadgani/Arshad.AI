@@ -153,8 +153,11 @@ def test_stockout_eight_days_after_window_is_go():
     assert run(variants=make_variants(available=21)).verdict == "go"  # END + 8
 
 
-def test_stockout_before_window_is_not_a_window_conflict():
-    assert run(variants=make_variants(available=5)).verdict == "go"  # 06-06
+def test_stockout_before_window_is_still_a_conflict():
+    # Out of stock on 06-06, before the trip: still out of stock during it.
+    r = run(variants=make_variants(available=5))
+    assert r.verdict == "no-go"
+    assert r.conflicts[0].projected_stockout_date == "2026-06-06"
 
 
 def test_timed_event_in_window_is_no_go():
@@ -213,6 +216,55 @@ def test_a_conflict_in_healthy_data_stays_no_go_when_another_source_failed():
     r = run(cal=cal, orders=None, partial_failures=["orders"])
     assert r.verdict == "no-go"
     assert "orders" in r.partial_failures
+
+
+def test_huge_stock_with_slow_sales_does_not_overflow_the_date():
+    from src.services.shopify.inventory_cover import project_stockout_date
+
+    assert project_stockout_date(100000, 1, as_of=AS_OF, window_days=30) is not None
+    r = run(variants=make_variants(available=100000), orders=make_orders(qty=1))
+    assert r.verdict == "go"
+
+
+def test_oversized_timestamp_strings_are_truncated_not_a_validation_error():
+    event = timed_event("2026-06-11T10:00:00Z", "2026-06-11T11:00:00Z")
+    event["start"]["dateTime"] = "2026-06-11T10:00:00" + "0" * 200 + "Z"
+    r = run(cal=CalendarResult(events=[event]))
+    assert r.verdict in ("no-go", "unknown")
+
+
+def test_null_inventory_item_is_unreadable_not_untracked():
+    variants = make_variants()
+    variants["variants"][0]["inventoryItem"] = None
+    r = run(variants=variants)
+    assert r.verdict == "unknown"
+    assert "inventory_levels" in r.partial_failures
+
+
+def test_reversed_all_day_event_is_unreadable_not_dropped():
+    cal = CalendarResult(events=[all_day_event("2026-06-12", "2026-06-12")])
+    r = run(cal=cal)
+    assert r.verdict == "unknown"
+    assert "calendar" in r.partial_failures
+
+
+def test_all_day_event_with_bad_dates_is_unreadable():
+    for event in (
+        {"summary": "x", "start": {"date": "nope"}, "end": {"date": "2026-06-12"}},
+        {"summary": "x", "start": {"date": "2026-06-11"}, "end": {"date": "garbage"}},
+        {"summary": "x", "start": {}, "end": {}},
+    ):
+        r = run(cal=CalendarResult(events=[event]))
+        assert r.verdict == "unknown"
+
+
+@pytest.mark.parametrize(
+    ("start", "end"),
+    [("9999-12-01", "9999-12-31"), ("0001-01-01", "0001-01-05")],
+)
+def test_request_rejects_extreme_dates(start, end):
+    with pytest.raises(ValueError):
+        TripFeasibilityRequest(start_date=start, end_date=end)
 
 
 def test_cancelled_timed_event_is_ignored():
@@ -421,6 +473,14 @@ def test_route_malformed_body_is_422(client, body):
     assert post(client, body).status_code == 422
 
 
+def test_route_422_body_names_the_failing_field_for_the_form(client):
+    # The frontend maps error.details.errors[].loc to form fields.
+    resp = post(client, {"start_date": "2026-06-10", "end_date": "nope"})
+    assert resp.status_code == 422
+    errors = resp.json()["error"]["details"]["errors"]
+    assert errors[0]["loc"][-1] == "end_date"
+
+
 def test_route_shopify_not_connected_is_unknown_but_calendar_still_checked(
     client, monkeypatch
 ):
@@ -625,8 +685,10 @@ def test_variant_with_no_recent_sales_never_projects_a_stockout():
     assert run(orders=make_orders(qty=0)).verdict == "go"
 
 
-def test_zero_stock_with_sales_stocks_out_today_so_before_window_is_go():
-    assert run(variants=make_variants(available=0)).verdict == "go"
+def test_zero_stock_with_sales_is_a_conflict_for_a_later_trip():
+    r = run(variants=make_variants(available=0))
+    assert r.verdict == "no-go"
+    assert r.conflicts[0].projected_stockout_date == "2026-06-01"
 
 
 def test_zero_stock_inside_window_when_window_starts_today():

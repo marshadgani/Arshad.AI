@@ -3,7 +3,9 @@
 `as_of` and the window dates are injected so results are reproducible in
 tests. The route fetches Shopify and Calendar data and hands it in here.
 
-Verdict rule: any stockout inside the window or lookahead, or any timed
+Verdict rule: any stockout projected on or before the end of the window plus
+lookahead (so a variant that is already out of stock, or will run out before
+the trip, counts: it will still be out of stock during the trip), or any timed
 (non-all-day) event overlapping the window, is a conflict -> "no-go". With no
 conflict, a source that failed, was not connected, needs reauth, or was
 truncated -> "unknown" (a clean "go" is never produced from partial data).
@@ -13,8 +15,9 @@ returned alongside so the caller can show both.
 
 Timezone: window days are interpreted as UTC calendar days (UTC-midnight
 bounds). The shop timezone is not available to Calendar-only users, so this is
-a known approximation that can report a conflict in the boundary hours of a
-window, never miss one.
+a known approximation: a timed event within a few hours of a window edge can
+be reported or missed depending on the user's UTC offset (for UTC+3, a 01:00
+local event on the first day falls before the window).
 
 `calendar_truncated` forces "unknown" here, whereas build_inventory_cover's
 route treats it as cacheable. The asymmetry is intentional: a capped calendar
@@ -42,6 +45,8 @@ from .providers import CalendarResult
 
 TRIP_STOCKOUT_LOOKAHEAD_DAYS = 7
 
+# Always reported, never detected: these sources have no backend integration yet,
+# so every response lists them as not connected rather than guessing a value.
 UNAVAILABLE_SOURCE_NAMES = (
     "booking_com_pricing",
     "calendly_availability",
@@ -70,7 +75,6 @@ def _stockout_conflicts(
     *,
     as_of: datetime,
     window_days: int,
-    first_day: date,
     last_day: date,
 ) -> tuple[list[TripConflict], bool]:
     """(stockout conflicts, any tracked variant had no readable stock level).
@@ -83,7 +87,11 @@ def _stockout_conflicts(
     found: list[tuple[date, TripConflict]] = []
     unreadable = False
     for node in variants_data.get("variants") or []:
-        inv = node.get("inventoryItem") or {}
+        inv = node.get("inventoryItem")
+        if not isinstance(inv, dict) or "tracked" not in inv:
+            # Unknown (a scope gap can null inventoryItem), not "untracked".
+            unreadable = True
+            continue
         if not inv.get("tracked"):
             continue
         available = available_quantity(inv)
@@ -94,7 +102,7 @@ def _stockout_conflicts(
         stockout = project_stockout_date(
             available, sold.get(variant_id, 0), as_of=as_of, window_days=window_days
         )
-        if stockout is not None and first_day <= stockout <= last_day:
+        if stockout is not None and stockout <= last_day:
             found.append(
                 (
                     stockout,
@@ -144,8 +152,8 @@ def _calendar_findings(
                         TripConflict(
                             type="calendar_event",
                             event_title=title,
-                            event_start=str(start["dateTime"]),
-                            event_end=str(end["dateTime"]),
+                            event_start=str(start["dateTime"])[:64],
+                            event_end=str(end["dateTime"])[:64],
                         ),
                     )
                 )
@@ -161,7 +169,7 @@ def _calendar_findings(
                 if end.get("date")
                 else first + timedelta(days=1)
             )
-            if last_exclusive is None:
+            if last_exclusive is None or last_exclusive <= first:
                 unreadable = True
                 continue
             if first <= end_date and last_exclusive > start_date:
@@ -241,7 +249,6 @@ def check_trip_feasibility(
             orders_data,
             as_of=as_of,
             window_days=window_days,
-            first_day=start_date,
             last_day=end_date + timedelta(days=TRIP_STOCKOUT_LOOKAHEAD_DAYS),
         )
         conflicts.extend(stockouts)

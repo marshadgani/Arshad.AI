@@ -76,6 +76,16 @@ always-visible `/shopify` page tile, and a 401 there would trigger
 unrelated Shopify token expiring. `connected` / `needs_reauth` /
 `partial_failures` carry integration state in the body instead.
 
+`POST /api/v1/trip-feasibility` follows the same always-200 pattern as
+`GET /api/v1/shopify/dashboard`, for the same reason: `useFetch` would log the
+user out of the app on a 401 caused by an unrelated Shopify or Google token
+expiring. The body carries `shopify_connected`, `calendar_connected`,
+`shopify_needs_reauth`, `calendar_needs_reauth` and `partial_failures`.
+Malformed dates return 422. The verdict is `go` only when nothing conflicts and
+no source was degraded. A conflict found in healthy data stays `no-go` even if
+another source failed, and a failed or missing source with no conflict is
+`unknown`, never `go`.
+
 ## Error Responses
 
 All error responses follow this shape:
