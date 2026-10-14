@@ -9,7 +9,10 @@ sync()    refreshes a small status snapshot in integration.config.
 
 from __future__ import annotations
 
+import asyncio
+import re
 import time
+from datetime import datetime, timezone
 from typing import Any
 
 import httpx
@@ -36,6 +39,64 @@ from ._shared import (
 )
 
 _RENDER_API = "https://api.render.com/v1"
+_MAX_SERVICES = 10
+_DEPLOY_CONCURRENCY = 3
+_DEPLOY_TIMEOUT_SECONDS = 5.0
+
+
+def _build_service_entries(
+    kept: list[dict[str, Any]],
+    deploy_results: list[Any],
+) -> list[dict[str, Any]]:
+    """Assemble the per-service snapshot rows from the raw API shapes.
+
+    `deploy_results` is a parallel sequence aligned to services that have
+    an `id` field; services without an id still appear in the output, their
+    `latest_deploy_status` is None.
+    """
+    with_id = iter(deploy_results)
+    entries: list[dict[str, Any]] = []
+    for svc in kept:
+        entries.append(
+            {
+                "id": svc.get("id"),
+                "name": svc.get("name"),
+                "type": svc.get("type"),
+                "suspended": svc.get("suspended"),
+                "latest_deploy_status": next(with_id) if svc.get("id") else None,
+            }
+        )
+    return entries
+
+
+# Render service ids look like "srv-" plus alphanumerics. The id goes into a URL
+# path, so anything else is refused rather than interpolated.
+_SERVICE_ID = re.compile(r"srv-[a-zA-Z0-9]+")
+
+
+async def _latest_deploy_status(
+    client: httpx.AsyncClient,
+    sem: asyncio.Semaphore,
+    api_key: str,
+    service_id: str,
+) -> str | None:
+    """Status of the newest deploy, or None when there is none or the id is odd."""
+    if not _SERVICE_ID.fullmatch(service_id):
+        return None
+    async with sem:
+        resp = await asyncio.wait_for(
+            client.get(
+                f"{_RENDER_API}/services/{service_id}/deploys?limit=1",
+                headers={"Authorization": f"Bearer {api_key}"},
+            ),
+            timeout=_DEPLOY_TIMEOUT_SECONDS,
+        )
+    resp.raise_for_status()
+    deploys = resp.json() or []
+    if not deploys:
+        return None
+    status = (deploys[0].get("deploy") or {}).get("status")
+    return status if isinstance(status, str) else None
 
 
 async def _probe(api_key: str) -> dict[str, Any]:
@@ -98,19 +159,31 @@ class RenderIntegration(IntegrationProvider):
                 )
                 resp.raise_for_status()
                 services = resp.json() or []
+                kept = [s.get("service") or {} for s in services[:_MAX_SERVICES]]
+                sem = asyncio.Semaphore(_DEPLOY_CONCURRENCY)
+                deploy_results = await asyncio.gather(
+                    *(
+                        _latest_deploy_status(client, sem, api_key, str(svc["id"]))
+                        for svc in kept
+                        if svc.get("id")
+                    ),
+                    return_exceptions=True,
+                )
         except Exception as exc:  # noqa: BLE001
             await mark_error(integration=integration, db=db, err=exc)
-            raise IntegrationError("sync_failed", f"{type(exc).__name__}: {exc}")
+            raise IntegrationError("sync_failed", type(exc).__name__)
+        failed = next((r for r in deploy_results if isinstance(r, BaseException)), None)
+        if isinstance(failed, asyncio.CancelledError):
+            raise failed
+        if failed is not None:
+            await mark_error(integration=integration, db=db, err=failed)
+            raise IntegrationError("sync_failed", type(failed).__name__)
+        entries = _build_service_entries(kept, deploy_results)
         integration.config = {
             "service_count": len(services),
-            "services": [
-                {
-                    "id": s.get("service", {}).get("id"),
-                    "name": s.get("service", {}).get("name"),
-                    "type": s.get("service", {}).get("type"),
-                }
-                for s in services[:10]
-            ],
+            "services_truncated": len(services) > _MAX_SERVICES,
+            "services": entries,
+            "synced_at": datetime.now(timezone.utc).isoformat(),
         }
         return await mark_synced(
             integration=integration,

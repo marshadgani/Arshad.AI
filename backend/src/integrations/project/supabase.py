@@ -10,6 +10,7 @@ records the project list in integration.config.
 from __future__ import annotations
 
 import time
+from datetime import datetime, timezone
 from typing import Any
 
 import httpx
@@ -36,6 +37,23 @@ from ._shared import (
 )
 
 _API = "https://api.supabase.com/v1"
+_HEALTHY_STATUS = "ACTIVE_HEALTHY"
+
+
+def _build_project_entries(projects: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Assemble the per-project snapshot rows from the raw API shapes.
+
+    Receives the already-sorted slice (unhealthy first) — just maps fields.
+    """
+    return [
+        {
+            "ref": p.get("id"),
+            "name": p.get("name"),
+            "region": p.get("region"),
+            "status": p.get("status"),
+        }
+        for p in projects[:10]
+    ]
 
 
 async def _probe(api_key: str) -> dict[str, Any]:
@@ -99,15 +117,22 @@ class SupabaseIntegration(IntegrationProvider):
                 )
                 resp.raise_for_status()
                 projects = resp.json() or []
+                if not isinstance(projects, list) or not all(
+                    isinstance(p, dict) for p in projects
+                ):
+                    raise TypeError("unexpected projects payload")
+                # Unhealthy projects first so the 10-project cap can only drop
+                # healthy ones: a trip check must never miss a project that is down.
+                projects = sorted(
+                    projects, key=lambda p: p.get("status") == _HEALTHY_STATUS
+                )
         except Exception as exc:  # noqa: BLE001
             await mark_error(integration=integration, db=db, err=exc)
-            raise IntegrationError("sync_failed", f"{type(exc).__name__}: {exc}")
+            raise IntegrationError("sync_failed", type(exc).__name__)
         integration.config = {
             "project_count": len(projects),
-            "projects": [
-                {"ref": p.get("id"), "name": p.get("name"), "region": p.get("region")}
-                for p in projects[:10]
-            ],
+            "projects": _build_project_entries(projects),
+            "synced_at": datetime.now(timezone.utc).isoformat(),
         }
         return await mark_synced(
             integration=integration,

@@ -136,8 +136,17 @@ async def mark_error(
     *, integration: Integration, db: AsyncSession, err: Exception
 ) -> None:
     integration.status = "error"
-    integration.last_error = f"{type(err).__name__}: {err}"[:500]
+    # Exception text can carry URLs, service ids or names; persist the type and
+    # HTTP status only, since last_error is returned by the integrations API.
+    response = getattr(err, "response", None)
+    status_code = getattr(response, "status_code", None)
+    suffix = f" (HTTP {status_code})" if isinstance(status_code, int) else ""
+    integration.last_error = f"{type(err).__name__}{suffix}"
     await db.commit()
+
+
+# Real provider keys are under 100 characters; this only stops absurd input.
+MAX_API_KEY_LENGTH = 512
 
 
 def require_api_key(payload: dict[str, Any]) -> str:
@@ -145,5 +154,10 @@ def require_api_key(payload: dict[str, Any]) -> str:
     if not isinstance(api_key, str) or not api_key.strip():
         raise IntegrationError(
             "missing_api_key", "Provide a non-empty 'api_key' in the request body."
+        )
+    if len(api_key.strip()) > MAX_API_KEY_LENGTH:
+        raise IntegrationError(
+            "api_key_too_long",
+            f"api_key must not exceed {MAX_API_KEY_LENGTH} characters.",
         )
     return api_key.strip()

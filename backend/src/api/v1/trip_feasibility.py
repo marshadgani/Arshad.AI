@@ -21,6 +21,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.auth.dependencies import get_current_user
 from src.middleware.rate_limit import enforce_rate_limit
@@ -28,6 +29,7 @@ from src.models.database import get_db
 from src.models.integration import Integration
 from src.models.user import User
 from src.schemas.shopify import TripFeasibilityRequest, TripFeasibilityResponse
+from src.services.integrations.state import ACTIVE_STATUSES
 from src.services.shopify import (
     client,
     gather,
@@ -60,6 +62,40 @@ async def _check_rate_limit(user_id: str) -> None:
 
 async def _find_integration(user_id: str, db: AsyncSession) -> Integration | None:
     return await state.find_integration(user_id, db)
+
+
+async def _find_infra_integrations(
+    user_id: str, db: AsyncSession
+) -> tuple[Integration | None, Integration | None]:
+    """The caller's Render and Supabase rows, else the shared deployment row.
+
+    Project API-key integrations are stored with user_id NULL (one per
+    deployment), the same predicate the integrations router uses. The caller's
+    own row sorts first; another user's row can never match. Reads the stored
+    snapshot only, never the API key and never the provider.
+
+    Known limit: a shared (user_id NULL) row is visible to every signed-in
+    user. That is safe while the login allowlist admits only the owner. Gate
+    these rows behind a role before any second account is allowed.
+    """
+    rows = (
+        await db.scalars(
+            select(Integration)
+            .where(
+                Integration.slug.in_(("render", "supabase")),
+                or_(
+                    Integration.user_id == user_id,
+                    Integration.user_id.is_(None),
+                ),
+                Integration.status.in_(ACTIVE_STATUSES),
+            )
+            .order_by(Integration.user_id.is_(None).asc(), Integration.id)
+        )
+    ).all()
+    by_slug: dict[str, Integration] = {}
+    for row in rows:
+        by_slug.setdefault(row.slug, row)
+    return by_slug.get("render"), by_slug.get("supabase")
 
 
 async def _get_token(integration: Integration, db: AsyncSession) -> str:
@@ -150,7 +186,9 @@ def _verdict(
     variants: dict | None = None,
     orders: dict | None = None,
     failures: list[str] | None = None,
+    infra: tuple[Integration | None, Integration | None] = (None, None),
 ) -> JSONResponse:
+    render, supabase = infra
     return _ok(
         trip_feasibility.check_trip_feasibility(
             as_of=as_of,
@@ -163,6 +201,10 @@ def _verdict(
             shopify_needs_reauth=shopify_needs_reauth,
             window_days=gather.VELOCITY_WINDOW_DAYS,
             partial_failures=failures or [],
+            render_config=(render.config or {}) if render else None,
+            render_status=render.status if render else None,
+            supabase_config=(supabase.config or {}) if supabase else None,
+            supabase_status=supabase.status if supabase else None,
         )
     )
 
@@ -190,10 +232,12 @@ async def check_trip_feasibility(
         cal_time_max,
     )
 
+    infra = await _find_infra_integrations(user_id, db)
     integration = await _find_integration(user_id, db)
     if not integration:
         return _verdict(
             as_of=as_of,
+            infra=infra,
             body=body,
             cal=await _resolve_calendar(calendar_call),
             shopify_connected=False,
@@ -201,6 +245,7 @@ async def check_trip_feasibility(
     if integration.status == "expired":
         return _verdict(
             as_of=as_of,
+            infra=infra,
             body=body,
             cal=await _resolve_calendar(calendar_call),
             shopify_connected=True,
@@ -220,6 +265,7 @@ async def check_trip_feasibility(
         await _apply_error_status(integration, exc, needs_reauth, db)
         return _verdict(
             as_of=as_of,
+            infra=infra,
             body=body,
             cal=await _resolve_calendar(calendar_call),
             shopify_connected=True,
@@ -240,6 +286,7 @@ async def check_trip_feasibility(
     if await gather.reauth_if_needed(integration, [variants_result, orders_result], db):
         return _verdict(
             as_of=as_of,
+            infra=infra,
             body=body,
             cal=cal,
             shopify_connected=True,
@@ -257,6 +304,7 @@ async def check_trip_feasibility(
         await _mark_healthy(integration, db)
     return _verdict(
         as_of=as_of,
+        infra=infra,
         body=body,
         cal=cal,
         shopify_connected=True,
