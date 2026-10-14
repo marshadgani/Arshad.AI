@@ -2468,7 +2468,7 @@
     "ruflo": {
       "url": "https://github.com/ruvnet/ruflo.git",
       "name": "ruflo",
-      "last_fetched": "2026-10-05 19:31 UTC",
+      "last_fetched": "2026-10-14 14:42 UTC",
       "components": {
         "skills": [
           "ruflo",
@@ -2598,6 +2598,7 @@
           "cost-openrouter",
           "safety-scan",
           "pii-detect",
+          "generate-console-theme",
           "iot-witness-verify",
           "iot-register",
           "iot-firmware",
