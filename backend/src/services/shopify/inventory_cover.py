@@ -19,7 +19,7 @@ def _fmt(value: Decimal) -> str:
     return str(value.quantize(_TENTH, rounding=ROUND_HALF_UP))
 
 
-def _available(item: dict[str, Any]) -> int | None:
+def available_quantity(item: dict[str, Any]) -> int | None:
     """Summed 'available' across locations; None if Shopify reported no level."""
     total: int | None = None
     for edge in (item.get("inventoryLevels") or {}).get("edges") or []:
@@ -29,7 +29,7 @@ def _available(item: dict[str, Any]) -> int | None:
     return total
 
 
-def _units_sold(orders: list[dict[str, Any]]) -> dict[str, int]:
+def units_sold_by_variant(orders: list[dict[str, Any]]) -> dict[str, int]:
     sold: dict[str, int] = defaultdict(int)
     for order in orders:
         for edge in (order.get("lineItems") or {}).get("edges") or []:
@@ -38,6 +38,39 @@ def _units_sold(orders: list[dict[str, Any]]) -> dict[str, int]:
             if variant_id:
                 sold[variant_id] += int(node.get("quantity") or 0)
     return sold
+
+
+def project_stockout_date(
+    available: int,
+    units_sold: int,
+    *,
+    as_of: datetime,
+    window_days: int,
+) -> date | None:
+    """Calendar day the variant runs out at its trailing sales rate, or None
+    when there were no sales (velocity zero, so no projection is possible)."""
+    if units_sold <= 0:
+        return None
+    _, cover = velocity_and_cover(available, units_sold, window_days)
+    return _stockout_from_cover(as_of, cover)
+
+
+def _stockout_from_cover(as_of: datetime, cover: Decimal) -> date:
+    """Projected stockout day; a cover too large for a date clamps to date.max,
+    far outside any travel window, instead of raising OverflowError."""
+    days = int(cover.to_integral_value(rounding=ROUND_FLOOR))
+    try:
+        return as_of.date() + timedelta(days=days)
+    except OverflowError:
+        return date.max
+
+
+def velocity_and_cover(
+    available: int, units_sold: int, window_days: int
+) -> tuple[Decimal, Decimal]:
+    """(units per day, days of cover). Caller guarantees units_sold > 0."""
+    velocity = Decimal(units_sold) / Decimal(window_days)
+    return velocity, Decimal(max(available, 0)) / velocity
 
 
 def _parse_day(value: Any) -> date | None:
@@ -81,9 +114,8 @@ def build_inventory_cover(
     variants_data = variants_data or {}
     velocity_known = orders_data is not None
     orders_data = orders_data or {}
-    sold = _units_sold(orders_data.get("orders") or [])
+    sold = units_sold_by_variant(orders_data.get("orders") or [])
     windows = travel_windows(events) if calendar_connected else []
-    window = Decimal(window_days)
 
     items: list[DaysCoverItem] = []
     alerts: list[StockoutAlert] = []
@@ -91,7 +123,7 @@ def build_inventory_cover(
         inv = node.get("inventoryItem") or {}
         if not inv.get("tracked"):
             continue
-        available = _available(inv)
+        available = available_quantity(inv)
         if available is None:
             continue
         variant_id = str(node.get("id"))
@@ -107,11 +139,8 @@ def build_inventory_cover(
             )
             continue
 
-        velocity = Decimal(units) / window
-        cover = Decimal(max(available, 0)) / velocity
-        stockout = as_of.date() + timedelta(
-            days=int(cover.to_integral_value(rounding=ROUND_FLOOR))
-        )
+        velocity, cover = velocity_and_cover(available, units, window_days)
+        stockout = _stockout_from_cover(as_of, cover)
         hit = next((w for w in windows if w[0] <= stockout < w[1]), None)
         items.append(
             DaysCoverItem(

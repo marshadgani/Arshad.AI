@@ -3,9 +3,10 @@ import { useShopifyServiceDebt } from '../../../hooks/useShopifyServiceDebt';
 import { ShopifyDiscountSimulator } from '../ShopifyDiscountSimulator';
 import { ShopifyInventoryCover } from '../ShopifyInventoryCover';
 import { ShopifyServiceDebt } from '../ShopifyServiceDebt';
+import { ShopifyTripFeasibility } from '../ShopifyTripFeasibility';
 import styles from './ShopifyIntelligence.module.css';
 
-/** Wires the three intelligence cards to their hooks for the /shopify page. */
+/** Wires the intelligence cards to their hooks for the /shopify page. */
 export function ShopifyIntelligence() {
   const inventory = useShopifyInventoryCover();
   const debt = useShopifyServiceDebt();
@@ -25,6 +26,7 @@ export function ShopifyIntelligence() {
         error={debt.error}
         onRetry={debt.refresh}
       />
+      <ShopifyTripFeasibility />
     </div>
   );
 }

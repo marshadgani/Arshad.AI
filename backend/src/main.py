@@ -19,6 +19,7 @@ from src.api.v1.domains import router as domains_router
 from src.api.v1.obsidian import router as obsidian_router
 from src.api.v1.ontology import router as ontology_router
 from src.api.v1.shopify import router as shopify_router
+from src.api.v1.trip_feasibility import router as trip_feasibility_router
 from src.api.v1.whoop import router as whoop_router
 from src.auth.routers import router as auth_router
 from src.middleware.cache import close_redis
@@ -178,6 +179,14 @@ async def validation_exception_handler(
         {key: entry[key] for key in ("loc", "msg", "type", "ctx") if key in entry}
         for entry in exc.errors()
     ]
+    for entry in scrubbed:
+        # A model_validator that raises ValueError puts the exception object
+        # itself in ctx, which JSONResponse cannot serialise.
+        if "ctx" in entry:
+            entry["ctx"] = {
+                k: v if isinstance(v, (str, int, float, bool, type(None))) else str(v)
+                for k, v in entry["ctx"].items()
+            }
     return JSONResponse(
         status_code=422,
         content={
@@ -258,6 +267,7 @@ app.include_router(obsidian_router)
 app.include_router(ontology_router)
 app.include_router(whoop_router)
 app.include_router(shopify_router)
+app.include_router(trip_feasibility_router)
 app.include_router(apple_health_router)
 app.include_router(integrations_router)
 app.include_router(github_attach_alias_router)

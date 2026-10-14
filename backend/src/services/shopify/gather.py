@@ -83,6 +83,11 @@ def gather_result(
         _log.warning("Shopify %s fetch failed: %s", alias, describe_error(result))
         failures.append(alias)
         return None
+    if not isinstance(result, dict):
+        # A null or non-object body is a failed fetch, not an empty result.
+        _log.warning("Shopify %s fetch returned %s body", alias, type(result).__name__)
+        failures.append(alias)
+        return None
     if result.get("throttled"):
         if "throttled" not in failures:
             failures.append("throttled")
