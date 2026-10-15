@@ -45,6 +45,49 @@ Loops are grouped by function. Naming follows the "The X loop" convention.
 - **Stop / bail-out**: No material drop → log "stable." Escalate suspected algo hits to a human rather than mass-editing.
 - **Output**: A regression report with a recommended fix.
 
+### The striking-distance push loop
+- **Check cadence**: Weekly
+- **Acts when**: An existing page ranks in positions 8–20 for a query with meaningful impressions, or ranks in the top 5 with a click-through rate well below its neighbors.
+- **Purpose**: Move pages that Google already half-trusts onto page one, the cheapest ranking gains available.
+- **Skills used**: `seo-audit`, `copywriting`, `site-architecture`
+- **Loop body**:
+  1. Pull query + page pairs from Search Console for the trailing 28 days; keep positions 8–20 above an impression floor, plus top-5 positions with weak click-through.
+  2. For each candidate, read the top three results and name the specific reason each one outranks the page (intent match, a missing section, fresher facts, stronger internal links).
+  3. Draft the smallest change that closes that gap: answer the query in the opening lines, add the missing section, add internal links from strong related pages. For the weak-CTR cases, change only the title and meta description.
+  4. Stage the edits and record the starting position and CTR.
+- **Self-check**: Is the page the right one for the query, or is another page on the site competing for it (cannibalization)? Fix the conflict first. Is the impression count big enough for the position to mean anything?
+- **State / idempotency**: Track each page's last edit date and starting metrics; give an edited page 3–4 weeks before touching it again, so results are attributable.
+- **Stop / bail-out**: No candidates above the impression floor → log "no action." Two pushes on the same page with no movement → stop and escalate; the problem is probably authority or intent, not on-page.
+- **Output**: Staged page edits, each with the query, the reason, the change, and its baseline. Method in `seo-audit`'s [rankings push reference](https://github.com/coreyhaines31/marketingskills/blob/main/skills/seo-audit/references/rankings-push.md).
+
+### The AI-answer check loop
+- **Check cadence**: Weekly (AI answers vary run to run; daily checks mostly measure noise)
+- **Acts when**: A tracked prompt's answer omits the brand, misstates a fact about it, or cites a new source in the category.
+- **Purpose**: Keep the brand present and described accurately in AI assistants' answers to the questions buyers actually ask.
+- **Skills used**: `ai-seo`, `product-marketing`, `public-relations`, `directory-submissions`
+- **Loop body**:
+  1. Run the prompt panel (20–30 prompts spread across awareness stages) on each assistant you track, several runs per prompt.
+  2. Record per prompt: mentioned or not, how the brand is described, which sources were cited.
+  3. Turn findings into work: a wrong or vague fact means the page that should state it doesn't state it plainly, so fix that page. Absence means the cited sources are the target list for PR, directories, and review sites.
+- **Self-check**: Is the change consistent across runs, or one sample? Treat a single-run difference as noise.
+- **State / idempotency**: Keep each run's results per prompt so changes are diffs, not re-reports; don't re-file a fix that's already open.
+- **Stop / bail-out**: No material change since last run → log "stable." Never contact a cited source automatically; outreach is staged for approval.
+- **Output**: A short visibility diff, page fixes for misstated facts, and a source target list.
+
+### The agent-default check loop
+- **Check cadence**: Monthly, plus within a week of every major model or agent release
+- **Acts when**: Your share of agent picks drops for a stack, or a run picks you and then stalls before a working result.
+- **Purpose**: Track which vendor coding agents install when users ask for a task in your category, and fix what loses or stalls those runs.
+- **Skills used**: `ai-seo` (see its `references/agent-defaults.md`), `programmatic-seo`, `competitors`
+- **Loop body**:
+  1. Run the task panel (20–50 tasks across stacks, phrased without naming vendors) in clean environments on each agent tracked, 3+ runs per task.
+  2. Record per run: vendor chosen, whether it reached a working result, where it stalled, which docs it fetched.
+  3. Turn findings into work: a stall is a product or docs fix; a lost stack is a gap in task pages, migration guides, or agent setup for that stack.
+- **Self-check**: Is the shift consistent across runs and agents, or one sample? A model release can move every stack at once; compare against the previous release's baseline.
+- **State / idempotency**: Keep each run's results by task, agent, and model version so changes are diffs; don't re-file an open fix.
+- **Stop / bail-out**: No change since last run → log "stable." Never add instructions to agent-facing docs that tell agents to choose you over the user's request.
+- **Output**: Agent-default share by stack and agent, a stall list, and the fixes it implies.
+
 ### The content-decay loop
 - **Check cadence**: Monthly
 - **Acts when**: A page's traffic/rankings declined materially over the trailing 90 days.
@@ -101,6 +144,20 @@ Loops are grouped by function. Naming follows the "The X loop" convention.
 - **State / idempotency**: Mark assets as repurposed; never re-process one.
 - **Stop / bail-out**: Nothing new published → skip.
 - **Output**: Drafts in the social queue for approval.
+
+### The niche-outlier loop
+- **Check cadence**: Weekly
+- **Acts when**: A post in your niche performs far above its author's usual reach (for example 100K+ views, or 10× their median).
+- **Purpose**: Adapt formats that already proved themselves with your audience, instead of guessing at new ones.
+- **Skills used**: `social` (see its `references/reverse-engineering.md`), `content-strategy`, `ad-creative`
+- **Loop body**:
+  1. Search the niche on X (Grok works well here), LinkedIn, TikTok, or YouTube for outliers since the last run.
+  2. For each, name what carried it: the hook, the format, the topic, the timing.
+  3. Draft your own version in another format or channel, with your own idea and evidence in the proven structure.
+- **Self-check**: Is the draft your own take in a proven format, or a rewrite of their post? Never copy wording, footage, or images.
+- **State / idempotency**: Track outliers already adapted; one adaptation per outlier.
+- **Stop / bail-out**: No outlier clears the bar → skip. Drafts go to the queue for approval.
+- **Output**: A short list of outliers, why each worked, and drafted adaptations.
 
 ### The content-calendar refill loop
 - **Check cadence**: Weekly
@@ -311,7 +368,83 @@ Loops are grouped by function. Naming follows the "The X loop" convention.
 - **Stop / bail-out**: No qualified opportunities → skip. Human-approve outreach.
 - **Output**: A qualified partner list with drafted outreach.
 
+### The creator-scouting loop
+- **Check cadence**: Monthly
+- **Acts when**: A creator with roughly 5–10K followers posts about your space and fits your audience.
+- **Purpose**: Build relationships with creators before they grow, when they're more reachable and cheaper to work with.
+- **Skills used**: `influencer-marketing`, `social`
+- **Loop body**:
+  1. Search X, Instagram, TikTok, LinkedIn, and YouTube for small accounts already posting about the problem you solve.
+  2. Vet with the influencer-marketing skill's audience-alignment test and fake-follower checks.
+  3. Add qualified creators to a watchlist; draft a first touch (a genuine reply, a product invite) for the best fits.
+- **Self-check**: Is their audience your buyer, or just adjacent? Reach without fit doesn't count.
+- **State / idempotency**: Track every creator scouted, contacted, and declined; never re-pitch inside the cooldown.
+- **Stop / bail-out**: No qualified creators → skip. Human-approve all outreach.
+- **Output**: A creator watchlist with notes and drafted first touches.
 ---
+
+## Outbound
+
+### The signal-sweep loop
+- **Check cadence**: Daily (product-usage signals: on trigger, within minutes)
+- **Acts when**: A new signal fires on an ICP-fit account that isn't already in a sequence, a customer, or suppressed.
+- **Purpose**: Reach accounts while the reason to reach them is fresh.
+- **Skills used**: `prospecting`, `cold-email`
+- **Loop body**:
+  1. Pull new signals since the last run: job posts, job changes of past champions, identified website visits, funding, product-usage triggers, social engagement.
+  2. Drop accounts outside the ICP, already in a sequence, customers, open deals, and anything on the suppression list.
+  3. Score and tier the rest; find and verify the contact who owns the problem.
+  4. Match each to its play (see the prospecting skill's signal plays reference) and stage the first touch.
+- **Self-check**: Is the signal inside its freshness window? Does the account still pass the ICP check? Is the email verified within the last 7 days?
+- **State / idempotency**: Key on account + signal type + signal date; never enroll the same account twice for the same signal, and respect a cooldown after any previous sequence.
+- **Stop / bail-out**: No fresh signals → log "no action." Halt if a signal source fails rather than acting on partial data. First touches for Tier 1 go to a human for approval.
+- **Output**: Enrolled or staged contacts, each with its signal, tier, and play.
+
+### The reply-triage loop
+- **Check cadence**: Every 15–30 minutes during business hours
+- **Acts when**: A new reply arrives on any outbound channel.
+- **Purpose**: Turn replies into meetings fast and stop every other channel the moment someone answers.
+- **Skills used**: `cold-email`, `revops`
+- **Loop body**:
+  1. Collect new replies from the sending tool, LinkedIn tool, and dialer notes.
+  2. Classify each (positive, information request, objection, not now, referral, out of office, wrong person, unsubscribe, bounce).
+  3. Stop all sequences for that contact on every channel.
+  4. Act on the safe types directly (suppress unsubscribes and bounces, pause for out-of-office, set reminders for not-now) and draft responses for the rest.
+  5. Alert a human immediately on positive replies.
+- **Self-check**: Is the classification confident? Anything ambiguous goes to a human. Does a draft make any claim not in the approved sources?
+- **State / idempotency**: Track processed message IDs; never answer the same reply twice.
+- **Stop / bail-out**: No new replies → exit quietly. Never send a drafted response to a positive, objection, or referral reply without approval until the agent's accuracy has been proven.
+- **Output**: Updated CRM stages, suppression updates, drafted responses, and positive-reply alerts. See the cold-email skill's reply handling reference.
+
+### The cold-domain health loop
+- **Check cadence**: Daily for bounces; weekly for placement and reputation
+- **Acts when**: A sending domain or mailbox crosses a stop-loss threshold.
+- **Purpose**: Protect cold sending infrastructure before a bad week burns domains.
+- **Skills used**: `cold-email`
+- **Loop body**:
+  1. Pull per-mailbox and per-campaign bounce rates, spam complaints, and reply rates.
+  2. Weekly: run seed placement tests, check Google Postmaster Tools and Microsoft SNDS, and check blocklists.
+  3. Pause campaigns over 2% bounces; pull mailboxes under ~70% inbox placement into warmup; flag domains on blocklists.
+  4. Swap in spare warmed domains to keep volume steady.
+- **Self-check**: Is the drop one bad list or the infrastructure? A single campaign's bounces point at the list; every campaign on a domain dropping points at the domain.
+- **State / idempotency**: Track each mailbox's status (active, warming, paused, retired) with dates.
+- **Stop / bail-out**: All healthy → log. Escalate immediately on spam complaints near 0.1% or a primary-domain problem.
+- **Output**: A health table and the actions taken. Thresholds are in the cold-email skill's deliverability reference. (For lifecycle and marketing email, use the email-deliverability loop.)
+
+### The sequence-retro loop
+- **Check cadence**: Weekly
+- **Acts when**: Sequences have enough new sends to compare (roughly 300+ per variant).
+- **Purpose**: Keep what works, kill what doesn't, and learn which signals, segments, and channels produce meetings.
+- **Skills used**: `cold-email`, `prospecting`, `analytics`
+- **Loop body**:
+  1. Pull, per sequence, step, segment, signal, and channel: sends, replies, positive replies, meetings.
+  2. Compare against the previous period and against each other.
+  3. Read the no-reasons and objections from the reply log.
+  4. Propose: retire losing sequences, test one new variant, and shift volume toward the best signal-and-segment pairs.
+- **Self-check**: Are the samples big enough? Did deliverability change in the period (check the cold-domain health log) before blaming copy?
+- **State / idempotency**: Keep each week's results; log which recommendations were adopted.
+- **Stop / bail-out**: Too few sends to judge → report volumes only. Never judge on open rates.
+- **Output**: A one-screen retro with 3 recommendations.
 
 ## Activation
 
@@ -668,6 +801,21 @@ Loops are grouped by function. Naming follows the "The X loop" convention.
 - **Stop / bail-out**: All tracking healthy → log "clean." **Escalate a broken revenue/conversion event immediately** — every downstream loop is blind until it's fixed.
 - **Output**: A tracking-QA report with prioritized fixes.
 
+### The claim-drift loop
+- **Check cadence**: On every deploy or merge to the product, or daily
+- **Acts when**: A product change (price, plan limit, feature, integration, supported platform) makes a statement on a marketing surface false.
+- **Purpose**: Stop the site, docs, comparison pages, and ads from describing a product that no longer exists.
+- **Skills used**: `product-marketing`, `copy-editing`, `competitors`, `pricing`
+- **Loop body**:
+  1. Read the product changes since the last run: merged PRs, commits, release notes, pricing config.
+  2. Pick out the ones that change a customer-facing fact.
+  3. Search every marketing surface for the old fact (pages, docs, comparison tables, FAQ, structured data, ad copy, email templates) and stage corrections.
+  4. For new capabilities, add a backlog item: which queries or comparisons can the product now win?
+- **Self-check**: Has the change shipped to customers, or is it behind a flag or still in beta? Only correct facts that are live.
+- **State / idempotency**: Keep a claims ledger (each claim, its source of truth, and the pages that state it) plus the last processed commit or release as the watermark.
+- **Stop / bail-out**: No customer-facing changes → log "no action." Pricing and legal claims always go to a human before publishing.
+- **Output**: Staged corrections listed by page, and backlog items for newly winnable queries.
+
 ### The campaign-postmortem loop
 - **Check cadence**: On campaign end (event-based)
 - **Acts when**: A campaign (launch, promo, seasonal push) concludes.
@@ -682,6 +830,19 @@ Loops are grouped by function. Naming follows the "The X loop" convention.
 - **Stop / bail-out**: No concluded campaign → skip.
 - **Output**: A postmortem doc + backlog/plan inputs.
 
+### The launch-reaction loop
+- **Check cadence**: Hourly to every few hours for the first 24 hours after a launch (event-based)
+- **Acts when**: A launch, pricing change, or major announcement goes live.
+- **Purpose**: Hear how people actually react while there's still time to adjust messaging, answer questions, and fix confusion.
+- **Skills used**: `social` (see its `references/listening.md`), `launch`, `copywriting`
+- **Loop body**:
+  1. Pull posts, replies, and threads about the launch across X (Grok can search it directly), LinkedIn, Reddit, Hacker News, and Product Hunt.
+  2. Group reactions: praise, confusion, objections, bugs, pricing pushback.
+  3. Draft replies and messaging fixes (a clearer headline, an FAQ entry) for the top themes; route bugs to the product team.
+- **Self-check**: Is a theme a pattern, or one loud thread? Weight by count and by who's saying it.
+- **State / idempotency**: One run log per launch; track threads already answered.
+- **Stop / bail-out**: Stops after 24 hours, then hands off to the campaign-postmortem loop. Escalate a crisis or a security report to a human immediately.
+- **Output**: A reaction digest with themes, drafted replies, and messaging fixes.
 ---
 
 ## Adapting and authoring loops
