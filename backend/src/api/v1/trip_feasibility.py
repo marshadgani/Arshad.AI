@@ -205,6 +205,7 @@ def _verdict(
             calendly_needs_reauth=calendly.needs_reauth,
             calendly_truncated=calendly.truncated,
             calendly_partial_failure=calendly.partial_failure,
+            calendly_timezone=calendly.user_timezone,
         )
     )
 
@@ -217,7 +218,9 @@ async def check_trip_feasibility(
 ) -> JSONResponse:
     """Go / no-go / unknown for [start_date, end_date] (inclusive): projected
     Shopify stockouts in the window or the 7 days after, and timed Google
-    Calendar events overlapping it. Always 200 except 422 / 429.
+    Calendar and Calendly meetings overlapping it. Calendly is a required
+    live source: not connected, needs reauth, truncated or unreadable all give
+    "unknown". Always 200 except 422 / 429.
     """
     user_id = str(current_user.id)
     await _check_rate_limit(user_id)

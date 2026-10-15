@@ -58,6 +58,7 @@ function timeAgo(iso: string | null): string {
 const ERROR_TOAST_MS = 5000;
 
 const SLUG_NAMES: Record<string, string> = {
+  calendly: 'Calendly',
   github: 'GitHub',
   gmail: 'Gmail',
   google_calendar: 'Google Calendar',

@@ -32,7 +32,7 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...auth.crypto import decrypt
+from ...auth.crypto import TokenDecryptError, decrypt
 from ...models.integration import ApiKeyCredential, Integration
 from ...models.user import User
 from ...services.integrations.state import ACTIVE_STATUSES
@@ -198,7 +198,13 @@ class CalendlyFetchResult:
     needs_reauth: bool = False
     events: list[Any] = field(default_factory=list)
     truncated: bool = False
+    # Connected, token not rejected, but the read still failed for a non-auth
+    # reason (HTTP error, bad shape). Differs from `truncated`, where the read
+    # worked but hit the per-request cap.
     partial_failure: bool = False
+    # IANA name from the Calendly profile; "" when unknown. Trip dates are
+    # local days, so the service uses it to place the window edges.
+    user_timezone: str = ""
 
 
 def calendar_time_bounds(start_date: date, end_date: date) -> tuple[str, str]:
@@ -247,8 +253,8 @@ async def _fetch_calendly_events(
                 "user": user_uri,
                 "status": "active",
                 "count": CALENDLY_PAGE_SIZE,
-                "min_start_time": time_min,
-                "max_start_time": time_max,
+                "min_start_time": time_min.replace("+00:00", "Z"),
+                "max_start_time": time_max.replace("+00:00", "Z"),
             },
         )
         resp.raise_for_status()
@@ -279,18 +285,24 @@ async def resolve_calendly(
     )
     if creds is None:
         _log.warning("Trip-feasibility Calendly: connected row has no stored token")
-        return CalendlyFetchResult(connected=True, partial_failure=True)
+        return CalendlyFetchResult(connected=True, needs_reauth=True)
     config = integration.config if isinstance(integration.config, dict) else {}
-    extra = creds.extra if isinstance(creds.extra, dict) else {}
-    user_uri = config.get("user_uri") or extra.get("user_uri")
+    user_uri = config.get("user_uri")
     if not isinstance(user_uri, str) or not user_uri:
         _log.warning("Trip-feasibility Calendly: no stored user URI; reconnect needed")
-        return CalendlyFetchResult(connected=True, partial_failure=True)
+        return CalendlyFetchResult(connected=True, needs_reauth=True)
+    user_timezone = config.get("user_timezone")
+    user_timezone = user_timezone if isinstance(user_timezone, str) else ""
 
     time_min, time_max = calendar_time_bounds(start_date, end_date)
-    # Decrypted outside the try so a corrupt or rotated key surfaces as a loud
-    # error instead of being swallowed by the ValueError clause below.
-    api_key = decrypt(creds.encrypted_key)
+    # A token that cannot be decrypted (rotated OAUTH_ENCRYPTION_KEY, corrupt
+    # row) cannot be fixed by retrying: ask for a reconnect and keep the route
+    # always-200. Any other decrypt or database error still propagates.
+    try:
+        api_key = decrypt(creds.encrypted_key)
+    except TokenDecryptError:
+        _log.warning("Trip-feasibility Calendly: stored token cannot be decrypted")
+        return CalendlyFetchResult(connected=True, needs_reauth=True)
     try:
         body = await _fetch_calendly_events(user_uri, api_key, time_min, time_max)
     except httpx.HTTPStatusError as exc:
@@ -323,4 +335,5 @@ async def resolve_calendly(
         connected=True,
         events=events,
         truncated=has_more or len(events) >= CALENDLY_PAGE_SIZE,
+        user_timezone=user_timezone,
     )

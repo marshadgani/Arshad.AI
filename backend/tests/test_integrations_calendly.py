@@ -30,8 +30,34 @@ async def test_connect_writes_user_uri_to_config_immediately(monkeypatch):
         user=user, db=db, payload={"api_key": "tok"}
     )
     assert row.config == INFO
-    assert store.await_args.kwargs["extra"] == INFO
+    assert store.await_args.kwargs["extra"] == {}
+    assert store.await_args.kwargs["kind"] == "personal_apikey"
+    assert store.await_args.kwargs["scopes"] == ["events:read"]
     db.commit.assert_awaited()
+
+
+@pytest.mark.asyncio
+async def test_connect_fails_loudly_when_the_account_row_is_missing(monkeypatch):
+    monkeypatch.setattr(mod, "probe_user", AsyncMock(return_value=INFO))
+    monkeypatch.setattr(mod, "store_api_key", AsyncMock(return_value=MagicMock()))
+    db = MagicMock(scalar=AsyncMock(return_value=None), commit=AsyncMock())
+    with pytest.raises(IntegrationError) as ei:
+        await mod.CalendlyIntegration().connect(
+            user=MagicMock(id=uuid.uuid4()), db=db, payload={"api_key": "tok"}
+        )
+    assert ei.value.code == "connect_failed"
+
+
+@pytest.mark.asyncio
+async def test_connect_keeps_existing_config_keys(monkeypatch):
+    monkeypatch.setattr(mod, "probe_user", AsyncMock(return_value=INFO))
+    monkeypatch.setattr(mod, "store_api_key", AsyncMock(return_value=MagicMock()))
+    row = MagicMock(config={"keep": 1})
+    db = MagicMock(scalar=AsyncMock(return_value=row), commit=AsyncMock())
+    await mod.CalendlyIntegration().connect(
+        user=MagicMock(id=uuid.uuid4()), db=db, payload={"api_key": "tok"}
+    )
+    assert row.config == {"keep": 1, **INFO}
 
 
 @pytest.mark.asyncio
@@ -202,7 +228,7 @@ async def test_sync_rejected_token_marks_error_and_reraises(monkeypatch):
             integration=integ, db=_sync_db(MagicMock(encrypted_key="b"))
         )
     assert ei.value.code == "invalid_key"
-    assert integ.status == "error"
+    assert integ.status == "expired"
 
 
 @pytest.mark.asyncio

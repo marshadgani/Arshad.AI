@@ -51,7 +51,7 @@ function degradations(r: TripFeasibilityResult): Degradation[] {
   if (r.calendly_needs_reauth) out.push({ text: 'Your Calendly token needs to be reconnected. Update it from the Integrations page.', severe: true });
   else if (!r.calendly_connected) out.push({
     text: 'Connect Calendly from the Integrations page to check your meetings.',
-    severe: true,
+    severe: false,
     href: '/integrations',
     linkText: 'Integrations',
   });
@@ -70,9 +70,12 @@ function degradations(r: TripFeasibilityResult): Degradation[] {
     else if (r.supabase_needs_sync) out.push({ text: 'Supabase has never been synced, so project health was not checked. Sync it from Integrations.', severe: true });
     else if (r.supabase_stale) out.push({ text: 'The Supabase snapshot is more than 24 hours old, so project health is unconfirmed. Re-sync Supabase from Integrations.', severe: true });
   }
-  if (r.partial_failures.length > 0) {
+  const calendlyUnread = r.calendly_connected && !r.calendly_needs_reauth && r.partial_failures.includes('calendly');
+  if (calendlyUnread) out.push({ text: 'Calendly could not be read, so your meetings were not checked. Try again shortly.', severe: true });
+  const otherFailures = r.partial_failures.filter((f) => f !== 'calendly' && f !== 'calendly_truncated');
+  if (otherFailures.length > 0) {
     out.push({
-      text: `Some data could not be fetched (${r.partial_failures.join(', ')}). Try again shortly.`,
+      text: `Some data could not be fetched (${otherFailures.join(', ')}). Try again shortly.`,
       severe: false,
     });
   }

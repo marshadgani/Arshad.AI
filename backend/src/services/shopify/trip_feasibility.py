@@ -33,8 +33,9 @@ cannot confirm conflict-free travel.
 
 from __future__ import annotations
 
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone, tzinfo
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from ...schemas.shopify import (
     EVENT_TITLE_MAX,
@@ -205,15 +206,26 @@ def _calendar_findings(
     return [c for _, c in timed], all_day, unreadable
 
 
+def _local_zone(tz_name: str) -> tzinfo:
+    """The user's zone, or UTC when the stored name is empty or unknown."""
+    try:
+        return ZoneInfo(tz_name) if tz_name else timezone.utc
+    except (ZoneInfoNotFoundError, ValueError):
+        return timezone.utc
+
+
 def _calendly_findings(
-    events: list[Any], start_date: date, end_date: date
+    events: list[Any], start_date: date, end_date: date, tz_name: str = ""
 ) -> tuple[list[TripConflict], bool]:
     """(meeting conflicts, any event unreadable). Calendly titles are `name`
-    (Google's is `summary`). Reads name/start_time/end_time/status only."""
-    win_start = datetime.combine(start_date, time.min, tzinfo=timezone.utc)
-    win_end = datetime.combine(
-        end_date + timedelta(days=1), time.min, tzinfo=timezone.utc
-    )
+    (Google's is `summary`). Reads name/start_time/end_time/status only.
+
+    Trip dates are the user's local days, so the window edges are local
+    midnights in `tz_name` (UTC when unknown). A UTC window would drop a
+    01:00 meeting on day one for a UTC+3 user and report a false "go"."""
+    zone = _local_zone(tz_name)
+    win_start = datetime.combine(start_date, time.min, tzinfo=zone)
+    win_end = datetime.combine(end_date + timedelta(days=1), time.min, tzinfo=zone)
     found: list[tuple[datetime, TripConflict]] = []
     unreadable = False
     for event in events:
@@ -455,11 +467,16 @@ def check_trip_feasibility(
     calendly_needs_reauth: bool = False,
     calendly_truncated: bool = False,
     calendly_partial_failure: bool = False,
+    calendly_timezone: str = "",
 ) -> TripFeasibilityResponse:
     """Assemble the verdict from already-fetched data.
 
     `variants_data` / `orders_data` are None when that fetch failed (or Shopify
     was unavailable); `partial_failures` carries the route's failure labels.
+    Calendly is a required live source: not connected, needs reauth, truncated,
+    a partial failure or an unreadable event all force "unknown", while a
+    meeting inside the window is a conflict. `calendly_timezone` places the
+    window edges on the user's local midnights.
     """
     shopify_usable = shopify_connected and not shopify_needs_reauth
     variants_truncated, orders_truncated = _truncation_flags(variants_data, orders_data)
@@ -489,7 +506,7 @@ def check_trip_feasibility(
     calendly_usable = calendly_connected and not calendly_needs_reauth
     if calendly_usable and calendly_events:
         meetings, calendly_unreadable = _calendly_findings(
-            calendly_events, start_date, end_date
+            calendly_events, start_date, end_date, calendly_timezone
         )
         conflicts.extend(meetings)
 

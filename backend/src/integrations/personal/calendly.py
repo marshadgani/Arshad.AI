@@ -83,25 +83,29 @@ class CalendlyIntegration(IntegrationProvider):
             raise IntegrationError(
                 "probe_failed", f"Calendly unreachable: {type(exc).__name__}"
             ) from exc
+        # The URI and timezone live in Integration.config only: they are not
+        # secrets and a second copy in the credential's `extra` would be returned
+        # by the status endpoint and could go stale.
         result = await store_api_key(
             db=db,
             slug=self.slug,
             api_key=api_key,
-            extra=info,
+            extra={},
             scopes=["events:read"],
             user_id=user.id,
             kind="personal_apikey",
         )
-        # store_api_key never touches config's user_uri; without this a freshly
-        # connected user would have no URI until the first sync.
         integration = await db.scalar(
             select(Integration).where(
                 Integration.user_id == user.id, Integration.slug == self.slug
             )
         )
-        if integration is not None:
-            integration.config = {**(integration.config or {}), **info}
-            await db.commit()
+        if integration is None:
+            raise IntegrationError(
+                "connect_failed", "Calendly connected but the account was not saved."
+            )
+        integration.config = {**(integration.config or {}), **info}
+        await db.commit()
         return result
 
     async def sync(self, *, integration: Integration, db: AsyncSession) -> SyncResult:
@@ -118,6 +122,9 @@ class CalendlyIntegration(IntegrationProvider):
         except Exception as exc:  # noqa: BLE001
             await mark_error(integration=integration, db=db, err=exc)
             if isinstance(exc, IntegrationError):
+                if exc.code == "invalid_key":
+                    integration.status = "expired"
+                    await db.commit()
                 raise
             raise IntegrationError("sync_failed", type(exc).__name__) from exc
         integration.config = {**(integration.config or {}), **info}

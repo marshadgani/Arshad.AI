@@ -44,7 +44,8 @@ describe('ShopifyTripFeasibilityOutcome — Calendly', () => {
         result={result({ calendly_connected: false })}
       />,
     );
-    expect(screen.getByRole('alert')).toHaveTextContent('Connect Calendly from the Integrations page');
+    expect(screen.getByRole('status')).toHaveTextContent('Connect Calendly from the Integrations page');
+    expect(screen.queryByRole('alert')).toBeNull();
     expect(screen.getByText('Unknown')).toBeInTheDocument();
     expect(screen.queryByText(/Not checked/)).toBeNull();
   });
@@ -64,7 +65,8 @@ describe('ShopifyTripFeasibilityOutcome — Calendly', () => {
         result={result({ verdict: 'unknown', partial_failures: ['calendly'] })}
       />,
     );
-    expect(screen.getByRole('status')).toHaveTextContent('Some data could not be fetched (calendly)');
+    expect(screen.getByRole('alert')).toHaveTextContent('Calendly could not be read, so your meetings were not checked');
+    expect(screen.queryByText(/Some data could not be fetched/)).toBeNull();
     expect(screen.getByText('Unknown')).toBeInTheDocument();
   });
 

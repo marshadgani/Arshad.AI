@@ -257,7 +257,7 @@ async def test_500_and_network_errors_are_partial_failures(seams):
 
 
 @pytest.mark.asyncio
-async def test_user_uri_falls_back_to_credential_extra_then_fails_closed(seams):
+async def test_missing_user_uri_asks_for_a_reconnect(seams):
     fetch = AsyncMock(return_value={"collection": []})
     seams.setattr(providers_mod, "_fetch_calendly_events", fetch)
     seams.setattr(
@@ -266,10 +266,8 @@ async def test_user_uri_falls_back_to_credential_extra_then_fails_closed(seams):
         AsyncMock(return_value=_Row(config={})),
     )
     r = await _resolve(_db(_creds({"user_uri": "https://api.calendly.com/users/X"})))
-    assert r.connected and not r.partial_failure
-    assert fetch.await_args.args[0].endswith("/users/X")
-    r = await _resolve(_db(_creds({})))
-    assert r.partial_failure
+    assert r.connected and r.needs_reauth and not r.partial_failure
+    fetch.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -377,14 +375,14 @@ def test_unavailable_source_name_no_longer_lists_calendly_stub():
 
 
 @pytest.mark.asyncio
-async def test_missing_credentials_row_is_partial_failure(seams):
+async def test_missing_credentials_row_asks_for_a_reconnect(seams):
     seams.setattr(
         providers_mod, "_find_calendly_integration", AsyncMock(return_value=_Row())
     )
     fetch = AsyncMock()
     seams.setattr(providers_mod, "_fetch_calendly_events", fetch)
     r = await _resolve(_db(None))
-    assert r.connected and r.partial_failure
+    assert r.connected and r.needs_reauth and not r.partial_failure
     fetch.assert_not_awaited()
 
 
@@ -558,3 +556,136 @@ def test_route_reads_calendly_once_for_the_current_user(route_client):
     route_client.resolve_spy(spy)
     route_client.post("/api/v1/trip-feasibility", json=BODY)
     assert seen == [(route_client.user_id, START, END)]
+
+
+# ── FEAT-180 gate fixes ────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_undecryptable_token_asks_for_a_reconnect_not_a_500(seams):
+    from src.auth.crypto import TokenDecryptError
+
+    def boom(_):
+        raise TokenDecryptError("rotated key")
+
+    seams.setattr(providers_mod, "decrypt", boom)
+    seams.setattr(
+        providers_mod, "_find_calendly_integration", AsyncMock(return_value=_Row())
+    )
+    fetch = AsyncMock()
+    seams.setattr(providers_mod, "_fetch_calendly_events", fetch)
+    r = await _resolve(_db(_creds()))
+    assert r.connected and r.needs_reauth
+    fetch.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_user_timezone_is_returned_from_the_stored_profile(seams):
+    row = _Row(
+        config={
+            "user_uri": "https://api.calendly.com/users/U",
+            "user_timezone": "Asia/Riyadh",
+        }
+    )
+    seams.setattr(
+        providers_mod, "_find_calendly_integration", AsyncMock(return_value=row)
+    )
+    seams.setattr(
+        providers_mod,
+        "_fetch_calendly_events",
+        AsyncMock(return_value={"collection": []}),
+    )
+    assert (await _resolve(_db(_creds()))).user_timezone == "Asia/Riyadh"
+
+
+def _meeting(start, end):
+    return {"name": "Call", "status": "active", "start_time": start, "end_time": end}
+
+
+def test_window_uses_the_users_local_midnight_not_utc():
+    from datetime import date
+
+    from src.services.shopify.trip_feasibility import _calendly_findings
+
+    # 01:00 Riyadh time on the first trip day is 22:00 UTC the day before.
+    day_one = _meeting("2026-10-19T22:00:00Z", "2026-10-19T23:00:00Z")
+    trip = (date(2026, 10, 20), date(2026, 10, 22))
+    assert _calendly_findings([day_one], *trip)[0] == []
+    assert len(_calendly_findings([day_one], *trip, "Asia/Riyadh")[0]) == 1
+    # 02:00 Riyadh time the day after the trip is inside UTC but outside local.
+    after = _meeting("2026-10-22T23:00:00Z", "2026-10-22T23:30:00Z")
+    assert len(_calendly_findings([after], *trip)[0]) == 1
+    assert _calendly_findings([after], *trip, "Asia/Riyadh")[0] == []
+
+
+@pytest.mark.parametrize("bad", ["", "Not/AZone", "x" * 300])
+def test_unknown_timezone_falls_back_to_utc(bad):
+    from datetime import date
+
+    from src.services.shopify.trip_feasibility import _calendly_findings
+
+    m = _meeting("2026-10-20T10:00:00Z", "2026-10-20T11:00:00Z")
+    found, unreadable = _calendly_findings(
+        [m], date(2026, 10, 20), date(2026, 10, 20), bad
+    )
+    assert len(found) == 1 and not unreadable
+
+
+@pytest.mark.asyncio
+async def test_fetch_sends_the_documented_request(monkeypatch):
+    seen: dict = {}
+
+    class _Resp:
+        def raise_for_status(self):
+            seen["raised"] = True
+
+        def json(self):
+            return ["not", "an", "object"]
+
+    class _Client:
+        def __init__(self, **kw):
+            seen["timeout"] = kw.get("timeout")
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def get(self, url, headers=None, params=None):
+            seen.update(url=url, headers=headers, params=params)
+            return _Resp()
+
+    monkeypatch.setattr(providers_mod.httpx, "AsyncClient", _Client)
+    body = await providers_mod._fetch_calendly_events(
+        "https://api.calendly.com/users/U",
+        "tok",
+        "2026-10-19T00:00:00+00:00",
+        "2026-10-24T00:00:00+00:00",
+    )
+    assert body == {}
+    assert seen["raised"] is True
+    assert seen["url"] == "https://api.calendly.com/scheduled_events"
+    assert seen["headers"] == {"Authorization": "Bearer tok"}
+    assert seen["params"] == {
+        "user": "https://api.calendly.com/users/U",
+        "status": "active",
+        "count": 100,
+        "min_start_time": "2026-10-19T00:00:00Z",
+        "max_start_time": "2026-10-24T00:00:00Z",
+    }
+
+
+@pytest.mark.asyncio
+async def test_integration_lookup_is_scoped_to_the_caller_and_slug():
+    captured = {}
+
+    async def scalar(stmt):
+        captured["sql"] = str(stmt.compile(compile_kwargs={"literal_binds": False}))
+        return None
+
+    db = MagicMock(scalar=scalar)
+    assert await providers_mod._find_calendly_integration("u1", db) is None
+    sql = captured["sql"]
+    assert "integrations.user_id" in sql and "integrations.slug" in sql
+    assert "user_id IS NULL" not in sql
