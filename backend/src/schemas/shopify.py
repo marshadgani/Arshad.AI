@@ -151,7 +151,7 @@ class TripConflict(BaseModel):
     """Flat on the wire; the validator makes each `type` carry its own fields
     and none of the other type's."""
 
-    type: Literal["stockout", "calendar_event", "infrastructure"]
+    type: Literal["stockout", "calendar_event", "infrastructure", "calendly_event"]
     variant_id: Optional[str] = Field(None, max_length=255)
     projected_stockout_date: Optional[str] = Field(None, max_length=10)
     event_title: Optional[str] = Field(None, max_length=EVENT_TITLE_MAX)
@@ -160,6 +160,9 @@ class TripConflict(BaseModel):
     provider: Optional[Literal["render", "supabase"]] = None
     infra_name: Optional[str] = Field(None, max_length=255)
     infra_state: Optional[str] = Field(None, max_length=64)
+    calendly_event_title: Optional[str] = Field(None, max_length=EVENT_TITLE_MAX)
+    calendly_event_start: Optional[str] = Field(None, max_length=64)
+    calendly_event_end: Optional[str] = Field(None, max_length=64)
 
     @model_validator(mode="after")
     def _check_fields_match_type(self) -> Self:
@@ -167,6 +170,11 @@ class TripConflict(BaseModel):
             "stockout": (self.variant_id, self.projected_stockout_date),
             "calendar_event": (self.event_title, self.event_start, self.event_end),
             "infrastructure": (self.provider, self.infra_name, self.infra_state),
+            "calendly_event": (
+                self.calendly_event_title,
+                self.calendly_event_start,
+                self.calendly_event_end,
+            ),
         }
         for kind, values in groups.items():
             owned = kind == self.type
@@ -187,7 +195,6 @@ class TripAllDayEvent(BaseModel):
 
 UnavailableSourceName = Literal[
     "booking_com_pricing",
-    "calendly_availability",
     "render_health",
     "supabase_health",
 ]
@@ -219,6 +226,16 @@ class TripFeasibilityResponse(BaseModel):
     supabase_needs_sync: bool = False
     supabase_stale: bool = False
     supabase_sync_error: bool = False
+    calendly_connected: bool = False
+    calendly_needs_reauth: bool = False
+    calendly_truncated: bool = Field(
+        False,
+        description=(
+            "True when the Calendly API returned the per-request cap of 100 "
+            "events; the trip window may contain additional meetings that were "
+            "not checked. Verdict is always unknown when truncated."
+        ),
+    )
     partial_failures: list[str] = []
 
     @model_validator(mode="after")
@@ -237,6 +254,9 @@ class TripFeasibilityResponse(BaseModel):
                 or self.variants_truncated
                 or self.orders_truncated
                 or self.calendar_truncated
+                or not self.calendly_connected
+                or self.calendly_needs_reauth
+                or self.calendly_truncated
                 or self.partial_failures
                 or (
                     self.render_connected

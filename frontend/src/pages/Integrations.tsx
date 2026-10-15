@@ -58,6 +58,7 @@ function timeAgo(iso: string | null): string {
 const ERROR_TOAST_MS = 5000;
 
 const SLUG_NAMES: Record<string, string> = {
+  calendly: 'Calendly',
   github: 'GitHub',
   gmail: 'Gmail',
   google_calendar: 'Google Calendar',
@@ -176,7 +177,7 @@ export default function Integrations() {
   };
 
   const onConnect = async (item: IntegrationItem) => {
-    if (item.kind === 'project_apikey') {
+    if (item.kind === 'project_apikey' || item.kind === 'personal_apikey') {
       setApiKeyModal(item);
       setApiKeyDraft('');
       setApiKeyErr(null);

@@ -9,3 +9,4 @@ Append-only log of every dev-team pipeline invocation.
 | 2026-09-14T00:00:00+00:00 | FEAT-144 | Ontology layer slice 1 — GitHub person/project graph (entities + contributed_to relationships), visibility-ratchet trigger, pure derivation module, extraction service, CLI trigger, and test coverage | completed | 1 | approved | n/a |
 | 2026-10-06T00:00:00+00:00 | FEAT-167 | Ontology entity visibility control path — publish/unpublish UI, PATCH API, service, tests | completed | 1 | approved_with_caveats | n/a |
 | 2026-10-10T02:20:31+00:00 | FEAT-125 | Shopify intelligence layer (inventory cover, discount simulator, service debt) — final test/hardening pass | completed | 1 | approved | n/a |
+| 2026-10-15T00:42:57+00:00 | FEAT-180 | Calendly source for trip-feasibility checker | completed | 1 | approved_with_caveats | n/a |

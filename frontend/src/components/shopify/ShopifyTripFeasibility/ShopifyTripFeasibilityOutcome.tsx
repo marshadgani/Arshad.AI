@@ -11,6 +11,7 @@ const PROVIDER_LABEL = { render: 'Render', supabase: 'Supabase' } as const;
 
 function conflictKey(c: TripConflict, i: number): string {
   if (c.type === 'infrastructure') return `infra-${c.provider}-${c.infra_name}-${i}`;
+  if (c.type === 'calendly_event') return `calendly-${c.calendly_event_start}-${i}`;
   return `${c.type}-${c.variant_id ?? c.event_start ?? i}`;
 }
 
@@ -20,6 +21,8 @@ function conflictText(c: TripConflict): string {
       return `Stock runs out on ${c.projected_stockout_date}: ${c.variant_id}`;
     case 'calendar_event':
       return `Calendar: ${c.event_title} (${c.event_start})`;
+    case 'calendly_event':
+      return `Calendly: ${c.calendly_event_title} (${c.calendly_event_start})`;
     case 'infrastructure':
       return `${PROVIDER_LABEL[c.provider]}: ${c.infra_name} is ${c.infra_state}`;
   }
@@ -31,13 +34,28 @@ const VERDICT_CLASS: Record<TripVerdict, string> = {
   unknown: styles.unknown,
 };
 
+interface Degradation {
+  text: string;
+  severe: boolean;
+  href?: string;
+  linkText?: string;
+}
+
 /** Collect human-readable explanations for why the verdict is not a confident Go. */
-function degradations(r: TripFeasibilityResult): { text: string; severe: boolean }[] {
-  const out: { text: string; severe: boolean }[] = [];
+function degradations(r: TripFeasibilityResult): Degradation[] {
+  const out: Degradation[] = [];
   if (r.shopify_needs_reauth) out.push({ text: 'Reconnect Shopify to check stock.', severe: true });
   else if (!r.shopify_connected) out.push({ text: 'Shopify is not connected, so stock was not checked.', severe: false });
   if (r.calendar_needs_reauth) out.push({ text: 'Reconnect Google Calendar to check your schedule.', severe: true });
   else if (!r.calendar_connected) out.push({ text: 'Google Calendar is not connected, so your schedule was not checked.', severe: false });
+  if (r.calendly_needs_reauth) out.push({ text: 'Your Calendly token needs to be reconnected. Update it from the Integrations page.', severe: true });
+  else if (!r.calendly_connected) out.push({
+    text: 'Connect Calendly from the Integrations page to check your meetings.',
+    severe: false,
+    href: '/integrations',
+    linkText: 'Integrations',
+  });
+  else if (r.calendly_truncated) out.push({ text: 'Too many Calendly meetings to check (truncated); some may have been missed.', severe: true });
   if (r.variants_truncated) out.push({ text: 'Only part of the product list was checked.', severe: false });
   if (r.orders_truncated) out.push({ text: 'Only part of the recent sales history was checked.', severe: false });
   if (r.calendar_truncated) out.push({ text: 'Your calendar has more events than could be checked.', severe: false });
@@ -52,9 +70,12 @@ function degradations(r: TripFeasibilityResult): { text: string; severe: boolean
     else if (r.supabase_needs_sync) out.push({ text: 'Supabase has never been synced, so project health was not checked. Sync it from Integrations.', severe: true });
     else if (r.supabase_stale) out.push({ text: 'The Supabase snapshot is more than 24 hours old, so project health is unconfirmed. Re-sync Supabase from Integrations.', severe: true });
   }
-  if (r.partial_failures.length > 0) {
+  const calendlyUnread = r.calendly_connected && !r.calendly_needs_reauth && r.partial_failures.includes('calendly');
+  if (calendlyUnread) out.push({ text: 'Calendly could not be read, so your meetings were not checked. Try again shortly.', severe: true });
+  const otherFailures = r.partial_failures.filter((f) => f !== 'calendly' && f !== 'calendly_truncated');
+  if (otherFailures.length > 0) {
     out.push({
-      text: `Some data could not be fetched (${r.partial_failures.join(', ')}). Try again shortly.`,
+      text: `Some data could not be fetched (${otherFailures.join(', ')}). Try again shortly.`,
       severe: false,
     });
   }
@@ -75,6 +96,7 @@ export function ShopifyTripFeasibilityOutcome({ result }: ShopifyTripFeasibility
       ? 'unknown'
       : result.verdict;
   const badgeClass = VERDICT_CLASS[verdict];
+  const notChecked = result.unavailable_sources;
 
   return (
     <div aria-live="polite">
@@ -88,6 +110,7 @@ export function ShopifyTripFeasibilityOutcome({ result }: ShopifyTripFeasibility
           role={issue.severe ? 'alert' : 'status'}
         >
           {issue.text}
+          {issue.href && <> &middot; <a href={issue.href}>{issue.linkText}</a></>}
         </p>
       ))}
       {result.conflicts.length > 0 && (
@@ -107,10 +130,10 @@ export function ShopifyTripFeasibilityOutcome({ result }: ShopifyTripFeasibility
           </ul>
         </div>
       )}
-      {result.unavailable_sources.length > 0 && (
+      {notChecked.length > 0 && (
         <p className={styles.note}>
           Not checked:{' '}
-          {result.unavailable_sources
+          {notChecked
             .map((s) => `${s.name.replace(/_/g, ' ')} (${s.reason.replace(/_/g, ' ')})`)
             .join(', ')}
           .

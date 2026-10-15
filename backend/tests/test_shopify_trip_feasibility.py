@@ -95,6 +95,7 @@ def run(variants="ok", orders="ok", cal=None, **kw):
         shopify_needs_reauth=False,
         window_days=30,
         partial_failures=[],
+        calendly_connected=True,
     )
     args.update(kw)
     return check_trip_feasibility(**args)
@@ -130,7 +131,6 @@ def test_clean_sources_give_go_with_unavailable_sources_named():
     assert r.conflicts == []
     assert [(u.name, u.reason) for u in r.unavailable_sources] == [
         ("booking_com_pricing", "not_connected"),
-        ("calendly_availability", "not_connected"),
         ("render_health", "not_connected"),
         ("supabase_health", "not_connected"),
     ]
@@ -432,6 +432,11 @@ def client(monkeypatch):
     m(route, "_execute_variants_query", AsyncMock(return_value=make_variants()))
     m(route, "_execute_orders_query", AsyncMock(return_value=make_orders()))
     m(route, "_list_calendar_events", AsyncMock(return_value={"items": []}))
+    m(
+        route.providers,
+        "resolve_calendly",
+        AsyncMock(return_value=route.providers.CalendlyFetchResult(connected=True)),
+    )
     yield TestClient(app)
     app.dependency_overrides.clear()
 
@@ -451,7 +456,7 @@ def data(resp):
 def test_route_clean_go(client):
     d = data(post(client))
     assert d["verdict"] == "go"
-    assert len(d["unavailable_sources"]) == 4
+    assert len(d["unavailable_sources"]) == 3
 
 
 def test_route_never_asks_google_for_more_than_250_events(client, monkeypatch):
@@ -866,6 +871,11 @@ def test_route_rate_limit_uses_dedicated_bucket_and_user_identity(client, monkey
     monkeypatch.setattr(
         r, "_list_calendar_events", AsyncMock(return_value={"items": []})
     )
+    monkeypatch.setattr(
+        r.providers,
+        "resolve_calendly",
+        AsyncMock(return_value=r.providers.CalendlyFetchResult()),
+    )
     post(client)
     kw = seen.await_args.kwargs
     assert kw["bucket"] == "trip_feasibility"
@@ -921,7 +931,7 @@ def test_route_both_sources_down_is_unknown_with_independent_flags(client, monke
     d = data(post(client))
     assert d["verdict"] == "unknown"
     assert d["shopify_connected"] is False and d["calendar_connected"] is False
-    assert len(d["unavailable_sources"]) == 4
+    assert len(d["unavailable_sources"]) == 3
 
 
 def test_route_setup_failure_log_has_no_shop_domain(client, monkeypatch, caplog):
@@ -1016,10 +1026,7 @@ def test_infra_healthy_fresh_is_clean_go():
     )
     assert r.verdict == "go"
     assert r.render_connected and r.supabase_connected
-    assert [u.name for u in r.unavailable_sources] == [
-        "booking_com_pricing",
-        "calendly_availability",
-    ]
+    assert [u.name for u in r.unavailable_sources] == ["booking_com_pricing"]
 
 
 def test_infra_never_synced_is_unknown():

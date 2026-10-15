@@ -90,6 +90,14 @@ The infrastructure check adds nine flags: `render_connected`, `render_needs_sync
 `supabase_needs_sync`, `supabase_stale` and `supabase_sync_error`. Any of the
 needs-sync, stale, error or truncated flags on a connected provider degrades the
 verdict to `unknown`.
+Calendly is a required live source and adds `calendly_connected`,
+`calendly_needs_reauth` and `calendly_truncated`. Not connected, needs reauth or
+truncated degrades the verdict to `unknown`, so `go` is impossible. A failed or
+unreadable Calendly read is reported as `calendly` in `partial_failures` and also
+forces `unknown`. A missing token or user URI, or a token that cannot be
+decrypted, is reported as `calendly_needs_reauth` (reconnect), never a 500.
+Trip dates are local days: the window edges use the timezone stored with the
+Calendly profile, falling back to UTC.
 
 ## Error Responses
 

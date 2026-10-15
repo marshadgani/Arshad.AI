@@ -19,6 +19,13 @@ a known approximation: a timed event within a few hours of a window edge can
 be reported or missed depending on the user's UTC offset (for UTC+3, a 01:00
 local event on the first day falls before the window).
 
+Calendly is a required live source, like Calendar: not connected, needs reauth,
+a failed read or a truncated read all force "unknown". One request reads at
+most 100 scheduled events (the Calendly per-request cap); a response at the cap
+sets `calendly_truncated` and forces "unknown" because an unexamined meeting
+could be a conflict. Only an event's name, start, end and status are read, never
+invitee data.
+
 `calendar_truncated` forces "unknown" here, whereas build_inventory_cover's
 route treats it as cacheable. The asymmetry is intentional: a capped calendar
 cannot confirm conflict-free travel.
@@ -26,8 +33,9 @@ cannot confirm conflict-free travel.
 
 from __future__ import annotations
 
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone, tzinfo
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from ...schemas.shopify import (
     EVENT_TITLE_MAX,
@@ -47,10 +55,7 @@ TRIP_STOCKOUT_LOOKAHEAD_DAYS = 7
 
 # Always reported, never detected: these sources have no backend integration yet,
 # so every response lists them as not connected rather than guessing a value.
-UNAVAILABLE_SOURCE_NAMES = (
-    "booking_com_pricing",
-    "calendly_availability",
-)
+UNAVAILABLE_SOURCE_NAMES = ("booking_com_pricing",)
 
 INFRA_STALENESS_HOURS = 24
 INFRA_FAILED_DEPLOY_STATUSES = frozenset(
@@ -199,6 +204,61 @@ def _calendar_findings(
             unreadable = True
     timed.sort(key=lambda pair: pair[0])
     return [c for _, c in timed], all_day, unreadable
+
+
+def _local_zone(tz_name: str) -> tzinfo:
+    """The user's zone, or UTC when the stored name is empty or unknown."""
+    try:
+        return ZoneInfo(tz_name) if tz_name else timezone.utc
+    except (ZoneInfoNotFoundError, ValueError):
+        return timezone.utc
+
+
+def _calendly_findings(
+    events: list[Any], start_date: date, end_date: date, tz_name: str = ""
+) -> tuple[list[TripConflict], bool]:
+    """(meeting conflicts, any event unreadable). Calendly titles are `name`
+    (Google's is `summary`). Reads name/start_time/end_time/status only.
+
+    Trip dates are the user's local days, so the window edges are local
+    midnights in `tz_name` (UTC when unknown). A UTC window would drop a
+    01:00 meeting on day one for a UTC+3 user and report a false "go"."""
+    zone = _local_zone(tz_name)
+    win_start = datetime.combine(start_date, time.min, tzinfo=zone)
+    win_end = datetime.combine(end_date + timedelta(days=1), time.min, tzinfo=zone)
+    found: list[tuple[datetime, TripConflict]] = []
+    unreadable = False
+    for event in events:
+        if not isinstance(event, dict):
+            unreadable = True
+            continue
+        status = event.get("status")
+        if status is None:
+            unreadable = True
+            continue
+        if status != "active":
+            continue
+        begin = _parse_instant(event.get("start_time"))
+        finish = _parse_instant(event.get("end_time"))
+        if begin is None or finish is None:
+            unreadable = True
+            continue
+        if begin < win_end and finish > win_start:
+            found.append(
+                (
+                    begin,
+                    TripConflict(
+                        type="calendly_event",
+                        calendly_event_title=str(event.get("name") or "(no title)")[
+                            :EVENT_TITLE_MAX
+                        ],
+                        calendly_event_start=str(event["start_time"])[:64],
+                        calendly_event_end=str(event["end_time"])[:64],
+                    ),
+                )
+            )
+    found.sort(key=lambda pair: pair[0])
+    return [c for _, c in found], unreadable
 
 
 def _snapshot_flags(
@@ -402,11 +462,21 @@ def check_trip_feasibility(
     supabase_config: dict[str, Any] | None = None,
     render_status: str | None = None,
     supabase_status: str | None = None,
+    calendly_events: list[Any] | None = None,
+    calendly_connected: bool = False,
+    calendly_needs_reauth: bool = False,
+    calendly_truncated: bool = False,
+    calendly_partial_failure: bool = False,
+    calendly_timezone: str = "",
 ) -> TripFeasibilityResponse:
     """Assemble the verdict from already-fetched data.
 
     `variants_data` / `orders_data` are None when that fetch failed (or Shopify
     was unavailable); `partial_failures` carries the route's failure labels.
+    Calendly is a required live source: not connected, needs reauth, truncated,
+    a partial failure or an unreadable event all force "unknown", while a
+    meeting inside the window is a conflict. `calendly_timezone` places the
+    window edges on the user's local midnights.
     """
     shopify_usable = shopify_connected and not shopify_needs_reauth
     variants_truncated, orders_truncated = _truncation_flags(variants_data, orders_data)
@@ -432,6 +502,14 @@ def check_trip_feasibility(
         )
         conflicts.extend(timed)
 
+    calendly_unreadable = False
+    calendly_usable = calendly_connected and not calendly_needs_reauth
+    if calendly_usable and calendly_events:
+        meetings, calendly_unreadable = _calendly_findings(
+            calendly_events, start_date, end_date, calendly_timezone
+        )
+        conflicts.extend(meetings)
+
     infra_conflicts, infra, infra_unreadable = _infrastructure_findings(
         render_config,
         supabase_config,
@@ -447,11 +525,19 @@ def check_trip_feasibility(
         failures.append("calendar")
     if levels_unreadable and "inventory_levels" not in failures:
         failures.append("inventory_levels")
+    if (calendly_partial_failure or calendly_unreadable) and (
+        "calendly" not in failures
+    ):
+        failures.append("calendly")
+    if calendly_truncated and "calendly_truncated" not in failures:
+        failures.append("calendly_truncated")
     failures.extend(f for f in infra_unreadable if f not in failures)
 
     degraded = (
         not shopify_usable
         or not calendar_usable
+        or not calendly_usable
+        or calendly_truncated
         or variants_data is None
         or orders_data is None
         or variants_truncated
@@ -480,6 +566,9 @@ def check_trip_feasibility(
         variants_truncated=variants_truncated,
         orders_truncated=orders_truncated,
         calendar_truncated=cal.calendar_truncated,
+        calendly_connected=calendly_connected,
+        calendly_needs_reauth=calendly_needs_reauth,
+        calendly_truncated=calendly_truncated,
         partial_failures=failures,
         **infra,
     )
