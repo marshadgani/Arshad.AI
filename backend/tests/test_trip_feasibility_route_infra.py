@@ -73,9 +73,9 @@ def base_client(monkeypatch):
         route, "_find_infra_integrations", AsyncMock(return_value=(None, None))
     )
     monkeypatch.setattr(
-        route,
-        "_resolve_calendly",
-        AsyncMock(return_value=route.CalendlyFetchResult(connected=True)),
+        route.providers,
+        "resolve_calendly",
+        AsyncMock(return_value=route.providers.CalendlyFetchResult(connected=True)),
     )
 
     yield TestClient(app)

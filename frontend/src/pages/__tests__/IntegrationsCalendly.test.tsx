@@ -138,7 +138,7 @@ describe('Integrations page – Calendly personal_apikey modal (REQ-180-006)', (
 
     await waitFor(() => {
       const fetchCalls = (vi.mocked(global.fetch) as ReturnType<typeof vi.fn>).mock.calls;
-      const connectCall = fetchCalls.find(([url]: [string]) =>
+      const connectCall = fetchCalls.find(([url]) =>
         String(url).includes('/calendly/connect'),
       );
       expect(connectCall).toBeDefined();
@@ -226,7 +226,7 @@ describe('Integrations page – Calendly personal_apikey modal (REQ-180-006)', (
 
     await waitFor(() => {
       const fetchCalls = (vi.mocked(global.fetch) as ReturnType<typeof vi.fn>).mock.calls;
-      const connectCall = fetchCalls.find(([url]: [string]) =>
+      const connectCall = fetchCalls.find(([url]) =>
         String(url).includes('/render/connect'),
       );
       expect(connectCall).toBeDefined();

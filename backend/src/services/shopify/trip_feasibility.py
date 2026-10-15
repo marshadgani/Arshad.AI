@@ -220,7 +220,11 @@ def _calendly_findings(
         if not isinstance(event, dict):
             unreadable = True
             continue
-        if event.get("status") != "active":
+        status = event.get("status")
+        if status is None:
+            unreadable = True
+            continue
+        if status != "active":
             continue
         begin = _parse_instant(event.get("start_time"))
         finish = _parse_instant(event.get("end_time"))

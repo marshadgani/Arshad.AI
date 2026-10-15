@@ -433,9 +433,9 @@ def client(monkeypatch):
     m(route, "_execute_orders_query", AsyncMock(return_value=make_orders()))
     m(route, "_list_calendar_events", AsyncMock(return_value={"items": []}))
     m(
-        route,
-        "_resolve_calendly",
-        AsyncMock(return_value=route.CalendlyFetchResult(connected=True)),
+        route.providers,
+        "resolve_calendly",
+        AsyncMock(return_value=route.providers.CalendlyFetchResult(connected=True)),
     )
     yield TestClient(app)
     app.dependency_overrides.clear()
@@ -872,7 +872,9 @@ def test_route_rate_limit_uses_dedicated_bucket_and_user_identity(client, monkey
         r, "_list_calendar_events", AsyncMock(return_value={"items": []})
     )
     monkeypatch.setattr(
-        r, "_resolve_calendly", AsyncMock(return_value=r.CalendlyFetchResult())
+        r.providers,
+        "resolve_calendly",
+        AsyncMock(return_value=r.providers.CalendlyFetchResult()),
     )
     post(client)
     kw = seen.await_args.kwargs

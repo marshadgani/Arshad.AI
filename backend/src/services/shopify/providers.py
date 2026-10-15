@@ -278,18 +278,21 @@ async def resolve_calendly(
         )
     )
     if creds is None:
+        _log.warning("Trip-feasibility Calendly: connected row has no stored token")
         return CalendlyFetchResult(connected=True, partial_failure=True)
     config = integration.config if isinstance(integration.config, dict) else {}
     extra = creds.extra if isinstance(creds.extra, dict) else {}
     user_uri = config.get("user_uri") or extra.get("user_uri")
     if not isinstance(user_uri, str) or not user_uri:
+        _log.warning("Trip-feasibility Calendly: no stored user URI; reconnect needed")
         return CalendlyFetchResult(connected=True, partial_failure=True)
 
     time_min, time_max = calendar_time_bounds(start_date, end_date)
+    # Decrypted outside the try so a corrupt or rotated key surfaces as a loud
+    # error instead of being swallowed by the ValueError clause below.
+    api_key = decrypt(creds.encrypted_key)
     try:
-        body = await _fetch_calendly_events(
-            user_uri, decrypt(creds.encrypted_key), time_min, time_max
-        )
+        body = await _fetch_calendly_events(user_uri, api_key, time_min, time_max)
     except httpx.HTTPStatusError as exc:
         if exc.response.status_code in (401, 403):
             integration.status = "expired"
@@ -297,6 +300,10 @@ async def resolve_calendly(
                 f"HTTPStatusError (HTTP {exc.response.status_code})"
             )
             await db.commit()
+            _log.warning(
+                "Trip-feasibility Calendly token rejected (HTTP %s); marked expired",
+                exc.response.status_code,
+            )
             return CalendlyFetchResult(connected=True, needs_reauth=True)
         _log.warning(
             "Trip-feasibility Calendly read failed: HTTP %s", exc.response.status_code
@@ -308,6 +315,7 @@ async def resolve_calendly(
 
     events = body.get("collection")
     if not isinstance(events, list):
+        _log.warning("Trip-feasibility Calendly: response had no event list")
         return CalendlyFetchResult(connected=True, partial_failure=True)
     pagination = body.get("pagination")
     has_more = isinstance(pagination, dict) and bool(pagination.get("next_page_token"))
