@@ -90,7 +90,7 @@ for await (const event of stream) {
       events: [{
         type: 'user.tool_confirmation',
         tool_use_id: event.id,         // not a toolu_ id - use event.id
-        result: (await approve(event)) ? 'allow' : 'deny', // you write approve(): ask a person or apply your own rule; deny when unattended
+        result: 'allow',               // or 'deny'
         // deny_message: '...',        // optional, only with result: 'deny'
       }],
     })
@@ -150,8 +150,6 @@ if (s?.status !== 'running') {
 } // else: still running after 2s - don't archive, let it settle or escalate
 ```
 
-While a workflow run is open, the status is not enough: an archive or a delete might return a 400 even when the session is `idle`, and an archive that succeeds ends the run. Before either, ask the agent to stop its runs, or wait until each run has ended (`shared/managed-agents-multiagent.md` § While a run is open).
-
 ---
 
 ## 7. Stream-first, then send
@@ -175,11 +173,11 @@ The `Promise.all([stream, send])` shape works too, but stream-first is simpler a
 **The mounted resource has a different `file_id` than the file you uploaded.** Session creation makes a session-scoped copy.
 
 ```ts
-const uploaded = await client.beta.files.upload({ file })
+const uploaded = await client.beta.files.upload({ file, purpose: 'agent_resource' })
 // uploaded.id         -> the original file
 const session = await client.beta.sessions.create({
   /* ... */
-  resources: [{ type: 'file', file_id: uploaded.id, mount_path: '/data.csv' }],
+  resources: [{ type: 'file', file_id: uploaded.id, mount_path: '/workspace/data.csv' }],
 })
 // session.resources[0].file_id !== uploaded.id  <- different IDs
 ```

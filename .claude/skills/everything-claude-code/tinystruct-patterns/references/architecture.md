@@ -46,9 +46,7 @@ org.tinystruct/
 │   ├── component/AbstractData.java ← base POJO for DB persistence
 │   ├── component/Condition.java  ← fluent SQL query builder
 │   ├── component/FieldType.java  ← SQL-to-Java type mappings
-│   ├── annotation/               ← @Table, @Id, @Column mapping annotations
-│   ├── Mapping.java              ← reads @Table/@Column annotations or .map.xml metadata, cached per class
-│   ├── tools/TableCreator.java   ← creates missing tables (database.autocreate)
+│   ├── Mapping.java              ← reads .map.xml metadata
 │   ├── DatabaseOperator.java     ← low-level JDBC wrapper
 │   └── FileEntity.java           ← file upload representation
 ├── http/                         ← Request, Response, Constants

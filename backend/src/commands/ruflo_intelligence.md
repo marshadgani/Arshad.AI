@@ -20,6 +20,6 @@ Present a summary table:
 
 If patterns are stale, suggest:
 ```bash
-npx @claude-flow/cli@latest hooks pretrain --path . --depth medium
-npx @claude-flow/cli@latest mcp exec -t agentdb_consolidate
+mcp tool call hooks_pretrain --json
+mcp tool call agentdb_consolidate --json
 ```

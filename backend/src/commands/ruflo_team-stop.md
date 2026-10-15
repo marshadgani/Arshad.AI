@@ -1,6 +1,6 @@
 ---
 name: team-stop
-description: Pause an AI team without deleting its evidence. Pass a team ID.
+description: Pause a RuFlo AI Team without deleting its evidence.
 ---
 
-Use the manage-team-lifecycle skill for team: $ARGUMENTS. If no team was given, ask which one. Explain the effect, then set the team status to paused; this command never deletes retained data.
+Use manage-team-lifecycle for team `$ARGUMENTS`. Explain the effect, then pause the team; this command never deletes retained data.

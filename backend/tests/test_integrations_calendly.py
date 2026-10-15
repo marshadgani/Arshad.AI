@@ -77,9 +77,7 @@ def _http(monkeypatch, *, status=200, body=None, exc=None):
             seen["url"], seen["headers"] = url, headers
             if exc:
                 raise exc
-            return httpx.Response(
-                status, json=body, request=httpx.Request("GET", url)
-            )
+            return httpx.Response(status, json=body, request=httpx.Request("GET", url))
 
     monkeypatch.setattr(mod.httpx, "AsyncClient", _Client)
     return seen
@@ -87,8 +85,13 @@ def _http(monkeypatch, *, status=200, body=None, exc=None):
 
 @pytest.mark.asyncio
 async def test_probe_returns_uri_and_timezone_and_sends_bearer(monkeypatch):
-    seen = _http(monkeypatch, body={"resource": {"uri": "u", "timezone": "Asia/Riyadh"}})
-    assert await mod.probe_user("tok") == {"user_uri": "u", "user_timezone": "Asia/Riyadh"}
+    seen = _http(
+        monkeypatch, body={"resource": {"uri": "u", "timezone": "Asia/Riyadh"}}
+    )
+    assert await mod.probe_user("tok") == {
+        "user_uri": "u",
+        "user_timezone": "Asia/Riyadh",
+    }
     assert seen["url"].endswith("/users/me")
     assert seen["headers"] == {"Authorization": "Bearer tok"}
 
@@ -183,9 +186,7 @@ async def test_sync_refreshes_config_and_marks_connected(monkeypatch):
 @pytest.mark.asyncio
 async def test_sync_without_stored_token_raises_not_connected():
     with pytest.raises(IntegrationError) as ei:
-        await mod.CalendlyIntegration().sync(
-            integration=MagicMock(), db=_sync_db(None)
-        )
+        await mod.CalendlyIntegration().sync(integration=MagicMock(), db=_sync_db(None))
     assert ei.value.code == "not_connected"
 
 

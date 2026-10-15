@@ -1,40 +1,33 @@
-# ECC for Qoder
+# ITO Production v1 native Fusion presets
 
-This directory contains ECC's native Qoder plugin manifest. The repository root
-is the plugin bundle: Qoder loads the canonical `skills/`, `agents/`, and
-`commands/` directories rather than copies maintained under `.qoder-plugin/`.
+These restrained presets are separate from the preserved ITO_V28 compatibility examples. The parent review approved their two-source still previews. Exact installed imports, parameter/connection readbacks, save/reopen and six 30-frame renders passed verification. The Lua installer also passed actual installation and an idempotent rerun, with original presets unchanged. They do not change the finished V28 film.
 
-## Install and verify
+## Presets
 
-ECC's hook runtime requires Node.js 18 or newer on Qoder's non-interactive
-`PATH`. From a reviewed checkout:
+| Preset | Behavior | Starting strength |
+|---|---|---|
+| HighlightBloom | Glow limited to brighter image content, without an exposure or color-gain node | Threshold 0.70, glow gain 0.12, 6px glow size, 22% blend |
+| RGBFringe | Opposing red/blue spatial offsets with unchanged original green/alpha routing and duplicated edge pixels | Normalized horizontal offsets −0.001/+0.001, approximately −1.92/+1.92 px at 1920 px width |
+| LumaHalo | Thin glow through a Sobel/luminance mask recomputed from each source frame, without translating the image | 2 px glow size, glow gain 0.10, 25% blend |
 
-```bash
-qoder plugins validate . --strict
-qoder plugins install .
-qoder plugins list
+The halo follows image edges through its per-frame mask. It performs no object detection or tracking. These are conservative starting values, not a universal match for every shot or reference. RGB output is recombined from actual spatially offset channels; it does not remap green from alpha as the compatibility example does. Both glow nodes use frame clipping. Alpha preservation is established by node routing/disabled alpha processing; H264 proof renders do not contain alpha.
+
+## Install
+
+Keep the three .setting files beside install_ito_production_v1.lua. On macOS run the saved installer from its absolute path:
+
+```sh
+"/Applications/DaVinci Resolve/DaVinci Resolve.app/Contents/Libraries/Fusion/fuscript" -l lua "/absolute/path/to/reusable/install_ito_production_v1.lua"
 ```
 
-For Qoder IDE, create a ZIP whose root contains `.qoder-plugin/`, `skills/`,
-`agents/`, `commands/`, `hooks/`, `scripts/`, and `.mcp.json`, then use
-**Upload Plugin**. Do not upload only `.qoder-plugin/` or an individual
-`SKILL.md`; both would omit referenced resources.
+It installs into your user Fusion/Macros/ITO_Production_v1 directory. It preflights every source, refuses conflicting installed bytes and verifies readback. Identical reruns are allowed. Existing ITO_V22 and ITO_V28 files remain untouched.
 
-## Capability boundary
+## Import and connect
 
-- Qoder discovers all compatible skills and agents from their canonical root
-  directories. `commands/` remains a legacy compatibility surface; workflows
-  should prefer their corresponding skills.
-- The bundled `chrome-devtools` MCP server uses the same pinned `npx` launch
-  contract as Codex. It is downloaded on first use and therefore requires Node,
-  npm/npx, and network access.
-- Qoder receives only ECC's reviewed `SessionStart` bootstrap. The much broader
-  Claude hook profile is not copied: blocking tool hooks, asynchronous stop
-  jobs, and Claude-specific matchers have not been asserted to be Qoder-safe.
-- The Qoder hook uses `command` plus `args`, `QODER_PLUGIN_ROOT`, and Node's own
-  executable for child processes. It does not rely on Bash, `python3`, or shell
-  variable expansion, so the launcher contract is portable across native
-  Windows, macOS, and Linux when Node 18+ is available.
+Use Resolve's TimelineItem.ImportFusionComp with the actual installed .setting path in a new composition or duplicated clip. These are serialized tool-graph snippets, so add the clip's MediaIn and MediaOut boundaries. Internal links are already serialized.
 
-Qoder plugin installation is separate from ECC's managed installer. Do not
-combine it with a manually copied Qoder skill installation.
+- HighlightBloom: connect MediaIn to ITO_PROD_Bloom.Input; connect Bloom output to MediaOut.
+- RGBFringe: connect MediaIn to RedOffset.Input, BlueOffset.Input and RedCopy.Background. Connect BlueCopy output to MediaOut. Each node name carries the ITO_PROD_ prefix.
+- LumaHalo: connect MediaIn to Contours.Input and Halo.Input. Connect Halo output to MediaOut. Each node name carries the ITO_PROD_ prefix.
+
+[provenance.json](provenance.json) records exact shipped hashes and a sanitized summary of prior native verification, with hashes of the separately retained evidence. The earlier [ITO V28 compatibility examples](../ito-v28/README.md) are not recommended production defaults. This package does not include the source footage, native project or proof renders.

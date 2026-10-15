@@ -78,7 +78,7 @@ For each field, ask:
 
 ### Company/Organization
 - Auto-suggest for faster entry
-- Enrichment after submission (HubSpot Breeze, Clay, Apollo, etc.)
+- Enrichment after submission (Clearbit, etc.)
 - Consider inferring from email domain
 
 ### Job Title/Role

@@ -52,20 +52,13 @@ export function resolveLegend(config, catalog, presentKinds) {
   });
 }
 
-// Labels render slightly larger than the layout font size; measure the
-// rendered size so a long label cannot run into the next entry.
-function renderedLegendFontSize(fontSize) {
-  return fontSize < 8 ? fontSize + 0.5 : fontSize + 2;
-}
-
 function measuredEntryWidth(entry, fontSize, swatchGap) {
   const swatchWidth = entry.swatchWidth ?? 14;
   return Math.ceil(
     swatchWidth
     + swatchGap
-    + textUnits(entry.label) * renderedLegendFontSize(fontSize) * TEXT_ADVANCE_EM
-    + (entry.interactive ? INTERACTIVE_BADGE_ALLOWANCE : 0)
-    + (entry.trailingWidth ?? 0),
+    + textUnits(entry.label) * fontSize * TEXT_ADVANCE_EM
+    + (entry.interactive ? INTERACTIVE_BADGE_ALLOWANCE : 0),
   );
 }
 
@@ -198,15 +191,12 @@ export function measureLegend(entries, {
   };
 }
 
-// `labelClass`/`labelWeight` let a renderer state that its legend labels are
-// the same ink and weight as the value they describe; both default to the
-// shared presentation, so callers that pass nothing keep their exact bytes.
-export function renderLegend({ entries, layout, renderSwatch, locale, labelClass = 't-muted', labelWeight = 500 }) {
+export function renderLegend({ entries, layout, renderSwatch, locale }) {
   if (!entries.length) return '';
   const measured = measureLegend(entries, layout);
   if (!measured) return '';
   const hasInteractiveEntries = measured.entries.some((entry) => entry.interactive);
-  const renderedFontSize = renderedLegendFontSize(measured.fontSize);
+  const renderedFontSize = measured.fontSize < 8 ? measured.fontSize + 0.5 : measured.fontSize + 2;
   const rootAttributes = hasInteractiveEntries ? ' data-legend="" data-legend-bridge=""' : ' data-legend=""';
   const parts = [
     `        <g${rootAttributes}>`,
@@ -219,7 +209,7 @@ export function renderLegend({ entries, layout, renderSwatch, locale, labelClass
       : '';
     parts.push(`          <g data-legend-semantic-kind="${esc(entry.kind)}"${interactive} data-legend-x="${entry.x}" data-legend-baseline="${entry.baseline}" data-legend-width="${entry.width}">`);
     parts.push(`            ${renderSwatch(entry)}`);
-    parts.push(`            <text x="${entry.x + (entry.swatchWidth ?? 14) + (entry.swatchGap ?? DEFAULT_SWATCH_GAP)}" y="${entry.baseline}" class="${labelClass}" font-size="${renderedFontSize}" font-weight="${labelWeight}">${esc(entry.label)}</text>`);
+    parts.push(`            <text x="${entry.x + (entry.swatchWidth ?? 14) + (entry.swatchGap ?? DEFAULT_SWATCH_GAP)}" y="${entry.baseline}" class="t-muted" font-size="${renderedFontSize}" font-weight="500">${esc(entry.label)}</text>`);
     parts.push('          </g>');
   }
   parts.push('        </g>');

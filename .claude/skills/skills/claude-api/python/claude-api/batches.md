@@ -164,10 +164,8 @@ requests = [
     Request(
         custom_id=f"classify-{i}",
         params=MessageCreateParamsNonStreaming(
-            model="claude-haiku-5-5",
-            # Claude Haiku 5.5 thinks by default, and thinking counts toward max_tokens
-            max_tokens=1024,
-            output_config={"effort": "low"},
+            model="claude-haiku-4-5",
+            max_tokens=50,
             messages=[{
                 "role": "user",
                 "content": f"Classify as positive/negative/neutral (one word): {text}"

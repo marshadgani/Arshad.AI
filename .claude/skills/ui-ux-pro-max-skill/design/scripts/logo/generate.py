@@ -8,19 +8,8 @@ with the selected model's prompt/aspect-ratio contract.
 
 Models:
 - Nano Banana (default): gemini-2.5-flash-image - fast, high-volume, low-latency
-- Nano Banana Pro (--pro): gemini-3-pro-image - professional quality, advanced reasoning
+- Nano Banana Pro (--pro): gemini-3-pro-image-preview - professional quality, advanced reasoning
 - MuAPI Nano Banana (--provider muapi): nano-banana - hosted asynchronous image generation
-
-Set GEMINI_FLASH_IMAGE_MODEL or GEMINI_PRO_IMAGE_MODEL to use another Gemini
-model id, for example when Google retires one of these.
-
-Gemini returns PNG or JPEG data. The file gets the extension of the returned
-type, so ``--output logo.png`` can be saved as ``logo.jpg``; the path actually
-written is printed.
-
-Exit status is 1 when nothing was generated: a failed single request, or a
-batch where every variant failed. A batch where some variants succeed exits 0
-and reports how many were generated.
 
 Usage:
     python generate.py --prompt "tech startup logo minimalist blue"
@@ -39,7 +28,6 @@ import argparse
 import ipaddress
 import json
 import os
-import sys
 import time
 from datetime import datetime
 from pathlib import Path
@@ -77,15 +65,8 @@ ATLASCLOUD_API_KEY = os.environ.get("ATLASCLOUD_API_KEY")
 MUAPI_API_KEY = os.environ.get("MUAPI_API_KEY")
 
 # Gemini "Nano Banana" model configurations for image generation
-GEMINI_FLASH = (
-    os.environ.get("GEMINI_FLASH_IMAGE_MODEL") or "gemini-2.5-flash-image"
-)  # Nano Banana: fast, high-volume, low-latency
-GEMINI_PRO = (
-    os.environ.get("GEMINI_PRO_IMAGE_MODEL") or "gemini-3-pro-image"
-)  # Nano Banana Pro: professional quality, advanced reasoning
-
-# File extensions for the image types Gemini returns as inline data
-IMAGE_EXTENSIONS = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}
+GEMINI_FLASH = "gemini-2.5-flash-image"  # Nano Banana: fast, high-volume, low-latency
+GEMINI_PRO = "gemini-3-pro-image-preview"  # Nano Banana Pro: professional quality, advanced reasoning
 
 # Atlas Cloud model validated against the live model catalog and schema.
 ATLAS_MODEL = "google/nano-banana-2-lite/text-to-image"
@@ -450,21 +431,7 @@ def _generate_with_muapi(prompt, output_path, aspect_ratio, api_key, model):
     raise RuntimeError("MuAPI prediction timed out while polling")
 
 
-def _path_for_image_type(output_path, mime_type):
-    """Return output_path with the extension of the returned image type.
-
-    An unknown image type keeps the requested path.
-    """
-    extension = IMAGE_EXTENSIONS.get(mime_type.split(";")[0].strip().lower())
-    path = Path(output_path)
-    suffix = path.suffix.lower()
-    if extension is None or suffix == extension or (suffix, extension) == (".jpeg", ".jpg"):
-        return output_path
-    return str(path.with_suffix(extension))
-
-
 def _generate_with_gemini(prompt, output_path, aspect_ratio, use_pro):
-    """Generate with Gemini and return the path the image was saved to."""
     if not GEMINI_API_KEY:
         raise RuntimeError("GEMINI_API_KEY not set")
 
@@ -511,15 +478,9 @@ def _generate_with_gemini(prompt, output_path, aspect_ratio, use_pro):
             and part.inline_data
             and part.inline_data.mime_type.startswith("image/")
         ):
-            saved_path = _path_for_image_type(output_path, part.inline_data.mime_type)
-            if saved_path != output_path:
-                print(
-                    f"Gemini returned {part.inline_data.mime_type}, "
-                    f"so saving as {saved_path} instead of {output_path}"
-                )
-            with open(saved_path, "wb") as output_file:
+            with open(output_path, "wb") as output_file:
                 output_file.write(part.inline_data.data)
-            return saved_path
+            return
     raise RuntimeError("Gemini did not return an image")
 
 
@@ -559,9 +520,9 @@ def generate_logo(
         model_label = f"MuAPI ({muapi_model})"
     else:
         model_label = (
-            f"Nano Banana Pro ({GEMINI_PRO})"
+            "Nano Banana Pro (gemini-3-pro-image-preview)"
             if use_pro
-            else f"Nano Banana ({GEMINI_FLASH})"
+            else "Nano Banana (gemini-2.5-flash-image)"
         )
 
     print(f"Generating logo with {model_label}...")
@@ -587,7 +548,7 @@ def generate_logo(
                 muapi_model,
             )
         else:
-            output_path = _generate_with_gemini(full_prompt, output_path, ratio, use_pro)
+            _generate_with_gemini(full_prompt, output_path, ratio, use_pro)
 
         print(f"Logo saved to: {output_path}")
         return output_path
@@ -674,7 +635,7 @@ def generate_batch(
 
         if result:
             results.append(result)
-            print(f"  ✓ Saved: {os.path.basename(result)}\n")
+            print(f"  ✓ Saved: {filename}\n")
         else:
             print(f"  ✗ Failed: {style_key}\n")
 
@@ -714,7 +675,7 @@ def main():
     parser.add_argument(
         "--pro",
         action="store_true",
-        help=f"Use Nano Banana Pro ({GEMINI_PRO}) for professional quality",
+        help="Use Nano Banana Pro (gemini-3-pro-image-preview) for professional quality",
     )
     parser.add_argument(
         "--provider",
@@ -777,7 +738,7 @@ def main():
         output_dir = (
             args.output_dir or f"./{args.brand.lower().replace(' ', '_')}_logos"
         )
-        results = generate_batch(
+        generate_batch(
             prompt=prompt,
             brand_name=args.brand or "Logo",
             count=args.batch,
@@ -789,10 +750,8 @@ def main():
             atlas_model=args.atlas_model,
             muapi_model=args.muapi_model,
         )
-        if not results:
-            sys.exit(1)
     else:
-        saved_path = generate_logo(
+        generate_logo(
             prompt=prompt,
             style=args.style,
             industry=args.industry,
@@ -804,8 +763,6 @@ def main():
             atlas_model=args.atlas_model,
             muapi_model=args.muapi_model,
         )
-        if saved_path is None:
-            sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -772,22 +772,20 @@ public function rules(): array
 ### Secure Storage
 
 ```php
-// Store sensitive files on the same private disk used to create temporary URLs.
-$path = $request->file('document')->store('documents', 's3');
-// Never use the 'public' disk for sensitive documents.
+// Store files outside public directory
+$path = $request->file('document')->store('documents', 'local');
+// Never use 'public' disk for sensitive documents
 
 // Use signed URLs for temporary file access
 use Illuminate\Support\Facades\Storage;
 
-public function download(Document $document)
+public function download(Request $request, string $path)
 {
-    // Requires route-model binding for Document, a persisted $document->path,
-    // and a DocumentPolicy::download rule registered with Laravel.
-    // Authorize against the model that owns the file, never a path taken from the request
-    $this->authorize('download', $document);
+    // Generate temporary signed URL (expires in 15 minutes)
+    $url = Storage::temporaryUrl($path, now()->addMinutes(15));
 
-    // Generate the temporary signed URL (expires in 15 minutes) only after authorization
-    $url = Storage::disk('s3')->temporaryUrl($document->path, now()->addMinutes(15));
+    // Validate user has permission
+    $this->authorize('download', $path);
 
     return redirect($url);
 }

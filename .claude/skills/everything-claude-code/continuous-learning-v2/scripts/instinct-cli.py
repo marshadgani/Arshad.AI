@@ -525,7 +525,7 @@ def parse_instinct_file(content: str) -> list[dict]:
     in_frontmatter = False
     content_lines = []
 
-    for line in content.removeprefix('\ufeff').split('\n'):
+    for line in content.split('\n'):
         if line.strip() == '---':
             if in_frontmatter:
                 # End of frontmatter - content comes next
@@ -551,8 +551,7 @@ def parse_instinct_file(content: str) -> list[dict]:
                     value = value[1:-1].replace("''", "'")
                 if key == 'confidence':
                     try:
-                        confidence = float(value)
-                        current[key] = confidence if 0.0 <= confidence <= 1.0 else 0.5
+                        current[key] = float(value)
                     except ValueError:
                         current[key] = 0.5  # default on malformed confidence
                 else:

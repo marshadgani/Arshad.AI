@@ -509,7 +509,11 @@ FetchResult = providers_mod.CalendlyFetchResult
     [
         (FetchResult(), "calendly_connected", None),
         (FetchResult(connected=True, needs_reauth=True), "calendly_needs_reauth", None),
-        (FetchResult(connected=True, truncated=True), "calendly_truncated", "calendly_truncated"),
+        (
+            FetchResult(connected=True, truncated=True),
+            "calendly_truncated",
+            "calendly_truncated",
+        ),
         (FetchResult(connected=True, partial_failure=True), None, "calendly"),
     ],
 )

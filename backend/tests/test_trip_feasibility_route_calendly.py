@@ -52,7 +52,7 @@ def base_client(monkeypatch):
 
 
 def test_tc201_calendly_not_connected_verdict_is_unknown(monkeypatch, base_client):
-    """TC-201: Calendly not connected + no Shopify + no Calendar → verdict is exactly 'unknown'."""
+    """TC-201: nothing connected -> verdict is exactly unknown."""
     monkeypatch.setattr(
         route.providers,
         "resolve_calendly",
