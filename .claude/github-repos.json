@@ -6170,10 +6170,11 @@
     "taste-skill": {
       "url": "https://github.com/Leonxlnx/taste-skill.git",
       "name": "taste-skill",
-      "last_fetched": "2026-10-05 19:34 UTC",
+      "last_fetched": "2026-10-15 06:07 UTC",
       "components": {
         "skills": [
           "brandkit",
+          "taste-skill-v2-experimental",
           "redesign-skill",
           "imagegen-frontend-web",
           "soft-skill",
