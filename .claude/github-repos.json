@@ -6197,7 +6197,7 @@
     "awesome-claude-design": {
       "url": "https://github.com/VoltAgent/awesome-claude-design.git",
       "name": "awesome-claude-design",
-      "last_fetched": "2026-10-05 19:34 UTC",
+      "last_fetched": "2026-10-15 06:07 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -6209,7 +6209,7 @@
     "design-md-chrome": {
       "url": "https://github.com/bergside/design-md-chrome.git",
       "name": "design-md-chrome",
-      "last_fetched": "2026-10-05 19:34 UTC",
+      "last_fetched": "2026-10-15 06:07 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -6221,7 +6221,7 @@
     "design-motion-principles": {
       "url": "https://github.com/kylezantos/design-motion-principles.git",
       "name": "design-motion-principles",
-      "last_fetched": "2026-10-05 19:34 UTC",
+      "last_fetched": "2026-10-15 06:07 UTC",
       "components": {
         "skills": [
           "design-motion-principles"
@@ -6235,7 +6235,7 @@
     "omniroute": {
       "url": "https://github.com/diegosouzapw/OmniRoute.git",
       "name": "OmniRoute",
-      "last_fetched": "2026-10-05 19:34 UTC",
+      "last_fetched": "2026-10-15 06:07 UTC",
       "components": {
         "skills": [
           "omni-context-rtk",
@@ -6299,14 +6299,14 @@
         "token_optimization": [
           "SKILL.md",
           "SKILL.md",
+          "shared-tiers.ts",
           "combo.ts",
           "settingsSchemas.ts",
           "providerSpecificData.ts",
           "sameAccountTransportRetry.ts",
           "sessionAffinityPin.ts",
           "chat.ts",
-          "projectCombo.ts",
-          "requestDefaults.ts"
+          "projectCombo.ts"
         ]
       }
     },
