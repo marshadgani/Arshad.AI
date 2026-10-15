@@ -81,7 +81,7 @@ describe('ShopifyTripFeasibilityOutcome — Calendly', () => {
 
   it('warns when too many meetings were returned', () => {
     render(<ShopifyTripFeasibilityOutcome result={result({ calendly_truncated: true })} />);
-    expect(screen.getByRole('alert')).toHaveTextContent('Too many Calendly meetings');
+    expect(screen.getByRole('alert')).toHaveTextContent('Too many Calendly meetings to check (truncated)');
   });
 
   it('lists a Calendly meeting conflict', () => {

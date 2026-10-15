@@ -34,16 +34,28 @@ const VERDICT_CLASS: Record<TripVerdict, string> = {
   unknown: styles.unknown,
 };
 
+interface Degradation {
+  text: string;
+  severe: boolean;
+  href?: string;
+  linkText?: string;
+}
+
 /** Collect human-readable explanations for why the verdict is not a confident Go. */
-function degradations(r: TripFeasibilityResult): { text: string; severe: boolean }[] {
-  const out: { text: string; severe: boolean }[] = [];
+function degradations(r: TripFeasibilityResult): Degradation[] {
+  const out: Degradation[] = [];
   if (r.shopify_needs_reauth) out.push({ text: 'Reconnect Shopify to check stock.', severe: true });
   else if (!r.shopify_connected) out.push({ text: 'Shopify is not connected, so stock was not checked.', severe: false });
   if (r.calendar_needs_reauth) out.push({ text: 'Reconnect Google Calendar to check your schedule.', severe: true });
   else if (!r.calendar_connected) out.push({ text: 'Google Calendar is not connected, so your schedule was not checked.', severe: false });
   if (r.calendly_needs_reauth) out.push({ text: 'Your Calendly token needs to be reconnected. Update it from the Integrations page.', severe: true });
-  else if (!r.calendly_connected) out.push({ text: 'Connect Calendly from the Integrations page to check your meetings.', severe: true });
-  else if (r.calendly_truncated) out.push({ text: 'Too many Calendly meetings to check, some may have been missed.', severe: true });
+  else if (!r.calendly_connected) out.push({
+    text: 'Connect Calendly from the Integrations page to check your meetings.',
+    severe: true,
+    href: '/integrations',
+    linkText: 'Integrations',
+  });
+  else if (r.calendly_truncated) out.push({ text: 'Too many Calendly meetings to check (truncated); some may have been missed.', severe: true });
   if (r.variants_truncated) out.push({ text: 'Only part of the product list was checked.', severe: false });
   if (r.orders_truncated) out.push({ text: 'Only part of the recent sales history was checked.', severe: false });
   if (r.calendar_truncated) out.push({ text: 'Your calendar has more events than could be checked.', severe: false });
@@ -95,6 +107,7 @@ export function ShopifyTripFeasibilityOutcome({ result }: ShopifyTripFeasibility
           role={issue.severe ? 'alert' : 'status'}
         >
           {issue.text}
+          {issue.href && <> &middot; <a href={issue.href}>{issue.linkText}</a></>}
         </p>
       ))}
       {result.conflicts.length > 0 && (
