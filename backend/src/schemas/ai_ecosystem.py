@@ -48,10 +48,12 @@ class SummaryResponse(ORMBase):
 
 
 class LogRequest(ORMBase):
-    agent_name: str
-    model: str | None = None
-    tokens_used: int = Field(default=0, ge=0)
-    duration_ms: int | None = None
+    agent_name: str = Field(
+        ..., min_length=1, max_length=100, pattern=r"^[A-Za-z0-9._:-]+$"
+    )
+    model: str | None = Field(default=None, max_length=100)
+    tokens_used: int = Field(default=0, ge=0, le=2_000_000_000)
+    duration_ms: int | None = Field(default=None, ge=0, le=2_000_000_000)
     success: bool = True
     session_id: uuid.UUID | None = None
 

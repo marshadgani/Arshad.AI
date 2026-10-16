@@ -26,6 +26,18 @@
           { "type": "command", "command": ".claude/hooks/post-edit-format.sh" }
         ]
       }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/subagent_usage_log.py",
+            "async": true,
+            "timeout": 60
+          }
+        ]
+      }
     ]
   },
 

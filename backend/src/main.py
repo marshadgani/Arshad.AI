@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from src.agents.routers import router as agents_router
 from src.api.v1.ai_ecosystem import router as ai_ecosystem_router
+from src.api.v1.ai_ecosystem_ingest import router as ai_ecosystem_ingest_router
 from src.api.v1.ai_ecosystem_skills import router as ai_ecosystem_skills_router
 from src.api.v1.apple_health import router as apple_health_router
 from src.api.v1.chat import router as chat_router
@@ -262,6 +263,7 @@ app.include_router(chat_router)
 app.include_router(dashboard_router)
 app.include_router(domains_router)
 app.include_router(ai_ecosystem_router)
+app.include_router(ai_ecosystem_ingest_router)
 app.include_router(ai_ecosystem_skills_router)
 app.include_router(obsidian_router)
 app.include_router(ontology_router)
