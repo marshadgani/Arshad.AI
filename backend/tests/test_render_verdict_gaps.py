@@ -363,11 +363,12 @@ async def test_fetch_logs_failure_logs_only_type_and_status(caplog):
 
 
 @pytest.mark.asyncio
-async def test_fetch_metric_empty_series_is_no_data_not_failure():
+async def test_fetch_metric_empty_series_is_missing_data_not_a_quiet_metric():
     res = await rc.fetch_metric(
         "srv-a", T0, FINISH, "memory", "k", _http(_resp(200, []))
     )
-    assert res.mean is None and res.sample_count == 0 and res.fetch_failed is False
+    assert res.mean is None and res.sample_count == 0
+    assert res.fetch_failed is True and res.failure_code == "no_data"
 
 
 @pytest.mark.asyncio
@@ -735,4 +736,5 @@ def test_info_only_payload_counts_zero_errors(ctx, monkeypatch):
     )
     d = _get(ctx)
     assert d["before_error_count"] == d["after_error_count"] == 0
-    assert d["verdict"] == "neutral"
+    # The wired metrics return no points, so the verdict cannot claim neutral.
+    assert d["verdict"] == "unknown"

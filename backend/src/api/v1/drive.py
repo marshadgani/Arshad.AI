@@ -7,12 +7,17 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.auth.dependencies import get_current_user
+from src.middleware.rate_limit import enforce_rate_limit
 from src.models.database import get_db
 from src.models.user import User
 from src.schemas.drive import DriveAuditResponse, DriveFile
 from src.services.google_drive import DriveAuditService
 
 router = APIRouter(prefix="/api/v1/drive", tags=["drive"])
+
+# Each call makes up to 3 Google requests, so cap how often one user can run it.
+_RATE_LIMIT = 10
+_RATE_WINDOW_SECONDS = 60
 
 
 @router.get(
@@ -37,6 +42,13 @@ async def permissions_audit(
     ``anyone_with_link`` and ``stale_sharing`` are null when Drive did not
     return permissions (non-owned file): unknown, not safe.
     """
+    await enforce_rate_limit(
+        bucket="drive_audit",
+        identity=str(current_user.id),
+        limit=_RATE_LIMIT,
+        window_seconds=_RATE_WINDOW_SECONDS,
+        message=f"Too many requests. Retry after {_RATE_WINDOW_SECONDS} seconds.",
+    )
     result = await DriveAuditService.get_audit_results(
         current_user.id,
         db,

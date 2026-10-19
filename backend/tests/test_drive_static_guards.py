@@ -62,7 +62,7 @@ class TestNoInlineClock:
             pytest.skip(f"{module_path} not built yet")
         source = module_path.read_text()
         assert "datetime.now(" not in source, (
-            f"{module_path.name} contains an inline datetime.now() call — inject the clock instead"
+            f"{module_path.name} calls datetime.now() inline — inject the clock"
         )
         assert "datetime.utcnow(" not in source, (
             f"{module_path.name} contains datetime.utcnow() — inject the clock instead"
@@ -143,7 +143,7 @@ class TestReadOnlyScope:
             source = module_path.read_text()
             for pattern in write_scope_patterns:
                 assert pattern not in source, (
-                    f"{module_path.name} references write scope (matched pattern {pattern!r})"
+                    f"{module_path.name} references a write scope ({pattern!r})"
                 )
 
     def test_drive_metadata_readonly_scope_unchanged_in_provider(self):
@@ -172,5 +172,5 @@ class TestReadOnlyScope:
         source = http_module.read_text().lower()
         for method in ("client.delete", "client.patch", "client.post"):
             assert method not in source, (
-                f"_http.py issues a {method.upper()} call — Drive integration is read-only"
+                f"_http.py issues a {method.upper()} call — Drive is read-only"
             )

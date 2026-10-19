@@ -28,7 +28,7 @@ from ._errors import (
     _record_error,
     _safe_error_str,
 )
-from ._http import list_recent_files
+from ._http import MalformedDriveResponse, list_recent_files
 from ._models import DriveAuditResult, KnowledgeSuggestionsResult
 
 logger = logging.getLogger(__name__)
@@ -44,6 +44,13 @@ class DriveAuditService:
         stale_days: int,
         now: datetime,
     ) -> DriveAuditResult:
+        """Live audit of the caller's recent Drive files.
+
+        Every failure becomes a flag in the result so the route stays
+        always-200: an unreadable reply, a rate limit or a dead token is never
+        reported as "no risky files". ``total`` is the number of files
+        returned, not the size of the Drive.
+        """
         integration = await find_integration(user_id, _SLUG, db)
         if integration is None:
             return DriveAuditResult()
@@ -83,6 +90,13 @@ class DriveAuditService:
             label = {429: "rate_limited", 403: "forbidden"}.get(status, "fetch_failed")
             return DriveAuditResult(
                 connected=True, partial_failures=[f"google_drive: {label}"]
+            )
+        except MalformedDriveResponse:
+            # A bad reply is not proof the integration is broken, so the stored
+            # status is left alone.
+            logger.warning("Drive list failed: malformed response")
+            return DriveAuditResult(
+                connected=True, partial_failures=["google_drive: malformed_response"]
             )
         except httpx.RequestError as exc:
             logger.warning("Drive list failed: %s", type(exc).__name__)
@@ -140,6 +154,9 @@ class DriveAuditService:
                 logger.warning("Drive cache config has unexpected shape")
                 partial.append("google_drive: cache_unreadable")
             config = {}
+        if "files" not in config and "google_drive: cache_unreadable" not in partial:
+            # Connected but the sync has not stored a file list yet.
+            partial.append("google_drive: not_synced")
         cached = config.get("files") or []
         if not isinstance(cached, list):
             logger.warning("Drive cache files has unexpected shape")
@@ -147,13 +164,16 @@ class DriveAuditService:
             cached = []
         # Deduplicate while preserving the cache's recency order.
         seen: dict[str, None] = {}
+        skipped = 0
         for f in cached:
-            if not isinstance(f, dict):
-                continue
-            name = f.get("name")
+            name = f.get("name") if isinstance(f, dict) else None
             if not isinstance(name, str) or not name.strip():
+                skipped += 1
                 continue
             seen[name[:_MAX_NAME_CHARS]] = None
+        if skipped:
+            logger.warning("Drive cache had %d unreadable entries", skipped)
+            partial.append("google_drive: cache_unreadable")
         unique = list(seen)
         ordered = unique[:_MAX_SUGGESTIONS]
         file_count = config.get("file_count")

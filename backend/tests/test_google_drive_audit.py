@@ -237,7 +237,7 @@ class TestModifiedTimeParsing:
         assert result[0].stale_sharing is True
 
     def test_malformed_timestamp_yields_unknown_not_raise(self):
-        """An unparseable modifiedTime must produce stale_sharing=None (unknown), never crash."""
+        """An unparseable modifiedTime gives stale_sharing=None (unknown), no crash."""
         f = _file(modified_time="NOT-A-DATE", permissions=[_perm()])
         result = classify_files([f], now=NOW, stale_days=STALE)
         # None means unknown — cannot determine staleness without a timestamp.
@@ -246,7 +246,7 @@ class TestModifiedTimeParsing:
         assert result[0].id == f["id"]
 
     def test_missing_modified_time_yields_unknown(self):
-        """A missing modifiedTime produces stale_sharing=None (unknown), not False (safe)."""
+        """A missing modifiedTime gives stale_sharing=None (unknown), not False."""
         f = {"id": "x1", "name": "doc", "permissions": [_perm()]}
         result = classify_files([f], now=NOW, stale_days=STALE)
         assert result[0].stale_sharing is None

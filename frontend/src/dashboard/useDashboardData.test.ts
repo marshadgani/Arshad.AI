@@ -204,7 +204,8 @@ describe('TC-FE-004: 401 from knowledge-suggestions clears session token', () =>
     // Session token must remain intact — only the Drive token needs re-auth.
     expect(clearTokenSpy).not.toHaveBeenCalled();
     expect(result.current.error).toBeNull();
-    // The hook surfaces the data array (empty) — caller reads needs_reauth from body.
+    // useFetch hands over only the data array. The state flags are not exposed,
+    // so the card shows a neutral 'connect or sync Drive' hint for an empty list.
     expect(result.current.data).toEqual([]);
   });
 });

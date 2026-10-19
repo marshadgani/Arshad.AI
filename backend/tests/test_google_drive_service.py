@@ -197,8 +197,8 @@ class TestDriveHttpErrors:
         assert result.needs_reauth is True
         assert result.connected is True
 
-    def test_drive_403_returns_partial_failure_not_reauth(self, monkeypatch):
-        """403 = scope missing (rate-limit style), not invalid grant."""
+    def test_drive_403_asks_for_a_reconnect_like_the_sync_does(self, monkeypatch):
+        """403 = the drive.metadata.readonly scope was never granted."""
         _patch_token(monkeypatch)
         _patch_http(monkeypatch, raises=self._drive_exc(403))
         intg = _integration()
@@ -208,8 +208,8 @@ class TestDriveHttpErrors:
                 USER_A, db, limit=20, stale_days=180, now=NOW
             )
         )
-        assert result.needs_reauth is False
-        assert any("forbidden" in f for f in result.partial_failures)
+        assert result.needs_reauth is True
+        assert intg.status == "expired"
 
     def test_drive_500_returns_partial_failure(self, monkeypatch):
         _patch_token(monkeypatch)

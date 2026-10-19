@@ -1,4 +1,5 @@
-"""Error helpers: sanitised error strings, reauth detection, token fetch, status recording.
+"""Error helpers: sanitised error strings, reauth detection, token fetch and
+status recording.
 
 Logging discipline: only exception type names and HTTP status codes are
 ever logged — never response bodies, file names, tokens, or user data.
@@ -30,11 +31,12 @@ def _safe_error_str(exc: Exception) -> str:
 def _is_reauth_status(
     exc: Exception, statuses: Sequence[int] = _API_REAUTH_STATUSES
 ) -> bool:
-    """Drive API calls: only 401 means the grant is dead.
+    """True when the status means the Google grant must be re-approved.
 
-    A 403 is usually a rate limit and a 400 a bad request, so neither
-    may mark the integration expired. Token refresh passes the wider
-    400–403 range (invalid_grant).
+    Drive API calls use 401 (token dead) and 403 (the drive.metadata.readonly
+    scope was never granted), matching the Drive sync. A 429 or 5xx is a
+    transient failure and never marks the integration expired. Token refresh
+    passes the wider 400–403 range (invalid_grant).
     """
     return (
         isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code in statuses
@@ -42,7 +44,10 @@ def _is_reauth_status(
 
 
 async def _get_token(user_id: uuid.UUID, db: AsyncSession) -> str:
-    """Fetch a valid Google token; convert a 400–403 refresh error to TokenUnavailableError."""
+    """Fetch a valid Google token.
+
+    A 400–403 refresh error becomes TokenUnavailableError.
+    """
     try:
         return await get_valid_google_token(user_id, db)
     except httpx.HTTPStatusError as exc:
@@ -52,7 +57,7 @@ async def _get_token(user_id: uuid.UUID, db: AsyncSession) -> str:
 
 
 async def _commit_or_rollback(db: AsyncSession, context: str) -> None:
-    """Commit the session; on failure log, attempt rollback, and log again if that fails."""
+    """Commit the session. On failure log, try a rollback, and log if that fails."""
     try:
         await db.commit()
     except Exception as commit_exc:  # noqa: BLE001

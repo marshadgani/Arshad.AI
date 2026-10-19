@@ -178,9 +178,13 @@ class TestErrorRaising:
         with pytest.raises(httpx.HTTPStatusError):
             run(_call(t))
 
-    def test_malformed_json_returns_empty_list(self):
-        """Missing 'files' key: treat as empty, do not raise."""
-        t = _QueueTransport([httpx.Response(200, json={"other": "data"})])
-        files, truncated = run(_call(t))
-        assert files == []
-        assert truncated is False
+    @pytest.mark.parametrize(
+        "body", [{"other": "data"}, [], "text", None, {"files": "abc"}]
+    )
+    def test_reply_without_a_file_list_is_an_error_not_an_empty_audit(self, body):
+        """A 200 with no file list must never read as 'no risky files'."""
+        from src.services.drive._http import MalformedDriveResponse
+
+        t = _QueueTransport([httpx.Response(200, json=body)])
+        with pytest.raises(MalformedDriveResponse):
+            run(_call(t))

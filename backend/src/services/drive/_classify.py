@@ -11,6 +11,10 @@ from typing import Any
 
 from ._models import FileAuditResult
 
+# Only Google-hosted links are relayed, so a tampered field can never be a
+# script or third-party URL.
+_LINK_PREFIXES = ("https://drive.google.com/", "https://docs.google.com/")
+
 
 def _parse_time(value: Any) -> datetime | None:
     """Parse an ISO-format datetime string into a timezone-aware datetime.
@@ -50,7 +54,12 @@ def classify_files(
         if not isinstance(f, dict):
             continue
         file_id = f.get("id")
-        if not file_id:
+        if not isinstance(file_id, str) or not file_id:
+            continue
+        name = f.get("name") or ""
+        modified_raw = f.get("modifiedTime") or ""
+        link = f.get("webViewLink") or ""
+        if not all(isinstance(v, str) for v in (name, modified_raw, link)):
             continue
         permissions = [p for p in (f.get("permissions") or []) if isinstance(p, dict)]
         visible = bool(permissions)
@@ -64,9 +73,9 @@ def classify_files(
         results.append(
             FileAuditResult(
                 id=file_id,
-                name=f.get("name") or "",
-                web_view_link=f.get("webViewLink") or "",
-                modified_time=f.get("modifiedTime") or "",
+                name=name,
+                web_view_link=link if link.startswith(_LINK_PREFIXES) else "",
+                modified_time=modified_raw,
                 anyone_with_link=anyone,
                 stale_sharing=stale,
                 permissions_visible=visible,

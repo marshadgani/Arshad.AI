@@ -19,6 +19,10 @@ from ._constants import _FIELDS, _FILES_URL, _PAGE_CAP
 logger = logging.getLogger(__name__)
 
 
+class MalformedDriveResponse(ValueError):
+    """Drive answered 200 but the body is not the documented file list."""
+
+
 async def list_recent_files(
     access_token: str, *, limit: int = 20, page_cap: int = _PAGE_CAP
 ) -> tuple[list[dict[str, Any]], bool]:
@@ -46,8 +50,14 @@ async def list_recent_files(
                 headers={"Authorization": f"Bearer {access_token}"},
             )
             resp.raise_for_status()
-            body = resp.json() or {}
-            files.extend(body.get("files") or [])
+            try:
+                body = resp.json()
+            except ValueError as exc:
+                raise MalformedDriveResponse("Drive reply is not JSON") from exc
+            page = body.get("files") if isinstance(body, dict) else None
+            if not isinstance(page, list):
+                raise MalformedDriveResponse("Drive reply has no file list")
+            files.extend(page)
             page_token = body.get("nextPageToken")
             if len(files) >= limit or not page_token:
                 break

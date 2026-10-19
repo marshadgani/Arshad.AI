@@ -125,10 +125,13 @@ class TestPersistedStateOnErrors:
         assert res.needs_reauth is False
         assert intg.status == "error"
 
-    def test_drive_403_exact_label(self, monkeypatch, healthy):
+    def test_drive_403_asks_for_a_reconnect(self, monkeypatch, healthy):
         _patch_list(monkeypatch, raises=_http_error(403))
-        res = _audit(_DB(_intg()))
-        assert res.partial_failures == ["google_drive: forbidden"]
+        intg = _intg()
+        res = _audit(_DB(intg))
+        assert res.needs_reauth is True
+        assert res.partial_failures == ["google_drive: needs_reauth"]
+        assert intg.status == "expired"
 
     def test_unexpected_exception_labelled_and_sanitised(self, monkeypatch, healthy):
         _patch_list(monkeypatch, raises=ValueError("SECRET-NAME.pdf"))

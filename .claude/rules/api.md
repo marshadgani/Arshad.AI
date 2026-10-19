@@ -99,6 +99,29 @@ decrypted, is reported as `calendly_needs_reauth` (reconnect), never a 500.
 Trip dates are local days: the window edges use the timezone stored with the
 Calendly profile, falling back to UTC.
 
+`GET /api/v1/drive/permissions-audit` and `GET /api/v1/dashboard/knowledge-suggestions`
+follow the same always-200 pattern for Google Drive: `connected`, `needs_reauth`,
+`truncated` and `partial_failures` carry integration state in the body, because a
+401 from a Drive token would make `useFetch` log the user out of the app. A Drive
+401 or 403 (scope never granted) is `needs_reauth`, matching the Drive sync. A
+reply that is not the documented file list is `google_drive: malformed_response`
+and never reads as "no risky files". `total` is the number of files returned, not
+the size of the Drive. `anyone_with_link` and `stale_sharing` are `null` when
+Drive returned no permissions (unknown, never safe). `stale_sharing` is a proxy:
+the file was last modified more than `stale_days` ago and is shared beyond its
+owner. The knowledge-suggestions endpoint reads the sync cache only and never
+calls Drive; a connected account that was never synced reports
+`google_drive: not_synced`.
+
+`GET /api/v1/render/services` and
+`GET /api/v1/render/services/{service_id}/deploys/{deploy_id}/verdict` also return
+200 with `connected`, `needs_reauth` and `partial_failures`. The verdict is
+`unknown` whenever a log or metric read failed, was truncated, returned no data
+points, or lost its log level. `deploy_id` must match `dep-[a-zA-Z0-9]{1,64}`
+(422 `invalid_deploy_id` otherwise). These routes use the shared deployment
+Render key, visible to every signed-in user, which is safe only while the login
+allowlist admits the owner alone.
+
 ## Error Responses
 
 All error responses follow this shape:

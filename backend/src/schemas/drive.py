@@ -20,6 +20,8 @@ class DriveFile(BaseModel):
 
 
 class DriveAuditResponse(BaseModel):
+    """Always-200 audit body: integration state rides in the flags, never an error."""
+
     data: list[DriveFile]
     total: int
     connected: bool

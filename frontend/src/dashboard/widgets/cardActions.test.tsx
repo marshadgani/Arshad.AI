@@ -80,6 +80,21 @@ describe('null and blank states', () => {
   it('renders no suggestions while they load', () => {
     renderWithChat(<KnowledgeSearchCard suggestions={null} />);
     expect(screen.queryAllByRole('button')).toHaveLength(0);
+    expect(screen.queryByText(/No suggestions yet/)).toBeNull();
+  });
+
+  it('explains an empty list and links to Integrations', () => {
+    renderWithChat(<KnowledgeSearchCard suggestions={[]} />);
+    expect(screen.getByText(/No suggestions yet/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Integrations page' })).toHaveAttribute(
+      'href',
+      '/integrations',
+    );
+  });
+
+  it('hides the empty hint when there are suggestions', () => {
+    renderWithChat(<KnowledgeSearchCard suggestions={['Roadmap']} />);
+    expect(screen.queryByText(/No suggestions yet/)).toBeNull();
   });
 
   it('matches the Open chat label by prefix and ignores case', async () => {
