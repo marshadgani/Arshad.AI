@@ -1,9 +1,7 @@
 ---
 name: verification-loop
-description: Run a six-phase verification of a Claude Code session's work — build, type check, lint, tests with coverage, security grep, and diff review — then produce a PASS/FAIL verification report. Use when verifying work after completing a feature or refactor, before creating a PR, or when quality gates must pass.
+description: "A comprehensive verification system for Claude Code sessions. Use when verifying a Claude Code session's work before claiming it is complete."
 license: MIT
-metadata:
-  origin: ECC
 ---
 
 # Verification Loop Skill
@@ -32,9 +30,8 @@ If build fails, STOP and fix before continuing.
 
 ### Phase 2: Type Check
 ```bash
-set -o pipefail
 # TypeScript projects
-npx --no-install tsc --noEmit 2>&1 | head -30
+npx tsc --noEmit 2>&1 | head -30
 
 # Python projects
 pyright . 2>&1 | head -30
