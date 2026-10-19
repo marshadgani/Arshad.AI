@@ -4540,7 +4540,7 @@
     "learn-claude-code": {
       "url": "https://github.com/shareAI-lab/learn-claude-code.git",
       "name": "learn-claude-code",
-      "last_fetched": "2026-10-05 19:33 UTC",
+      "last_fetched": "2026-10-19 16:27 UTC",
       "components": {
         "skills": [
           "agent-builder",
@@ -4563,7 +4563,7 @@
     "claude-code-router": {
       "url": "https://github.com/musistudio/claude-code-router.git",
       "name": "claude-code-router",
-      "last_fetched": "2026-10-05 19:33 UTC",
+      "last_fetched": "2026-10-19 16:27 UTC",
       "components": {
         "skills": [],
         "agents": [
@@ -4591,8 +4591,14 @@
         "commands": [],
         "hooks": [],
         "token_optimization": [
+          "opencode-cache-usage.ts",
           "responses-session-affinity.ts",
-          "openrouter-discount-provider-router.ts"
+          "request-log-store.ts",
+          "store.ts",
+          "fusion-vision-mcp.ts",
+          "openrouter-discount-provider-router.ts",
+          "providers.md",
+          "providers.md"
         ]
       }
     },
