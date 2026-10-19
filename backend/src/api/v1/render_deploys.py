@@ -54,6 +54,9 @@ router = APIRouter(prefix="/api/v1/render", tags=["render"])
 _RATE_LIMIT = 10
 _RATE_WINDOW_SECONDS = 60
 _METRICS = ("cpu", "memory", "latency")
+_NOT_LIVE_STATUSES = frozenset(
+    {"build_failed", "update_failed", "pre_deploy_failed", "canceled"}
+)
 
 _log = logging.getLogger(__name__)
 
@@ -132,14 +135,19 @@ def _ok(model: RenderVerdictResponse) -> JSONResponse:
     return JSONResponse({"data": model.model_dump()})
 
 
+def _text(value: Any) -> str | None:
+    """Return value when it is a str, otherwise None."""
+    return value if isinstance(value, str) else None
+
+
 def _snapshot_services(row: Integration | None) -> list[dict[str, Any]]:
     config = row.config if row is not None and isinstance(row.config, dict) else {}
     services = config.get("services")
-    return (
-        [s for s in services if isinstance(s, dict)]
-        if isinstance(services, list)
-        else []
-    )
+    if not isinstance(services, list):
+        if row is not None:
+            _log.warning("render integration snapshot has no services list")
+        return []
+    return [s for s in services if isinstance(s, dict)]
 
 
 def _unwrap(result: Any, fallback: Any) -> Any:
@@ -162,20 +170,24 @@ async def list_services(
 ) -> JSONResponse:
     """Services and their latest deploy ids from the last sync. No Render call."""
     row = await _find_render_integration(str(user.id), db)
+
+    # Snapshot JSON is written by the sync job; a malformed entry is skipped so
+    # one bad row cannot turn this always-200 route into a validation 500.
     snapshot = RenderServicesSnapshotResponse(
         connected=row is not None,
         needs_reauth=row is not None and row.status == "expired",
         services=[
             RenderServiceSummary(
                 id=s["id"],
-                name=s.get("name"),
-                latest_deploy_id=s.get("latest_deploy_id"),
-                latest_deploy_status=s.get("latest_deploy_status"),
+                name=_text(s.get("name")),
+                latest_deploy_id=_text(s.get("latest_deploy_id")),
+                latest_deploy_status=_text(s.get("latest_deploy_status")),
             )
             for s in _snapshot_services(row)
-            if s.get("id")
+            if isinstance(s.get("id"), str) and s["id"]
         ],
     )
+
     return JSONResponse({"data": snapshot.model_dump()})
 
 
@@ -249,6 +261,15 @@ async def deploy_verdict(
                 )
             )
 
+        if deploy.status in _NOT_LIVE_STATUSES:
+            # A deploy that never went live cannot have changed behaviour; its
+            # windows would compare the old release with itself.
+            return _ok(
+                RenderVerdictResponse.degraded(
+                    connected=True, partial_failures=["deploy_not_live"]
+                )
+            )
+
         windows = render_verdict.compute_windows(
             deploy.created_at, deploy.finished_at, as_of
         )
@@ -278,14 +299,13 @@ async def deploy_verdict(
     metrics = [_unwrap(r, failed_metric) for r in results[2:]]
 
     log_codes = [c for c in (before_code, after_code) if c]
-    failures: list[str] = []
-    if log_codes:
-        failures.append("logs")
-        failures.extend(dict.fromkeys(log_codes))
     needs_reauth = "needs_reauth" in log_codes or any(
         m.failure_code == "needs_reauth" for m in metrics
     )
-    failures = [f for f in failures if f != "needs_reauth"]
+    failures: list[str] = []
+    if log_codes:
+        failures.append("logs")
+        failures.extend(c for c in dict.fromkeys(log_codes) if c != "needs_reauth")
 
     response = render_verdict.compute_verdict_from_data(
         before_logs,

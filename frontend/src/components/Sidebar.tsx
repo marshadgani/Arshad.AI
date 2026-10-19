@@ -88,6 +88,13 @@ export default function Sidebar({ isOpen, onClose, overlayMode }: SidebarProps) 
         </div>
 
         <div className={styles.section}>
+          <div className={styles.label}>Infrastructure</div>
+          <NavLink to="/render" className={navItemClass}>
+            <span className={styles.icon}>◈</span>Render deploys
+          </NavLink>
+        </div>
+
+        <div className={styles.section}>
           <div className={styles.label}>Account</div>
           <NavLink to="/integrations" className={navItemClass}>
             <span className={styles.icon}>⌗</span>Integrations

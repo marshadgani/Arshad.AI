@@ -62,26 +62,30 @@ def _build_service_entries(
     with_id = iter(deploy_results)
     entries: list[dict[str, Any]] = []
     for svc in kept:
+        status, deploy_id = (
+            _deploy_value(next(with_id)) if svc.get("id") else (DEPLOY_UNCHECKED, None)
+        )
         entries.append(
             {
                 "id": svc.get("id"),
                 "name": svc.get("name"),
                 "type": svc.get("type"),
                 "suspended": svc.get("suspended"),
-                "latest_deploy_status": _deploy_value(next(with_id))
-                if svc.get("id")
-                else DEPLOY_UNCHECKED,
+                "latest_deploy_status": status,
+                "latest_deploy_id": deploy_id,
+                "owner_id": svc.get("ownerId"),
             }
         )
     return entries
 
 
-def _deploy_value(result: Any) -> str | None:
-    """A deploy lookup result as stored: a failed lookup becomes DEPLOY_UNCHECKED."""
+def _deploy_value(result: Any) -> tuple[str | None, str | None]:
+    """A deploy lookup result as (status, deploy_id): a failed lookup becomes
+    (DEPLOY_UNCHECKED, None)."""
     if isinstance(result, asyncio.CancelledError):
         raise result
     if isinstance(result, BaseException):
-        return DEPLOY_UNCHECKED
+        return DEPLOY_UNCHECKED, None
     return result
 
 
@@ -96,11 +100,12 @@ async def _latest_deploy_status(
     sem: asyncio.Semaphore,
     api_key: str,
     service_id: str,
-) -> str | None:
-    """Status of the newest deploy, None when the service has never deployed, or
-    DEPLOY_UNCHECKED when the id or the status cannot be trusted."""
+) -> tuple[str | None, str | None]:
+    """(status, deploy_id) of the newest deploy. Status is None when the service
+    has never deployed, or DEPLOY_UNCHECKED when the id or the status cannot be
+    trusted."""
     if not _SERVICE_ID.fullmatch(service_id):
-        return DEPLOY_UNCHECKED
+        return DEPLOY_UNCHECKED, None
     async with sem:
         resp = await asyncio.wait_for(
             client.get(
@@ -112,9 +117,14 @@ async def _latest_deploy_status(
     resp.raise_for_status()
     deploys = resp.json() or []
     if not deploys:
-        return None
-    status = (deploys[0].get("deploy") or {}).get("status")
-    return status if isinstance(status, str) and status else DEPLOY_UNCHECKED
+        return None, None
+    deploy = deploys[0].get("deploy") or {}
+    status = deploy.get("status")
+    deploy_id = deploy.get("id")
+    return (
+        status if isinstance(status, str) and status else DEPLOY_UNCHECKED,
+        deploy_id if isinstance(deploy_id, str) and deploy_id else None,
+    )
 
 
 async def _probe(api_key: str) -> dict[str, Any]:
@@ -156,7 +166,7 @@ class RenderIntegration(IntegrationProvider):
             slug=self.slug,
             api_key=api_key,
             extra=probe,
-            scopes=["services:read"],
+            scopes=["services:read", "logs:read", "metrics:read"],
         )
 
     async def sync(self, *, integration: Integration, db: AsyncSession) -> SyncResult:

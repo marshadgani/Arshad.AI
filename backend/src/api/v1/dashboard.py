@@ -36,6 +36,7 @@ from src.services import dashboard_live as live
 from src.services.briefing import compose_briefing
 from src.services.gmail_client import fetch_unread_count
 from src.services.google_calendar import fetch_todays_events
+from src.services.google_drive import DriveAuditService
 from src.services.google_token import TokenUnavailableError, get_valid_google_token
 
 logger = logging.getLogger(__name__)
@@ -362,14 +363,17 @@ async def list_health_habits(
 
 
 @router.get("/knowledge-suggestions", summary="Knowledge-search suggestions")
-async def list_knowledge_suggestions(db: AsyncSession = Depends(get_db)):
-    items = (
-        (
-            await db.execute(
-                select(m.KnowledgeSuggestion).order_by(m.KnowledgeSuggestion.text)
-            )
-        )
-        .scalars()
-        .all()
-    )
-    return {"data": [i.text for i in items], "total": len(items)}
+async def list_knowledge_suggestions(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Recent Drive file names from the sync cache; no live Drive call."""
+    result = await DriveAuditService.get_knowledge_suggestions(current_user.id, db)
+    return {
+        "data": result.names,
+        "total": result.total,
+        "connected": result.connected,
+        "needs_reauth": result.needs_reauth,
+        "truncated": result.truncated,
+        "partial_failures": result.partial_failures,
+    }

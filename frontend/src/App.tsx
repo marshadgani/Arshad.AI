@@ -15,6 +15,7 @@ import IntegrationsOAuthComplete from './pages/IntegrationsOAuthComplete';
 import Learning from './pages/Learning';
 import Login from './pages/Login';
 import PersonalFinance from './pages/PersonalFinance';
+import RenderMonitor from './pages/RenderMonitor';
 import ShopifyStore from './pages/ShopifyStore';
 import StockMarket from './pages/StockMarket';
 import Travel from './pages/Travel';
@@ -78,6 +79,7 @@ function ProtectedRoutes() {
         <Route path="/learning"           element={<Learning />} />
         <Route path="/home-iot"           element={<HomeIoT />} />
         <Route path="/travel"             element={<Travel />} />
+        <Route path="/render"             element={<RenderMonitor />} />
         <Route path="/integrations"       element={<Integrations />} />
         <Route path="/integrations/oauth-complete" element={<IntegrationsOAuthComplete />} />
         <Route path="/ai-ecosystem"       element={<AiEcosystem />} />

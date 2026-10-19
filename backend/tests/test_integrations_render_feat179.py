@@ -312,8 +312,11 @@ def test_deploy_value_reraises_cancellation():
 
 
 def test_deploy_value_maps_failure_to_unchecked():
-    assert render_mod._deploy_value(RuntimeError("x")) == render_mod.DEPLOY_UNCHECKED
-    assert render_mod._deploy_value("live") == "live"
+    assert render_mod._deploy_value(RuntimeError("x")) == (
+        render_mod.DEPLOY_UNCHECKED,
+        None,
+    )
+    assert render_mod._deploy_value(("live", "dep-1")) == ("live", "dep-1")
 
 
 @pytest.mark.asyncio
