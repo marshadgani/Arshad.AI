@@ -4505,17 +4505,20 @@
     "orca": {
       "url": "https://github.com/stablyai/orca.git",
       "name": "orca",
-      "last_fetched": "2026-10-05 19:32 UTC",
+      "last_fetched": "2026-10-19 16:12 UTC",
       "components": {
         "skills": [
           "computer-use",
           "orchestration",
           "linear-tickets",
+          "orca-jira",
+          "jira-tickets",
           "orca-cli",
           "orca-per-workspace-env",
           "orca-emulator-android",
           "orca-linear",
-          "orca-emulator"
+          "orca-emulator",
+          "orca-chat-visuals"
         ],
         "agents": [],
         "commands": [],
