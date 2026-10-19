@@ -10,3 +10,4 @@ Append-only log of every dev-team pipeline invocation.
 | 2026-10-06T00:00:00+00:00 | FEAT-167 | Ontology entity visibility control path — publish/unpublish UI, PATCH API, service, tests | completed | 1 | approved_with_caveats | n/a |
 | 2026-10-10T02:20:31+00:00 | FEAT-125 | Shopify intelligence layer (inventory cover, discount simulator, service debt) — final test/hardening pass | completed | 1 | approved | n/a |
 | 2026-10-15T00:42:57+00:00 | FEAT-180 | Calendly source for trip-feasibility checker | completed | 1 | approved_with_caveats | n/a |
+| 2026-10-19T00:00:00+00:00 | FEAT-123 | Google Drive permissions audit + knowledge_suggestions source | completed | 5 | approved | n/a |
