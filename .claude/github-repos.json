@@ -2348,7 +2348,7 @@
     "claude-plugins-official": {
       "url": "https://github.com/anthropics/claude-plugins-official.git",
       "name": "claude-plugins-official",
-      "last_fetched": "2026-10-05 19:31 UTC",
+      "last_fetched": "2026-10-19 16:25 UTC",
       "components": {
         "skills": [
           "access",
