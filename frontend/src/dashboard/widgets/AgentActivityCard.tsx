@@ -11,7 +11,7 @@ export interface AgentActivityCardProps {
 export function AgentActivityCard({ agentActivity }: AgentActivityCardProps) {
   return (
     <section className={styles.card}>
-      <CardHeader title="Agent activity" meta="live" live />
+      <CardHeader title="Agent activity" meta="recent runs" />
       <div className={styles.list}>
         {agentActivity === null ? (
           <CardSkeleton />

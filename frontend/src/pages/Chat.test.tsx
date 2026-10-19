@@ -1,5 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import { vi } from 'vitest';
 
 import Chat from './Chat';
@@ -76,5 +76,56 @@ describe('Chat page failure and cleanup paths', () => {
     renderChat({ pathname: '/chat', state: { draft: 'once' } });
     await screen.findByTestId('panel');
     expect(api.createChatSession).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Chat page reuse and hardening', () => {
+  it('starts a fresh session when a capture arrives while a chat is open', async () => {
+    const api = await import('../chat/chatApi');
+    vi.mocked(api.createChatSession).mockClear();
+    vi.mocked(api.createChatSession).mockResolvedValueOnce({ id: 'fresh' } as never);
+    panelProps.length = 0;
+    function Capture() {
+      const navigate = useNavigate();
+      return (
+        <button type="button" onClick={() => navigate('/chat', { state: { draft: 'later' } })}>
+          capture
+        </button>
+      );
+    }
+    render(
+      <MemoryRouter initialEntries={['/chat/abc']}>
+        <Capture />
+        <Routes>
+          <Route path="/chat" element={<Chat />} />
+          <Route path="/chat/:sessionId" element={<Chat />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(screen.getByTestId('panel')).toHaveTextContent('abc');
+    screen.getByRole('button', { name: 'capture' }).click();
+    await waitFor(() => expect(screen.getByTestId('panel')).toHaveTextContent('fresh'));
+    expect(api.createChatSession).toHaveBeenCalledTimes(1);
+    expect(panelProps.some((p) => p.initialDraft === 'later')).toBe(true);
+  });
+
+  it('ignores a draft that is not a string', async () => {
+    panelProps.length = 0;
+    renderChat({ pathname: '/chat', state: { draft: { evil: true } } });
+    await screen.findByTestId('panel');
+    expect(panelProps[0].initialDraft).toBeUndefined();
+  });
+
+  it('retries with the kept text after a failed start', async () => {
+    const api = await import('../chat/chatApi');
+    vi.mocked(api.createChatSession).mockRejectedValueOnce(new Error('network'));
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    panelProps.length = 0;
+    renderChat({ pathname: '/chat', state: { draft: 'keep me' } });
+    await screen.findByRole('alert');
+    screen.getByRole('button', { name: /try again/i }).click();
+    await screen.findByTestId('panel');
+    expect(panelProps[0].initialDraft).toBe('keep me');
+    consoleError.mockRestore();
   });
 });

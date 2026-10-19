@@ -10,12 +10,18 @@ export default function Chat() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const draft = (location.state as { draft?: string } | null)?.draft;
+  const stateDraft = (location.state as { draft?: unknown } | null)?.draft;
+  const draft = typeof stateDraft === 'string' ? stateDraft : undefined;
   const [error, setError] = useState<string | null>(null);
+  // After a failed start the text moves out of browser history (so Back does
+  // not show it to the next person) and is kept here instead.
+  const [keptDraft, setKeptDraft] = useState<string | undefined>(undefined);
   // The redirect must carry the newest captured text, but a changing draft
   // must never create a second session, so read it through a ref.
   const draftRef = useRef(draft);
-  draftRef.current = draft;
+  // Keep the newest captured text even after it is cleared from history, so a
+  // retry after a failed start still carries it.
+  if (draft !== undefined) draftRef.current = draft;
   const startedRef = useRef(false);
 
   const startSession = useCallback(() => {
@@ -29,6 +35,7 @@ export default function Chat() {
       )
       .catch((err) => {
         console.error('Could not create a chat session', err);
+        setKeptDraft(draftRef.current);
         setError(
           err instanceof MissingTokenError
             ? 'You need to sign in again before starting a chat.'
@@ -36,6 +43,12 @@ export default function Chat() {
         );
       });
   }, [navigate]);
+
+  // Once a session is open the captured text has been handed over; forget it so
+  // a later plain /chat visit does not carry it into a new session.
+  useEffect(() => {
+    if (sessionId) draftRef.current = undefined;
+  }, [sessionId]);
 
   // If no sessionId in URL, auto-create one and redirect.
   useEffect(() => {
@@ -47,8 +60,8 @@ export default function Chat() {
   // The draft only needs to survive the redirect. Clear it from history once
   // the panel has it, so a reload or Back does not refill text already sent.
   useEffect(() => {
-    if (sessionId && draft) navigate(location.pathname, { replace: true, state: null });
-  }, [sessionId, draft, navigate, location.pathname]);
+    if ((sessionId || error) && draft) navigate(location.pathname, { replace: true, state: null });
+  }, [sessionId, error, draft, navigate, location.pathname]);
 
   if (sessionId) return <ChatPanel sessionId={sessionId} initialDraft={draft} />;
 
@@ -59,8 +72,8 @@ export default function Chat() {
           <p className={styles.statusMessage} role="alert">
             {error}
           </p>
-          {draft ? (
-            <p className={styles.statusMessage}>Your text is kept: &ldquo;{draft}&rdquo;</p>
+          {keptDraft ? (
+            <p className={styles.statusMessage}>Your text is kept: &ldquo;{keptDraft}&rdquo;</p>
           ) : null}
           <button type="button" className={styles.retryButton} onClick={startSession}>
             Try again
