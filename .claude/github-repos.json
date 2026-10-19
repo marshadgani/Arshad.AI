@@ -4314,7 +4314,7 @@
     "openmontage": {
       "url": "https://github.com/calesthio/OpenMontage.git",
       "name": "OpenMontage",
-      "last_fetched": "2026-10-05 19:32 UTC",
+      "last_fetched": "2026-10-19 16:27 UTC",
       "components": {
         "skills": [
           "flux-best-practices",
