@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { useAuth } from '../auth/AuthContext';
-import { CHAT_PATH } from '../routes/paths';
+import { useHandOffToChat } from '../hooks/useHandOffToChat';
 import styles from './TopBar.module.css';
 
 export interface TopBarProps {
@@ -13,6 +13,7 @@ export interface TopBarProps {
 export default function TopBar({ onMenuClick, isNavOpen }: TopBarProps) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { handOff } = useHandOffToChat();
   const [capture, setCapture] = useState('');
   const captureRef = useRef<HTMLInputElement>(null);
   const initial = (user?.name?.[0] ?? user?.email?.[0] ?? 'A').toUpperCase();
@@ -32,10 +33,7 @@ export default function TopBar({ onMenuClick, isNavOpen }: TopBarProps) {
   // and press Send. It never sends on its own.
   const handleCapture = (e: FormEvent) => {
     e.preventDefault();
-    const text = capture.trim();
-    if (!text) return;
-    setCapture('');
-    navigate(CHAT_PATH, { state: { draft: text } });
+    if (handOff(capture)) setCapture('');
   };
 
   return (

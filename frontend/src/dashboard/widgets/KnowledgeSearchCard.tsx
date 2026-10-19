@@ -1,8 +1,8 @@
 import { FormEvent, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 
-import { CHAT_PATH } from '../../routes/paths';
+import { MAX_HANDOFF_CHARS, useHandOffToChat } from '../../hooks/useHandOffToChat';
 import { CardHeader } from '../CardHeader';
+import { CardSkeleton } from '../CardSkeleton';
 import styles from '../Dashboard.module.css';
 
 export interface KnowledgeSearchCardProps {
@@ -10,21 +10,16 @@ export interface KnowledgeSearchCardProps {
 }
 
 export function KnowledgeSearchCard({ suggestions }: KnowledgeSearchCardProps) {
-  const navigate = useNavigate();
+  const { handOff } = useHandOffToChat();
   const [query, setQuery] = useState('');
+  const [blank, setBlank] = useState(false);
 
   // Searching hands the question to a new chat, prefilled, so you review it
   // and press Send. The chat assistant does the lookup with your tools.
-  const ask = (text: string) => {
-    const draft = text.trim();
-    if (!draft) return;
-    navigate(CHAT_PATH, { state: { draft } });
-  };
-
   const onSubmit = (e: FormEvent) => {
     e.preventDefault();
-    ask(query);
-    setQuery('');
+    if (handOff(query)) setQuery('');
+    else setBlank(true);
   };
 
   return (
@@ -35,18 +30,28 @@ export function KnowledgeSearchCard({ suggestions }: KnowledgeSearchCardProps) {
         <input
           className={styles.searchInput}
           aria-label="Search your knowledge"
+          aria-invalid={blank}
+          maxLength={MAX_HANDOFF_CHARS}
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setBlank(false);
+          }}
           placeholder='Search across all your knowledge — try "Q3 launch deck"'
         />
       </form>
-      <div className={styles.searchSuggest}>
-        {(suggestions ?? []).map((s) => (
-          <button key={s} type="button" className={styles.suggestion} onClick={() => ask(s)}>
-            {s}
-          </button>
-        ))}
-      </div>
+      {blank && <p role="alert">Type a question first, then press Enter.</p>}
+      {suggestions === null ? (
+        <CardSkeleton rows={1} />
+      ) : (
+        <div className={styles.searchSuggest}>
+          {suggestions.map((s) => (
+            <button key={s} type="button" className={styles.suggestion} onClick={() => handOff(s)}>
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
