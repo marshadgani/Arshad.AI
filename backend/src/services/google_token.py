@@ -10,6 +10,7 @@ can gracefully fall back to cached/mock data instead of crashing.
 
 from __future__ import annotations
 
+import logging
 import os
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -21,6 +22,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..auth.crypto import TokenDecryptError, decrypt, encrypt
 from ..models.oauth_account import OAuthAccount
 from ..models.oauth_token import OAuthToken
+
+_log = logging.getLogger(__name__)
 
 _GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 _EXPIRY_BUFFER_SECONDS = 60
@@ -78,7 +81,8 @@ async def _refresh(token_row: OAuthToken, db: AsyncSession) -> str:
     # A revoked or expired refresh token comes back as 400 invalid_grant.
     # Letting that escape turned every Google-backed dashboard widget into a
     # 500 instead of the documented fallback, so map any refresh failure to
-    # TokenUnavailableError.
+    # TokenUnavailableError. The original error is logged here because the
+    # dashboard callers discard it, which would hide a revoked token.
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.post(
@@ -92,11 +96,12 @@ async def _refresh(token_row: OAuthToken, db: AsyncSession) -> str:
             )
         resp.raise_for_status()
         data = resp.json()
-    except (httpx.HTTPError, ValueError) as exc:
+        new_access = data["access_token"]
+        expires_in = int(data.get("expires_in", 3600))
+    except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
+        _log.warning("Google token refresh failed: %s", exc)
         raise TokenUnavailableError(f"Google token refresh failed: {exc}") from exc
 
-    new_access = data["access_token"]
-    expires_in = int(data.get("expires_in", 3600))
     token_row.encrypted_access_token = encrypt(new_access)
     token_row.token_expires_at = datetime.now(timezone.utc) + timedelta(
         seconds=expires_in

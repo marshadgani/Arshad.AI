@@ -6,38 +6,51 @@ authenticates with a dedicated key (``AGENT_USAGE_INGEST_KEY``) sent in the
 ``X-Usage-Key`` header. The key can write usage rows and nothing else.
 
 A request with no ``X-Usage-Key`` header falls back to the normal bearer
-check, so existing JWT callers keep working.
+check, so existing JWT callers keep working. This is a deliberate departure
+from api.md's "every route needs a bearer token" rule.
 
-The key must be at least 32 characters. A shorter or missing value disables
-the key path entirely (503), so a misconfigured deploy fails loudly instead
-of accepting a guessable key.
+Rotation: set ``AGENT_USAGE_INGEST_KEY_NEXT`` to the new key, update the
+hook's ``ARSHAD_USAGE_KEY``, then move the new value into
+``AGENT_USAGE_INGEST_KEY`` and clear ``_NEXT``. Both are accepted meanwhile.
+
+Keys must be at least 32 characters. A shorter or missing value is ignored.
+A wrong key and an unconfigured server both answer with the same 401 so a
+caller cannot probe whether a key is set. The real reason goes to the server
+log, never the key itself.
 """
 
 from __future__ import annotations
 
 import hmac
+import logging
 import os
 
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, Header, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..api.errors import http_error
 from ..models.database import get_db
 from ..models.user import User
 from .dependencies import get_current_user
 
+_log = logging.getLogger(__name__)
+
 _MIN_KEY_LENGTH = 32
+_KEY_ENV_VARS = ("AGENT_USAGE_INGEST_KEY", "AGENT_USAGE_INGEST_KEY_NEXT")
 
 
-def _error(status_code: int, code: str, message: str) -> HTTPException:
-    return HTTPException(
-        status_code=status_code,
-        detail={"error": {"code": code, "message": message, "details": {}}},
+def _configured_keys() -> list[str]:
+    keys = (os.getenv(name, "") for name in _KEY_ENV_VARS)
+    return [key for key in keys if len(key) >= _MIN_KEY_LENGTH]
+
+
+def _invalid_key() -> Exception:
+    return http_error(
+        status.HTTP_401_UNAUTHORIZED,
+        "invalid_usage_key",
+        "Usage ingest key is invalid.",
+        headers={"WWW-Authenticate": "Bearer"},
     )
-
-
-def _configured_key() -> str | None:
-    key = os.getenv("AGENT_USAGE_INGEST_KEY", "")
-    return key if len(key) >= _MIN_KEY_LENGTH else None
 
 
 async def require_usage_writer(
@@ -49,17 +62,18 @@ async def require_usage_writer(
     if x_usage_key is None:
         return await get_current_user(authorization=authorization, db=db)
 
-    expected = _configured_key()
-    if expected is None:
-        raise _error(
-            status.HTTP_503_SERVICE_UNAVAILABLE,
-            "usage_ingest_not_configured",
-            "Usage ingest key is not configured on this server.",
+    expected = _configured_keys()
+    if not expected:
+        _log.warning(
+            "Usage ingest rejected: no AGENT_USAGE_INGEST_KEY of 32+ characters "
+            "is configured on this server."
         )
-    if not hmac.compare_digest(x_usage_key.encode(), expected.encode()):
-        raise _error(
-            status.HTTP_401_UNAUTHORIZED,
-            "invalid_usage_key",
-            "Usage ingest key is invalid.",
-        )
+        raise _invalid_key()
+
+    presented = x_usage_key.encode()
+    # Compare against every key without short-circuiting.
+    matches = [hmac.compare_digest(presented, key.encode()) for key in expected]
+    if not any(matches):
+        _log.warning("Usage ingest rejected: X-Usage-Key does not match.")
+        raise _invalid_key()
     return None

@@ -34,7 +34,7 @@
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/subagent_usage_log.py",
             "async": true,
-            "timeout": 60
+            "timeout": 100
           }
         ]
       }
