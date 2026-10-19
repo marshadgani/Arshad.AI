@@ -201,7 +201,7 @@
     "claude-mem": {
       "url": "https://github.com/thedotmack/claude-mem.git",
       "name": "claude-mem",
-      "last_fetched": "2026-10-05 19:30 UTC",
+      "last_fetched": "2026-10-19 16:24 UTC",
       "components": {
         "skills": [
           "mem-setup",
@@ -213,9 +213,12 @@
           "learn-codebase",
           "what-the",
           "smart-explore",
+          "build-and-release",
           "mode-creator",
+          "release",
           "mem-search",
           "cloud-sync",
+          "build",
           "agent-cost-report",
           "timeline-report",
           "design-is",
@@ -223,8 +226,10 @@
           "wowerpoint",
           "make-plan",
           "ccs-align",
+          "screenpipe",
           "version-bump",
           "how-it-works",
+          "childhood",
           "do",
           "standup",
           "babysit",
