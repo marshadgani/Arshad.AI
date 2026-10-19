@@ -33,6 +33,10 @@ set -e
 # changing it from inside the interpreter has no effect.
 export PYTHONUTF8=1
 
+# Set to 1 below only when the interpreter had to be found by its real path
+# (pass 4); the hook reports it as the `launcher_fallback` metric.
+unset SG_LAUNCHER_FALLBACK
+
 # Git Bash / MSYS on Windows hands script paths to this shim in POSIX form
 # (`/c/Users/...`). When we exec a Windows `python.exe` (which we do on
 # Windows since `python3` is the Microsoft Store stub), python interprets the
@@ -41,14 +45,30 @@ export PYTHONUTF8=1
 # fails with ENOENT, and every Edit/Write/MultiEdit tool use blocks until the
 # session restarts. See anthropics/claude-plugins-official#2043.
 #
-# Fix: convert absolute path args to native Windows form via `cygpath -w`
-# before exec. `cygpath` is a Git Bash builtin; it's absent on macOS/Linux,
-# where the `command -v` guard makes this a no-op. `cygpath -w` is idempotent
-# for already-Windows paths so the rare mixed-form case is safe.
+# Fix: convert absolute path args to native Windows form before exec.
+# `cygpath` ships with Git Bash; it's absent on macOS/Linux, where the
+# `command -v` guard makes this a no-op. `cygpath -w` is idempotent for
+# already-Windows paths so the rare mixed-form case is safe.
+#
+# Under Git Bash every $(...) is a new Windows process, and this shim runs on
+# every hook, so drive paths (`/c/Users/...`, where the plugin lives) are
+# converted in-shell. Git Bash and MSYS2 (OSTYPE=msys) mount drives at
+# /<letter>; anything else (`/tmp`, `/usr`, Cygwin's /cygdrive) needs cygpath
+# to resolve. See #6470.
 if command -v cygpath >/dev/null 2>&1; then
+    sg_drive_mounts=""
+    case "${OSTYPE:-}" in msys*) sg_drive_mounts=1 ;; esac
     converted=()
     for a in "$@"; do
         case "$a" in
+            /[A-Za-z]/*)
+                if [ -n "$sg_drive_mounts" ]; then
+                    drive="${a:1:1}"
+                    rest="${a:3}"
+                    converted+=("${drive^^}:\\${rest//\//\\}")
+                else
+                    converted+=("$(cygpath -w "$a")")
+                fi ;;
             /*) converted+=("$(cygpath -w "$a")") ;;
             *)  converted+=("$a") ;;
         esac
@@ -56,10 +76,47 @@ if command -v cygpath >/dev/null 2>&1; then
     set -- "${converted[@]}"
 fi
 
+# The hook script the chosen interpreter has to run (already in native form).
+SG_TARGET=""
+case "${1:-}" in
+    ""|-*) ;;
+    *) SG_TARGET="$1" ;;
+esac
+
+# Names whose interpreter runs but cannot see the hook script ("|"-separated).
+sg_unreadable=""
+
 probe() {
     # $1..N: the interpreter command (may be multi-word like `py -3`)
-    # Writes "<major>.<minor>" to stdout and exits 0 iff at least Python 3.
-    "$@" -c 'import sys; print(f"{sys.version_info[0]}.{sys.version_info[1]}")' 2>/dev/null
+    # Writes "<major>.<minor>" to stdout and exits 0 iff it is at least
+    # Python 3 AND it can read the hook script; exits 3 if it cannot.
+    #
+    # The second half matters on Windows: an interpreter started through a
+    # packaged launcher alias (Microsoft Store Python, Python Install Manager;
+    # the python/python3/py entries under ...\Microsoft\WindowsApps) runs with
+    # a different view of %APPDATA% than the process that started it. It
+    # answers `-c` fine, then fails on the script with "can't open file ...
+    # [Errno 2]" and exit code 2 -- and exit 2 from an asyncRewake hook wakes
+    # the model, whose reply runs the Stop hook again: an endless loop that
+    # never reviewed anything. See #6251, #5781.
+    #
+    # Only for `$(probe ...)`: the `exec` replaces that subshell instead of
+    # forking a second process from it.
+    [ "${BASH_SUBSHELL:-0}" -gt 0 ] || return 1
+    exec "$@" -c 'import os, sys; t = (sys.argv[1:] or [""])[0]; sys.exit(3) if t and not (os.path.isfile(t) and os.access(t, os.R_OK)) else print(f"{sys.version_info[0]}.{sys.version_info[1]}")' "$SG_TARGET" 2>/dev/null
+}
+
+# Use as `v=$(probe ...) || { note_unreadable "<name>"; continue; }`.
+note_unreadable() {
+    [ $? -eq 3 ] && sg_unreadable="$sg_unreadable|$1|"
+    return 0
+}
+
+# True iff the command's executable is on PATH ($1 of a possibly multi-word
+# command like `py -3`). A builtin lookup: `$(probe ...)` costs a process even
+# when the interpreter does not exist, so missing names are skipped first.
+on_path() {
+    command -v "$1" >/dev/null 2>&1
 }
 
 # True iff arg is a "M.m" version string >= 3.10. claude_agent_sdk requires
@@ -80,7 +137,9 @@ is_sdk_compatible() {
 # so picking one here always upgrades over the system `python3`. Highest
 # available wins; the user doesn't have to PATH-prefer it.
 for cmd in "python3.13" "python3.12" "python3.11" "python3.10"; do
-    v=$(probe "$cmd") || continue
+    on_path "$cmd" || continue
+    v=$(probe "$cmd") || { note_unreadable "$cmd"; continue; }
+    v=${v%$'\r'}
     if is_sdk_compatible "$v"; then
         exec "$cmd" "$@"
     fi
@@ -89,13 +148,21 @@ done
 # Pass 2 — bare interpreters, but only if SDK-compatible. Covers Linux distros
 # that ship 3.10+ as the default `python3`, and Windows where `python` /
 # `py -3` resolves to the user's python.org install.
+sg_older=""  # first of these that is a readable Python 3 below 3.10
 for cmd in "python3" "python" "py -3"; do
     # shellcheck disable=SC2086
-    v=$(probe $cmd) || continue
+    on_path $cmd || continue
+    # shellcheck disable=SC2086
+    v=$(probe $cmd) || { note_unreadable "$cmd"; continue; }
+    v=${v%$'\r'}
     if is_sdk_compatible "$v"; then
         # shellcheck disable=SC2086
         exec $cmd "$@"
     fi
+    # Anything that successfully reported a "M.m" string.
+    case "$v" in
+        [0-9]*.[0-9]*) [ -n "$sg_older" ] || sg_older="$cmd" ;;
+    esac
 done
 
 # Pass 3 — fallback to any Python 3, even <3.10. Pattern-based checks
@@ -103,18 +170,72 @@ done
 # own; the SDK-dependent paths will detect the version mismatch and degrade
 # inside the Python code. Without this fallback, the entire plugin would
 # stop working on default macOS, which is a regression vs today.
-for cmd in "python3" "python" "py -3"; do
+if [ -n "$sg_older" ]; then
     # shellcheck disable=SC2086
-    v=$(probe $cmd) || continue
-    # Accept anything that successfully reported a "M.m" string.
+    exec $sg_older "$@"
+fi
+
+# Pass 4 — nothing above could run the hook script. If that is because the
+# names on PATH resolve to packaged launcher aliases that cannot see the
+# plugin directory (see probe), the same interpreter usually works when it is
+# started by its real path instead of through the alias. Candidates:
+#   - every further python3/python on PATH, by full path (a regular install
+#     often sits behind the alias in PATH order; the first match is the one
+#     the bare name resolved to above),
+#   - the real executable each alias reports as sys.executable.
+# The list is built before the loop that execs, and from a here-document: a
+# redirect around that loop would become the hook's stdin.
+sg_candidates=()
+for name in "python3" "python"; do
+    first=1
+    while IFS= read -r c; do
+        if [ -n "$first" ]; then first=""; continue; fi
+        [ -n "$c" ] && sg_candidates+=("$c")
+    done <<EOF
+$(type -ap "$name" 2>/dev/null)
+EOF
+done
+for cmd in "python3" "python" "py -3"; do
+    case "$sg_unreadable" in *"|$cmd|"*) ;; *) continue ;; esac
+    # shellcheck disable=SC2086
+    c=$($cmd -c 'import sys; print(sys.executable)' 2>/dev/null) || continue
+    c=${c%$'\r'}  # native Windows Python prints CRLF
+    [ -n "$c" ] || continue
+    if command -v cygpath >/dev/null 2>&1; then
+        c=$(cygpath -u "$c" 2>/dev/null) || continue
+    fi
+    sg_candidates+=("$c")
+done
+export SG_LAUNCHER_FALLBACK=1
+sg_fallback=""
+sg_tried="|"
+for cmd in "${sg_candidates[@]}"; do
+    case "$sg_tried" in *"|$cmd|"*) continue ;; esac
+    sg_tried="$sg_tried$cmd|"
+    v=$(probe "$cmd") || { note_unreadable "$cmd"; continue; }
+    v=${v%$'\r'}
+    if is_sdk_compatible "$v"; then
+        exec "$cmd" "$@"
+    fi
     case "$v" in
-        [0-9]*.[0-9]*)
-            # shellcheck disable=SC2086
-            exec $cmd "$@"
-            ;;
+        [0-9]*.[0-9]*) [ -n "$sg_fallback" ] || sg_fallback="$cmd" ;;
     esac
 done
+if [ -n "$sg_fallback" ]; then
+    exec "$sg_fallback" "$@"
+fi
 
+# Exit 1, never 2: on an asyncRewake hook exit 2 means "the review has
+# findings, wake the model", and a launcher failure is not a finding.
+if [ -n "$sg_unreadable" ]; then
+    echo "security-guidance: found Python, but it cannot read the hook script (missing, or not visible to Python), so no security checks ran." >&2
+    echo "  hook script: $SG_TARGET" >&2
+    echo "  on Windows this happens when python, python3 and py are Microsoft Store or Python Install Manager aliases;" >&2
+    echo "  install Python from https://python.org and put it ahead of ...\\Microsoft\\WindowsApps in PATH" >&2
+    # No Python to report it, so the launcher emits the metric itself.
+    echo '{"metrics": {"launcher_unreadable": 1}}'
+    exit 1
+fi
 echo "security-guidance: no working Python 3 interpreter found." >&2
 echo "  tried: python3.13, python3.12, python3.11, python3.10, python3, python, py -3" >&2
 echo "  on Windows, install Python from https://python.org (NOT the Microsoft Store)" >&2
