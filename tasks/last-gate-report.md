@@ -1,55 +1,122 @@
-### GATE PASSED — Ready for merge
+# Gate Report — FEAT-123 Google Drive Permissions Audit
 
-**FEAT-132: Render per-deploy regression verdict**
-
-Eight agents ran: code-reviewer, security-auditor, debugger, test-writer, refactorer, doc-writer, silent-failure-hunter, pr-test-analyzer. No Critical findings. No security findings.
-
-**Verdict: PASS.**
+**Branch:** `claude/chat-mobile-health-integration-if20cp`
+**Target:** `claude/ai-personal-assistant-main`
+**Date:** 2026-10-19
+**Verdict:** ✅ PASS
 
 ---
 
-## Agent Results
+## Agent Results Summary
 
 | Agent | Verdict | Findings |
 |---|---|---|
-| code-reviewer | PASS | No bugs, logic errors, or performance issues found in the new render service/client/verdict modules. Route correctly delegates to seam functions. |
-| security-auditor | PASS | API key appears only in Authorization header. Log statements emit only exception type and HTTP status. No secrets in log output. Always-200 contract prevents 401 cascades. Rate limiting in place. Input validated (422 on bad service_id). |
-| debugger | PASS | All failure paths return degraded responses, never 500. `asyncio.gather(return_exceptions=True)` catches all seam failures. `CancelledError` is re-raised correctly. |
-| test-writer | PASS | 145 tests across 8 test files. Hard constraint (log level never dropped) enforced with 11 dedicated tests. Client, verdict, route, and contract all covered. Coverage well above 70%. |
-| refactorer | PASS | Clean module boundaries (models <- client <- verdict, nothing imports api or integrations). No duplication. seam pattern consistent with shopify.py. |
-| doc-writer | PASS | Module-level docstrings on all three service modules and the route file. Public functions documented. |
-| silent-failure-hunter | PASS | No swallowed exceptions. `_unwrap` logs exception type before returning fallback. `BLE001` noqa comment scoped to the single always-200 catch block with explicit reasoning. |
-| pr-test-analyzer | PASS | Happy path, error paths, scoping, authentication, rate limiting, and the level-drop hard constraint all tested. No implementation-tied tests. Negative tests present (missing auth, bad IDs, disconnected integration). |
+| code-reviewer | ✅ PASS | No bugs, logic errors, or performance issues |
+| security-auditor | ✅ PASS | No secrets leaked, no write scopes, read-only Drive access |
+| debugger | ✅ PASS | All error paths handled; no unhandled runtime failures |
+| test-writer | ✅ PASS | 192 tests, all passing; >70% coverage on all new modules |
+| refactorer | ✅ PASS | Clean separation of concerns across 5 sub-modules |
+| doc-writer | ✅ PASS | All public APIs documented with docstrings |
+| silent-failure-hunter | ✅ PASS | No swallowed exceptions; no HTTP 200 masking errors |
+| pr-test-analyzer | ✅ PASS | Happy path, all error paths, edge cases, negative tests covered |
 
 ---
 
-## Findings
+## Detailed Findings
 
-**Critical:** none.
+### code-reviewer — PASS
 
-**Warning:** none.
+- `classify_files`: correctly returns `stale_sharing=None` (not `False`) for missing/unparseable
+  `modifiedTime`. `None` means unknown/unsafe, `False` means verified-not-stale. Semantically correct.
+- `DriveAuditService.get_audit_results`: all 6 error categories handled (token unavailable,
+  token fetch failure, 401, 403, 429, unexpected exception).
+- Route handler uses `datetime.now(timezone.utc)` for the live clock — correct placement
+  (NF-203 restricts the service/classify layer, not the route handler entry point).
+- `_commit_or_rollback`: commit failure logs and attempts rollback; rollback failure also
+  logged. Neither failure propagates to the caller.
+- `mark_healthy` failure caught and logged, response still returned.
+
+### security-auditor — PASS
+
+- No OAuth write scope strings in any module (`auth/drive`, `drive.file`, `drive.appdata`).
+- `drive.metadata.readonly` scope verified present in `src/auth/providers/google.py`.
+- `_safe_error_str` returns only `TypeName: status=NNN` — never response bodies, never tokens.
+- Logging discipline: type names and HTTP status codes only. Sentinel-value tests (192 tests)
+  verify this at runtime.
+- Drive HTTP client: only `client.get()` calls — no POST/PATCH/DELETE.
+- No SQL injection vectors: ORM queries via `find_integration` / `mark_healthy`.
+
+### debugger — PASS
+
+- Token refresh path: `TokenUnavailableError` caught before generic `Exception` in service layer.
+- Drive API path: `httpx.HTTPStatusError`, `httpx.RequestError`, then `Exception` — correct ordering.
+- No silent runtime failures: every exception either re-raises or logs + returns graceful result.
+- DB session release before network call prevents connection pool starvation.
+
+### test-writer — PASS (192 tests, all passing)
+
+Coverage spans:
+- `_classify.py`: all branches of `classify_files`, `_parse_time`, clock injection, naive `now`
+- `_http.py`: pagination caps, page-token forwarding, bearer header, read-only HTTP methods,
+  all 4xx/5xx status codes raising
+- `service.py`: 401/403/429/500/timeout/unexpected error, commit failure, mark_healthy failure,
+  unreadable entries, knowledge suggestions (all cache shapes)
+- `drive.py` route: always-200 matrix, query param validation, user scoping
+- `dashboard.py` knowledge-suggestions: no seed rows, additive contract, user scoping, no 401
+- `google_drive.py` sync: pageSize=30, required config keys, file_count, privacy of last_error
+- Static guards: NF-202 (no migration), NF-203 (no inline clock), NF-201 (no f-string logging),
+  NF-205 (no write scope)
+
+### refactorer — PASS
+
+Five sub-modules, one concern each:
+- `_models.py` — dataclasses only
+- `_constants.py` — module-wide literals
+- `_classify.py` — pure timestamp + sharing logic, zero I/O
+- `_http.py` — Drive API HTTP, zero DB
+- `_errors.py` — error string sanitisation, DB session helpers
+- `service.py` — orchestration only, imports from all four above
+
+No duplication, no unnecessary abstraction.
+
+### doc-writer — PASS
+
+- All public functions and methods have docstrings.
+- Module-level docstrings on all 6 new modules.
+- Route endpoint has `summary` and a full docstring explaining the `stale_sharing` proxy semantics
+  and the `None`-means-unknown contract.
+
+### silent-failure-hunter — PASS
+
+- `mark_healthy` failure: explicitly caught, logged, response continues.
+- Commit failure: `_commit_or_rollback` logs and rollbacks — never silent.
+- `classify_files` dropped entries: logged as `unreadable_entries` partial failure, not silent.
+- Always-200 contract: HTTP 200 with body flags is intentional (documented in `.claude/rules/api.md`)
+  and follows the same pattern as `/api/v1/whoop/dashboard` and `/api/v1/shopify/dashboard`.
+  This is not an HTTP 200 masking a real error — it is a deliberate policy to prevent
+  `useFetch`'s 401→clearToken() from logging the user out on an unrelated Google token expiry.
+
+### pr-test-analyzer — PASS
+
+- Happy path tested: `test_success_calls_mark_healthy`, `test_happy_path_no_sentinel_in_logs`
+- All HTTP error codes tested: 401, 403, 429, 500, timeout
+- Negative tests: commit failure still returns, mark_healthy failure doesn't break response,
+  cache with wrong type reports unreadable (not crash)
+- Privacy/sentinel tests: confirm file names, emails, tokens, IDs never appear in logs
+- User scoping: separate user IDs get separate results
 
 ---
 
-## Test Summary
+## WARN Items (non-blocking)
 
-- Backend: 145 render tests pass (124 in render-specific test files + 21 in render integration files).
-- Frontend: 10 tests pass (7 hook tests + 3 component tests).
-- Pre-existing DB-dependent test failures (test_auth.py, test_personal_attach.py, test_ontology_security.py, test_ontology_visibility_pg.py) are unrelated to this feature and fail due to no Postgres running in the CI environment.
+- `_errors._get_token` does not add a comment explaining why `TokenUnavailableError` is
+  intentionally not caught there (it propagates to service.py where it is handled correctly).
+  Suggest adding an inline comment on a future pass.
 
 ---
 
-## What was built
+## Conclusion
 
-- `backend/src/services/render/` — typed Pydantic models (LogRecord.level required + coerced), async Render API client, pure verdict logic
-- `backend/src/api/v1/render_deploys.py` — always-200 GET `/api/v1/render/services/{service_id}/deploys/{deploy_id}/verdict` + GET `/api/v1/render/services`
-- `backend/src/schemas/render.py` — re-export for main.py
-- `backend/src/services/integrations/project_scoping.py` — shared infra-integration lookup
-- `frontend/src/types/render.ts` — TypeScript contract
-- `frontend/src/hooks/useRenderDeployVerdict.ts` + test
-- `frontend/src/hooks/useRenderIntegrationSnapshot.ts`
-- `frontend/src/components/RenderDeployVerdict/` — verdict badge, before/after table, metric rows, chips, banners
-- `frontend/src/pages/RenderMonitor/` — service picker page
-- App.tsx `/render` route + Sidebar link
-
-Automates the manual check sequence in CLAUDE.md §23.
+✅ **PASS** — No Critical findings. No FAIL gate. Zero blocking items.
+All 192 tests pass. The implementation follows project conventions, the always-200 contract,
+clock injection, log privacy discipline, and read-only scope constraint.
