@@ -56,6 +56,3 @@ redis-data/
 .DS_Store
 frontend/tsconfig.tsbuildinfo
 backend/.venv/
-
-# Local failure log written by .claude/hooks/subagent_usage_log.py
-.claude/hooks/.usage-hook.log

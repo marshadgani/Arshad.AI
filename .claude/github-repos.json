@@ -6,7 +6,7 @@
     "claude-code": {
       "url": "https://github.com/anthropics/claude-code.git",
       "name": "claude-code",
-      "last_fetched": "2026-10-05 19:30 UTC",
+      "last_fetched": "2026-10-19 16:09 UTC",
       "components": {
         "skills": [
           "writing-rules",
@@ -100,7 +100,7 @@
     "repomix": {
       "url": "https://github.com/yamadashy/repomix.git",
       "name": "repomix",
-      "last_fetched": "2026-10-05 19:30 UTC",
+      "last_fetched": "2026-10-19 16:09 UTC",
       "components": {
         "skills": [
           "repomix-explorer",
@@ -150,7 +150,7 @@
     "superpowers": {
       "url": "https://github.com/obra/superpowers.git",
       "name": "superpowers",
-      "last_fetched": "2026-10-05 19:30 UTC",
+      "last_fetched": "2026-10-19 16:09 UTC",
       "components": {
         "skills": [
           "using-superpowers",
@@ -172,6 +172,7 @@
         "agents": [],
         "commands": [],
         "hooks": [
+          "test-run-hook-cmd-windows.sh",
           "test-session-start.sh"
         ],
         "token_optimization": []
@@ -200,7 +201,7 @@
     "claude-mem": {
       "url": "https://github.com/thedotmack/claude-mem.git",
       "name": "claude-mem",
-      "last_fetched": "2026-10-05 19:30 UTC",
+      "last_fetched": "2026-10-19 16:10 UTC",
       "components": {
         "skills": [
           "mem-setup",
@@ -212,9 +213,12 @@
           "learn-codebase",
           "what-the",
           "smart-explore",
+          "build-and-release",
           "mode-creator",
+          "release",
           "mem-search",
           "cloud-sync",
+          "build",
           "agent-cost-report",
           "timeline-report",
           "design-is",
@@ -222,8 +226,10 @@
           "wowerpoint",
           "make-plan",
           "ccs-align",
+          "screenpipe",
           "version-bump",
           "how-it-works",
+          "childhood",
           "do",
           "standup",
           "babysit",
@@ -260,7 +266,7 @@
     "obsidian-skills": {
       "url": "https://github.com/kepano/obsidian-skills.git",
       "name": "obsidian-skills",
-      "last_fetched": "2026-10-05 19:31 UTC",
+      "last_fetched": "2026-10-19 16:10 UTC",
       "components": {
         "skills": [
           "obsidian-cli",
@@ -279,7 +285,7 @@
     "n8n-mcp": {
       "url": "https://github.com/czlonkowski/n8n-mcp.git",
       "name": "n8n-mcp",
-      "last_fetched": "2026-10-05 19:31 UTC",
+      "last_fetched": "2026-10-19 16:10 UTC",
       "components": {
         "skills": [
           "n8n-code-python",
@@ -319,7 +325,7 @@
     "get-shit-done": {
       "url": "https://github.com/gsd-build/get-shit-done.git",
       "name": "get-shit-done",
-      "last_fetched": "2026-10-05 19:31 UTC",
+      "last_fetched": "2026-10-19 16:10 UTC",
       "components": {
         "skills": [],
         "agents": [
@@ -447,7 +453,7 @@
     "awesome-claude-code": {
       "url": "https://github.com/hesreallyhim/awesome-claude-code.git",
       "name": "awesome-claude-code",
-      "last_fetched": "2026-10-05 19:31 UTC",
+      "last_fetched": "2026-10-19 16:10 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -461,13 +467,14 @@
     "context7": {
       "url": "https://github.com/upstash/context7.git",
       "name": "context7",
-      "last_fetched": "2026-10-05 19:31 UTC",
+      "last_fetched": "2026-10-19 16:10 UTC",
       "components": {
         "skills": [
           "context7-mcp",
           "context7-cli",
           "find-docs",
           "context7-docs",
+          "context7-mcp",
           "context7-mcp",
           "context7-mcp",
           "context7-mcp",
@@ -488,7 +495,7 @@
     "everything-claude-code": {
       "url": "https://github.com/affaan-m/everything-claude-code.git",
       "name": "everything-claude-code",
-      "last_fetched": "2026-10-05 19:31 UTC",
+      "last_fetched": "2026-10-19 16:10 UTC",
       "components": {
         "skills": [
           "kotlin-exposed-patterns",
@@ -513,6 +520,7 @@
           "product-capability",
           "manim-video",
           "video-editing",
+          "skill-host-compat",
           "workspace-surface-audit",
           "counterparty-channel-discipline",
           "django-tdd",
@@ -522,6 +530,7 @@
           "continuous-learning-v2",
           "agent-eval",
           "llm-trading-agent-security",
+          "deepseek-harness-setup",
           "knowledge-ops",
           "browser-qa",
           "esign-field-placement",
@@ -532,12 +541,14 @@
           "team-builder",
           "backend-patterns",
           "autonomous-agent-harness",
+          "conventional-commit-review",
           "springboot-security",
           "dashboard-builder",
           "taste",
           "terminal-opener",
           "healthcare-cdss-patterns",
           "returns-reverse-logistics",
+          "docs-governance",
           "homelab-network-readiness",
           "swift-protocol-di-testing",
           "gateguard",
@@ -550,8 +561,10 @@
           "hipaa-compliance",
           "api-design",
           "investor-materials",
+          "bengali-nlp",
           "deep-research",
           "security-scan",
+          "module-regression",
           "dev-team",
           "accessibility",
           "codehealth-mcp",
@@ -567,6 +580,7 @@
           "ito-baskets",
           "operator-approval-loop",
           "agent-payment-x402",
+          "agent-runtime-gateway-smoke-test",
           "search-first",
           "i18n-sync",
           "growth-log",
@@ -625,6 +639,7 @@
           "redis-patterns",
           "agentic-os",
           "agent-architecture-audit",
+          "osint-investigation",
           "django-verification",
           "safety-guard",
           "dotnet-patterns",
@@ -634,6 +649,7 @@
           "unified-notifications-ops",
           "liquid-glass-design",
           "ui-demo",
+          "mybatis-patterns",
           "dmux-workflows",
           "bun-runtime",
           "market-research",
@@ -643,6 +659,7 @@
           "docker-patterns",
           "canary-watch",
           "ecc-recipes",
+          "mcp-dependency-review",
           "scientific-pkg-gget",
           "flutter-dart-code-review",
           "skill-comply",
@@ -668,6 +685,8 @@
           "vite-patterns",
           "data-scraper-agent",
           "orch-change-feature",
+          "brownfield-retrospective",
+          "token-card",
           "pytorch-patterns",
           "scientific-db-uspto-database",
           "prediction-market-risk-review",
@@ -676,6 +695,7 @@
           "cost-aware-llm-pipeline",
           "angular-developer",
           "netmiko-ssh-automation",
+          "test-collaboration",
           "architecture-decision-records",
           "kotlin-testing",
           "android-clean-architecture",
@@ -731,8 +751,10 @@
           "code-tour",
           "orch-fix-defect",
           "mailtrap-email-integration",
+          "change-impact",
           "nestjs-patterns",
           "frontend-design-direction",
+          "agent-security-hardening",
           "prompt-optimizer",
           "openclaw-persona-forge",
           "production-audit",
@@ -743,6 +765,7 @@
           "loop-design-check",
           "python-patterns",
           "config-gc",
+          "story-lifecycle",
           "article-writing",
           "scientific-db-pubmed-database",
           "intent-driven-development",
@@ -768,6 +791,7 @@
           "laravel-verification",
           "nuxt4-patterns",
           "defi-amm-security",
+          "context-and-decisions",
           "master-agreement-generator",
           "plan-orchestrate",
           "mysql-patterns",
@@ -783,6 +807,7 @@
           "react-performance",
           "golang-patterns",
           "nutrient-document-processing",
+          "prompt-caching-strategy",
           "configure-ecc",
           "frontend-slides",
           "investor-materials",
@@ -791,6 +816,7 @@
           "content-engine",
           "bun-runtime",
           "market-research",
+          "mcp-dependency-review",
           "nextjs-turbopack",
           "investor-outreach",
           "article-writing",
@@ -815,13 +841,17 @@
           "design-system",
           "django-security",
           "backend-patterns",
+          "conventional-commit-review",
           "springboot-security",
           "dashboard-builder",
+          "docs-governance",
           "swift-protocol-di-testing",
           "ai-first-engineering",
           "hexagonal-architecture",
           "make-interfaces-feel-better",
           "api-design",
+          "bengali-nlp",
+          "module-regression",
           "dev-team",
           "accessibility",
           "springboot-verification",
@@ -855,6 +885,7 @@
           "cpp-coding-standards",
           "springboot-patterns",
           "liquid-glass-design",
+          "mybatis-patterns",
           "bun-runtime",
           "product-lens",
           "rust-testing",
@@ -870,6 +901,7 @@
           "compose-multiplatform-patterns",
           "cost-aware-llm-pipeline",
           "angular-developer",
+          "test-collaboration",
           "architecture-decision-records",
           "kotlin-testing",
           "android-clean-architecture",
@@ -891,7 +923,9 @@
           "inherit-legacy-style",
           "fsharp-testing",
           "code-tour",
+          "change-impact",
           "nestjs-patterns",
+          "agent-security-hardening",
           "production-audit",
           "vue-patterns",
           "python-patterns",
@@ -909,6 +943,7 @@
           "regex-vs-llm-structured-text",
           "laravel-verification",
           "nuxt4-patterns",
+          "context-and-decisions",
           "mysql-patterns",
           "frontend-a11y",
           "foundation-models-on-device",
@@ -1484,12 +1519,15 @@
           "strategic-compact",
           "product-capability",
           "video-editing",
+          "skill-host-compat",
           "backend-patterns",
+          "docs-governance",
           "frontend-slides",
           "ecc-conventions",
           "api-design",
           "investor-materials",
           "deep-research",
+          "module-regression",
           "mcp-server-patterns",
           "agent-sort",
           "benchmark-methodology",
@@ -1505,19 +1543,23 @@
           "dmux-workflows",
           "bun-runtime",
           "market-research",
+          "mcp-dependency-review",
           "competitive-platform-analysis",
+          "test-collaboration",
           "nextjs-turbopack",
           "plan-canvas",
           "brand-voice",
           "fal-ai-media",
           "x-api",
           "investor-outreach",
+          "change-impact",
           "article-writing",
           "security-review",
           "agent-introspection-debugging",
           "documentation-lookup",
           "verification-loop",
-          "frontend-patterns"
+          "frontend-patterns",
+          "context-and-decisions"
         ],
         "agents": [
           "observer",
@@ -1542,7 +1584,9 @@
           "type-design-analyzer",
           "harmonyos-app-resolver",
           "doc-updater",
+          "commit-reviewer",
           "network-troubleshooter",
+          "ruby-reviewer",
           "database-reviewer",
           "opensource-packager",
           "code-explorer",
@@ -1569,6 +1613,7 @@
           "django-reviewer",
           "rust-build-resolver",
           "a11y-architect",
+          "bengali-reviewer",
           "gan-evaluator",
           "code-architect",
           "marketing-agent",
@@ -2083,6 +2128,7 @@
           "multi-plan",
           "learn",
           "sessions",
+          "astra-review",
           "promote",
           "flutter-review",
           "pr",
@@ -2220,6 +2266,7 @@
           "epic-sync",
           "learn",
           "sessions",
+          "astra-review",
           "promote",
           "flutter-review",
           "orch-fix-defect",
@@ -2239,6 +2286,7 @@
           "plan",
           "pm2",
           "multi-execute",
+          "skill-host-compat",
           "instinct-status",
           "refactor-clean",
           "epic-claim",
@@ -2251,6 +2299,7 @@
           "ecc-guide",
           "checkpoint",
           "auto-update",
+          "token-card",
           "multi-frontend",
           "plan-canvas",
           "skill-create",
@@ -2285,13 +2334,13 @@
         "token_optimization": [
           "SKILL.md",
           "SKILL.md",
+          "SKILL.md",
           "the-longform-guide.md",
           "README.md",
           "SKILL.md",
+          "CURATION.md",
           "SKILL.md",
           "test_claude_provider.py",
-          "README.md",
-          "README.md",
           "README.md"
         ]
       }
@@ -2299,7 +2348,7 @@
     "claude-plugins-official": {
       "url": "https://github.com/anthropics/claude-plugins-official.git",
       "name": "claude-plugins-official",
-      "last_fetched": "2026-10-05 19:31 UTC",
+      "last_fetched": "2026-10-19 16:11 UTC",
       "components": {
         "skills": [
           "access",
@@ -2423,7 +2472,7 @@
     "ruflo": {
       "url": "https://github.com/ruvnet/ruflo.git",
       "name": "ruflo",
-      "last_fetched": "2026-10-05 19:31 UTC",
+      "last_fetched": "2026-10-19 16:11 UTC",
       "components": {
         "skills": [
           "ruflo",
@@ -2553,6 +2602,7 @@
           "cost-openrouter",
           "safety-scan",
           "pii-detect",
+          "generate-console-theme",
           "iot-witness-verify",
           "iot-register",
           "iot-firmware",
@@ -3695,7 +3745,7 @@
     "agent-skills": {
       "url": "https://github.com/addyosmani/agent-skills.git",
       "name": "agent-skills",
-      "last_fetched": "2026-10-05 19:32 UTC",
+      "last_fetched": "2026-10-19 16:11 UTC",
       "components": {
         "skills": [
           "interview-me",
@@ -3756,7 +3806,7 @@
     "headroom": {
       "url": "https://github.com/headroomlabs-ai/headroom.git",
       "name": "headroom",
-      "last_fetched": "2026-10-05 19:32 UTC",
+      "last_fetched": "2026-10-19 16:11 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -3767,19 +3817,19 @@
           "agno.md",
           "ccr.md",
           "transforms.md",
+          "learn.md",
           "langchain.md",
           "ARCHITECTURE.md",
           "index.md",
           "README.md",
-          "benchmark.py",
-          "scenarios.py"
+          "benchmark.py"
         ]
       }
     },
     "agent-browser": {
       "url": "https://github.com/vercel-labs/agent-browser.git",
       "name": "agent-browser",
-      "last_fetched": "2026-10-05 19:32 UTC",
+      "last_fetched": "2026-10-19 16:11 UTC",
       "components": {
         "skills": [
           "agent-browser",
@@ -3802,7 +3852,7 @@
     "andrej-karpathy-skills": {
       "url": "https://github.com/multica-ai/andrej-karpathy-skills.git",
       "name": "andrej-karpathy-skills",
-      "last_fetched": "2026-10-05 19:32 UTC",
+      "last_fetched": "2026-10-19 16:11 UTC",
       "components": {
         "skills": [
           "karpathy-guidelines"
@@ -3816,7 +3866,7 @@
     "ui-ux-pro-max-skill": {
       "url": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git",
       "name": "ui-ux-pro-max-skill",
-      "last_fetched": "2026-10-05 19:32 UTC",
+      "last_fetched": "2026-10-19 16:11 UTC",
       "components": {
         "skills": [
           "banner-design",
@@ -3853,21 +3903,21 @@
     "system-prompts-leaks": {
       "url": "https://github.com/asgeirtj/system_prompts_leaks.git",
       "name": "system_prompts_leaks",
-      "last_fetched": "2026-10-05 19:32 UTC",
+      "last_fetched": "2026-10-19 16:11 UTC",
       "components": {
         "skills": [
           "simplify",
           "import-memory",
+          "chrome-browser",
           "doctor",
           "debug",
           "init-new",
           "session-start-hook",
           "artifact-design",
+          "computer-use",
           "workflow-authoring",
           "deep-research",
-          "design",
           "skill-creator",
-          "explain-usage",
           "google-workspace",
           "update-config",
           "plugin-authoring",
@@ -3878,13 +3928,11 @@
           "keybindings-help",
           "docx",
           "fewer-permission-prompts",
-          "consolidate-memory",
-          "schedule",
+          "deep-research",
           "artifact-diagramming",
           "schedule",
           "run-skill-generator",
           "loop",
-          "setup-claude",
           "code-review",
           "artifact-capabilities",
           "verify",
@@ -3898,7 +3946,13 @@
           "design-sync",
           "non-storybook",
           "storybook",
+          "built-in-browser",
           "pdf",
+          "design-system",
+          "design",
+          "slides",
+          "dashboard",
+          "docs",
           "options",
           "export-as-pptx-editable",
           "make-a-deck",
@@ -4100,15 +4154,15 @@
           "prompt-caching.md",
           "cost-optimization.md",
           "managed-agents-multiagent.md",
-          "preserved-thinking-migration.md",
-          "models.md"
+          "opentelemetry.md",
+          "preserved-thinking-migration.md"
         ]
       }
     },
     "awesome-openclaw-skills": {
       "url": "https://github.com/VoltAgent/awesome-openclaw-skills.git",
       "name": "awesome-openclaw-skills",
-      "last_fetched": "2026-10-05 19:32 UTC",
+      "last_fetched": "2026-10-19 16:12 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -4123,7 +4177,7 @@
     "awesome-ai-agents": {
       "url": "https://github.com/e2b-dev/awesome-ai-agents.git",
       "name": "awesome-ai-agents",
-      "last_fetched": "2026-10-05 19:32 UTC",
+      "last_fetched": "2026-10-19 16:12 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -4135,7 +4189,7 @@
     "awesome-agent-skills": {
       "url": "https://github.com/VoltAgent/awesome-agent-skills.git",
       "name": "awesome-agent-skills",
-      "last_fetched": "2026-10-05 19:32 UTC",
+      "last_fetched": "2026-10-19 16:12 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -4149,7 +4203,7 @@
     "awesome-claude-code-subagents": {
       "url": "https://github.com/VoltAgent/awesome-claude-code-subagents.git",
       "name": "awesome-claude-code-subagents",
-      "last_fetched": "2026-10-05 19:32 UTC",
+      "last_fetched": "2026-10-19 16:12 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -4163,7 +4217,7 @@
     "skills": {
       "url": "https://github.com/anthropics/skills.git",
       "name": "skills",
-      "last_fetched": "2026-10-05 19:32 UTC",
+      "last_fetched": "2026-10-19 16:12 UTC",
       "components": {
         "skills": [
           "canvas-design",
@@ -4211,7 +4265,7 @@
     "anydoc": {
       "url": "https://github.com/firecrawl/anydoc.git",
       "name": "anydoc",
-      "last_fetched": "2026-10-05 19:32 UTC",
+      "last_fetched": "2026-10-19 16:12 UTC",
       "components": {
         "skills": [
           "convert-documents-to-markdown"
@@ -4225,11 +4279,14 @@
     "archify": {
       "url": "https://github.com/tt-a1i/archify.git",
       "name": "archify",
-      "last_fetched": "2026-10-05 19:32 UTC",
+      "last_fetched": "2026-10-19 16:12 UTC",
       "components": {
         "skills": [
           "archify",
-          "archify-review"
+          "test-value",
+          "archify-review",
+          "simplify-codebase",
+          "archify-tuning"
         ],
         "agents": [],
         "commands": [],
@@ -4257,7 +4314,7 @@
     "openmontage": {
       "url": "https://github.com/calesthio/OpenMontage.git",
       "name": "OpenMontage",
-      "last_fetched": "2026-10-05 19:32 UTC",
+      "last_fetched": "2026-10-19 16:12 UTC",
       "components": {
         "skills": [
           "flux-best-practices",
@@ -4434,7 +4491,7 @@
     "agent-reach": {
       "url": "https://github.com/Panniantong/Agent-Reach.git",
       "name": "Agent-Reach",
-      "last_fetched": "2026-10-05 19:32 UTC",
+      "last_fetched": "2026-10-19 16:12 UTC",
       "components": {
         "skills": [
           "skill"
@@ -4448,17 +4505,20 @@
     "orca": {
       "url": "https://github.com/stablyai/orca.git",
       "name": "orca",
-      "last_fetched": "2026-10-05 19:32 UTC",
+      "last_fetched": "2026-10-19 16:12 UTC",
       "components": {
         "skills": [
           "computer-use",
           "orchestration",
           "linear-tickets",
+          "orca-jira",
+          "jira-tickets",
           "orca-cli",
           "orca-per-workspace-env",
           "orca-emulator-android",
           "orca-linear",
-          "orca-emulator"
+          "orca-emulator",
+          "orca-chat-visuals"
         ],
         "agents": [],
         "commands": [],
@@ -4480,7 +4540,7 @@
     "learn-claude-code": {
       "url": "https://github.com/shareAI-lab/learn-claude-code.git",
       "name": "learn-claude-code",
-      "last_fetched": "2026-10-05 19:33 UTC",
+      "last_fetched": "2026-10-19 16:12 UTC",
       "components": {
         "skills": [
           "agent-builder",
@@ -4503,7 +4563,7 @@
     "claude-code-router": {
       "url": "https://github.com/musistudio/claude-code-router.git",
       "name": "claude-code-router",
-      "last_fetched": "2026-10-05 19:33 UTC",
+      "last_fetched": "2026-10-19 16:13 UTC",
       "components": {
         "skills": [],
         "agents": [
@@ -4531,15 +4591,21 @@
         "commands": [],
         "hooks": [],
         "token_optimization": [
+          "opencode-cache-usage.ts",
           "responses-session-affinity.ts",
-          "openrouter-discount-provider-router.ts"
+          "request-log-store.ts",
+          "store.ts",
+          "fusion-vision-mcp.ts",
+          "openrouter-discount-provider-router.ts",
+          "providers.md",
+          "providers.md"
         ]
       }
     },
     "claude-skills": {
       "url": "https://github.com/alirezarezvani/claude-skills.git",
       "name": "claude-skills",
-      "last_fetched": "2026-10-05 19:33 UTC",
+      "last_fetched": "2026-10-19 16:13 UTC",
       "components": {
         "skills": [
           "md-review",
@@ -5935,7 +6001,7 @@
     "codegraph": {
       "url": "https://github.com/colbymchenry/codegraph.git",
       "name": "codegraph",
-      "last_fetched": "2026-10-05 19:33 UTC",
+      "last_fetched": "2026-10-19 16:13 UTC",
       "components": {
         "skills": [
           "agent-eval",
@@ -5952,7 +6018,7 @@
     "marketingskills": {
       "url": "https://github.com/coreyhaines31/marketingskills.git",
       "name": "marketingskills",
-      "last_fetched": "2026-10-05 19:33 UTC",
+      "last_fetched": "2026-10-19 16:13 UTC",
       "components": {
         "skills": [
           "free-tools",
@@ -6015,7 +6081,7 @@
     "obsidian-releases": {
       "url": "https://github.com/obsidianmd/obsidian-releases.git",
       "name": "obsidian-releases",
-      "last_fetched": "2026-10-05 19:33 UTC",
+      "last_fetched": "2026-10-19 16:13 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -6027,7 +6093,7 @@
     "obsidian-git": {
       "url": "https://github.com/Vinzent03/obsidian-git.git",
       "name": "obsidian-git",
-      "last_fetched": "2026-10-05 19:33 UTC",
+      "last_fetched": "2026-10-19 16:13 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -6039,9 +6105,10 @@
     "impeccable": {
       "url": "https://github.com/pbakaus/impeccable.git",
       "name": "impeccable",
-      "last_fetched": "2026-10-05 19:33 UTC",
+      "last_fetched": "2026-10-19 16:13 UTC",
       "components": {
         "skills": [
+          "impeccable",
           "impeccable",
           "impeccable",
           "impeccable",
@@ -6107,10 +6174,11 @@
     "taste-skill": {
       "url": "https://github.com/Leonxlnx/taste-skill.git",
       "name": "taste-skill",
-      "last_fetched": "2026-10-05 19:34 UTC",
+      "last_fetched": "2026-10-19 16:13 UTC",
       "components": {
         "skills": [
           "brandkit",
+          "taste-skill-v2-experimental",
           "redesign-skill",
           "imagegen-frontend-web",
           "soft-skill",
@@ -6118,7 +6186,6 @@
           "taste-skill",
           "taste-skill-v1",
           "stitch-skill",
-          "output-skill",
           "image-to-code-skill",
           "gpt-tasteskill",
           "imagegen-frontend-mobile",
@@ -6133,7 +6200,7 @@
     "awesome-claude-design": {
       "url": "https://github.com/VoltAgent/awesome-claude-design.git",
       "name": "awesome-claude-design",
-      "last_fetched": "2026-10-05 19:34 UTC",
+      "last_fetched": "2026-10-19 16:14 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -6145,7 +6212,7 @@
     "design-md-chrome": {
       "url": "https://github.com/bergside/design-md-chrome.git",
       "name": "design-md-chrome",
-      "last_fetched": "2026-10-05 19:34 UTC",
+      "last_fetched": "2026-10-19 16:14 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -6157,7 +6224,7 @@
     "design-motion-principles": {
       "url": "https://github.com/kylezantos/design-motion-principles.git",
       "name": "design-motion-principles",
-      "last_fetched": "2026-10-05 19:34 UTC",
+      "last_fetched": "2026-10-19 16:14 UTC",
       "components": {
         "skills": [
           "design-motion-principles"
@@ -6171,7 +6238,7 @@
     "omniroute": {
       "url": "https://github.com/diegosouzapw/OmniRoute.git",
       "name": "OmniRoute",
-      "last_fetched": "2026-10-05 19:34 UTC",
+      "last_fetched": "2026-10-19 16:14 UTC",
       "components": {
         "skills": [
           "omni-context-rtk",
@@ -6225,6 +6292,7 @@
           "validate-release-green",
           "sweep-reds",
           "green-prs",
+          "merge-batch",
           "bridge-proof"
         ],
         "agents": [],
@@ -6235,21 +6303,21 @@
         "token_optimization": [
           "SKILL.md",
           "SKILL.md",
+          "shared-tiers.ts",
           "combo.ts",
           "settingsSchemas.ts",
           "providerSpecificData.ts",
           "sameAccountTransportRetry.ts",
           "sessionAffinityPin.ts",
           "chat.ts",
-          "projectCombo.ts",
-          "requestDefaults.ts"
+          "projectCombo.ts"
         ]
       }
     },
     "one-skill-to-rule-them-all": {
       "url": "https://github.com/rebelytics/one-skill-to-rule-them-all.git",
       "name": "one-skill-to-rule-them-all",
-      "last_fetched": "2026-10-05 19:34 UTC",
+      "last_fetched": "2026-10-19 16:14 UTC",
       "components": {
         "skills": [
           "one-skill-to-rule-them-all"

@@ -90,7 +90,7 @@ for await (const event of stream) {
       events: [{
         type: 'user.tool_confirmation',
         tool_use_id: event.id,         // not a toolu_ id - use event.id
-        result: 'allow',               // or 'deny'
+        result: (await approve(event)) ? 'allow' : 'deny', // you write approve(): ask a person or apply your own rule; deny when unattended
         // deny_message: '...',        // optional, only with result: 'deny'
       }],
     })
@@ -136,7 +136,7 @@ for await (const event of stream) {
 
 The SSE stream emits `session.status_idle` slightly before the session's queryable status reflects it. Clients that break on idle and immediately call `sessions.delete()` or `sessions.archive()` will intermittently 400 with "cannot delete/archive while running."
 
-Poll before cleanup:
+If the user asked you to delete or archive the session, poll first:
 
 ```ts
 let s
@@ -149,6 +149,8 @@ if (s?.status !== 'running') {
   await client.beta.sessions.archive(session.id)
 } // else: still running after 2s - don't archive, let it settle or escalate
 ```
+
+While a workflow run is open, the status is not enough: an archive or a delete might return a 400 even when the session is `idle`, and an archive that succeeds ends the run. Before either, ask the agent to stop its runs, or wait until each run has ended (`shared/managed-agents-multiagent.md` § While a run is open).
 
 ---
 
@@ -173,16 +175,16 @@ The `Promise.all([stream, send])` shape works too, but stream-first is simpler a
 **The mounted resource has a different `file_id` than the file you uploaded.** Session creation makes a session-scoped copy.
 
 ```ts
-const uploaded = await client.beta.files.upload({ file, purpose: 'agent_resource' })
+const uploaded = await client.beta.files.upload({ file })
 // uploaded.id         -> the original file
 const session = await client.beta.sessions.create({
   /* ... */
-  resources: [{ type: 'file', file_id: uploaded.id, mount_path: '/workspace/data.csv' }],
+  resources: [{ type: 'file', file_id: uploaded.id, mount_path: '/data.csv' }],
 })
 // session.resources[0].file_id !== uploaded.id  <- different IDs
 ```
 
-Delete the original via `files.delete(uploaded.id)`; the session-scoped copy is garbage-collected with the session. `mount_path` must be absolute - see `shared/managed-agents-environments.md`.
+The original stays until you delete it (`files.delete(uploaded.id)`); the session-scoped copy is garbage-collected with the session. `mount_path` must be absolute - see `shared/managed-agents-environments.md`.
 
 ---
 

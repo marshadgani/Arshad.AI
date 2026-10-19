@@ -189,7 +189,7 @@ async def test_odd_service_id_never_reaches_the_url(bad_id):
         client, asyncio.Semaphore(1), "key", bad_id
     )
 
-    assert status == "unchecked"
+    assert status == ("unchecked", None)
 
 
 @pytest.mark.asyncio

@@ -3,6 +3,7 @@
 Endpoints:
   GET  /api/v1/ai-ecosystem/agents          list all agents with live status
   GET  /api/v1/ai-ecosystem/metrics         usage metrics aggregated by period
+  POST /api/v1/ai-ecosystem/log             record one agent invocation
   GET  /api/v1/ai-ecosystem/summary         aggregate totals for the period
 """
 
@@ -21,6 +22,7 @@ from src.models.database import get_db
 from src.schemas.ai_ecosystem import (
     AgentMetricResponse,
     AgentResponse,
+    LogRequest,
     RegisterAgentRequest,
     SummaryResponse,
 )
@@ -157,6 +159,26 @@ async def get_metrics(
         )
 
     return {"data": {"period": period, "agents": agents_out}}
+
+
+@router.post("/log", summary="Record one agent invocation", status_code=201)
+async def log_invocation(
+    body: LogRequest,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    entry = AgentUsageLog(
+        id=uuid.uuid4(),
+        agent_name=body.agent_name,
+        model=body.model,
+        tokens_used=body.tokens_used,
+        duration_ms=body.duration_ms,
+        success=body.success,
+        session_id=body.session_id,
+        invoked_at=datetime.now(timezone.utc),
+    )
+    db.add(entry)
+    await db.commit()
+    return {"data": {"id": str(entry.id)}}
 
 
 @router.get("/summary", summary="Aggregate stats for a time period")

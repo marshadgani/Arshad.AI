@@ -1,38 +1,55 @@
-### ⚠️ GATE PASSED WITH WARNINGS — Ready for merge
+### GATE PASSED — Ready for merge
 
-**FEAT-182: record every Claude Code subagent run on the AI Ecosystem page, plus the Google token refresh fix**
+**FEAT-132: Render per-deploy regression verdict**
 
-Eight agents ran: code-reviewer, security-auditor, debugger, test-writer, refactorer, doc-writer, silent-failure-hunter, pr-test-analyzer. No Critical findings. Every security finding was fixed. The test-writer's one FAIL (coverage) was fixed.
+Eight agents ran: code-reviewer, security-auditor, debugger, test-writer, refactorer, doc-writer, silent-failure-hunter, pr-test-analyzer. No Critical findings. No security findings.
 
-**Verdict: WARN.** The only open items are documentation edits and follow-up features, listed below.
+**Verdict: PASS.**
 
-Changes:
-- A `SubagentStop` hook (`.claude/hooks/subagent_usage_log.py`) posts each subagent run (name, model, tokens, duration, success) to `POST /api/v1/ai-ecosystem/log`. It runs async and always exits 0.
-- `/log` moved to `ai_ecosystem_ingest.py`. It accepts a dedicated `X-Usage-Key`, or a normal user JWT as before.
-- A new agent name is registered on first sight, so built-in subagents appear on the page.
-- `google_token.py`: any refresh failure now raises `TokenUnavailableError`, so `/dashboard/events` and `/dashboard/briefing` fall back instead of returning 500.
+---
 
-Fixed after the gate:
-- SEC-001: `/log` is rate limited (300 per minute) and auto-registration stops at 100 rows.
-- SEC-002: `model` must match `^[A-Za-z0-9._:/-]+$`. Tokens are capped at 10,000,000 and duration at 7 days.
-- SEC-003: a second key, `AGENT_USAGE_INGEST_KEY_NEXT`, is accepted so the key can rotate with no downtime.
-- SEC-004: an unset server key and a wrong key now give the same 401. The real reason goes to the server log. The key is never logged.
-- The 401 now carries `WWW-Authenticate`, and the duplicate error helper is gone (uses the shared `http_error`).
-- `google_token.py` logs the original error. A 200 with a missing or malformed body is also mapped to `TokenUnavailableError`.
-- The hook survives odd input: non-object JSON, non-string `agent_type`, mixed naive and aware timestamps, non-UTF-8 transcripts, unhashable message ids. An unreadable transcript still records the run.
-- The hook writes failures to `.claude/hooks/.usage-hook.log` (gitignored), because an async hook's stderr is likely never seen. The hook timeout is 100s so two 45s attempts fit.
-- Tests: 182 pass across the four related files. Full backend suite 1,666 pass. The 9 failures and 55 errors are the same set as on main (the sandbox has no database or Redis).
-- Measured coverage: `usage_ingest.py` 100%, `ai_ecosystem_ingest.py` 100%, `google_token.py` 100% (was about 48%), hook 97%.
-- The `ON CONFLICT (agent_name) DO NOTHING` statement is asserted by compiling it for Postgres. The unique constraint `uq_agent_registry_agent_name` exists in migration `i1f2g3h4a5b6`.
+## Agent Results
 
-Residual risk, accepted for a single-user system:
-- Anyone holding the ingest key can add usage rows and inflate the numbers. They cannot read data or change existing agents. Rotate with the `_NEXT` key.
-- Auto-registered agents stay active so they show on the page. The 100-row cap is what bounds flooding.
+| Agent | Verdict | Findings |
+|---|---|---|
+| code-reviewer | PASS | No bugs, logic errors, or performance issues found in the new render service/client/verdict modules. Route correctly delegates to seam functions. |
+| security-auditor | PASS | API key appears only in Authorization header. Log statements emit only exception type and HTTP status. No secrets in log output. Always-200 contract prevents 401 cascades. Rate limiting in place. Input validated (422 on bad service_id). |
+| debugger | PASS | All failure paths return degraded responses, never 500. `asyncio.gather(return_exceptions=True)` catches all seam failures. `CancelledError` is re-raised correctly. |
+| test-writer | PASS | 145 tests across 8 test files. Hard constraint (log level never dropped) enforced with 11 dedicated tests. Client, verdict, route, and contract all covered. Coverage well above 70%. |
+| refactorer | PASS | Clean module boundaries (models <- client <- verdict, nothing imports api or integrations). No duplication. seam pattern consistent with shopify.py. |
+| doc-writer | PASS | Module-level docstrings on all three service modules and the route file. Public functions documented. |
+| silent-failure-hunter | PASS | No swallowed exceptions. `_unwrap` logs exception type before returning fallback. `BLE001` noqa comment scoped to the single always-200 catch block with explicit reasoning. |
+| pr-test-analyzer | PASS | Happy path, error paths, scoping, authentication, rate limiting, and the level-drop hard constraint all tested. No implementation-tied tests. Negative tests present (missing auth, bad IDs, disconnected integration). |
 
-Deferred warnings:
-- [ ] `CLAUDE.md` §9 hooks table has no `SubagentStop` row, §6 env table lacks `AGENT_USAGE_INGEST_KEY`, `AGENT_USAGE_INGEST_KEY_NEXT`, `ARSHAD_USAGE_KEY`, `ARSHAD_USAGE_URL`, and `.claude/rules/api.md` needs a note that `/log` accepts the ingest key. These are the owner's instruction files, so they were not edited on a reviewer's request.
-- [ ] A revoked Google token looks the same as "never linked" on the dashboard. A `needs_reauth` flag needs an API and frontend change, like Whoop and Shopify.
-- [ ] After `invalid_grant`, every dashboard request retries the refresh (up to 10s). Marking the row as revoked would stop that.
-- [ ] No real-Postgres integration test for the registry insert race.
-- [ ] The production registry still shows `ai-engineer` as Opus. Main's agent file says Sonnet, so re-register it.
-- [ ] Setup before the page shows data: set `AGENT_USAGE_INGEST_KEY` on Render and `ARSHAD_USAGE_KEY` in the Claude Code environment.
+---
+
+## Findings
+
+**Critical:** none.
+
+**Warning:** none.
+
+---
+
+## Test Summary
+
+- Backend: 145 render tests pass (124 in render-specific test files + 21 in render integration files).
+- Frontend: 10 tests pass (7 hook tests + 3 component tests).
+- Pre-existing DB-dependent test failures (test_auth.py, test_personal_attach.py, test_ontology_security.py, test_ontology_visibility_pg.py) are unrelated to this feature and fail due to no Postgres running in the CI environment.
+
+---
+
+## What was built
+
+- `backend/src/services/render/` — typed Pydantic models (LogRecord.level required + coerced), async Render API client, pure verdict logic
+- `backend/src/api/v1/render_deploys.py` — always-200 GET `/api/v1/render/services/{service_id}/deploys/{deploy_id}/verdict` + GET `/api/v1/render/services`
+- `backend/src/schemas/render.py` — re-export for main.py
+- `backend/src/services/integrations/project_scoping.py` — shared infra-integration lookup
+- `frontend/src/types/render.ts` — TypeScript contract
+- `frontend/src/hooks/useRenderDeployVerdict.ts` + test
+- `frontend/src/hooks/useRenderIntegrationSnapshot.ts`
+- `frontend/src/components/RenderDeployVerdict/` — verdict badge, before/after table, metric rows, chips, banners
+- `frontend/src/pages/RenderMonitor/` — service picker page
+- App.tsx `/render` route + Sidebar link
+
+Automates the manual check sequence in CLAUDE.md §23.

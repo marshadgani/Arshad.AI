@@ -1,0 +1,94 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.verdictBadge {
+  align-self: flex-start;
+  padding: var(--s-1) var(--s-3);
+  border-radius: var(--radius-md);
+  border: 1px solid currentColor;
+  font-family: var(--font-display);
+  text-transform: capitalize;
+}
+
+.verdictRegression {
+  color: var(--status-danger);
+  background: var(--status-danger-bg);
+}
+
+.verdictImprovement {
+  color: var(--status-ok);
+  background: var(--status-ok-bg);
+}
+
+.verdictNeutral {
+  color: var(--status-neutral);
+}
+
+.verdictUnknown {
+  color: var(--status-warn);
+  background: var(--status-warn-bg);
+}
+
+.metricsTable {
+  border-collapse: collapse;
+  color: var(--text-primary);
+}
+
+.metricsTable th,
+.metricsTable td {
+  padding: var(--s-2) var(--s-4);
+  border-bottom: 1px solid var(--border-faint);
+  text-align: left;
+  font-family: var(--font-mono);
+}
+
+.caption {
+  color: var(--text-muted);
+  text-align: left;
+  padding-bottom: var(--s-2);
+}
+
+.delta,
+.footnote,
+.status,
+.empty {
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.footnote {
+  color: var(--text-muted);
+}
+
+.error {
+  color: var(--status-danger);
+  margin: 0;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.warningChip {
+  padding: var(--s-1) var(--s-2);
+  border-radius: var(--radius-sm);
+  color: var(--status-warn);
+  background: var(--status-warn-faint);
+  font-family: var(--font-mono);
+}
+
+.reauthBanner {
+  padding: var(--s-3);
+  border-radius: var(--radius-md);
+  color: var(--status-warn);
+  background: var(--status-warn-bg);
+  border: 1px solid var(--status-warn-faint);
+}

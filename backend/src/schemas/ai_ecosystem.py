@@ -48,16 +48,10 @@ class SummaryResponse(ORMBase):
 
 
 class LogRequest(ORMBase):
-    # tokens_used and duration_ms caps are mirrored by _MAX_TOKENS and
-    # _MAX_DURATION_MS in .claude/hooks/subagent_usage_log.py. Keep them equal.
-    agent_name: str = Field(
-        ..., min_length=1, max_length=100, pattern=r"^[A-Za-z0-9._:-]+$"
-    )
-    model: str | None = Field(
-        default=None, max_length=100, pattern=r"^[A-Za-z0-9._:/-]+$"
-    )
-    tokens_used: int = Field(default=0, ge=0, le=10_000_000)
-    duration_ms: int | None = Field(default=None, ge=0, le=604_800_000)
+    agent_name: str
+    model: str | None = None
+    tokens_used: int = Field(default=0, ge=0)
+    duration_ms: int | None = None
     success: bool = True
     session_id: uuid.UUID | None = None
 

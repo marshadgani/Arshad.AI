@@ -75,8 +75,13 @@ class GoogleDriveIntegration(IntegrationProvider):
                 resp = await client.get(
                     "https://www.googleapis.com/drive/v3/files",
                     params={
-                        "pageSize": 20,
-                        "fields": "files(id,name,mimeType,modifiedTime)",
+                        "pageSize": 30,
+                        "orderBy": "modifiedTime desc",
+                        "q": "trashed=false",
+                        "fields": (
+                            "nextPageToken,"
+                            "files(id,name,mimeType,modifiedTime,webViewLink)"
+                        ),
                     },
                     headers={"Authorization": f"Bearer {access_token}"},
                 )
@@ -91,19 +96,31 @@ class GoogleDriveIntegration(IntegrationProvider):
                     "Drive scope not on your token. Log out + log in again to grant it.",
                 )
             resp.raise_for_status()
-            files = (resp.json() or {}).get("files", [])
+            body = resp.json() or {}
+            files = body.get("files", [])
+            has_more = bool(body.get("nextPageToken"))
         except IntegrationError:
             raise
         except Exception as exc:  # noqa: BLE001
             integration.status = "error"
-            integration.last_error = f"{type(exc).__name__}: {exc}"[:500]
+            integration.last_error = type(exc).__name__
             await db.commit()
-            raise IntegrationError("sync_failed", f"{type(exc).__name__}: {exc}")
+            raise IntegrationError("sync_failed", type(exc).__name__)
+        # config.files holds file metadata only (name, type, dates, URLs): no
+        # file content and no permission email addresses. Readers must use
+        # .get() because rows cached before this shape lack the newer keys.
         integration.config = {
             "file_count": len(files),
+            "truncated": has_more,
             "files": [
-                {"id": f.get("id"), "name": f.get("name"), "mime": f.get("mimeType")}
-                for f in files[:10]
+                {
+                    "id": f.get("id"),
+                    "name": f.get("name"),
+                    "mime": f.get("mimeType"),
+                    "modified_time": f.get("modifiedTime"),
+                    "web_view_link": f.get("webViewLink"),
+                }
+                for f in files[:30]
             ],
         }
         integration.last_synced_at = datetime.now(timezone.utc)

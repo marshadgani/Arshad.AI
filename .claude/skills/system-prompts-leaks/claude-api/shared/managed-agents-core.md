@@ -26,7 +26,7 @@ Environment (template) --> Container (tool execution workspace)
                                  +-- Conversation (event stream in/out)
 ```
 
-> **Agent creation is a prerequisite.** Sessions reference a pre-created agent by ID - `model`/`system`/`tools` live on the agent object, never on the session. Every flow starts with `POST /v1/agents`.
+> **Agent creation is a prerequisite.** Sessions reference a pre-created agent by ID - `model`/`system`/`tools` are set on the agent object; a session can override them for that session only (§ Override agent configuration for a session). Every flow starts with `POST /v1/agents`.
 
 ---
 
@@ -43,7 +43,7 @@ rescheduling -> running <-> idle -> terminated
 | `rescheduling` | Session is (re)scheduling after a retryable error has occurred, ready to be picked up by the orchestration system. |
 | `terminated` | Session has ended and is in an irreversible, unusable state - **either on completion or because of an unrecoverable error**. Terminated does not by itself mean failure; fetch the session to tell the two apart. |
 
-- Events can be sent when the session is `running` or `idle`. Messages are queued and processed in order. Exception: a session paused at its budget (`stop_reason: budget_reached`) accepts only **settle events** - events that resolve work already in progress (`user.tool_confirmation`, `user.tool_result`, `user.custom_tool_result`, `user.interrupt`) rather than starting new work - see § Session budgets.
+- Events can be sent when the session is `running` or `idle`. Messages are queued and processed in order. Exceptions: a session waiting on you (`stop_reason: requires_action`) or paused at its budget (`budget_reached`) accepts only **settle events** - events that resolve work already in progress (`user.tool_confirmation`, `user.tool_result`, `user.custom_tool_result`, `user.interrupt`) rather than starting new work - see § Session budgets.
 - The agent transitions `idle -> running` when it receives a new event, then back to `idle` when done.
 - Errors surface as `session.error` events in the stream, not as a status value.
 
@@ -112,7 +112,16 @@ const agent = await client.beta.agents.create(
     name: "Coding Assistant",
     model: "claude-opus-5-5",
     system: "You are a helpful coding agent.",
-    tools: [{ type: "agent_toolset_20260401"}],
+    tools: [
+      {
+        type: "agent_toolset_20260401",
+        default_config: { permission_policy: { type: "auto" } },
+        configs: [
+          { name: "web_fetch", enabled: false },
+          { name: "web_search", enabled: false },
+        ],
+      },
+    ],
   },
 );
 
@@ -163,16 +172,16 @@ session = client.beta.sessions.create(
 
 An outcome-driven session is therefore a single call - pass one `user.define_outcome` in `initial_events` instead of creating the session and then sending the event (see `shared/managed-agents-outcomes.md`).
 
-**Agent configuration fields** (passed to `agents.create()`, not `sessions.create()`):
+**Agent configuration fields** (passed to `agents.create()`):
 
 | Field         | Type     | Required | Description                                    |
 | ------------- | -------- | -------- | ---------------------------------------------- |
 | `name`        | string   | **Yes**  | Human-readable name (1-256 chars)              |
 | `model`       | string or object | **Yes** | Claude model ID (bare string, or an object taking `id`, `speed`, `effort`, and `inference_geo`). All Claude 4.5+ models supported. See § Effort on the agent model and § Pinning inference geography below. |
 | `system`      | string   | No       | System prompt - defines the agent's behavior (up to 100K chars) |
-| `tools`       | array    | No       | Encompasses three kinds: (1) pre-built Claude Agent tools (`agent_toolset_20260401`), (2) MCP tools (`mcp_toolset`), and (3) custom client-side tools. Max 128. |
+| `tools`       | array    | No       | Encompasses three kinds: (1) pre-built Claude Agent tools (`agent_toolset_20260401`), (2) MCP tools (`mcp_toolset`), and (3) custom client-side tools. Max 256. |
 | `mcp_servers` | array    | No       | MCP server connections - standardized third-party capabilities (e.g. GitHub, Asana). Max 20, unique names. See `shared/managed-agents-tools.md` -> MCP Servers. |
-| `skills`      | array    | No       | Customized "best-practices" context with progressive disclosure. Max 20. See `shared/managed-agents-tools.md` -> Skills. |
+| `skills`      | array    | No       | Customized "best-practices" context with progressive disclosure. Max 500. See `shared/managed-agents-tools.md` -> Skills. |
 | `description` | string   | No       | Description of the agent (up to 2048 chars)    |
 | `multiagent`  | object   | No       | `{type: "coordinator", agents: [...]}` - roster this agent may delegate to. See `shared/managed-agents-multiagent.md`. |
 | `metadata`    | object   | No       | Arbitrary key-value pairs (max 16, keys <=64 chars, values <=512 chars) |
@@ -222,7 +231,7 @@ The API is **flat** - `model`, `system`, `tools` etc. are top-level fields, not 
 | `system`           | string   | No       | System prompt                                      |
 | `tools`            | array    | No       | Agent toolset / MCP toolset / custom tools         |
 | `mcp_servers`      | array    | No       | MCP server connections                             |
-| `skills`           | array    | No       | Skill references (max 20)                          |
+| `skills`           | array    | No       | Skill references (max 500)                         |
 | `description`      | string   | No       | Description of the agent                           |
 | `multiagent`       | object   | No       | Coordinator roster - see `shared/managed-agents-multiagent.md` |
 | `metadata`         | object   | No       | Arbitrary key-value pairs                          |
@@ -295,7 +304,7 @@ Each `POST /v1/agents/{id}` (update) creates a new immutable version - a sequent
 | Update           | `POST`   | `/v1/agents/{id}`                     |
 | Archive          | `POST`   | `/v1/agents/{id}/archive`             |
 
-> Warning: **Archive is permanent.** Archiving makes the agent read-only: existing sessions continue to run, but **new sessions cannot reference it**, and there is no unarchive. Since agents have no `delete`, this is the terminal lifecycle state. Never archive a production agent as routine cleanup - confirm with the user first.
+> Warning: **Archive is permanent.** Archiving makes the agent read-only: existing sessions continue to run, but **new sessions cannot reference it**, and there is no unarchive. Since agents have no `delete`, this is the terminal lifecycle state. Never archive a production agent as routine cleanup.
 
 ### Using an Agent in a Session
 
@@ -340,7 +349,7 @@ Overrides are session-local: they do **not** modify the agent resource or create
 
 ### Updating the agent configuration mid-session
 
-`sessions.update()` can change `agent.tools` and `agent.mcp_servers` (including permission policies and the per-tool web settings - `allowed_domains` / `blocked_domains` etc., see `shared/managed-agents-tools.md` § Web search & web fetch settings) on an **existing** session. Updated domain lists apply to the rest of the session. This is a **session-local override** - it does not create a new agent version and does not propagate back to the agent object. The provided arrays are **full replacements**; to append one tool, `GET` the session, modify, and `POST` back. The session must be `idle` - interrupt first if running. `vault_ids` is **create-only**: the update param exists in the SDK but is rejected by the API ("Not yet supported") - attach vaults when you create the session.
+`sessions.update()` can change `agent.tools` and `agent.mcp_servers` (including permission policies and the per-tool web settings - `allowed_domains` / `blocked_domains` etc., see `shared/managed-agents-tools.md` § Web search & web fetch settings) on an **existing** session. Updated domain lists apply to the rest of the session. This is a **session-local override** - it does not create a new agent version and does not propagate back to the agent object. The provided arrays are **full replacements** (keep the toolset's `default_config` and `configs`, or the policy reverts to `always_allow` and the web tools come back on); to append one tool, `GET` the session, modify, and `POST` back. The session must be `idle` - interrupt first if running. `vault_ids` is **create-only**: the update param exists in the SDK but is rejected by the API ("Not yet supported") - attach vaults when you create the session.
 
 Among the agent-configuration fields, only `tools` and `mcp_servers` can change after a session is created - to run with a `model`, `system`, or `skills` other than the agent's values, use `agent_with_overrides` at create time (above). (`title`, `metadata`, and `budget` have their own session-update paths - see § Session operations / § Session budgets.) The agent's model configuration - including its `inference_geo` pin - and its configured `system` field are fixed for the session's lifetime; you can still **append system-level context between turns** by sending a `system.message` event (see `shared/managed-agents-events.md` § Adding system context mid-session).
 
@@ -349,7 +358,14 @@ client.beta.sessions.update(
     session.id,
     agent={
         "tools": [
-            {"type": "agent_toolset_20260401"},
+            {
+                "type": "agent_toolset_20260401",
+                "default_config": {"permission_policy": {"type": "auto"}},
+                "configs": [
+                    {"name": "web_fetch", "enabled": False},
+                    {"name": "web_search", "enabled": False},
+                ],
+            },
             {"type": "mcp_toolset", "mcp_server_name": "linear"},
         ],
         "mcp_servers": [{"type": "url", "name": "linear", "url": "https://mcp.linear.app/sse"}],

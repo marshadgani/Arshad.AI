@@ -11,14 +11,15 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from src.agents.routers import router as agents_router
 from src.api.v1.ai_ecosystem import router as ai_ecosystem_router
-from src.api.v1.ai_ecosystem_ingest import router as ai_ecosystem_ingest_router
 from src.api.v1.ai_ecosystem_skills import router as ai_ecosystem_skills_router
 from src.api.v1.apple_health import router as apple_health_router
 from src.api.v1.chat import router as chat_router
 from src.api.v1.dashboard import router as dashboard_router
 from src.api.v1.domains import router as domains_router
+from src.api.v1.drive import router as drive_router
 from src.api.v1.obsidian import router as obsidian_router
 from src.api.v1.ontology import router as ontology_router
+from src.api.v1.render_deploys import router as render_deploys_router
 from src.api.v1.shopify import router as shopify_router
 from src.api.v1.trip_feasibility import router as trip_feasibility_router
 from src.api.v1.whoop import router as whoop_router
@@ -253,6 +254,8 @@ async def health():
 
 from src.integrations.routers import (  # noqa: E402
     github_attach_alias_router,
+)
+from src.integrations.routers import (
     router as integrations_router,
 )
 
@@ -263,13 +266,14 @@ app.include_router(chat_router)
 app.include_router(dashboard_router)
 app.include_router(domains_router)
 app.include_router(ai_ecosystem_router)
-app.include_router(ai_ecosystem_ingest_router)
 app.include_router(ai_ecosystem_skills_router)
 app.include_router(obsidian_router)
 app.include_router(ontology_router)
 app.include_router(whoop_router)
 app.include_router(shopify_router)
 app.include_router(trip_feasibility_router)
+app.include_router(render_deploys_router)
+app.include_router(drive_router)
 app.include_router(apple_health_router)
 app.include_router(integrations_router)
 app.include_router(github_attach_alias_router)
