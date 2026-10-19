@@ -1275,6 +1275,7 @@ def test_route_infra_conflict_is_no_go_even_on_early_exit(client, monkeypatch):
 @pytest.mark.asyncio
 async def test_find_infra_integrations_scopes_to_caller_or_shared_row():
     from src.api.v1 import trip_feasibility as route
+    from src.services.integrations.state import ACTIVE_STATUSES
 
     seen = []
 
@@ -1299,7 +1300,7 @@ async def test_find_infra_integrations_scopes_to_caller_or_shared_row():
     assert "integrations.slug IN" in sql
     # The caller's own row must sort before the shared (NULL owner) row.
     assert "ORDER BY integrations.user_id IS NULL" in sql
-    assert "error" in route.ACTIVE_STATUSES
+    assert "error" in ACTIVE_STATUSES
     assert "11111111-1111-1111-1111-111111111111" in str(
         seen[0].compile().params.values()
     )

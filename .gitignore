@@ -56,3 +56,6 @@ redis-data/
 .DS_Store
 frontend/tsconfig.tsbuildinfo
 backend/.venv/
+
+# Vitest cache
+.vite/

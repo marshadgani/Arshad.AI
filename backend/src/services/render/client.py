@@ -225,7 +225,10 @@ async def fetch_metric(
         _note(f"{metric_type} metric fetch", exc)
         return MetricWindow(fetch_failed=True, failure_code=_failure_code(exc))
     if not values:
-        return MetricWindow()
+        # A series with no points is missing data, not a quiet metric. Flagging
+        # it keeps the verdict from reading neutral or improved on nothing.
+        _note(f"{metric_type} metric fetch", ValueError("no data points"))
+        return MetricWindow(fetch_failed=True, failure_code="no_data")
     return MetricWindow(
         mean=statistics.fmean(values),
         stddev=statistics.pstdev(values),

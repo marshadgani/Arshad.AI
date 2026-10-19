@@ -122,11 +122,26 @@ def test_invalid_service_id_is_422(client):
     assert resp.json()["error"]["code"] == "invalid_service_id"
 
 
-def test_deploy_id_is_not_format_validated(monkeypatch, client):
+@pytest.mark.parametrize(
+    "bad", ["garbage!!", "..", ".", "dep-", "srv-abc", "dep-" + "a" * 65, "dep-a%2Fb"]
+)
+def test_malformed_deploy_id_is_rejected_before_any_render_call(
+    monkeypatch, client, bad
+):
     spy = AsyncMock(return_value=None)
     monkeypatch.setattr(route, "_fetch_deploy_record", spy)
-    d = _data(client.get(f"/api/v1/render/services/{SID}/deploys/garbage!!/verdict"))
-    assert spy.await_args.args[1] == "garbage!!"
+    resp = client.get(f"/api/v1/render/services/{SID}/deploys/{bad}/verdict")
+    assert resp.status_code in (404, 422)
+    if resp.status_code == 422:
+        assert resp.json()["error"]["code"] == "invalid_deploy_id"
+    spy.assert_not_awaited()
+
+
+def test_well_formed_deploy_id_reaches_render(monkeypatch, client):
+    spy = AsyncMock(return_value=None)
+    monkeypatch.setattr(route, "_fetch_deploy_record", spy)
+    d = _data(client.get(f"/api/v1/render/services/{SID}/deploys/dep-abc123/verdict"))
+    assert spy.await_args.args[1] == "dep-abc123"
     assert d["partial_failures"] == ["deploy_record"]
 
 

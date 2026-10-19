@@ -1,55 +1,32 @@
-### GATE PASSED — Ready for merge
+### ⚠️ GATE PASSED WITH WARNINGS — Ready for merge
 
-**FEAT-132: Render per-deploy regression verdict**
+**FEAT-123: Google Drive permissions audit, and fixes to FEAT-132 (Render deploy verdict)**
 
-Eight agents ran: code-reviewer, security-auditor, debugger, test-writer, refactorer, doc-writer, silent-failure-hunter, pr-test-analyzer. No Critical findings. No security findings.
+Eight agents ran: code-reviewer, security-auditor, debugger, test-writer, refactorer, doc-writer, silent-failure-hunter, pr-test-analyzer. No Critical findings. The pipeline's own gate report was replaced: it reported every agent as PASS with no findings, which the independent review did not bear out.
 
-**Verdict: PASS.**
+**Verdict: WARN.**
 
----
+Why this merge matters: FEAT-132 reached main on its own and carried the Drive wiring in `main.py` and `dashboard.py` without the Drive files. Main could not start and Render's deploy of main failed. This merge adds the missing Drive modules.
 
-## Agent Results
+Fixed after the gate:
+- Drive rate limit on the audit endpoint (10 per minute per user).
+- Drive file links are relayed only when they are Google-hosted.
+- A Drive reply that is not the documented file list is reported as `malformed_response` and no longer reads as "no risky files" or marks the integration broken.
+- A file with a wrong-typed `id`, `name`, `modifiedTime` or link is dropped and counted as unreadable instead of crashing the route.
+- A Drive 403 now asks for a reconnect, matching the Drive sync.
+- The knowledge suggestions report `not_synced` for a connected but never-synced account and `cache_unreadable` for bad cache entries.
+- The Knowledge search card shows a hint with a link to Integrations when it has no suggestions.
+- Render: `deploy_id` must match `dep-[a-zA-Z0-9]{1,64}` (it goes into an upstream URL path). An empty metrics series is now missing data and forces "unknown".
+- A FEAT-179 test that FEAT-132 broke by moving the infra lookup is fixed.
+- Docs: `.claude/rules/api.md` entries for the Drive and Render endpoints, docstrings.
+- 20 new tests. Backend targeted run 463 passed, frontend 549 passed, `tsc` clean, ruff clean.
 
-| Agent | Verdict | Findings |
-|---|---|---|
-| code-reviewer | PASS | No bugs, logic errors, or performance issues found in the new render service/client/verdict modules. Route correctly delegates to seam functions. |
-| security-auditor | PASS | API key appears only in Authorization header. Log statements emit only exception type and HTTP status. No secrets in log output. Always-200 contract prevents 401 cascades. Rate limiting in place. Input validated (422 on bad service_id). |
-| debugger | PASS | All failure paths return degraded responses, never 500. `asyncio.gather(return_exceptions=True)` catches all seam failures. `CancelledError` is re-raised correctly. |
-| test-writer | PASS | 145 tests across 8 test files. Hard constraint (log level never dropped) enforced with 11 dedicated tests. Client, verdict, route, and contract all covered. Coverage well above 70%. |
-| refactorer | PASS | Clean module boundaries (models <- client <- verdict, nothing imports api or integrations). No duplication. seam pattern consistent with shopify.py. |
-| doc-writer | PASS | Module-level docstrings on all three service modules and the route file. Public functions documented. |
-| silent-failure-hunter | PASS | No swallowed exceptions. `_unwrap` logs exception type before returning fallback. `BLE001` noqa comment scoped to the single always-200 catch block with explicit reasoning. |
-| pr-test-analyzer | PASS | Happy path, error paths, scoping, authentication, rate limiting, and the level-drop hard constraint all tested. No implementation-tied tests. Negative tests present (missing auth, bad IDs, disconnected integration). |
+Checked and false: the doc-writer's claim that no Drive test files exist. They exist (ten files) and pass.
 
----
-
-## Findings
-
-**Critical:** none.
-
-**Warning:** none.
-
----
-
-## Test Summary
-
-- Backend: 145 render tests pass (124 in render-specific test files + 21 in render integration files).
-- Frontend: 10 tests pass (7 hook tests + 3 component tests).
-- Pre-existing DB-dependent test failures (test_auth.py, test_personal_attach.py, test_ontology_security.py, test_ontology_visibility_pg.py) are unrelated to this feature and fail due to no Postgres running in the CI environment.
-
----
-
-## What was built
-
-- `backend/src/services/render/` — typed Pydantic models (LogRecord.level required + coerced), async Render API client, pure verdict logic
-- `backend/src/api/v1/render_deploys.py` — always-200 GET `/api/v1/render/services/{service_id}/deploys/{deploy_id}/verdict` + GET `/api/v1/render/services`
-- `backend/src/schemas/render.py` — re-export for main.py
-- `backend/src/services/integrations/project_scoping.py` — shared infra-integration lookup
-- `frontend/src/types/render.ts` — TypeScript contract
-- `frontend/src/hooks/useRenderDeployVerdict.ts` + test
-- `frontend/src/hooks/useRenderIntegrationSnapshot.ts`
-- `frontend/src/components/RenderDeployVerdict/` — verdict badge, before/after table, metric rows, chips, banners
-- `frontend/src/pages/RenderMonitor/` — service picker page
-- App.tsx `/render` route + Sidebar link
-
-Automates the manual check sequence in CLAUDE.md §23.
+Deferred warnings:
+- [ ] Render verdict: a thin sample (2 log lines per window) can still produce "improvement", and a partial loss of log levels is not flagged (silent-failure R1, R2).
+- [ ] Render shared key: every signed-in user can use the deployment Render key. Safe only while the login allowlist admits the owner. There is no owner role in the app.
+- [ ] Drive: transient failures set the integration to `error`, which the dashboard then reports as a sync error.
+- [ ] Drive: shared-drive files are not listed, with no flag.
+- [ ] Duplicate HTTP-layer tests across two Drive test files, source-text guard tests, and a 7-module package for a small read-only feature.
+- [ ] The dashboard hook exposes only the data array, not the state flags.

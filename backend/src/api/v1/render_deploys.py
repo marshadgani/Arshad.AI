@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from datetime import datetime, timezone
 from typing import Any
 
@@ -61,6 +62,12 @@ _NOT_LIVE_STATUSES = frozenset(
 _log = logging.getLogger(__name__)
 
 # ── Collaborator seams (monkeypatchable module globals) ──────────────────
+
+
+# Render deploy ids look like dep-<alphanumerics>. The id goes into an upstream
+# URL path, and dot segments would survive URL quoting, so anything else is
+# refused before any request is made.
+_DEPLOY_ID = re.compile(r"dep-[a-zA-Z0-9]{1,64}")
 
 
 async def _check_rate_limit(user_id: str) -> None:
@@ -207,6 +214,12 @@ async def deploy_verdict(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
             "invalid_service_id",
             "Service ID must match pattern (srv|crn)-[a-zA-Z0-9]+",
+        )
+    if not _DEPLOY_ID.fullmatch(deploy_id):
+        raise http_error(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "invalid_deploy_id",
+            "Deploy ID must match pattern dep-[a-zA-Z0-9]{1,64}",
         )
     await _check_rate_limit(str(user.id))
 

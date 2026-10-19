@@ -1,4 +1,5 @@
 import { FormEvent, useState } from 'react';
+import { Link } from 'react-router-dom';
 
 import { MAX_HANDOFF_CHARS, useHandOffToChat } from '../../hooks/useHandOffToChat';
 import { CardHeader } from '../CardHeader';
@@ -45,6 +46,12 @@ export function KnowledgeSearchCard({ suggestions }: KnowledgeSearchCardProps) {
         <CardSkeleton rows={1} />
       ) : (
         <div className={styles.searchSuggest}>
+          {suggestions.length === 0 && (
+            <p>
+              No suggestions yet. Connect or sync Google Drive on the{' '}
+              <Link to="/integrations">Integrations page</Link> to see your recent files here.
+            </p>
+          )}
           {suggestions.map((s) => (
             <button key={s} type="button" className={styles.suggestion} onClick={() => handOff(s)}>
               {s}
