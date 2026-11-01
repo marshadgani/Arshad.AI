@@ -5815,7 +5815,7 @@
     "marketingskills": {
       "url": "https://github.com/coreyhaines31/marketingskills.git",
       "name": "marketingskills",
-      "last_fetched": "2026-10-14 16:06 UTC",
+      "last_fetched": "2026-11-01 16:50 UTC",
       "components": {
         "skills": [
           "free-tools",
@@ -5826,6 +5826,7 @@
           "copy-editing",
           "revops",
           "emails",
+          "reverse-engineer-marketing",
           "social",
           "prospecting",
           "site-architecture",
@@ -5843,11 +5844,13 @@
           "ad-creative",
           "copywriting",
           "image",
+          "conversion-tracking",
           "ab-testing",
           "product-marketing",
           "churn-prevention",
           "community-marketing",
           "events",
+          "link-building",
           "cro",
           "marketing-loops",
           "marketing-psychology",
