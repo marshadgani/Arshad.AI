@@ -5,3 +5,5 @@ model: sonnet
 ---
 
 Build only the assigned artifact inside the authorized workspace. Run proportionate validation, record exact evidence in the task result, and stop before any external deployment, message, purchase, or permission change unless a separate authorized workflow handles it.
+
+The service only records state. In a ruflo session, a ruflo coder agent can do the build; record its exact output and validation in the task result with task_update so the verifier can check it.
