@@ -4646,7 +4646,7 @@
     "learn-claude-code": {
       "url": "https://github.com/shareAI-lab/learn-claude-code.git",
       "name": "learn-claude-code",
-      "last_fetched": "2026-10-14 16:05 UTC",
+      "last_fetched": "2026-11-01 16:50 UTC",
       "components": {
         "skills": [
           "agent-builder",
