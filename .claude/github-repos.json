@@ -4418,7 +4418,7 @@
     "openmontage": {
       "url": "https://github.com/calesthio/OpenMontage.git",
       "name": "OpenMontage",
-      "last_fetched": "2026-10-14 16:04 UTC",
+      "last_fetched": "2026-11-01 16:49 UTC",
       "components": {
         "skills": [
           "flux-best-practices",
@@ -4480,6 +4480,7 @@
           "threejs-materials",
           "hyperframes-cli",
           "vercel-composition-patterns",
+          "provider-refresh-oct23",
           "atlas-cloud",
           "provider-model-refresh",
           "video-download",
@@ -4609,9 +4610,10 @@
     "orca": {
       "url": "https://github.com/stablyai/orca.git",
       "name": "orca",
-      "last_fetched": "2026-10-14 16:05 UTC",
+      "last_fetched": "2026-11-01 16:49 UTC",
       "components": {
         "skills": [
+          "orca-plugin-authoring",
           "computer-use",
           "orchestration",
           "linear-tickets",
@@ -4629,15 +4631,15 @@
         "hooks": [],
         "token_optimization": [
           "pane-agent-identity-resolver.ts",
+          "agent-hook-listener-claude-turn-state.test.ts",
           "agent-title-identity.ts",
           "global-settings-types.ts",
-          "claude-events.ts",
           "claude-lifecycle-events.ts",
-          "claude-status-build.ts",
           "jcode-turn-prompt.test.ts",
           "provider-event-routing.ts",
           "terminal-title-agent-type.ts",
-          "agent-task-complete-notify.ts"
+          "pty-exit-hibernate.ts",
+          "parked-terminal-byte-watcher.test.ts"
         ]
       }
     },
