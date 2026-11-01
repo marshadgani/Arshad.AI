@@ -3729,7 +3729,7 @@
     "agent-skills": {
       "url": "https://github.com/addyosmani/agent-skills.git",
       "name": "agent-skills",
-      "last_fetched": "2026-10-14 16:04 UTC",
+      "last_fetched": "2026-11-01 16:48 UTC",
       "components": {
         "skills": [
           "interview-me",
