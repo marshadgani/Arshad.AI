@@ -1,11 +1,12 @@
 ---
+disable-model-invocation: true
 name: "cs-caveman"
-description: "/cs:caveman — Activate persistent caveman-mode. Ultra-compressed responses with technical substance preserved. Auto-clarity exception for warnings + destructive ops. Stays active until 'stop caveman' / 'normal mode'."
+description: "/cs-caveman — Activate persistent caveman-mode. Ultra-compressed responses with technical substance preserved. Auto-clarity exception for warnings + destructive ops. Stays active until 'stop caveman' / 'normal mode'."
 ---
 
-# /cs:caveman — Caveman Mode
+# /cs-caveman — Caveman Mode
 
-**Command:** `/cs:caveman`
+**Command:** `/cs-caveman`
 
 Activate caveman mode. Stays active until explicit deactivation.
 
@@ -47,20 +48,20 @@ User types: "stop caveman" / "normal mode" → resume normal prose.
 
 ```bash
 # Compress text
-python ../skills/caveman/scripts/caveman_compressor.py "text"
+python ${CLAUDE_PLUGIN_ROOT}/skills/caveman/scripts/caveman_compressor.py "text"
 
 # Estimate token savings at price
-python ../skills/caveman/scripts/token_savings_estimator.py "text" --price-per-mtok 3.00
+python ${CLAUDE_PLUGIN_ROOT}/skills/caveman/scripts/token_savings_estimator.py "text" --price-per-mtok 3.00
 
 # Verify response follows caveman rules
-python ../skills/caveman/scripts/caveman_lint.py "response"
+python ${CLAUDE_PLUGIN_ROOT}/skills/caveman/scripts/caveman_lint.py "response"
 ```
 
 ## Related
 
 - Agent: [`cs-caveman-mode`](../agents/cs-caveman-mode.md)
 - Skill: [`caveman`](../skills/caveman/SKILL.md)
-- Adjacent: `/cs:grill-me`, `/cs:handoff` (other Pocock-derived skills)
+- Adjacent: `/cs-grill-me`, `/cs-handoff` (other Pocock-derived skills)
 
 ---
 

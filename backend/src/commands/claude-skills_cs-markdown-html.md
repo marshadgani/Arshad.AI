@@ -1,9 +1,10 @@
 ---
+disable-model-invocation: true
 description: Top-level markdown-to-HTML router. Classifies the input markdown (document / review / slides), checks the design-system onboarding gate + 100-line threshold, then forks context to the right converter sub-skill via the markdown-html-orchestrator skill. Returns a ≤100-word digest with input lines, output path, design style, top features used, and one forcing question.
 argument-hint: "<path to markdown file>"
 ---
 
-# /cs:markdown-html — Markdown-to-HTML router
+# /cs-markdown-html — Markdown-to-HTML router
 
 Route this conversion through the `markdown-html-orchestrator` skill:
 
@@ -12,7 +13,7 @@ Route this conversion through the `markdown-html-orchestrator` skill:
 ## Pre-flight gates (refuse and surface, never override)
 
 1. **Input < 100 lines.** Markdown still wins below the threshold (Shihipar). Refuse with the line count + recommendation to keep as markdown.
-2. **Design-system not onboarded.** Surface `python3 markdown-html/skills/design-system/scripts/onboard.py` and re-prompt after.
+2. **Design-system not onboarded.** Surface `python3 ${CLAUDE_PLUGIN_ROOT}/skills/design-system/scripts/onboard.py` and re-prompt after.
 3. **Output directory unwritable.** Refuse; let the user fix the path or re-onboard.
 
 ## Routing (deterministic, two-signal threshold)
@@ -26,11 +27,11 @@ Route this conversion through the `markdown-html-orchestrator` skill:
 Pipeline:
 
 ```bash
-python3 markdown-html/skills/markdown-html-orchestrator/scripts/doctype_classifier.py \
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/markdown-html-orchestrator/scripts/doctype_classifier.py \
     --input "$ARGUMENTS" --output json \
-  | python3 markdown-html/skills/markdown-html-orchestrator/scripts/route_explainer.py
+  | python3 ${CLAUDE_PLUGIN_ROOT}/skills/markdown-html-orchestrator/scripts/route_explainer.py
 
-python3 markdown-html/skills/markdown-html-orchestrator/scripts/output_path_resolver.py \
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/markdown-html-orchestrator/scripts/output_path_resolver.py \
     --input "$ARGUMENTS" --doctype <verdict>
 ```
 
@@ -55,4 +56,4 @@ python3 markdown-html/skills/markdown-html-orchestrator/scripts/output_path_reso
 
 ## Status
 
-All five skills are live (orchestrator + `design-system` + the three converters). This command runs the classifier + design-system gate, then hands the conversion to the routed converter sub-skill (`/cs:md-document`, `/cs:md-review`, or `/cs:md-slides`). Never render HTML inline — the converter scripts own the rendering.
+All five skills are live (orchestrator + `design-system` + the three converters). This command runs the classifier + design-system gate, then hands the conversion to the routed converter sub-skill (`/cs-md-document`, `/cs-md-review`, or `/cs-md-slides`). Never render HTML inline — the converter scripts own the rendering.

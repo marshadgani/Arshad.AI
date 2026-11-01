@@ -1,11 +1,12 @@
 ---
 name: research-finance
-description: Use when managing the money for an internal R&D program or portfolio — building a multi-period program budget with the F&A (indirect) split, tracking burn rate and runway against value-inflection milestones, or routing R&D cost items to a capitalize-vs-expense determination. Every budget output surfaces its assumptions block; capitalize-vs-expense is decision-support only and routes to a named finance owner — it never books an entry or decides accounting treatment. Distinct from finance/financial-analysis (corporate DCF, close, valuation) and research/grants (funding discovery — this manages money already won).
-version: 2.9.0
-author: claude-code-skills
+description: "Use for R&D program money: multi-period budgets with indirect cost split, burn and runway against milestones, or capitalize vs expense routing. Runs program_budget_planner.py, burn_runway_tracker.py and capex_vs_opex_router.py."
 license: MIT
-tags: [research-ops, research-finance, rd-budget, burn-rate, runway, fa-rate, capitalize-vs-expense, portfolio]
-compatible_tools: [claude-code, codex-cli, cursor, antigravity, opencode, gemini-cli]
+metadata:
+  version: 2.9.0
+  author: claude-code-skills
+  tags: [research-ops, research-finance, rd-budget, burn-rate, runway, fa-rate, capitalize-vs-expense, portfolio]
+  compatible_tools: [claude-code, codex-cli, cursor, antigravity, opencode, gemini-cli]
 ---
 
 # research-finance
@@ -69,11 +70,11 @@ Answers are saved to `~/.config/research-ops/research-finance.json` (global) or 
 This skill ships an **isolated, opt-in** bridge to `engineering/autoresearch-agent`. Only when you ask to "optimize" / "extend runway" / "run a loop" does an autoresearch experiment iteratively improve a program plan against this skill's runway metric. `scripts/ar_evaluator.py` is the ground-truth evaluator; it prints `runway_months: <float>` (higher is better).
 
 ```bash
-/ar:setup --domain custom --name extend-runway \
+/autoresearch-agent:setup --domain custom --name extend-runway \
   --target ledger.json \
   --eval "python3 ar_evaluator.py --target ledger.json" \
   --metric runway_months --direction higher
-/ar:loop custom/extend-runway
+/ar-loop custom/extend-runway
 ```
 
 Isolated: no hard dependency — autoresearch runs only on demand, and the loop edits `ledger.json`, never the evaluator.
@@ -121,7 +122,7 @@ The sample budget excludes the sequencer (capital equipment) and CRO subaward fr
 
 ## Forcing-question library (Matt Pocock grill discipline)
 
-Walked one at a time by `/cs:grill-research-ops` or the orchestrator. Recommended answer + canon citation per question. Never bundled.
+Walked one at a time by `/cs-grill-research-ops` or the orchestrator. Recommended answer + canon citation per question. Never bundled.
 
 1. **"Is this spend in the research phase or the development phase — and can you evidence technical feasibility?"**
    Recommended: research = expense; development = capitalize-candidate only with feasibility evidence, routed to a named finance owner.

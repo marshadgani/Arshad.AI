@@ -1,6 +1,6 @@
 ---
 name: grill-with-docs
-description: Docs-anchored grilling session — challenges a plan against the project's existing language (CONTEXT.md) and recorded decisions (docs/adr/), and updates those files inline as terminology and decisions crystallise. Use when user wants to stress-test a plan against documented domain language, or mentions "grill with docs".
+description: "Use when a plan should be stress-tested against the project's own docs (CONTEXT.md glossary, docs/adr decisions), or the user says 'grill with docs'. Scans ADRs with adr_scanner.py and updates the docs inline as terms and decisions settle."
 license: MIT
 metadata:
   derived_from: "https://github.com/mattpocock/skills/tree/main/skills/engineering/grill-with-docs"
@@ -12,7 +12,7 @@ metadata:
 
 # Grill with Docs
 
-> Derived from [Matt Pocock's grill-with-docs](https://github.com/mattpocock/skills/tree/main/skills/engineering/grill-with-docs) (MIT, © 2026 Matt Pocock). Matt's interview discipline + docs-anchored grilling rules preserved verbatim under MIT. Additions in this repo: 3 stdlib validators (CONTEXT.md linter, ADR scanner, glossary↔code consistency check), 3 in-depth references each citing 7+ authoritative sources, `cs-grill-with-docs` agent, `/cs:grill-with-docs` command. See [Wrapper additions](#wrapper-additions) below.
+> Derived from [Matt Pocock's grill-with-docs](https://github.com/mattpocock/skills/tree/main/skills/engineering/grill-with-docs) (MIT, © 2026 Matt Pocock). Matt's interview discipline + docs-anchored grilling rules preserved verbatim under MIT. Additions in this repo: 3 stdlib validators (CONTEXT.md linter, ADR scanner, glossary↔code consistency check), 3 in-depth references each citing 7+ authoritative sources, `cs-grill-with-docs` agent, `/cs-grill-with-docs` command. See [Wrapper additions](#wrapper-additions) below.
 
 <what-to-do>
 
@@ -135,7 +135,7 @@ The additions below are **not** part of Matt's upstream skill. They operationali
 ### Companion
 
 - Agent: `cs-grill-with-docs` (see `../../agents/cs-grill-with-docs.md`)
-- Command: `/cs:grill-with-docs` (see `../../commands/cs-grill-with-docs.md`)
+- Command: `/cs-grill-with-docs` (see `../../commands/cs-grill-with-docs.md`)
 
 ---
 

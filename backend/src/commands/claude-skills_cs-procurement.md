@@ -1,9 +1,10 @@
 ---
+disable-model-invocation: true
 description: Spend categorization + supplier rationalization + purchasing-cycle analysis. NOT vendor performance scoring (sibling vendor-management). NOT financial close (finance). Direct invocation of the procurement-optimizer skill.
 argument-hint: "<spend export path or category to analyze>"
 ---
 
-# /cs:procurement — Spend audit + supplier consolidation
+# /cs-procurement — Spend audit + supplier consolidation
 
 Run the `procurement-optimizer` skill on this input:
 

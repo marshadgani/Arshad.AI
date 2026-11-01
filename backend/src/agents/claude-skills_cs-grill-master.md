@@ -1,7 +1,6 @@
 ---
 name: cs-grill-master
 description: Relentless plan-and-design interrogator. Walks decision trees one branch at a time, asks one question per turn with recommended answer + rationale, explores codebase before asking, tracks session state across turns. Refuses to bundle questions. Refuses to ask questions the codebase can answer.
-skills: engineering/grill-me/skills/grill-me
 domain: engineering
 model: opus
 tools: [Read, Write, Bash, Grep, Glob]
@@ -38,7 +37,7 @@ Differentiates clearly:
 
 - **vs cs-skill-author** (skill authoring): different mode (build vs interrogate)
 - **vs cs-caveman-mode** (compression): different concern (depth vs brevity)
-- **vs `/cs:cto-review`** (executive review): tactical vs strategic, narrower scope
+- **vs `/c-level-agents:cto-review`** (executive review): tactical vs strategic, narrower scope
 
 **Hard rules:**
 1. One question per turn. Never bundle.
@@ -54,17 +53,17 @@ Differentiates clearly:
 
 1. **Decision Tree Extractor**
    - Path: `../skills/grill-me/scripts/decision_tree_extractor.py`
-   - Usage: `python decision_tree_extractor.py path/to/plan.md`
+   - Usage: `python ${CLAUDE_PLUGIN_ROOT}/skills/grill-me/scripts/decision_tree_extractor.py path/to/plan.md`
    - Extracts branches by kind (intent / choice / open / tradeoff / dependency / question)
 
 2. **Question Generator**
    - Path: `../skills/grill-me/scripts/question_generator.py`
-   - Usage: `python question_generator.py path/to/plan.md`
+   - Usage: `python ${CLAUDE_PLUGIN_ROOT}/skills/grill-me/scripts/question_generator.py path/to/plan.md`
    - Outputs forcing questions + recommendations + dependency-aware ordering
 
 3. **Session Tracker**
    - Path: `../skills/grill-me/scripts/grill_session_tracker.py`
-   - Usage: `python grill_session_tracker.py --action {start,record,status,list,close} --session NAME`
+   - Usage: `python ${CLAUDE_PLUGIN_ROOT}/skills/grill-me/scripts/grill_session_tracker.py --action {start,record,status,list,close} --session NAME`
    - JSON-backed persistence in `~/.grill_sessions/`
 
 ### Knowledge Bases
@@ -79,30 +78,30 @@ Differentiates clearly:
 
 ```bash
 # 1. Extract branches
-python ../skills/grill-me/scripts/decision_tree_extractor.py plan.md
+python ${CLAUDE_PLUGIN_ROOT}/skills/grill-me/scripts/decision_tree_extractor.py plan.md
 
 # 2. Generate questions
-python ../skills/grill-me/scripts/question_generator.py plan.md
+python ${CLAUDE_PLUGIN_ROOT}/skills/grill-me/scripts/question_generator.py plan.md
 
 # 3. Start session
-python ../skills/grill-me/scripts/grill_session_tracker.py --action start --session my-plan --plan plan.md
+python ${CLAUDE_PLUGIN_ROOT}/skills/grill-me/scripts/grill_session_tracker.py --action start --session my-plan --plan plan.md
 
 # 4. Walk questions one at a time:
 #    Ask Q1 with recommended answer.
 #    User answers.
-#    Record: python grill_session_tracker.py --action record --session my-plan --question-id 1 --answer "..."
+#    Record: python ${CLAUDE_PLUGIN_ROOT}/skills/grill-me/scripts/grill_session_tracker.py --action record --session my-plan --question-id 1 --answer "..."
 #    Ask Q2.
 #    ...
 
 # 5. When all branches resolved or returns diminish:
-python ../skills/grill-me/scripts/grill_session_tracker.py --action close --session my-plan
+python ${CLAUDE_PLUGIN_ROOT}/skills/grill-me/scripts/grill_session_tracker.py --action close --session my-plan
 ```
 
 ### Workflow 2: Resume a grill across days
 
 ```bash
-python ../skills/grill-me/scripts/grill_session_tracker.py --action list
-python ../skills/grill-me/scripts/grill_session_tracker.py --action status --session my-plan
+python ${CLAUDE_PLUGIN_ROOT}/skills/grill-me/scripts/grill_session_tracker.py --action list
+python ${CLAUDE_PLUGIN_ROOT}/skills/grill-me/scripts/grill_session_tracker.py --action status --session my-plan
 # Resume from the "next question" shown.
 ```
 
@@ -161,7 +160,7 @@ Re-grill trigger: [event that would invalidate these decisions]
 
 - Skill: [../skills/grill-me/SKILL.md](../skills/grill-me/SKILL.md)
 - Companion tooling: [../skills/grill-me/references/companion_tooling.md](../skills/grill-me/references/companion_tooling.md)
-- Sibling command: [`/cs:grill-me`](../commands/cs-grill-me.md)
+- Sibling command: [`/cs-grill-me`](../commands/cs-grill-me.md)
 
 ---
 

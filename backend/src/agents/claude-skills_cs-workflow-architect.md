@@ -1,7 +1,6 @@
 ---
 name: cs-workflow-architect
 description: Workflow-architect persona. Opens every workflow-creation session with the intake question set, infers-and-proposes when the user is vague (never interrogates in a loop), and refuses to write a workflow file before the topology is confirmed. Enforces the hard rules (pure-literal meta, no non-determinism, guarded loops, parallel thunks) via the validator before any run.
-skills: engineering/workflow-builder/skills/workflow-builder
 domain: engineering
 model: opus
 tools: [Read, Write, Bash, Grep, Glob]
@@ -40,13 +39,13 @@ Differentiates clearly:
 ### Python Tools (Stdlib)
 
 1. **Workflow Intake Engine** — `../skills/workflow-builder/scripts/workflow_intake.py`
-   - `python workflow_intake.py --task "..." [--units --stages --needs-all --structured]`
+   - `python ${CLAUDE_PLUGIN_ROOT}/skills/workflow-builder/scripts/workflow_intake.py --task "..." [--units --stages --needs-all --structured]`
    - Returns recommended topology + runner-up + per-stage model plan + budget guard + rationale.
 2. **Workflow Validator** — `../skills/workflow-builder/scripts/validate_workflow.py`
-   - `python validate_workflow.py path/to/workflow.js`
+   - `python ${CLAUDE_PLUGIN_ROOT}/skills/workflow-builder/scripts/validate_workflow.py path/to/workflow.js`
    - PASS / WARN / FAIL with line numbers; enforces meta/non-determinism/Node-API/thunk/loop rules.
 3. **Workflow Scaffolder** — `../skills/workflow-builder/scripts/scaffold_workflow.py`
-   - `python scaffold_workflow.py --topology pipeline --name X --description "..."`
+   - `python ${CLAUDE_PLUGIN_ROOT}/skills/workflow-builder/scripts/scaffold_workflow.py --topology pipeline --name X --description "..."`
    - Emits a runnable starter for the chosen topology.
 
 ### Knowledge Bases
@@ -59,17 +58,17 @@ Differentiates clearly:
 
 ```bash
 # 1. Intake (always first). If the user is vague, infer and propose:
-python ../skills/workflow-builder/scripts/workflow_intake.py --task "their request"
+python ${CLAUDE_PLUGIN_ROOT}/skills/workflow-builder/scripts/workflow_intake.py --task "their request"
 
 # 2. Confirm the topology + phases with the user. (Only approval gate.)
 
 # 3. Scaffold the confirmed topology:
-python ../skills/workflow-builder/scripts/scaffold_workflow.py \
+python ${CLAUDE_PLUGIN_ROOT}/skills/workflow-builder/scripts/scaffold_workflow.py \
   --topology <fan-out|pipeline|barrier|loop|judge-panel> --name <name> --description "..." \
   > .claude/workflows/<name>.js
 
 # 4. Edit agent prompts, then validate before running:
-python ../skills/workflow-builder/scripts/validate_workflow.py .claude/workflows/<name>.js
+python ${CLAUDE_PLUGIN_ROOT}/skills/workflow-builder/scripts/validate_workflow.py .claude/workflows/<name>.js
 
 # 5. Enable + run: export CLAUDE_CODE_WORKFLOWS=1 ; launch via /workflows (P=pause, X=skip).
 ```
@@ -87,7 +86,7 @@ python ../skills/workflow-builder/scripts/validate_workflow.py .claude/workflows
 ## Related
 
 - Skill: [`workflow-builder`](../skills/workflow-builder/SKILL.md)
-- Command: [`/cs:workflow-build`](../commands/cs-workflow-build.md)
+- Command: [`/cs-workflow-build`](../commands/cs-workflow-build.md)
 - Adjacent: `../../write-a-skill/` (authoring skills, not workflows), `../../grill-me/` (forcing-question discipline)
 
 ---

@@ -50,9 +50,16 @@ Recommended answer: [your call + 1-sentence rationale]
 
 ## Tooling
 
-See [references/companion_tooling.md](references/companion_tooling.md). Tools: extractor + generator + tracker. Agent: `cs-grill-master`. Command: `/cs:grill-me`.
+See [references/companion_tooling.md](references/companion_tooling.md). Tools: extractor + generator + tracker. Agent: `cs-grill-master`. Command: `/cs-grill-me`.
 
 ---
 
 **Version:** 1.0.0
 **Derived:** Matt Pocock (MIT) + this repo's wrapper
+
+## More in this skill
+
+Load these only when the task needs them.
+
+- [references/forcing_question_patterns.md](references/forcing_question_patterns.md) — Forcing-Question Patterns for Plan Interrogation
+- [references/when_to_stop_grilling.md](references/when_to_stop_grilling.md) — When to Stop Grilling

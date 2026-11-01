@@ -1,9 +1,10 @@
 ---
+disable-model-invocation: true
 description: Structured RFP/RFI/RFQ response with win-theme injection and proof-point matrix. NOT free-form proposal authoring (that's business-growth/contract-and-proposal-writer). Direct invocation of the rfp-responder skill.
 argument-hint: "<RFP document path or RFP requirements list>"
 ---
 
-# /cs:rfp-respond — RFP structured response + win-theme + winrate prediction
+# /cs-rfp-respond — RFP structured response + win-theme + winrate prediction
 
 Run the `rfp-responder` skill on this input:
 

@@ -1,11 +1,12 @@
 ---
+disable-model-invocation: true
 name: "cs-grill-me"
-description: "/cs:grill-me <path-to-plan> — Start a relentless interrogation of a plan or design. Walks decision tree one branch at a time. One question per turn with recommended answer. Explores codebase before asking."
+description: "/cs-grill-me <path-to-plan> — Start a relentless interrogation of a plan or design. Walks decision tree one branch at a time. One question per turn with recommended answer. Explores codebase before asking."
 ---
 
-# /cs:grill-me — Relentless Plan Interrogation
+# /cs-grill-me — Relentless Plan Interrogation
 
-**Command:** `/cs:grill-me <path-to-plan>`
+**Command:** `/cs-grill-me <path-to-plan>`
 
 The grill-master persona interrogates a plan one decision branch at a time.
 
@@ -36,22 +37,22 @@ The grill-master persona interrogates a plan one decision branch at a time.
 
 ```bash
 # 1. Extract decision branches from the plan
-python ../skills/grill-me/scripts/decision_tree_extractor.py path/to/plan.md
+python ${CLAUDE_PLUGIN_ROOT}/skills/grill-me/scripts/decision_tree_extractor.py path/to/plan.md
 
 # 2. Generate forcing questions with recommendations
-python ../skills/grill-me/scripts/question_generator.py path/to/plan.md
+python ${CLAUDE_PLUGIN_ROOT}/skills/grill-me/scripts/question_generator.py path/to/plan.md
 
 # 3. Start session
-python ../skills/grill-me/scripts/grill_session_tracker.py --action start --session NAME --plan path/to/plan.md
+python ${CLAUDE_PLUGIN_ROOT}/skills/grill-me/scripts/grill_session_tracker.py --action start --session NAME --plan path/to/plan.md
 
 # 4. Walk one question at a time:
 #    Persona asks Q1 with recommendation.
 #    User answers.
 #    Record:
-python ../skills/grill-me/scripts/grill_session_tracker.py --action record --session NAME --question-id 1 --answer "..."
+python ${CLAUDE_PLUGIN_ROOT}/skills/grill-me/scripts/grill_session_tracker.py --action record --session NAME --question-id 1 --answer "..."
 
 # 5. When complete:
-python ../skills/grill-me/scripts/grill_session_tracker.py --action close --session NAME
+python ${CLAUDE_PLUGIN_ROOT}/skills/grill-me/scripts/grill_session_tracker.py --action close --session NAME
 ```
 
 ## When to Stop
@@ -76,7 +77,7 @@ Recommended: [position] because [1-sentence rationale]
 
 - Agent: [`cs-grill-master`](../agents/cs-grill-master.md)
 - Skill: [`grill-me`](../skills/grill-me/SKILL.md)
-- Adjacent: `/cs:caveman`, `/cs:handoff`, `/cs:write-a-skill`
+- Adjacent: `/cs-caveman`, `/cs-handoff`, `/cs-write-a-skill`
 
 ---
 

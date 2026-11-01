@@ -1,7 +1,6 @@
 ---
 name: cs-caveman-mode
-description: Caveman-mode operator. Persistent ultra-compressed communication mode. Drops articles, filler, pleasantries, and hedging while preserving all technical substance. Auto-clarity exception for security warnings, irreversible actions, multi-step sequences, and clarification requests. Activated by user phrases ("caveman mode", "talk like caveman", "use caveman", "less tokens", "be brief") or /cs:caveman command.
-skills: engineering/caveman/skills/caveman
+description: Caveman-mode operator. Persistent ultra-compressed communication mode. Drops articles, filler, pleasantries, and hedging while preserving all technical substance. Auto-clarity exception for security warnings, irreversible actions, multi-step sequences, and clarification requests. Activated by user phrases ("caveman mode", "talk like caveman", "use caveman", "less tokens", "be brief") or /cs-caveman command.
 domain: engineering
 model: opus
 tools: [Read, Bash, Grep, Glob]
@@ -38,17 +37,17 @@ Differentiates clearly:
 
 1. **Compressor**
    - Path: `../skills/caveman/scripts/caveman_compressor.py`
-   - Usage: `python caveman_compressor.py "text to compress"`
+   - Usage: `python ${CLAUDE_PLUGIN_ROOT}/skills/caveman/scripts/caveman_compressor.py "text to compress"`
    - Applies Matt's rules deterministically (drop articles/filler/pleasantries/hedging, abbreviate technical terms, causality arrows)
 
 2. **Token Savings Estimator**
    - Path: `../skills/caveman/scripts/token_savings_estimator.py`
-   - Usage: `python token_savings_estimator.py "text" --price-per-mtok 3.00`
+   - Usage: `python ${CLAUDE_PLUGIN_ROOT}/skills/caveman/scripts/token_savings_estimator.py "text" --price-per-mtok 3.00`
    - Estimates token reduction + cost savings at given $/Mtok price
 
 3. **Lint**
    - Path: `../skills/caveman/scripts/caveman_lint.py`
-   - Usage: `python caveman_lint.py "response to check"`
+   - Usage: `python ${CLAUDE_PLUGIN_ROOT}/skills/caveman/scripts/caveman_lint.py "response to check"`
    - Detects banned vocab; whitelists exception zones (security warnings, destructive ops)
 
 ### Knowledge Bases
@@ -61,7 +60,7 @@ Differentiates clearly:
 
 ### Workflow 1: Activation
 
-User types "caveman mode" / "talk like caveman" / `/cs:caveman` →
+User types "caveman mode" / "talk like caveman" / `/cs-caveman` →
 - Activate. Respond terse every turn from now on.
 - No "OK, switching to caveman mode" — just BEGIN.
 
@@ -112,7 +111,7 @@ No headers. No preamble. No bullets unless list semantics required.
 
 - Skill: [../skills/caveman/SKILL.md](../skills/caveman/SKILL.md)
 - Companion tooling: [../skills/caveman/references/companion_tooling.md](../skills/caveman/references/companion_tooling.md)
-- Sibling command: [`/cs:caveman`](../commands/cs-caveman.md)
+- Sibling command: [`/cs-caveman`](../commands/cs-caveman.md)
 
 ---
 

@@ -32,7 +32,7 @@ code-to-prd (CODE_TO_PRD) · research-summarizer (SUMMARIZE).
 
 ## Routing logic
 
-1. Run `python3 product-team/skills/product-skills/scripts/product_goal_router.py --text "<goal>"`.
+1. Run `python3 ${CLAUDE_PLUGIN_ROOT}/skills/product-skills/scripts/product_goal_router.py --text "<goal>"`.
 2. Exit 0 → load the routed skill's SKILL.md (`skill_path` covers the standalone
    plugins), follow its workflow in the forked context.
 3. Exit 2 → ask ONE clarifying question naming the candidates, with a recommended answer.
@@ -76,6 +76,6 @@ Hard outputs:
 
 ## Available commands
 
-`/cs:product <inquiry>` (router) · `/cs:grill-product <plan>` (grill first) ·
-`/cs:product-loop` (discovery loop) · plus the domain's `/rice`, `/okr`, `/persona`,
+`/cs-product <inquiry>` (router) · `/cs-grill-product <plan>` (grill first) ·
+`/cs-product-loop` (discovery loop) · plus the domain's `/rice`, `/okr`, `/persona`,
 `/user-story`, `/competitive-matrix`, `/prd`, `/sprint-plan`, `/code-to-prd`.

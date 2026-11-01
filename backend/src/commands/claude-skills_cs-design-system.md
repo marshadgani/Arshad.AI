@@ -1,14 +1,15 @@
 ---
+disable-model-invocation: true
 description: Run the one-time markdown-html design-system onboarding wizard. Captures brand primary/accent (HEX) + heading/body Google Fonts + design style (editorial/technical/minimal/playful) + default output directory + syntax theme + TOC behavior + optional logo/company. WCAG-AA validates body-text contrast; refuses if it fails. Stores at ~/.config/markdown-html/design-system.json (or project-scoped with --scope project). Every converter reads this config via config_loader.py before rendering.
 argument-hint: "[--defaults | --show | --reset | --set key=value | --scope global|project]"
 ---
 
-# /cs:design-system — Markdown-HTML design-system onboarding
+# /cs-design-system — Markdown-HTML design-system onboarding
 
 Run the design-system wizard:
 
 ```bash
-python3 markdown-html/skills/design-system/scripts/onboard.py $ARGUMENTS
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/design-system/scripts/onboard.py $ARGUMENTS
 ```
 
 ## Modes
@@ -46,11 +47,11 @@ python3 markdown-html/skills/design-system/scripts/onboard.py $ARGUMENTS
 Inspect the effective config:
 
 ```bash
-python3 markdown-html/skills/design-system/scripts/config_loader.py --show
-python3 markdown-html/skills/design-system/scripts/config_loader.py --status
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/design-system/scripts/config_loader.py --show
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/design-system/scripts/config_loader.py --status
 ```
 
-Then convert markdown via `/cs:markdown-html <path>.md`.
+Then convert markdown via `/cs-markdown-html <path>.md`.
 
 ## Bypass
 

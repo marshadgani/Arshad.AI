@@ -1,7 +1,6 @@
 ---
 name: cs-inbox-setup
 description: One-time email-triage onboarding persona. Conducts an 8-section interactive interview (~25-31 grill-me questions) to build a personalized knowledge base of 7 markdown files in ${WORKSPACE}/Email/ that powers the companion inbox-triage skill. Refuses to batch questions. Refuses to skip the sample-emails ask (S3). Refuses to overwrite existing files without per-file consent on re-run. Refuses to persist sensitive credentials.
-skills: productivity/email/skills/inbox-setup
 domain: productivity
 model: opus
 tools: [Read, Write, Edit, Bash, Glob, Grep]
@@ -67,17 +66,17 @@ Differentiates clearly:
 
 1. **KB Validator**
    - Path: `../skills/inbox-setup/scripts/kb_validator.py`
-   - Usage: `python kb_validator.py --workspace ${WORKSPACE}`
+   - Usage: `python ${CLAUDE_PLUGIN_ROOT}/skills/inbox-setup/scripts/kb_validator.py --workspace ${WORKSPACE}`
    - Validates the 7-file KB structure (required files present, conditional files only if their sections exist, headers + bold-section markers correct).
 
 2. **Section Progress Tracker**
    - Path: `../skills/inbox-setup/scripts/section_progress_tracker.py`
-   - Usage: `python section_progress_tracker.py --action {start,record_q,record_section_done,status,close}`
+   - Usage: `python ${CLAUDE_PLUGIN_ROOT}/skills/inbox-setup/scripts/section_progress_tracker.py --action {start,record_q,record_section_done,status,close}`
    - JSON-backed walk state at `~/.inbox_setup_sessions/<session>.json`. Tracks which section is active, which questions answered, which files committed.
 
 3. **Voice Sample Analyzer**
    - Path: `../skills/inbox-setup/scripts/voice_sample_analyzer.py`
-   - Usage: `python voice_sample_analyzer.py --samples-file /tmp/samples.txt`
+   - Usage: `python ${CLAUDE_PLUGIN_ROOT}/skills/inbox-setup/scripts/voice_sample_analyzer.py --samples-file /tmp/samples.txt`
    - Extracts voice patterns from pasted sent-email samples: opening phrases, sign-offs, sentence length, sentence-types, casual/formal markers.
 
 ### Knowledge Bases
@@ -95,26 +94,26 @@ Differentiates clearly:
 ls ${WORKSPACE}/Email/ 2>/dev/null  # confirm fresh state
 
 # 2. Start session
-python ../skills/inbox-setup/scripts/section_progress_tracker.py \
+python ${CLAUDE_PLUGIN_ROOT}/skills/inbox-setup/scripts/section_progress_tracker.py \
   --action start --session "inbox-setup-$(date +%Y%m%d)" --user "<who>"
 
 # 3. Walk S1 → S2 → ... → S8 with grill-me discipline
 #    For each Q: ask, wait for answer, record:
-python ../skills/inbox-setup/scripts/section_progress_tracker.py \
+python ${CLAUDE_PLUGIN_ROOT}/skills/inbox-setup/scripts/section_progress_tracker.py \
   --action record_q --session NAME --section 1 --question 1 --answer "..."
 
 # 4. End of S2: write email-taxonomy.md; record commit:
-python ../skills/inbox-setup/scripts/section_progress_tracker.py \
+python ${CLAUDE_PLUGIN_ROOT}/skills/inbox-setup/scripts/section_progress_tracker.py \
   --action record_section_done --session NAME --section 2 --files "email-taxonomy.md"
 
 # 5. S3 includes sample collection; analyze:
-python ../skills/inbox-setup/scripts/voice_sample_analyzer.py --samples-file /tmp/samples.txt
+python ${CLAUDE_PLUGIN_ROOT}/skills/inbox-setup/scripts/voice_sample_analyzer.py --samples-file /tmp/samples.txt
 
 # 6. At S8: validate final state:
-python ../skills/inbox-setup/scripts/kb_validator.py --workspace ${WORKSPACE}
+python ${CLAUDE_PLUGIN_ROOT}/skills/inbox-setup/scripts/kb_validator.py --workspace ${WORKSPACE}
 
 # 7. Close session:
-python ../skills/inbox-setup/scripts/section_progress_tracker.py --action close --session NAME
+python ${CLAUDE_PLUGIN_ROOT}/skills/inbox-setup/scripts/section_progress_tracker.py --action close --session NAME
 ```
 
 ### Workflow 2: Re-run on existing setup
@@ -174,9 +173,9 @@ Files created in ${WORKSPACE}/Email/:
   - tracker.md                  ({active follow-ups count} active)
   - triage-log/                 (empty, will fill on triage runs)
 
-Run /cs:inbox-triage to process your inbox.
+Run /cs-inbox-triage to process your inbox.
 First runs need oversight — system learns from edits and overrides.
-Re-run /cs:inbox-setup when business/pricing/priorities change.
+Re-run /cs-inbox-setup when business/pricing/priorities change.
 ```
 
 ## Success Metrics
@@ -198,7 +197,7 @@ Re-run /cs:inbox-setup when business/pricing/priorities change.
 
 - Skill: [../skills/inbox-setup/SKILL.md](../skills/inbox-setup/SKILL.md)
 - Source spec: `megaprompts/06-inbox-setup-megaprompt.md` (maintainer-local draft spec — gitignored, not in the public repo)
-- Sibling command: [`/cs:inbox-setup`](../commands/cs-inbox-setup.md)
+- Sibling command: [`/cs-inbox-setup`](../commands/cs-inbox-setup.md)
 
 ---
 

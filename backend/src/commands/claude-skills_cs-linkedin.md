@@ -1,12 +1,13 @@
 ---
+disable-model-invocation: true
 name: "cs-linkedin"
-description: "/cs:linkedin — Route any organic LinkedIn goal to the right lane (profile / strategy / content / engagement / analytics) after gating it against LinkedIn's User Agreement. Refuses automation, scraping, engagement pods, bulk DMs, fake identity, and fabricated proof before a word is drafted. Nothing is ever sent."
+description: "/cs-linkedin — Route any organic LinkedIn goal to the right lane (profile / strategy / content / engagement / analytics) after gating it against LinkedIn's User Agreement. Refuses automation, scraping, engagement pods, bulk DMs, fake identity, and fabricated proof before a word is drafted. Nothing is ever sent."
 argument-hint: "[what you want from LinkedIn — a goal, a profile problem, a post, an outreach plan, or a question about your numbers]"
 ---
 
-# /cs:linkedin — Gate, then route
+# /cs-linkedin — Gate, then route
 
-**Command:** `/cs:linkedin [your goal]`
+**Command:** `/cs-linkedin [your goal]`
 
 This plugin holds no LinkedIn credentials, makes no API calls, and sends nothing. Every
 output is text you paste and post yourself.
@@ -19,8 +20,8 @@ output is text you paste and post yourself.
 
 ## When NOT to run
 
-- You already know the lane → go straight to `/cs:linkedin-profile`, `/cs:linkedin-plan`,
-  `/cs:linkedin-post`, `/cs:linkedin-outreach`, or `/cs:linkedin-analyze`
+- You already know the lane → go straight to `/cs-linkedin-profile`, `/cs-linkedin-plan`,
+  `/cs-linkedin-post`, `/cs-linkedin-outreach`, or `/cs-linkedin-analyze`
 - X/Twitter → `marketing-skill/x-twitter-growth`
 - Multi-platform brand social calendars → `marketing-skill/social-content`
 - Cold email → `marketing-skill/cold-email`
@@ -39,14 +40,14 @@ output is text you paste and post yourself.
 
 ```bash
 # 1. Gate first, always
-python3 ../skills/linkedin-skills/scripts/linkedin_policy_gate.py \
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/linkedin-skills/scripts/linkedin_policy_gate.py \
   --text "<the user's own words>" --output human
 #    exit 4 REFUSE  -> name the rule, offer the substitute, route there instead
 #    exit 3 CONSTRAIN -> proceed and state the constraint out loud
 #    exit 0 ALLOW   -> proceed
 
 # 2. Route
-python3 ../skills/linkedin-skills/scripts/linkedin_goal_router.py \
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/linkedin-skills/scripts/linkedin_goal_router.py \
   --text "<the goal>" --output human
 #    exit 0 route · exit 2 ask ONE question · exit 3 ask what they want to walk away with
 ```
@@ -75,4 +76,4 @@ python3 ../skills/linkedin-skills/scripts/linkedin_goal_router.py \
 
 - Agent: [`cs-linkedin-orchestrator`](../agents/cs-linkedin-orchestrator.md)
 - Skill: [`linkedin-skills`](../skills/linkedin-skills/SKILL.md)
-- Siblings: [`/cs:grill-linkedin`](cs-grill-linkedin.md) and the six lane commands
+- Siblings: [`/cs-grill-linkedin`](cs-grill-linkedin.md) and the six lane commands

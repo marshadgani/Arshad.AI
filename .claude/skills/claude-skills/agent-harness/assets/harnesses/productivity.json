@@ -1,7 +1,7 @@
 {
   "schema": "agent-harness/manifest.v1",
   "domain": "productivity",
-  "skill_count": 11,
+  "skill_count": 12,
   "loop_defaults": {
     "max_attempts_per_task": 3,
     "max_loop_iterations": 12,
@@ -16,7 +16,7 @@
     {
       "name": "andreessen",
       "path": "productivity/andreessen/skills/andreessen",
-      "description": "Marc Andreessen-mode decision and productivity skill. A blunt, market-first operator that pressure-tests ideas, ventures, features, and career bets through Andreessen's actual frameworks \u2014 market dominates team and product; the only milestone that matters is product/market fit; bias to build over deliberate. Use when the user says 'andreessen', 'pmarca mode', 'should I build this', 'is there a market', 'are we at product/market fit', 'pmf check', 'pressure-test this idea', 'be brutal about this venture', 'market-first take', or wants a no-disclaimers, no-hedging, confidence-leveled verdict \u2026",
+      "description": "Use when the user wants a blunt market-first verdict on an idea, venture or career bet ('is there a market', 'are we at PMF', 'pmarca mode'), or a 3x5-card daily plan. Scores with market_first_evaluator.py and pmf_signal_scorer.py; leads with the strongest counterargument.",
       "tools": [
         {
           "script": "productivity/andreessen/skills/andreessen/scripts/anti_todo_card.py",
@@ -87,7 +87,7 @@
     {
       "name": "capture",
       "path": "productivity/capture/skills/capture",
-      "description": "Captures and organizes chaotic brain dumps into a structured, actionable system with zero information loss. Use this skill whenever the user says 'capture this', 'brain dump', 'let me dump some ideas', 'I've got a bunch of thoughts', 'here's everything on my mind', 'idea dump', 'let me get this out of my head', 'I need to organize my thoughts', 'here's what I'm thinking', or any variation where someone is unloading a messy stream of ideas, tasks, thoughts, and plans wanting them turned into something coherent. Also trigger when the user pastes or dictates a long, unstructured block of mixed \u2026",
+      "description": "Use whenever the user unloads a messy brain dump of ideas, tasks and plans ('capture this', 'brain dump', a long unstructured paste) and wants it organized. Sorts it with dump_classifier.py into projects, tasks and connections with nothing lost.",
       "tools": [
         {
           "script": "productivity/capture/skills/capture/scripts/complexity_estimator.py",
@@ -227,7 +227,7 @@
     {
       "name": "inbox-setup",
       "path": "productivity/email/skills/inbox-setup",
-      "description": "One-time setup skill that builds a personalized inbox triage knowledge base via interactive interview. Interviews the user about their email patterns, business context, reply style, and priorities using grill-me discipline (one question at a time, forcing format where possible, dependency-ordered, each question explains why I'm asking), then generates the knowledge base files that power the companion 'inbox-triage' skill. Run this once before using inbox-triage for the first time. Re-run when business, pricing, or priorities change significantly. Triggers: 'set up my inbox', 'configure \u2026",
+      "description": "Use when setting up email triage for the first time, before inbox-triage, or when priorities change. Interviews the user one question at a time and writes the knowledge base inbox-triage reads, validated with kb_validator.py.",
       "tools": [
         {
           "script": "productivity/email/skills/inbox-setup/scripts/kb_validator.py",
@@ -292,7 +292,7 @@
     {
       "name": "inbox-triage",
       "path": "productivity/email/skills/inbox-triage",
-      "description": "Runs a full inbox triage using the knowledge base created by the 'inbox-setup' skill. Light-intake by design (most invocations skip questions and run with KB-default preferences); asks at most 2 grill-me override questions when invocation is outside normal cadence or includes category-skip intent. Searches recent emails, classifies them via the user's taxonomy, researches new senders, generates recommendations, drafts replies (NEVER sends), delivers a report in the user's preferred format, and updates the knowledge base with learnings. Designed to run on a recurring schedule (1-3x daily) or \u2026",
+      "description": "Use when the user wants their inbox processed ('triage my inbox', 'check my email'). Classifies recent mail with the inbox-setup knowledge base, drafts replies it never sends (checked by draft_safety_validator.py) and reports.",
       "tools": [
         {
           "script": "productivity/email/skills/inbox-triage/scripts/draft_safety_validator.py",
@@ -357,7 +357,7 @@
     {
       "name": "fable-goal",
       "path": "productivity/fable-goal/skills/fable-goal",
-      "description": "Convert a rambling description of a desired outcome into one polished, autonomous /goal prompt ready to paste into a fresh session. Use when the user says \"/fable-goal\", \"turn this into a goal prompt\", \"write me a fable prompt\", \"write the prompt that builds X\", or rambles about something they want made and asks for the prompt that makes it happen. The output is a single copy-paste prompt, never the build itself. Do NOT use when the user wants the thing built right now in this session \u2014 only when they want the PROMPT that will make it happen in a fresh session.",
+      "description": "Use when the user wants a /goal prompt rather than the build itself ('/fable-goal', 'turn this into a goal prompt', 'write the prompt that builds X'). Turns their ramble into one copy-paste prompt checked by goal_prompt_self_check.py.",
       "tools": [
         {
           "script": "productivity/fable-goal/skills/fable-goal/scripts/goal_prompt_self_check.py",
@@ -389,124 +389,124 @@
       ]
     },
     {
-      "name": "handoff",
-      "path": "productivity/handoff/skills/handoff",
-      "description": "Compact the current conversation into a handoff document for another agent to pick up. Save to a user-configured location (OS temp, home folder, or per-project .handoff/), redact secrets before write, suggest skills for the next session, and auto-load the latest handoff on the next SessionStart. First-run setup asks where to save so the project folder never gets cluttered. Use when the user says 'hand this off', 'handoff doc', 'summarize this for a new session', 'compact this conversation', 'I'm ending this session', 'pick this up later', or any variation signaling intent to pass work to a \u2026",
+      "name": "session-handoff",
+      "path": "productivity/handoff/skills/session-handoff",
+      "description": "Write a handoff document so a fresh session or another agent can pick up exactly where this one left off: goal, current state, decisions, next steps and the skills to load, referencing existing files instead of copying them, with secrets redacted before saving. Use whenever the user is ending a session, switching machines, running low on context, or asks for a handoff, a handoff doc, a 'pick up where we left off' summary, or to compact the conversation for next time. Saves to a location the user picks on first run (OS temp, home folder or per-project .handoff/) and can auto-load the latest \u2026",
       "tools": [
         {
-          "script": "productivity/handoff/skills/handoff/scripts/cleanup.py",
+          "script": "productivity/handoff/skills/session-handoff/scripts/cleanup.py",
           "wired": true,
           "supports_sample": true,
           "verification": [
             {
-              "cmd": "python3 productivity/handoff/skills/handoff/scripts/cleanup.py --help",
+              "cmd": "python3 productivity/handoff/skills/session-handoff/scripts/cleanup.py --help",
               "expect_exit": 0,
               "kind": "smoke"
             },
             {
-              "cmd": "python3 productivity/handoff/skills/handoff/scripts/cleanup.py --sample",
+              "cmd": "python3 productivity/handoff/skills/session-handoff/scripts/cleanup.py --sample",
               "expect_exit": 0,
               "kind": "sample"
             }
           ]
         },
         {
-          "script": "productivity/handoff/skills/handoff/scripts/config_loader.py",
+          "script": "productivity/handoff/skills/session-handoff/scripts/config_loader.py",
           "wired": true,
           "supports_sample": true,
           "verification": [
             {
-              "cmd": "python3 productivity/handoff/skills/handoff/scripts/config_loader.py --help",
+              "cmd": "python3 productivity/handoff/skills/session-handoff/scripts/config_loader.py --help",
               "expect_exit": 0,
               "kind": "smoke"
             },
             {
-              "cmd": "python3 productivity/handoff/skills/handoff/scripts/config_loader.py --sample",
+              "cmd": "python3 productivity/handoff/skills/session-handoff/scripts/config_loader.py --sample",
               "expect_exit": 0,
               "kind": "sample"
             }
           ]
         },
         {
-          "script": "productivity/handoff/skills/handoff/scripts/handoff_self_check.py",
+          "script": "productivity/handoff/skills/session-handoff/scripts/handoff_self_check.py",
           "wired": true,
           "supports_sample": true,
           "verification": [
             {
-              "cmd": "python3 productivity/handoff/skills/handoff/scripts/handoff_self_check.py --help",
+              "cmd": "python3 productivity/handoff/skills/session-handoff/scripts/handoff_self_check.py --help",
               "expect_exit": 0,
               "kind": "smoke"
             },
             {
-              "cmd": "python3 productivity/handoff/skills/handoff/scripts/handoff_self_check.py --sample",
+              "cmd": "python3 productivity/handoff/skills/session-handoff/scripts/handoff_self_check.py --sample",
               "expect_exit": 0,
               "kind": "sample"
             }
           ]
         },
         {
-          "script": "productivity/handoff/skills/handoff/scripts/handoff_template_generator.py",
+          "script": "productivity/handoff/skills/session-handoff/scripts/handoff_template_generator.py",
           "wired": true,
           "supports_sample": true,
           "verification": [
             {
-              "cmd": "python3 productivity/handoff/skills/handoff/scripts/handoff_template_generator.py --help",
+              "cmd": "python3 productivity/handoff/skills/session-handoff/scripts/handoff_template_generator.py --help",
               "expect_exit": 0,
               "kind": "smoke"
             },
             {
-              "cmd": "python3 productivity/handoff/skills/handoff/scripts/handoff_template_generator.py --sample",
+              "cmd": "python3 productivity/handoff/skills/session-handoff/scripts/handoff_template_generator.py --sample",
               "expect_exit": 0,
               "kind": "sample"
             }
           ]
         },
         {
-          "script": "productivity/handoff/skills/handoff/scripts/redaction_linter.py",
+          "script": "productivity/handoff/skills/session-handoff/scripts/redaction_linter.py",
           "wired": true,
           "supports_sample": true,
           "verification": [
             {
-              "cmd": "python3 productivity/handoff/skills/handoff/scripts/redaction_linter.py --help",
+              "cmd": "python3 productivity/handoff/skills/session-handoff/scripts/redaction_linter.py --help",
               "expect_exit": 0,
               "kind": "smoke"
             },
             {
-              "cmd": "python3 productivity/handoff/skills/handoff/scripts/redaction_linter.py --sample",
+              "cmd": "python3 productivity/handoff/skills/session-handoff/scripts/redaction_linter.py --sample",
               "expect_exit": 0,
               "kind": "sample"
             }
           ]
         },
         {
-          "script": "productivity/handoff/skills/handoff/scripts/setup.py",
+          "script": "productivity/handoff/skills/session-handoff/scripts/setup.py",
           "wired": true,
           "supports_sample": true,
           "verification": [
             {
-              "cmd": "python3 productivity/handoff/skills/handoff/scripts/setup.py --help",
+              "cmd": "python3 productivity/handoff/skills/session-handoff/scripts/setup.py --help",
               "expect_exit": 0,
               "kind": "smoke"
             },
             {
-              "cmd": "python3 productivity/handoff/skills/handoff/scripts/setup.py --sample",
+              "cmd": "python3 productivity/handoff/skills/session-handoff/scripts/setup.py --sample",
               "expect_exit": 0,
               "kind": "sample"
             }
           ]
         },
         {
-          "script": "productivity/handoff/skills/handoff/scripts/skill_recommender.py",
+          "script": "productivity/handoff/skills/session-handoff/scripts/skill_recommender.py",
           "wired": true,
           "supports_sample": true,
           "verification": [
             {
-              "cmd": "python3 productivity/handoff/skills/handoff/scripts/skill_recommender.py --help",
+              "cmd": "python3 productivity/handoff/skills/session-handoff/scripts/skill_recommender.py --help",
               "expect_exit": 0,
               "kind": "smoke"
             },
             {
-              "cmd": "python3 productivity/handoff/skills/handoff/scripts/skill_recommender.py --sample",
+              "cmd": "python3 productivity/handoff/skills/session-handoff/scripts/skill_recommender.py --sample",
               "expect_exit": 0,
               "kind": "sample"
             }
@@ -531,7 +531,7 @@
     {
       "name": "meetings",
       "path": "productivity/meetings/skills/meetings",
-      "description": "Use when someone wants to decide whether a meeting is worth calling, price a meeting in dollars, build a timeboxed agenda with desired outcomes, or turn messy meeting notes into owned action items \u2014 or says \"should this be a meeting\", \"/cs:meeting-prep\", or \"/cs:meeting-actions\". Runs a cost gate (ASYNC / NOT-READY / MEET), builds a decision-first agenda, and extracts an owner + due-date checklist that flags every orphan.",
+      "description": "Use when someone wants to decide whether a meeting is worth calling, price a meeting in dollars, build a timeboxed agenda with desired outcomes, or turn messy meeting notes into owned action items \u2014 or says \"should this be a meeting\", \"/cs-meeting-prep\", or \"/cs-meeting-actions\". Runs a cost gate (ASYNC / NOT-READY / MEET), builds a decision-first agenda, and extracts an owner + due-date checklist that flags every orphan.",
       "tools": [
         {
           "script": "productivity/meetings/skills/meetings/scripts/action_item_extractor.py",
@@ -601,7 +601,7 @@
     {
       "name": "reflect",
       "path": "productivity/reflect/skills/reflect",
-      "description": "Mid-conversation reflection skill that pauses execution and zooms out from detail-mode to honestly reassess direction, assumptions, and bias. Use when the user says 'reflect', 'take a step back', 'step back', 'zoom out', 'are we missing something', 'bigger picture', 'sanity check this', 'are we on track', 'are we overthinking this', 'forest for the trees', or any variation signaling intent to break out of detail-mode and reassess. Also trigger when the conversation has gone deep on implementation details without strategic check-in, or when the user shows signs of being stuck \u2014 that's often \u2026",
+      "description": "Use when the user says 'step back', 'zoom out', 'are we on track' or 'sanity check this', or work has gone deep into details without a check on direction. Reassesses direction, assumptions and bias across five dimensions.",
       "tools": [
         {
           "script": "productivity/reflect/skills/reflect/scripts/bias_pattern_detector.py",
@@ -739,9 +739,25 @@
       ]
     },
     {
+      "name": "swedish-mentor",
+      "path": "productivity/swedish-mentor",
+      "description": "Use when someone learning Swedish wants a learning path or YouTube clips and podcasts matched to their CEFR level and skill (SFI, L\u00e4tt Svenska, Radio Sweden p\u00e5 l\u00e4tt svenska).",
+      "tools": [],
+      "agentic_signals": {
+        "goal_intake": false,
+        "refusal_gate": true,
+        "verification": false,
+        "loop_discipline": true,
+        "close_out": false
+      },
+      "references": [
+        "swedish-resources.md"
+      ]
+    },
+    {
       "name": "weekly-review",
       "path": "productivity/weekly-review/skills/weekly-review",
-      "description": "Use when someone wants to run a weekly review, close open loops, audit stalled projects and commitments, get their system back to trusted, restart a lapsed review habit, or says \"/cs:weekly-review\". Walks David Allen's three-phase loop \u2014 GET CLEAR, GET CURRENT, GET CREATIVE \u2014 with deterministic scripts that inventory open loops, gate the checklist with named gaps, and score commitment health 0-100.",
+      "description": "Use when someone wants to run a weekly review, close open loops, audit stalled projects and commitments, get their system back to trusted, restart a lapsed review habit, or says \"/cs-weekly-review\". Walks David Allen's three-phase loop \u2014 GET CLEAR, GET CURRENT, GET CREATIVE \u2014 with deterministic scripts that inventory open loops, gate the checklist with named gaps, and score commitment health 0-100.",
       "tools": [
         {
           "script": "productivity/weekly-review/skills/weekly-review/scripts/commitment_auditor.py",

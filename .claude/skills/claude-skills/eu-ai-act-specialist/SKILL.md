@@ -1,6 +1,6 @@
 ---
 name: "eu-ai-act-specialist"
-description: "EU AI Act (Regulation (EU) 2024/1689) operational compliance for compliance teams. Three Article-level decisions: (1) What's the risk tier of this AI system — prohibited (Art. 5), high-risk (Art. 6 + Annex III), limited-risk (Art. 50), or minimal-risk? (2) For high-risk systems, what's the Article 43 conformity assessment route (Module A internal control vs Module H full QMS + notified body) and what goes in the Annex IV technical documentation? (3) Per organizational role (provider / deployer / importer / distributor / authorized representative), what are the active obligations and deadlines? Use during AI system intake review, when planning conformity assessment, or when scoping deployer obligations. Cites Articles + Annexes for every output. NOT executive AI strategy (see chief-ai-officer-advisor). NOT a legal substitute."
+description: "Use for EU AI Act (Regulation 2024/1689) compliance work: classifying an AI system's risk tier, planning the Art. 43 conformity route and Annex IV file, or listing obligations by role. Runs ai_system_risk_classifier.py, conformity_assessment_planner.py and ai_act_obligation_tracker.py, citing Articles."
 license: MIT
 metadata:
   version: 1.0.0
@@ -165,7 +165,7 @@ python scripts/conformity_assessment_planner.py system.json
 
 1. List all AI systems on or planned for EU market
 2. Run classifier for each — Article 5 prohibited list may expand via delegated acts
-3. Run obligation tracker — deadlines shift as Title III phases in (2025 → 2026 → 2027)
+3. Run obligation tracker — deadlines shift as the Act phases in (2025 → Art. 50 in Aug 2026 → Annex III high-risk Dec 2027 → Annex I Aug 2028, per Regulation (EU) 2026/1744). Re-check the dates on every refresh: the Omnibus showed they can move
 4. For each high-risk system: verify post-market monitoring data flow + serious incident reporting capacity
 5. Update Annex IV technical documentation per Article 11 ongoing requirement
 6. Pair with ISO 42001 management review (Clause 9.3) if both operate

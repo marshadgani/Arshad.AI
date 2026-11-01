@@ -1,9 +1,10 @@
 ---
+disable-model-invocation: true
 description: Forward bookings / billings / ARR forecast with funnel + cohort math + conversion-assumption disclosure. NOT financial close (finance). Direct invocation of the commercial-forecaster skill.
 argument-hint: "<pipeline export path or cohort + funnel data>"
 ---
 
-# /cs:commercial-forecast — Forward bookings + cohort ARR + funnel confidence
+# /cs-commercial-forecast — Forward bookings + cohort ARR + funnel confidence
 
 Run the `commercial-forecaster` skill on this input:
 

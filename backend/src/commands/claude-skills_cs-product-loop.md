@@ -1,9 +1,10 @@
 ---
+disable-model-invocation: true
 description: Run the continuous-discovery loop — score the weekly cadence (Torres), act on the named gap, lint the Opportunity Solution Tree as the machine gate, and keep the streak alive with explicit stop states. The product-domain recurring loop; graduates validated assumptions to experiments or PRDs.
 argument-hint: "[path to discovery_log.json] [path to ost.json]"
 ---
 
-# /cs:product-loop — the continuous-discovery loop
+# /cs-product-loop — the continuous-discovery loop
 
 Inputs (defaults: `discovery_log.json` and `ost.json` in the workspace; shapes in
 `product-team/skills/product-skills/assets/`):
@@ -14,7 +15,7 @@ Inputs (defaults: `discovery_log.json` and `ost.json` in the workspace; shapes i
 
 1. **Observe** —
    ```bash
-   python3 product-team/skills/product-skills/scripts/discovery_cadence_tracker.py --input discovery_log.json
+   python3 ${CLAUDE_PLUGIN_ROOT}/skills/product-skills/scripts/discovery_cadence_tracker.py --input discovery_log.json
    ```
    Exit 5 (< 2 interviews): there is no cadence to measure — help the user book the
    first two weekly touchpoints and write the outcome statement; stop there.
@@ -26,7 +27,7 @@ Inputs (defaults: `discovery_log.json` and `ost.json` in the workspace; shapes i
    iteration.
 4. **Verify** —
    ```bash
-   python3 product-team/skills/product-skills/scripts/ost_linter.py --input ost.json
+   python3 ${CLAUDE_PLUGIN_ROOT}/skills/product-skills/scripts/ost_linter.py --input ost.json
    ```
    Exit 2 → fix the listed O1–O5 violations before the tree may drive any roadmap or
    experiment. Then re-run the cadence tracker and confirm the health score did not

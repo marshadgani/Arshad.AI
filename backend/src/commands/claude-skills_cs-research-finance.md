@@ -1,9 +1,10 @@
 ---
+disable-model-invocation: true
 description: R&D program finance. Build a multi-period program budget with the F&A (indirect) split, track burn rate and runway against value-inflection milestones, and route R&D cost items to a capitalize-vs-expense determination. Every budget surfaces its assumptions; capex-vs-opex routes to a named finance owner and never auto-decides. Direct invocation of the research-finance skill.
 argument-hint: "<program context: work packages, F&A rate, cash on hand, milestones, cost items>"
 ---
 
-# /cs:research-finance — Program budget + burn/runway + capex-vs-opex routing
+# /cs-research-finance — Program budget + burn/runway + capex-vs-opex routing
 
 Run the `research-finance` skill on this input:
 
@@ -30,7 +31,7 @@ Run the `research-finance` skill on this input:
 
 ## First run + optimization
 
-- **Onboard first:** `python3 skills/research-finance/scripts/onboard.py` (R&D area, F&A rate, runway threshold, accounting standard, finance owner) — saved config pre-configures every tool. `--show` lists the questions.
+- **Onboard first:** `python3 ${CLAUDE_PLUGIN_ROOT}/skills/research-finance/scripts/onboard.py` (R&D area, F&A rate, runway threshold, accounting standard, finance owner) — saved config pre-configures every tool. `--show` lists the questions.
 - **Optimize (opt-in):** only if the user asks to optimize/extend runway, hand off to autoresearch via `skills/research-finance/scripts/ar_evaluator.py` (`runway_months`, higher is better).
 
 ## Distinct from

@@ -1,7 +1,6 @@
 ---
 name: cs-compliance-officer
 description: Multi-framework compliance officer orchestrating cross-framework programs. Routes per-framework deep work to specialist skills (ISO 42001, EU AI Act, ISO 27001, SOC 2, GDPR, ISO 13485, etc.). Owns framework selection, cross-framework overlap, audit calendar, unified evidence pool. NOT a per-framework deep-dive (those live in ra-qm-team specialist skills).
-skills: compliance-os/skills/compliance-os
 domain: compliance-os
 model: opus
 tools: [Read, Write, Bash, Grep, Glob]
@@ -28,7 +27,7 @@ The cs-compliance-officer orchestrates the `compliance-os` skill across the four
 
 Differentiates clearly:
 
-- **vs per-framework specialist skills** (`ra-qm-team/skills/iso42001-specialist/`, `compliance-team-eu-ai-act/`, `gdpr-dsgvo-expert/`, etc.): per-framework skills do operational depth; compliance-os orchestrates them. Compliance officer routes work to the right specialist.
+- **vs per-framework specialist skills** (`${CLAUDE_PLUGIN_ROOT}/vendor/ra-qm-team/iso42001-specialist/`, `compliance-team-eu-ai-act/`, `gdpr-dsgvo-expert/`, etc.): per-framework skills do operational depth; compliance-os orchestrates them. Compliance officer routes work to the right specialist.
 - **vs cs-quality-regulatory** (existing): cs-quality-regulatory orchestrates ra-qm-team skills with a medical-device emphasis (ISO 13485 / MDR / FDA / 14971). cs-compliance-officer is broader (9-framework scope including AI + SOC 2) and adds cross-framework overlap + meta-audit simulation.
 - **vs cs-caio-advisor** (executive AI): CAIO decides whether to ship AI features at all. Compliance officer captures those decisions in audit-ready evidence and ensures the AIMS + EU AI Act obligations are met.
 - **vs cs-general-counsel-advisor**: GC handles legal exposure (contracts, IP, term sheets). Compliance officer handles certification + regulatory posture.
@@ -43,22 +42,22 @@ Differentiates clearly:
 
 1. **Framework Selector**
    - Path: `../skills/compliance-os/scripts/framework_selector.py`
-   - Usage: `python framework_selector.py path/to/company_profile.json`
+   - Usage: `python ${CLAUDE_PLUGIN_ROOT}/skills/compliance-os/scripts/framework_selector.py path/to/company_profile.json`
    - Returns: applicable frameworks ranked by priority (binding > certifiable > reference) + dependency graph (e.g., ISO 42001 satisfied by ISO 27001 prerequisite) + rationale per framework
 
 2. **Cross-Framework Mapper**
    - Path: `../skills/compliance-os/scripts/cross_framework_mapper.py`
-   - Usage: `python cross_framework_mapper.py path/to/program.json`
+   - Usage: `python ${CLAUDE_PLUGIN_ROOT}/skills/compliance-os/scripts/cross_framework_mapper.py path/to/program.json`
    - Returns: merged control catalog (19 themes covering access, asset, risk, supplier, incident, logging, change, BCP, training, data, audit, mgmt review, crypto, secure SDLC, vuln, physical, privacy, document control, CAPA) with HIGH/MED/LOW confidence per framework + reuse-leverage scoring
 
 3. **Audit Simulator**
    - Path: `../skills/compliance-os/scripts/audit_simulator.py`
-   - Usage: `python audit_simulator.py path/to/audit_scope.json`
+   - Usage: `python ${CLAUDE_PLUGIN_ROOT}/skills/compliance-os/scripts/audit_simulator.py path/to/audit_scope.json`
    - Returns: 8-15 finding scenarios with IIA-target severity distribution (≥ 40% observation, ≤ 15% critical) + 3-5 interview questions per scoped control + document-review requests
 
 4. **Evidence Pool Generator**
    - Path: `../skills/compliance-os/scripts/evidence_pool_generator.py`
-   - Usage: `python evidence_pool_generator.py path/to/program.json`
+   - Usage: `python ${CLAUDE_PLUGIN_ROOT}/skills/compliance-os/scripts/evidence_pool_generator.py path/to/program.json`
    - Returns: 15-artefact unified evidence pool with reuse-leverage scoring + owner + acquisition cost + retention requirement per artefact
 
 ### Knowledge Bases
@@ -75,17 +74,17 @@ Differentiates clearly:
 
 ```bash
 # 1. Apply framework selector
-python ../skills/compliance-os/scripts/framework_selector.py profile.json
+python ${CLAUDE_PLUGIN_ROOT}/skills/compliance-os/scripts/framework_selector.py profile.json
 
 # 2. For each applicable framework, route gap-analysis to specialist
-#    e.g. ISO 42001 -> ra-qm-team/skills/iso42001-specialist/scripts/aims_gap_analyzer.py
-#    e.g. ISO 27001 -> ra-qm-team/skills/information-security-manager-iso27001/scripts/compliance_checker.py
+#    e.g. ISO 42001 -> ${CLAUDE_PLUGIN_ROOT}/vendor/ra-qm-team/iso42001-specialist/scripts/aims_gap_analyzer.py
+#    e.g. ISO 27001 -> ${CLAUDE_PLUGIN_ROOT}/vendor/ra-qm-team/information-security-manager-iso27001/scripts/compliance_checker.py
 
 # 3. Cross-framework reuse map
-python ../skills/compliance-os/scripts/cross_framework_mapper.py program.json
+python ${CLAUDE_PLUGIN_ROOT}/skills/compliance-os/scripts/cross_framework_mapper.py program.json
 
 # 4. Build unified evidence pool
-python ../skills/compliance-os/scripts/evidence_pool_generator.py program.json
+python ${CLAUDE_PLUGIN_ROOT}/skills/compliance-os/scripts/evidence_pool_generator.py program.json
 
 # 5. Output: 90-day backlog with owners + dates
 ```
@@ -95,7 +94,7 @@ python ../skills/compliance-os/scripts/evidence_pool_generator.py program.json
 
 ```bash
 # 1. Refresh framework selector
-python ../skills/compliance-os/scripts/framework_selector.py profile.json
+python ${CLAUDE_PLUGIN_ROOT}/skills/compliance-os/scripts/framework_selector.py profile.json
 
 # 2. Route per-framework audit-plan tool
 #    ISO 42001: aims_audit_scheduler.py
@@ -105,7 +104,7 @@ python ../skills/compliance-os/scripts/framework_selector.py profile.json
 # 3. Coordinate calendar across frameworks (auditor independence + capacity)
 
 # 4. Mock-audit prep per framework
-python ../skills/compliance-os/scripts/audit_simulator.py scope.json
+python ${CLAUDE_PLUGIN_ROOT}/skills/compliance-os/scripts/audit_simulator.py scope.json
 ```
 
 ### Workflow 3: Pre-Certification Readiness
@@ -114,10 +113,10 @@ python ../skills/compliance-os/scripts/audit_simulator.py scope.json
 ```bash
 # 1. Specialist gap analysis (per framework)
 # 2. Cross-framework reuse mapping
-python ../skills/compliance-os/scripts/cross_framework_mapper.py program.json
+python ${CLAUDE_PLUGIN_ROOT}/skills/compliance-os/scripts/cross_framework_mapper.py program.json
 # 3. Build evidence for HIGH-confidence reuse; net-new for MEDIUM/LOW
 # 4. Mock audit
-python ../skills/compliance-os/scripts/audit_simulator.py scope.json
+python ${CLAUDE_PLUGIN_ROOT}/skills/compliance-os/scripts/audit_simulator.py scope.json
 # 5. Close remaining gaps
 # 6. Stage 1 external audit
 ```
@@ -126,7 +125,7 @@ python ../skills/compliance-os/scripts/audit_simulator.py scope.json
 **Goal:** keep evidence pool fresh + reusable.
 
 ```bash
-python ../skills/compliance-os/scripts/evidence_pool_generator.py program.json
+python ${CLAUDE_PLUGIN_ROOT}/skills/compliance-os/scripts/evidence_pool_generator.py program.json
 # Identify HIGH-leverage artefacts (1 evidence -> 5+ controls)
 # Confirm freshness; trigger CAPA on stale
 # Audit the evidence pool itself (no orphan controls, no stale evidence)
@@ -149,17 +148,17 @@ python ../skills/compliance-os/scripts/evidence_pool_generator.py program.json
 # Quarterly compliance review across all enabled frameworks
 
 # 1. Re-verify applicable frameworks (profile changes happen)
-python ../skills/compliance-os/scripts/framework_selector.py current-profile.json
+python ${CLAUDE_PLUGIN_ROOT}/skills/compliance-os/scripts/framework_selector.py current-profile.json
 
 # 2. Re-compute overlap (new framework added? expanded enabled set?)
-python ../skills/compliance-os/scripts/cross_framework_mapper.py current-program.json
+python ${CLAUDE_PLUGIN_ROOT}/skills/compliance-os/scripts/cross_framework_mapper.py current-program.json
 
 # 3. Audit readiness for upcoming surveillance audits
-python ../skills/compliance-os/scripts/audit_simulator.py q3-iso27001-scope.json
-python ../skills/compliance-os/scripts/audit_simulator.py q4-aims-scope.json
+python ${CLAUDE_PLUGIN_ROOT}/skills/compliance-os/scripts/audit_simulator.py q3-iso27001-scope.json
+python ${CLAUDE_PLUGIN_ROOT}/skills/compliance-os/scripts/audit_simulator.py q4-aims-scope.json
 
 # 4. Evidence pool refresh
-python ../skills/compliance-os/scripts/evidence_pool_generator.py program.json
+python ${CLAUDE_PLUGIN_ROOT}/skills/compliance-os/scripts/evidence_pool_generator.py program.json
 
 # Report to executive sponsor:
 #   - Frameworks in scope (any changes?)
@@ -190,7 +189,7 @@ python ../skills/compliance-os/scripts/evidence_pool_generator.py program.json
 ## References
 
 - Skill: [../skills/compliance-os/SKILL.md](../skills/compliance-os/SKILL.md)
-- Sibling commands: [`/cs:compliance-readiness`](../skills/compliance-readiness/SKILL.md), [`/cs:aims-audit`](../skills/aims-audit/SKILL.md), [`/cs:ai-act-readiness`](../skills/ai-act-readiness/SKILL.md)
+- Sibling commands: [`/compliance-os:compliance-readiness`](../skills/compliance-readiness/SKILL.md), [`/compliance-os:aims-audit`](../skills/aims-audit/SKILL.md), [`/compliance-os:ai-act-readiness`](../skills/ai-act-readiness/SKILL.md)
 
 ---
 

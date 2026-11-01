@@ -1,9 +1,10 @@
 ---
+disable-model-invocation: true
 description: "Top-level Commercial router. Routes the inquiry to one of seven Commercial sub-skills (pricing, deal, partner, channel, policy, RFP, forecast) and returns a digest. Invokes the commercial-skills orchestrator (context: fork)."
 argument-hint: "<inquiry>"
 ---
 
-# /cs:commercial — Commercial router
+# /cs-commercial — Commercial router
 
 Use the `cs-commercial-orchestrator` agent + `commercial-skills` orchestrator skill to handle this inquiry:
 

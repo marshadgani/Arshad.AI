@@ -1,11 +1,12 @@
 ---
 name: market-research
-description: Use when doing upstream market-research methodology — sizing a market as TAM/SAM/SOM computed BOTH top-down and bottoms-up (never a single unsourced number), planning a survey sample size with finite-population correction and per-segment minimums, or scoring candidate market segments against Kotler's measurable/substantial/accessible/differentiable/actionable criteria. Outputs always show the method and the assumptions. For market-research analysts and product-marketing at the sizing/survey/segmentation moment. Distinct from marketing-skill (campaign analytics, attribution, demand-gen) — this is the evidence-building methodology, not live-campaign optimization.
-version: 2.9.0
-author: claude-code-skills
+description: "Use for market sizing (TAM, SAM, SOM both top-down and bottom-up), survey sample sizes or segment scoring. Runs market_sizer.py, sample_size_planner.py and segmentation_scorer.py and never returns one unsourced number."
 license: MIT
-tags: [research-ops, market-research, tam-sam-som, market-sizing, survey, sampling, segmentation, competitive-intelligence]
-compatible_tools: [claude-code, codex-cli, cursor, antigravity, opencode, gemini-cli]
+metadata:
+  version: 2.9.0
+  author: claude-code-skills
+  tags: [research-ops, market-research, tam-sam-som, market-sizing, survey, sampling, segmentation, competitive-intelligence]
+  compatible_tools: [claude-code, codex-cli, cursor, antigravity, opencode, gemini-cli]
 ---
 
 # market-research
@@ -69,11 +70,11 @@ Answers are saved to `~/.config/research-ops/market-research.json` (global) or `
 This skill ships an **isolated, opt-in** bridge to `engineering/autoresearch-agent`. Only when you ask to "optimize" / "reconcile the sizing" / "run a loop" does an autoresearch experiment iteratively reconcile your market model so top-down and bottoms-up triangulate. `scripts/ar_evaluator.py` is the ground-truth evaluator; it prints `tam_divergence: <fraction>` (**lower** is better).
 
 ```bash
-/ar:setup --domain custom --name tam-triangulation \
+/autoresearch-agent:setup --domain custom --name tam-triangulation \
   --target market.json \
   --eval "python3 ar_evaluator.py --target market.json" \
   --metric tam_divergence --direction lower
-/ar:loop custom/tam-triangulation
+/ar-loop custom/tam-triangulation
 ```
 
 Isolated: no hard dependency — autoresearch runs only on demand, and the loop edits `market.json`, never the evaluator.
@@ -121,7 +122,7 @@ The sample market triangulates a ~$1.47B top-down SAM against the bottoms-up fig
 
 ## Forcing-question library (Matt Pocock grill discipline)
 
-Walked one at a time by `/cs:grill-research-ops` or the orchestrator. Recommended answer + canon citation per question. Never bundled.
+Walked one at a time by `/cs-grill-research-ops` or the orchestrator. Recommended answer + canon citation per question. Never bundled.
 
 1. **"Is your TAM top-down or bottoms-up — and have you computed it both ways to triangulate?"**
    Recommended: both; reconcile the delta before quoting a number.
