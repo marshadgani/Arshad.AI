@@ -6,61 +6,16 @@
     "claude-code": {
       "url": "https://github.com/anthropics/claude-code.git",
       "name": "claude-code",
-      "last_fetched": "2026-10-14 16:02 UTC",
+      "last_fetched": "2026-11-01 16:47 UTC",
       "components": {
-        "skills": [
-          "writing-rules",
-          "plugin-settings",
-          "mcp-integration",
-          "command-development",
-          "agent-development",
-          "plugin-structure",
-          "hook-development",
-          "skill-development",
-          "claude-opus-4-5-migration",
-          "frontend-design"
-        ],
-        "agents": [
-          "code-explorer",
-          "code-architect",
-          "code-reviewer",
-          "agent-sdk-verifier-py",
-          "agent-sdk-verifier-ts",
-          "conversation-analyzer",
-          "plugin-validator",
-          "agent-creator",
-          "skill-reviewer",
-          "comment-analyzer",
-          "type-design-analyzer",
-          "code-simplifier",
-          "pr-test-analyzer",
-          "code-reviewer",
-          "silent-failure-hunter"
-        ],
+        "skills": [],
+        "agents": [],
         "commands": [
-          "feature-dev",
-          "new-sdk-app",
-          "help",
-          "configure",
-          "list",
-          "hookify",
-          "create-plugin",
-          "help",
-          "ralph-loop",
-          "cancel-ralph",
-          "code-review",
-          "review-pr",
-          "clean_gone",
-          "commit",
-          "commit-push-pr",
           "dedupe",
           "triage-issue",
           "commit-push-pr"
         ],
-        "hooks": [
-          "sg-python.sh",
-          "stop-hook.sh"
-        ],
+        "hooks": [],
         "token_optimization": [
           "CHANGELOG.md",
           "claude-code.d.ts"
