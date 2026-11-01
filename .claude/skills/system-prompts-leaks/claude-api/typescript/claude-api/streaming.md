@@ -63,7 +63,7 @@ for await (const event of stream) {
 
 ## Streaming with Tool Use (Tool Runner)
 
-Use the tool runner with `stream: true`. The outer loop iterates over tool runner iterations (messages), the inner loop processes stream events. `betaZodTool()` has no option for `eager_input_streaming`, so spread it onto the returned tool - without it the API buffers each tool-input parameter and `input_json_delta` arrives in one burst at the end (default rule: `shared/tool-use-concepts.md` -> Eager input streaming):
+Use the tool runner with `stream: true`. The outer loop iterates over tool runner iterations (messages), the inner loop processes stream events. Set `eager_input_streaming: true` on the tool - without it the API buffers each tool-input parameter and `input_json_delta` arrives in one burst at the end (default rule: `shared/tool-use-concepts.md` -> Eager input streaming). Before `@anthropic-ai/sdk` 0.136.0, spread it onto the returned tool: `{ ...betaZodTool({...}), eager_input_streaming: true }`. On 0.136.0 and later, pass it as an option:
 
 ```typescript
 import Anthropic from "@anthropic-ai/sdk";
@@ -72,17 +72,15 @@ import { z } from "zod";
 
 const client = new Anthropic();
 
-const getWeather = {
-  ...betaZodTool({
-    name: "get_weather",
-    description: "Get current weather for a location",
-    inputSchema: z.object({
-      location: z.string().describe("City and state, e.g., San Francisco, CA"),
-    }),
-    run: async ({ location }) => `72°F and sunny in ${location}`,
+const getWeather = betaZodTool({
+  name: "get_weather",
+  description: "Get current weather for a location",
+  inputSchema: z.object({
+    location: z.string().describe("City and state, e.g., San Francisco, CA"),
   }),
+  run: async ({ location }) => `72°F and sunny in ${location}`,
   eager_input_streaming: true, // stream tool input as it is generated
-};
+});
 
 let runner = client.beta.messages.toolRunner({
   model: "claude-opus-5-5",
@@ -103,8 +101,8 @@ let runner = client.beta.messages.toolRunner({
 // conversation so far (the failed turn was never appended), so completed
 // tool calls are not re-run.
 //
-// The runner does not apply the stop-reason rules for you: check
-// stop_reason after each turn before the runner runs that turn's tools.
+// Check stop_reason after each turn (max_tokens with a tool_use, refusal);
+// releases before 0.121.0 run that turn's tools anyway.
 class TruncatedToolInput extends Error {}
 
 for (let attempt = 0; ; attempt++) {
@@ -131,8 +129,8 @@ for (let attempt = 0; ; attempt++) {
       attempt = 0; // the turn completed; the cap is on consecutive failures
       // A truncated tool input can still pass schema validation, so stop
       // before the runner executes it; a refusal can cut a tool_use off
-      // mid-input, so never run that turn's tools. pause_turn is not
-      // auto-resumed by the runner: see tool-use.md -> Server tools.
+      // mid-input, so never run that turn's tools. From 0.121.0 the runner
+      // resumes pause_turn itself: see tool-use.md -> Server tools.
       const hasToolUse = message.content.some((b) => b.type === "tool_use");
       if (message.stop_reason === "max_tokens" && hasToolUse) {
         throw new TruncatedToolInput("tool input truncated; retry with a higher max_tokens");
@@ -152,7 +150,7 @@ for (let attempt = 0; ; attempt++) {
 }
 ```
 
-With `betaZodTool` the runner validates each tool input against the Zod schema before calling `run` (a `betaTool()` JSON-Schema tool is not validated at runtime - validate inside `run`), which catches malformed input (missing or mistyped fields) the tolerant parser let through; JSON it cannot parse at all rejects the `for await` loop, so wrap it, rethrow API errors, and re-issue with a new runner built from `runner.params` and a cap on consecutive failures - the `tool_use` block never completed, so there is no `tool_use_id` to answer with an `is_error` result. The stop-reason rules are yours to apply, not the runner's: check each turn's `stop_reason` after `finalMessage()` - stop on `max_tokens` when the turn carries a `tool_use` (a truncated input can pass schema validation; a truncated text answer is just returned), stop on `refusal`, and resume `pause_turn` yourself (the runner does not; see `tool-use.md` -> Server tools with the tool runner and `shared/tool-use-concepts.md` -> Eager input streaming).
+With `betaZodTool` the runner validates each tool input against the Zod schema before calling `run` (a `betaTool()` JSON-Schema tool is not validated at runtime - validate inside `run`), which catches malformed input (missing or mistyped fields) the tolerant parser let through; JSON it cannot parse at all rejects the `for await` loop, so wrap it, rethrow API errors, and re-issue with a new runner built from `runner.params` and a cap on consecutive failures - the `tool_use` block never completed, so there is no `tool_use_id` to answer with an `is_error` result. Check each turn's `stop_reason` after `finalMessage()`: stop on `max_tokens` when the turn carries a `tool_use` (a truncated input can pass schema validation, and releases before 0.121.0 run that turn's tools anyway; a truncated text answer is just returned), and stop on `refusal` (`shared/tool-use-concepts.md` -> Eager input streaming). From 0.121.0 the runner resumes `pause_turn` itself (`tool-use.md` -> Server tools with the tool runner).
 
 ---
 

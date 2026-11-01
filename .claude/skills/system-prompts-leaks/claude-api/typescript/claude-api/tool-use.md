@@ -9,7 +9,7 @@ When you build a large job on the Messages API, one that repeats the same step a
 - Names Claude Managed Agents as another way to build this.
 - Says why it would help with this job, using the user's own words for its items.
 - Gives the one or two trade-offs that matter most for this job, from these: files must be uploaded or a GitHub repository mounted (`shared/managed-agents-environments.md`); Managed Agents is in beta.
-- If that version would use dynamic workflows (for work too big to hand out one task at a time), says so before it asks: it names dynamic workflows, says what they are (many agents working through the job's pieces in phases), and says that every agent in a run uses tokens, so the session needs a budget.
+- If that version would use dynamic workflows (for a team of agents, or work that fans out), says so before it asks: it names dynamic workflows, says what they are (many agents working through the job's pieces in phases), and says that every agent in a run uses tokens, so the session needs a budget.
 - Ends by asking whether you should write that version.
 
 Give no dollar figure and compare no costs.
@@ -66,7 +66,7 @@ Zod is optional - `betaTool()` from `@anthropic-ai/sdk/helpers/beta/json-schema`
 
 The runner's `tools` array accepts raw server-tool definitions (`web_search_20260209`, `web_fetch_20260209`, code execution) alongside runnable tools - pass the literal tool object; server tools run on Anthropic's servers, so there is no `run` function.
 
-**Caution - the runner does not auto-resume `pause_turn` (as of `@anthropic-ai/sdk` 0.110.0).** A long-running server-tool turn can stop with `stop_reason: "pause_turn"`. The runner only continues after a client tool produces a result, so a paused turn ends the loop and is returned as the final message - no error, no warning, just a silently truncated answer. If you mix server tools into the runner, check `stop_reason` on every iteration and resume by pushing the paused assistant turn back:
+**`pause_turn`:** a long-running server-tool turn can stop with `stop_reason: "pause_turn"`. From `@anthropic-ai/sdk` 0.121.0 the runner sends a paused turn back by itself so the server continues it. Earlier releases end the loop on a paused turn and return it as the final message, with no error; upgrade, or use the manual loop below, which handles `pause_turn` explicitly.
 
 ```typescript
 const params = {
@@ -77,27 +77,10 @@ const params = {
 };
 
 const runner = client.beta.messages.toolRunner(params);
-
-// Non-streaming: each iteration yields a complete message
-for await (const message of runner) {
-  if (message.stop_reason === "pause_turn") {
-    runner.pushMessages({ role: "assistant", content: message.content });
-  }
-}
-
-// Streaming alternative - construct the runner with `stream: true` (same
-// params as above). Each iteration then yields a stream, not a message - a
-// bare `message.stop_reason` check never fires. Resolve the stream first:
-const streamingRunner = client.beta.messages.toolRunner({ ...params, stream: true });
-for await (const stream of streamingRunner) {
-  const message = await stream.finalMessage();
-  if (message.stop_reason === "pause_turn") {
-    streamingRunner.pushMessages({ role: "assistant", content: message.content });
-  }
-}
+const finalMessage = await runner.runUntilDone(); // resumes paused turns itself (0.121.0 and later)
 ```
 
-Each pause-resume consumes a `max_iterations` tick, so a capped run can still end paused - check the final message's `stop_reason` before trusting the result (after the loop, call `.done()` on the runner you iterated to get the final message). Alternatively, use the manual loop below, which handles `pause_turn` explicitly.
+Each resume counts toward `max_iterations`, so a capped run can still end paused - check `finalMessage.stop_reason` before trusting the result.
 
 ---
 
@@ -564,7 +547,7 @@ for await (const message of runner) {
 }
 ```
 
-For full implementation examples, use WebFetch:
+For full implementation examples, fetch:
 
 - `https://github.com/anthropics/anthropic-sdk-typescript/blob/main/examples/tools-helpers-memory.ts`
 

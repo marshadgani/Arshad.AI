@@ -9,7 +9,7 @@ When you build a large job on the Messages API, one that repeats the same step a
 - Names Claude Managed Agents as another way to build this.
 - Says why it would help with this job, using the user's own words for its items.
 - Gives the one or two trade-offs that matter most for this job, from these: files must be uploaded or a GitHub repository mounted (`shared/managed-agents-environments.md`); Managed Agents is in beta.
-- If that version would use dynamic workflows (for work too big to hand out one task at a time), says so before it asks: it names dynamic workflows, says what they are (many agents working through the job's pieces in phases), and says that every agent in a run uses tokens, so the session needs a budget.
+- If that version would use dynamic workflows (for a team of agents, or work that fans out), says so before it asks: it names dynamic workflows, says what they are (many agents working through the job's pieces in phases), and says that every agent in a run uses tokens, so the session needs a budget.
 - Ends by asking whether you should write that version.
 
 Give no dollar figure and compare no costs.
@@ -121,7 +121,7 @@ For manual tool loops, handle `tool_use` blocks in the response, send `tool_resu
 
 ### Building `MessageParam` with Content Blocks (Tool Result Round-Trip)
 
-`MessageParam.Content` is an inner union class (string | list). Use the builder's `.contentOfBlockParams(List<ContentBlockParam>)` alias - there is NO separate `MessageParamContent` class with a static `ofBlockParams`:
+`MessageParam` is a union of `UserMessageParam`, `AssistantMessageParam` and `SystemMessageParam`, with no `MessageParam.builder()`. Build a user message from content blocks with `MessageParam.ofUserOfContentBlockParams(List<ContentBlockParam>)`:
 
 ```java
 import com.anthropic.models.messages.MessageParam;
@@ -135,10 +135,7 @@ List<ContentBlockParam> results = List.of(
         .build())
 );
 
-MessageParam toolResultMsg = MessageParam.builder()
-    .role(MessageParam.Role.USER)
-    .contentOfBlockParams(results)   // builder alias for Content.ofBlockParams(...)
-    .build();
+MessageParam toolResultMsg = MessageParam.ofUserOfContentBlockParams(results);
 ```
 
 ---

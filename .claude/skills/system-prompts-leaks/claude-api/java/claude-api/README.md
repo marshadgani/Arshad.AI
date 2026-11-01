@@ -47,14 +47,14 @@ Maven:
 <dependency>
     <groupId>com.anthropic</groupId>
     <artifactId>anthropic-java</artifactId>
-    <version>2.34.0</version>
+    <version>3.2.0</version>
 </dependency>
 ```
 
 Gradle:
 
 ```groovy
-implementation("com.anthropic:anthropic-java:2.34.0")
+implementation("com.anthropic:anthropic-java:3.2.0")
 ```
 
 ## Client Initialization
@@ -182,7 +182,7 @@ long tokens = client.messages().countTokens(
 
 ## PDF / Document Input
 
-`DocumentBlockParam` builder has source shortcuts. Wrap in `ContentBlockParam.ofDocument()` and pass via `.addUserMessageOfBlockParams()`.
+`DocumentBlockParam` builder has source shortcuts. Wrap in `ContentBlockParam.ofDocument()` and pass via `.addUserMessageOfContentBlockParams()`.
 
 ```java
 import com.anthropic.models.messages.DocumentBlockParam;
@@ -199,7 +199,7 @@ DocumentBlockParam doc = DocumentBlockParam.builder()
 For **Files API** document references, use the beta path and beta types - see `files-api.md`: `BetaRequestDocumentBlock.builder().source(BetaFileDocumentSource.builder().fileId(id).build())`.
 
 ```java
-.addUserMessageOfBlockParams(List.of(
+.addUserMessageOfContentBlockParams(List.of(
     ContentBlockParam.ofDocument(doc),
     ContentBlockParam.ofText(TextBlockParam.builder().text("Summarize this").build())))
 ```
@@ -217,7 +217,7 @@ response.stopDetails().ifPresent(details -> {
 });
 ```
 
-**Refusal fallbacks (Claude Fable 5.1) - opt in by default.** Fallbacks are opt-in: without them a refused request simply stops. New `claude-fable-5-1` code should include the server-side `fallbacks` parameter (beta header `server-side-fallback-2026-06-01`, fallback model `claude-opus-4-8`, on the beta messages call) by default. The exact Java builder methods (and the client-side middleware for providers without server-side support) are not documented here - WebFetch the Java SDK repo's `examples/` from `shared/live-sources.md`; full semantics in `shared/model-migration.md` -> Migrating to Claude Fable 5.1 -> `refusal` stop reason.
+**Refusal fallbacks (Claude Fable 5.1) - opt in by default.** Fallbacks are opt-in: without them a refused request simply stops. New `claude-fable-5-1` code should include the server-side `fallbacks` parameter (beta header `server-side-fallback-2026-06-01`, fallback model `claude-opus-4-8`, on the beta messages call) by default. The exact Java builder methods (and the client-side middleware for providers without server-side support) are not documented here - fetch the Java SDK repo's `examples/` from `shared/live-sources.md`; full semantics in `shared/model-migration.md` -> Migrating to Claude Fable 5.1 -> `refusal` stop reason.
 
 ---
 

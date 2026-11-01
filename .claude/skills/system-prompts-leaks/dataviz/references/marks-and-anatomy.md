@@ -50,15 +50,18 @@ one swatch restates the title and costs space.
   segment to "solve" it - that crops the first/last characters and is worse than no
   label. Text never overflows or is clipped by its own mark.
 - Bars -> value at the tip. Columns -> value on the cap. Lines -> value at the end.
-- Y-axis ticks: round to clean numbers, compact from 1,000 up (0 / 1K / 2K); they
+- Y-axis ticks: round to clean numbers, in full under 10,000 (0 / 1,000 / 2,000) and
+  compact on an axis that reaches it (0 / 10K / 20K), one style per axis; along a
+  horizontal axis, in full under a million where the labels fit side by side. They
   carry the values you didn't directly label, so keep them unless every value is labeled.
 - **Text never wears the data color.** Marks - bars, lines, dots, area fills - carry
   the series color; labels, values, legends, and axis text use **text tokens**
   (primary / secondary / muted). A light categorical hue (yellow, aqua) is illegible
   as text on the surface. Identity comes from the colored mark *beside* the text - a
   dot, a short line-key, a swatch - never from coloring the text itself. A label set
-  *inside* a colored fill (a stacked segment, a map tile) is the one exception: pick
-  white or ink by the fill's luminance so it always clears contrast.
+  *inside* a colored fill (a stacked segment, a map tile) is the one exception: white or
+  near-black, the same two in both modes, by the fill's luminance. `palette.md` says which its
+  categorical and status colors take.
 - **When end-labels collide, don't stack them.** Direct end-labels work when series
   separate at the right edge. When lines converge, nudging labels apart vertically
   detaches them from their lines and reads as noise - instead use **leader lines**
@@ -74,6 +77,17 @@ one swatch restates the title and costs space.
 - **Meter:** the fill carries severity (accent -> warning -> danger); the unfilled
   track is a **lighter step of the same ramp** (blue-on-blue, etc.) so state reads
   across the whole bar.
+- **Segmented bar - one whole, split into parts.** A figure, thin or tall, with no baseline, so
+  no end is square. Widths proportional to the values; a part at zero draws nothing.  
+  **Thin:** 8px, or 4px in dense rows; fully rounded ends; no text. **Tall:** 28px and never
+  more; each part its own block, 4px corners, its share (46%) or rounded amount (413M)
+  printed inside at the leading edge, in white or near-black (*Labels & legend* says which).
+  A block too narrow for its label prints none: that value stays in the table view.
+  Hover, keyboard focus, and the bar's accessible name give every part's name, amount, and
+  share. The legend lists the names in block order and repeats no numbers. The tall bar is
+  exempt from four chart rules: the 24px bar cap, the ban on large saturated blocks, the ban
+  on a number on every point, and direct name labels (its legend names the parts). It keeps
+  its legend and its table view.
 - **Hero figure.** The single number a dashboard leads with, >=48px, in the same
   sans as everything else (never a display or serif face - it reads as off-brand
   decoration). Exactly one per view.
