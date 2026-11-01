@@ -1,7 +1,6 @@
 ---
 name: skill-host-compat
 description: Lint ECC skills for Codex/Cursor-safe frontmatter and Claude-only substitutions before a skill PR.
-origin: ECC
 ---
 
 # Skill Host Compatibility
@@ -26,9 +25,9 @@ smaller `.cursor/skills/` subset. CONTRIBUTING documents that sync as manual.
 sees `.agents/skills/`. This script is the cross-tree gate:
 
 1. Claude-only substitutions in executable `bash` / `sh` / `zsh` fences
-   in Codex/Cursor projections (`${CLAUDE_SESSION_ID}`, `${CLAUDE_SKILL_DIR}`, `${CLAUDE_PLUGIN_ROOT}`,
-   `${CLAUDE_PROJECT_DIR}`, `$ARGUMENTS`) fail. Codex leaves those tokens
-   as literal text. In a Codex copy, rewrite `${CLAUDE_PROJECT_DIR}` to
+   (`$CLAUDE_SESSION_ID`, `$CLAUDE_SKILL_DIR`, `$CLAUDE_PLUGIN_ROOT`,
+   `$CLAUDE_PROJECT_DIR`, `$ARGUMENTS`) fail. Codex leaves those tokens
+   as literal text. In a Codex copy, rewrite `$CLAUDE_PROJECT_DIR` to
    `$(pwd)` or an explicit path.
 2. A Codex copy may only use `name`, `description`, `metadata`, `license`,
    and `allowed-tools`. `origin: ECC` may stay on the canonical `skills/`
@@ -65,20 +64,20 @@ node scripts/ci/validate-skill-host-compat.js --strict-checklist
 Slash command:
 
 ```
-/skill-host-compat
-/skill-host-compat --inventory
+$skill-host-compat
+$skill-host-compat --inventory
 ```
 
 ## Anti-Patterns
 
 Codex and Cursor projections must resolve Claude-only substitutions in executable blocks. Canonical Claude-scoped examples remain valid. POSIX `$1` and `${1}` parameters are ambiguous and require review rather than failing this gate. This fence is the
-forbidden pattern:
+forbidden pattern; do not use these unresolved projection examples:
 
 ```bash
-echo "${CLAUDE_SESSION_ID}"
-ls "${CLAUDE_SKILL_DIR}"
-node "${CLAUDE_PLUGIN_ROOT}/scripts/setup.js" $ARGUMENTS
-cd "${CLAUDE_PROJECT_DIR}"
+echo "$CLAUDE_SESSION_ID"
+ls "$CLAUDE_SKILL_DIR"
+node "$CLAUDE_PLUGIN_ROOT/scripts/setup.js" $ARGUMENTS
+cd "$CLAUDE_PROJECT_DIR"
 ```
 
 Do not add `version:` or `origin:` to a Codex copy under `.agents/skills/`.
@@ -90,7 +89,7 @@ every `skills/` entry to have a Cursor copy.
 - Keep canonical `origin: ECC` if the CONTRIBUTING template calls for it.
 - Drop `origin`, `version`, and `argument-hint` on the Codex copy.
 - Show host-portable commands in bash fences (`npx`, `ecc`, or a resolved
-  root). Rewrite `${CLAUDE_PROJECT_DIR}` in Codex copies to `$(pwd)` or an
+  root). Rewrite `$CLAUDE_PROJECT_DIR` in Codex copies to `$(pwd)` or an
   explicit path. Keep valid Claude-scoped forms in canonical instructions; resolve host variables in the target projection.
 - Run this script before `npm test` when the change is a new skill.
 - Use `--inventory` to see checklist warning volume without failing the tree.
