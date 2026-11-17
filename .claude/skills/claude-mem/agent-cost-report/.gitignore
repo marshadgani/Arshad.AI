@@ -1,3 +1,0 @@
-# compiled Python caches never ship (sync-check and CHECKSUMS.txt skip them too)
-__pycache__/
-*.pyc

@@ -158,7 +158,7 @@
     "claude-mem": {
       "url": "https://github.com/thedotmack/claude-mem.git",
       "name": "claude-mem",
-      "last_fetched": "2026-10-05 19:30 UTC",
+      "last_fetched": "2026-11-17 13:33 UTC",
       "components": {
         "skills": [
           "mem-setup",
@@ -167,12 +167,17 @@
           "weekly-digests",
           "pathfinder",
           "oh-my-issues",
+          "owner-goals",
           "learn-codebase",
           "what-the",
           "smart-explore",
+          "build-and-release",
           "mode-creator",
+          "release",
+          "request-progress",
           "mem-search",
           "cloud-sync",
+          "build",
           "agent-cost-report",
           "timeline-report",
           "design-is",
@@ -180,12 +185,17 @@
           "wowerpoint",
           "make-plan",
           "ccs-align",
+          "screenpipe",
           "version-bump",
           "how-it-works",
+          "childhood",
           "do",
           "standup",
           "babysit",
+          "backup-setup",
           "knowledge-agent",
+          "dashboard-chat-best-practices",
+          "eve-chat-template-eve",
           "agent-cost-report",
           "make-plan",
           "do",
@@ -196,7 +206,8 @@
           "agent-cost-report",
           "install",
           "mem-search",
-          "agent-cost-report"
+          "agent-cost-report",
+          "community-sweep"
         ],
         "agents": [],
         "commands": [
@@ -204,14 +215,12 @@
         ],
         "hooks": [],
         "token_optimization": [
-          "12-provider-and-extensibility-roadmap.md",
-          "20-project-identity-and-injection-scope.md",
           "prompts.ts",
-          "npx-distribution.md",
+          "worker-configuration.d.ts",
           "observation-context-compression.test.ts",
           "observer-system-anchor.test.ts",
           "CHANGELOG.md",
-          "worker-configuration.d.ts"
+          "story.md"
         ]
       }
     },
