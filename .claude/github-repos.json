@@ -5656,7 +5656,7 @@
     "obsidian-releases": {
       "url": "https://github.com/obsidianmd/obsidian-releases.git",
       "name": "obsidian-releases",
-      "last_fetched": "2026-10-05 19:33 UTC",
+      "last_fetched": "2026-11-17 13:37 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -5668,7 +5668,7 @@
     "obsidian-git": {
       "url": "https://github.com/Vinzent03/obsidian-git.git",
       "name": "obsidian-git",
-      "last_fetched": "2026-10-05 19:33 UTC",
+      "last_fetched": "2026-11-17 13:37 UTC",
       "components": {
         "skills": [],
         "agents": [],
@@ -5680,9 +5680,11 @@
     "impeccable": {
       "url": "https://github.com/pbakaus/impeccable.git",
       "name": "impeccable",
-      "last_fetched": "2026-10-05 19:33 UTC",
+      "last_fetched": "2026-11-17 13:37 UTC",
       "components": {
         "skills": [
+          "impeccable",
+          "impeccable",
           "impeccable",
           "impeccable",
           "impeccable",
@@ -5713,30 +5715,37 @@
           "impeccable-documenter",
           "impeccable-manual-edit-applier",
           "impeccable-asset-producer",
+          "impeccable-motion-reviewer",
           "impeccable-finish-reviewer",
           "impeccable-documenter",
           "impeccable-manual-edit-applier",
           "impeccable-asset-producer",
+          "impeccable-motion-reviewer",
           "impeccable-asset-producer.agent",
           "impeccable-documenter.agent",
           "impeccable-manual-edit-applier.agent",
           "impeccable-finish-reviewer.agent",
+          "impeccable-motion-reviewer.agent",
           "impeccable-finish-reviewer",
           "impeccable-documenter",
           "impeccable-manual-edit-applier",
           "impeccable-asset-producer",
+          "impeccable-motion-reviewer",
           "impeccable-finish-reviewer",
           "impeccable-documenter",
           "impeccable-manual-edit-applier",
           "impeccable-asset-producer",
+          "impeccable-motion-reviewer",
           "impeccable-finish-reviewer",
           "impeccable-documenter",
           "impeccable-manual-edit-applier",
           "impeccable-asset-producer",
+          "impeccable-motion-reviewer",
           "impeccable-finish-reviewer",
           "impeccable-documenter",
           "impeccable-manual-edit-applier",
-          "impeccable-asset-producer"
+          "impeccable-asset-producer",
+          "impeccable-motion-reviewer"
         ],
         "commands": [
           "impeccable"
