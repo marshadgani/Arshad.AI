@@ -3879,7 +3879,7 @@
     "agent-browser": {
       "url": "https://github.com/vercel-labs/agent-browser.git",
       "name": "agent-browser",
-      "last_fetched": "2026-10-05 19:32 UTC",
+      "last_fetched": "2026-11-17 13:35 UTC",
       "components": {
         "skills": [
           "agent-browser",
@@ -3889,9 +3889,11 @@
           "vercel-sandbox",
           "agentcore",
           "electron",
+          "vercel",
+          "modern-web-guidance",
           "slack",
           "core",
-          "protected-vercel-deployments"
+          "technical-writer"
         ],
         "agents": [],
         "commands": [],
