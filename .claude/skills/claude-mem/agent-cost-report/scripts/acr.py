@@ -32,6 +32,10 @@ USAGE_FILE = "usage.json"
 NOT_YET = ()
 
 
+def add_owner_arg(p):
+    p.add_argument("--owner-name", metavar="NAME", help="report owner for name-keyed detectors and human reviews (default: ACR_OWNER_NAME, then git user.name; name-free patterns when unset)")
+
+
 def add_period_args(p):
     g = p.add_argument_group("period (PT calendar days, end exclusive)")
     g.add_argument("--start", metavar="YYYY-MM-DD", help="first PT day (default: --end minus 7 days)")
@@ -163,7 +167,7 @@ def build_parser():
     r.add_argument("--prices", metavar="FILE", help="price table to use instead of DIR/prices.json")
     r.add_argument("--db", metavar="FILE", help=argparse.SUPPRESS)
     r.add_argument("--no-gh", action="store_true", help="skip every gh call: the merged-PR list source and the per-PR confirmation (wins from GitHub show as unavailable)")
-    r.add_argument("--wins-repo", action="append", metavar="OWNER/REPO", help="repo(s) for the read-only merged-PR wins source (default: thedotmack/claude-mem; repeatable)")
+    r.add_argument("--wins-repo", action="append", metavar="OWNER/REPO", help="repo(s) for the read-only merged-PR wins source (off by default; repeatable)")
     r.add_argument("--no-behavior", action="store_true", help="skip the Phase 2B behavior pass (no mistakes line)")
     r.add_argument("--classify", action="store_true", help="run the optional classifier on unsettled candidates (off by default, G8)")
     r.add_argument("--classify-budget", type=float, metavar="USD", help="hard cap per run for --classify (default $2.00, G8)")
@@ -172,11 +176,13 @@ def build_parser():
     r.add_argument("--measured", metavar="FILE", help="measured.json from `measure-openrouter` (default: DIR/measured.json when present)")
     r.add_argument("--precision", metavar="FILE", help="JSON {pattern_key: precision} from the Phase 8.5 spot-check; tiles under 70%% move to Details")
     r.add_argument("--device-usage", metavar="FILE", action="append", default=[], help="device-usage-<label>.json export(s) from other machines to merge (repeatable)")
+    add_owner_arg(r)
     r.set_defaults(fn=cmd_rollup)
 
     v = sub.add_parser("review", help="merge confirmed labels from a reviewed labels.review.json into report.json")
     v.add_argument("--apply", required=True, metavar="FILE", help="reviewed copy of labels.review.json")
     v.add_argument("--out", required=True, metavar="DIR", help="directory holding report.json")
+    add_owner_arg(v)
     v.set_defaults(fn=cmd_review)
 
     rd = sub.add_parser("render", help="report.json -> self-contained report.html (Timing-style); --print also writes report.print.html with Details open")
