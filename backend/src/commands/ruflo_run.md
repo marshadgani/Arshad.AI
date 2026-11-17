@@ -1,70 +1,23 @@
-# stream-chain run
+---
+name: run
+description: Run a ruflo agent (claude -p) on one of your ruOS desktops and stream its output into the swarm
+---
+$ARGUMENTS
 
-Execute a custom stream chain with your own prompts.
+Place one swarm agent on a ruOS desktop. Follow the `ruos-host-run` skill. Summary:
 
-## Usage
+- **Target**: a desktop from the caller's own `desktop_status` list (id, Fly id or exact
+  name). Anything else is refused.
+- **Stopped desktop**: do not start it unless the user asked (`--start`); starting is billable.
+- **Auto-stop**: refuse a run whose timeout crosses the next weekday 23:00
+  America/Toronto stop unless the user passes `--ignore-autostop`.
+- **CLI path** (env-configured fleet MCP or SSH):
 
-```bash
-claude-flow stream-chain run <prompt1> <prompt2> [...] [options]
-```
+  `node "${CLAUDE_PLUGIN_ROOT}/scripts/cli.mjs" run --desktop "<ref>" --prompt-file <file> [--model sonnet] [--timeout 900] [--start]`
 
-Minimum 2 prompts required for chaining.
+- **Session path** (fleet MCP connected in Claude Code): `cli.mjs build` prints the exact
+  `desktop_exec` command strings; send them in order, poll, and report lifecycle with
+  `cli.mjs record start|output|end` so the swarm ledger stays one source.
 
-## Options
-
-- `--verbose` - Show detailed execution information
-- `--timeout <seconds>` - Timeout per step (default: 30)
-- `--debug` - Enable debug mode
-
-## How It Works
-
-Each prompt in the chain receives the complete output from the previous step as context, enabling complex multi-step workflows.
-
-## Examples
-
-### Basic Chain
-```bash
-claude-flow stream-chain run \
-  "Write a function" \
-  "Add tests for it"
-```
-
-### Complex Workflow
-```bash
-claude-flow stream-chain run \
-  "Analyze the authentication system" \
-  "Identify security vulnerabilities" \
-  "Propose fixes with priority levels" \
-  "Implement the critical fixes" \
-  "Generate tests for the fixes"
-```
-
-### With Options
-```bash
-claude-flow stream-chain run \
-  "Complex analysis task" \
-  "Detailed implementation" \
-  --timeout 60 \
-  --verbose
-```
-
-## Context Preservation
-
-The output from each step is injected into the next prompt:
-
-```
-Step 1: "Write a sorting function"
-Output: [function code]
-
-Step 2 receives: "Previous step output:
-[function code]
-
-Next step: Optimize for performance"
-```
-
-## Best Practices
-
-1. **Clear Instructions**: Make each prompt specific
-2. **Logical Flow**: Order prompts in logical sequence
-3. **Appropriate Timeouts**: Increase for complex tasks
-4. **Verification**: Add verification steps in chain
+Never put task text into a `desktop_exec` command yourself — only the strings `build` prints.
+Never contact a desktop on port 17870.

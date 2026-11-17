@@ -1,47 +1,22 @@
-# Neural Pattern Training
+---
+name: neural
+description: Neural pattern training, prediction, compression, and pipeline optimization
+---
 
-## 🎯 Key Principle
-**This tool coordinates Claude Code's actions. It does NOT write code or create content.**
+Neural system commands — dispatch by subcommand parsed from the user's input:
 
-## MCP Tool Usage in Claude Code
+1. **train** — `mcp__plugin_ruflo-core_ruflo__neural_train` with `{ modelType: "moe"|"transformer"|"classifier"|"embedding", epochs: N }` (`modelType` is required). The CLI equivalent is `neural train --pattern coordination|optimization|prediction|security|testing --epochs N`.
+2. **status** — `mcp__plugin_ruflo-core_ruflo__neural_status` (SONA + MoE state, active patterns, training in flight).
+3. **patterns** — `mcp__plugin_ruflo-core_ruflo__neural_patterns` with `{ action: "list"|"get"|"store"|"search"|"delete" }` (default list; `search` takes `query` and `limit`).
+4. **predict** — `mcp__plugin_ruflo-core_ruflo__neural_predict` with `{ input: "<task description>", topK? }` to get a predicted outcome.
+5. **optimize** — `mcp__plugin_ruflo-core_ruflo__neural_optimize` to retune the pipeline based on recent outcomes.
+6. **compress** — `mcp__plugin_ruflo-core_ruflo__neural_compress` to compact stored patterns (storage efficiency, runs after consolidation).
+7. **wsp** — ruv-FANN weight-space checks (`@claude-flow/cli` 3.77.0+, ADR-528). CLI only, via Bash: `npx @claude-flow/cli@latest neural wsp <op>`:
+   - `status` — whether the optional `ruv-fann-wsp`, `-invariants` and `-lifecycle` packages are installed; exit 2 with the reason when they are not.
+   - `inspect [-m model.json]` — content hash and shape (default: the agent centroid router).
+   - `check [--min-gap 0.05]` — self-routing invariants for the centroid router: each label must win on its own centroid by the gap. `check -m model.json -s suite.json` runs your own `ruv-fann.invariants/1` suite.
+   - `gate -m model.json -p patch.json -s suites.json` — accept/reject a weight patch of at most 128 edits against every dataset suite (MSE policy).
+   - `export-centroid -o file.json` — the centroid router as a one-layer Linear `ruv-fann.dense-layers/1` model.
+   All of these are evidence only: none promotes a model or changes routing. Exit 1 means a check or gate failed.
 
-**Tool:** `mcp__claude-flow__neural_train`
-
-## Parameters
-```json
-{
-  "pattern_type": "coordination",
-  "training_data": "task decomposition patterns",
-  "epochs": 50
-}
-```
-
-## Description
-Improve coordination patterns through neural network training
-
-## Details
-Training improves:
-- Task breakdown effectiveness
-- Coordination pattern selection
-- Resource allocation strategies
-- Overall coordination efficiency
-
-## Example Usage
-
-**In Claude Code:**
-1. Train coordination patterns: Use tool `mcp__claude-flow__neural_train` with parameters `{"pattern_type": "coordination", "training_data": "successful task patterns", "epochs": 50}`
-2. Train optimization patterns: Use tool `mcp__claude-flow__neural_train` with parameters `{"pattern_type": "optimization", "training_data": "performance metrics", "epochs": 30}`
-3. Check training status: Use tool `mcp__claude-flow__neural_status`
-4. Analyze patterns: Use tool `mcp__claude-flow__neural_patterns` with parameters `{"action": "analyze"}`
-
-## Important Reminders
-- ✅ This tool provides coordination and structure
-- ✅ Claude Code performs all actual implementation
-- ❌ The tool does NOT write code
-- ❌ The tool does NOT access files directly
-- ❌ The tool does NOT execute commands
-
-## See Also
-- Main documentation: /CLAUDE.md
-- Other commands in this category
-- Workflow examples in /workflows/
+Present results clearly. For `wsp check`/`gate`, show the verdict, then each violation or suite line. For `train`, surface the loss curve summary; for `predict`, show the predicted agent + confidence; for `optimize`/`compress`, show before/after counts.
