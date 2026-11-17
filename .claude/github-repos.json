@@ -4118,7 +4118,7 @@
     "skills": {
       "url": "https://github.com/anthropics/skills.git",
       "name": "skills",
-      "last_fetched": "2026-10-05 19:32 UTC",
+      "last_fetched": "2026-11-17 13:33 UTC",
       "components": {
         "skills": [
           "canvas-design",
