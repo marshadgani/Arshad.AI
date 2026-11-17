@@ -1,15 +1,20 @@
-// Written by Claude Code 2.1.288.
+// Written by Claude Code 2.1.325.
 // Claude Code function hooks: the plugin API's TypeScript declarations.
 //
 // EARLY ACCESS: this surface may change between releases without notice.
-// Written by the engine each time it loads a mod from a folder the person
-// owns, beside that mod as .claude-plugin/types/claude-code/index.d.ts;
-// written again after an update rather than edited. The first line names
-// the Claude Code version that wrote it. TypeScript 5.4 or newer reads it.
+// The engine writes this file each time it loads a mod from a folder the
+// person owns, beside that mod as .claude-plugin/types/claude-code/index.d.ts,
+// under a first line naming the Claude Code version that wrote it, and again
+// after an update, so don't edit a copy. TypeScript 5.4 or newer reads it.
 // `claude plugin validate <dir>` is the other half: it reads a plugin's
 // manifest and its hooks module's source the way the engine will and
-// reports what the module hooks and calls and everything the engine would
-// refuse, before any session loads it.
+// reports what the module hooks and calls, the $ nouns an engine.create
+// hook adds or withholds, and everything the engine would refuse, before
+// any session loads it. Its lists of hooks, calls and nouns are notes
+// (`notes` in its JSON report) and fail nothing. Validate also refuses an
+// engine.create hook outside its one form, spelled in plugin-authoring's
+// reference, which still loads: a check, and no guarantee or security
+// boundary.
 //
 // What is here: the module a hooks module may import types from,
 //   import type { Register, On, EngineInterface } from 'claude-code'
@@ -100,6 +105,21 @@
 
 declare module 'claude-code' {
   /**
+   * One plugin's row of the band: what its `AbovePrompt` chain settled to, with a
+   * Progress root inside a Box marked as that plugin's.
+   */
+  type AbovePromptRow = {
+      /**
+       * Who the row was asked of (`e.plugin` on its `AbovePrompt`).
+       */
+      plugin: string;
+      /**
+       * The row's settled tree, validated alone.
+       */
+      tree: RenderElement;
+  };
+
+  /**
    * What an Agent call a plugin raised (`$.tool.call({ tool: "Agent", ... })`)
    * answers as `result` once the agent settles; `text` is its final answer.
    *
@@ -120,30 +140,49 @@ declare module 'claude-code' {
 
   /**
    * One agent loop of this session as `$.agent.list()` returns it: a subagent
-   * or an in-process teammate.
+   * or a teammate.
    */
   export type AgentInfo = {
       /**
-       * The agent's id: the same string its loop's `tool.call` events carry as
-       * `agentId`, and a spawn inside it as `parentAgentId`.
+       * The agent's one id: `agent.spawn` answers it as `agentId`, its loop's
+       * events carry it as `agentId`, a spawn inside it as `parentAgentId`.
+       *
+       * The Agent tool's record spells it `agentId` too, the classic events
+       * (SubagentStart, SubagentStop, TeammateIdle) `agent_id`. A teammate in a
+       * terminal pane of its own runs no loop here: its id is its address.
        */
       id: string;
       /**
-       * Its row's label.
+       * A teammate's address in its team, `<name>@<team>`, which the roster keys
+       * it by; absent for any other agent.
+       *
+       * It joins `agent.spawn`'s `teammateId` and the Agent tool's `teammate_id`,
+       * and no event's `agentId`: that is `id`. A respawn under the name keeps it.
+       */
+      teammateId?: string;
+      /**
+       * The Agent call's own `description` of the task (a few words), as an
+       * `agent.spawn` hook left it.
        */
       description: string;
       /**
-       * The agent definition it runs as (`general-purpose`, `Explore`, ...), or
-       * `teammate` for an in-process teammate.
+       * The agent type it was spawned as, `agent.spawn`'s `subagentType`
+       * (`general-purpose`, `Explore`, ...); `teammate` for one spawned as none.
+       *
+       * A teammate's classic events give its `name` as `agent_type`, not this.
        */
       type: string;
       /**
-       * `running`, `completed`, `failed`, `killed`, or another of the engine's task
-       * statuses.
+       * Where its loop stands now (AgentStatus): a teammate that waits for a
+       * message is `idle`, not `running`.
+       *
+       * One in a terminal pane of its own is `running` or `idle` by what it last
+       * wrote in its team's roster, at a turn's start and at its end: a pane that
+       * is closed or dies leaves that word standing.
        */
-      status: string;
+      status: AgentStatus;
       /**
-       * The id of the subagent whose loop spawned it; absent when the main loop
+       * The id of the agent whose loop spawned it; absent when the main loop
        * did.
        */
       parentId?: string;
@@ -157,6 +196,9 @@ declare module 'claude-code' {
       /**
        * What SendMessage addresses it by (`Agent({ name })`, or the engine's own
        * for a background agent), when it has one; not `description` or `type`.
+       *
+       * A teammate's is its name in the team, with a suffix when the call's was
+       * taken. Two agents may hold one name: `id` tells them apart.
        */
       name?: string;
   };
@@ -229,22 +271,30 @@ declare module 'claude-code' {
   export type AgentSpawnArgs = Pick<AgentSpawnInput, 'prompt'> & Partial<Pick<AgentSpawnInput, 'description' | 'subagentType' | 'model' | 'name' | 'cwd'>>;
 
   /**
-   * The input of `agent.spawn`: what the Agent tool decided about the
-   * subagent it is about to start, before its model is resolved.
+   * The input of `agent.spawn`: what is decided about an agent about to start,
+   * before its model is resolved.
    *
-   * A hook rewrites content (prompt, description, subagentType, model,
-   * background, cwd), read back as the tool's parameters; tool_use_id, name,
-   * fork, parentModel, permissionMode, parentAgentId and provider are pinned.
+   * A subagent, a teammate, a workflow agent or a resumed run. A hook rewrites
+   * content (prompt, description, subagentType, model, background, cwd) unless
+   * `resume` fixes it, or `workflow` all but two; every other key is pinned.
    */
   export type AgentSpawnInput = {
       /**
        * The Agent tool call this spawn belongs to (for `$.ui.notice`). Pinned:
        * the spawn's identity.
+       *
+       * For a workflow agent, the Workflow tool call that started its run, shared
+       * by all of the run's agents and possibly empty on a resumed or
+       * server-launched run.
        */
       tool_use_id: string;
       /**
        * The task the subagent is given: the Agent tool's `prompt` parameter. A
        * rewrite is the prompt the subagent runs with.
+       *
+       * A workflow agent's is a fixed placeholder on a run that keeps its script
+       * out of SDK events (Code Review's, say): a hook has not seen the prompt, so
+       * a rewrite of it is not applied, and the agent starts with the script's own.
        */
       prompt: string;
       /**
@@ -257,7 +307,8 @@ declare module 'claude-code' {
        * `fork`). A rewrite names another agent this call can dispatch, exactly.
        *
        * That definition is the one spawned; a name matching none refuses the
-       * spawn, and a fork dispatches no other.
+       * spawn, and a fork dispatches no other. A teammate's may be a role no
+       * definition has, as the call spelled it, or `teammate` when it named none.
        */
       subagentType: string;
       /**
@@ -270,7 +321,8 @@ declare module 'claude-code' {
        * full id; undefined lets the agent's own model, then the parent's, decide.
        *
        * Ignored for forks, which always inherit. A hook sets this to pick the
-       * subagent's model.
+       * subagent's model; where the session forces one model on every subagent,
+       * that outranks a workflow agent's, a hook's included.
        */
       model?: string;
       /**
@@ -297,7 +349,8 @@ declare module 'claude-code' {
        * rewrite is read back as the call's `run_in_background`.
        *
        * The agent's own definition and remote isolation can still force it on,
-       * and disabled background tasks force it off.
+       * and disabled background tasks force it off. A teammate's is true: a
+       * rewrite is left out, said once in the plugin's failure line.
        */
       background: boolean;
       /**
@@ -306,13 +359,71 @@ declare module 'claude-code' {
        */
       fork: boolean;
       /**
+       * Present, and true, when the call starts a teammate: a named agent of the
+       * session's team, which goes idle between turns and wakes on a message.
+       *
+       * Absent for any other agent. Pinned: the spawn's identity.
+       */
+      isTeammate?: true;
+      /**
+       * Present when a workflow script's `agent()` starts the agent, absent for
+       * any other. Pinned: the spawn's identity.
+       *
+       * A rewrite of its `prompt` and `model` applies; `description`,
+       * `subagentType`, `background` and `cwd` do not apply to it, and one is left
+       * out and said once. A deny is the error the script's `agent()` call throws.
+       *
+       * `next` settles with the first attempt's `agentId`; a stalled agent's
+       * retry is not raised again. With `isolation: 'remote'` (internal builds
+       * only) no `turn.complete`, loop event or list row carries that id.
+       */
+      workflow?: {
+          /**
+           * The run's id, which starts `wf_` (empty only outside a real run).
+           *
+           * A child `workflow()`'s agents carry their parent run's, and a resume
+           * keeps it; a Workflow call that starts a fresh run gets a new id.
+           */
+          runId: string;
+          /**
+           * This agent's place among the run's `agent()` calls, from 1. Agents
+           * replayed from the run's journal count but are not raised.
+           *
+           * The journal knows an agent by what the script asked, before any hook.
+           * It restarts whenever the run's script starts over (a new run, a resume
+           * or a background hand-off of the same `runId`); a call that reopens a
+           * settled run keeps counting. A cap across resumes keeps its own count.
+           */
+          agentIndex: number;
+      };
+      /**
+       * Present when the run resumes a subagent or brings a teammate back from
+       * disk (`isTeammate` beside it), absent for a new agent.
+       *
+       * A hook can only refuse it; a changed content key is ignored, said once.
+       * `prompt` is the resuming message (empty where none is appended). A deny
+       * starts no run and ends nothing: a denied wake leaves its agent parked.
+       */
+      resume?: {
+          /**
+           * The id the run continues under, as `$.agent.list()` lists it; `next`
+           * settles with it. An agent started with no event raised has one too.
+           */
+          agentId: string;
+      };
+      /**
        * Given by the call (`Agent({ name })`, addressable by SendMessage);
        * undefined when unnamed. Pinned: the address the parent routes by.
+       *
+       * A teammate whose name the team has already gets a suffix (`scout-2`),
+       * which the answer's `teammateId` and `$.agent.list()` show.
        */
       name?: string;
       /**
        * The directory the subagent runs in when the call set one (`cwd`); undefined
        * means the parent's. A rewrite is where the subagent runs.
+       *
+       * A teammate runs in the session's: a rewrite is left out, as `background`'s.
        */
       cwd?: string;
   };
@@ -338,18 +449,32 @@ declare module 'claude-code' {
        * The started subagent's id: the same string its loop's `tool.call`
        * events carry as `agentId` and `$.agent.list()` lists it by.
        *
-       * Set by core; a hook that answers without `next` started none.
+       * A workflow's remote agent has no local loop, so nothing else carries
+       * it. Set by core; a hook that answers without `next` started none.
        */
       agentId?: string;
+      /**
+       * A started teammate's address in its team, `<name>@<team>`, as
+       * `$.agent.list()` gives it; absent for any other agent.
+       *
+       * Set by core. It joins the list's `teammateId` and the tool's
+       * `teammate_id`; every event of the teammate's loop carries `agentId`.
+       */
+      teammateId?: string;
       deny?: undefined;
   } | {
       /**
-       * Refuses the spawn, so nothing starts; the model sees the text as the
-       * Agent tool's error.
+       * Refuses the spawn, so nothing starts; the text is the Agent tool's
+       * error, or the error a workflow script's `agent()` call throws.
+       *
+       * Returned after a `next(e)` was answered it fails the hook: its
+       * `.catch` is asked (a deny from it fails too), or it is skipped by
+       * name and its last `next` stands.
        */
       deny: string;
       model?: undefined;
       agentId?: undefined;
+      teammateId?: undefined;
   };
 
   /**
@@ -415,6 +540,12 @@ declare module 'claude-code' {
        */
       maxTurns?: number;
       /**
+       * Token count, 100000 to 1000000, at which the agent compacts its own
+       * conversation as a subagent. It only lowers the window the agent would
+       * otherwise get.
+       */
+      autoCompactWindow?: number;
+      /**
        * Preloaded into the agent's context before its first turn: skill names.
        */
       skills?: readonly string[];
@@ -445,12 +576,79 @@ declare module 'claude-code' {
   };
 
   /**
+   * Where an agent's loop stands: `pending` (not started), `running` a turn,
+   * `waiting` (held), `idle` (between turns, until a message wakes it), or ended.
+   *
+   * `waiting` is on background work it owns, on a plan's approval or, in a
+   * background subagent, on an Agent call alone. Ended is `completed`, `failed`
+   * or `killed` (stopped); a message may yet resume one, under the same id.
+   */
+  export type AgentStatus = 'pending' | 'running' | 'waiting' | 'idle' | 'completed' | 'failed' | 'killed';
+
+  /**
+   * What an Agent call that started a teammate answers as `result` at
+   * `tool.call`: the started teammate's two ids, its name and its model.
+   *
+   * The call answers once the teammate started; each of its turns ends in its
+   * own `turn.complete`, carrying `agentId` (none here from a terminal pane).
+   */
+  export type AgentTeammateRecord = {
+      status: 'teammate_spawned';
+      /**
+       * The teammate's one id, as every Agent record spells it: `agent.spawn`'s
+       * `agentId`, its loop's events' `agentId`, its `$.agent.list()` `id`.
+       *
+       * For one in a terminal pane, which runs no loop here, its address. Absent
+       * from a record an earlier version wrote, which a resumed transcript holds.
+       */
+      agentId?: string;
+      /**
+       * The same id in this record's older spelling, which the classic events
+       * share (`classic.SubagentStop`'s `agent_id`).
+       */
+      agent_id: string;
+      /**
+       * Its address in its team, `<name>@<team>`: `$.agent.list()`'s
+       * `teammateId`, and no event's `agentId`.
+       */
+      teammate_id: string;
+      /**
+       * What SendMessage addresses it by: the call's `name`, any `@` replaced,
+       * with a suffix (`scout-2`) when the team already has it.
+       */
+      name: string;
+      /**
+       * The team it joined: the session's own.
+       */
+      team_name?: string;
+      /**
+       * What it was spawned as, when the call named a type.
+       */
+      agent_type?: string;
+      /**
+       * What it was started on, an alias resolved, as every Agent record spells
+       * it: `agent.spawn`'s `model`.
+       *
+       * Absent where `agentId` is: `model` has it then, an alias as spelled.
+       */
+      resolvedModel?: string;
+      /**
+       * The older spelling of that, an alias left as the call spelled it.
+       */
+      model?: string;
+      /**
+       * The task it was given, as an `agent.spawn` hook left it.
+       */
+      prompt: string;
+  };
+
+  /**
    * The hook `on("*", hook)` takes: it runs on every event, plugin nouns no
    * declaration names included, so `e` is `unknown` and `next` is StarNext.
    *
    * Until `next.is(pattern, e)` narrows `e`, all a hook can do with it is pass
    * it on, time it, log it, or fail it; once narrowed it is an ordinary hook on
-   * those events.
+   * those events, except `engine.create`, where it only observes the fold.
    *
    * @param $ the engine interface; at `engine.create` the empty table, so a hook
    *          that reads `$` tests `next.is("engine.create", e)` first
@@ -704,14 +902,9 @@ declare module 'claude-code' {
    * The `Box` props a `hover` may override, none of which moves the Box's
    * siblings, and `scope`, which names the hover group the Box joins.
    *
-   * `display` is `"flex"` alone, on a Box drawn `display: "none"`: with a
-   * `scope`, every member of the lit group is revealed, in whichever site it
-   * sits, so a pointer on a glyph in the transcript can swap an entry into a
-   * fixed row of the band, or reveal an absolutely positioned card.
-   * `borderStyle` only restyles a border the Box has; the offsets move a Box
-   * drawn `position: "absolute"`, none in the flow. The surface applies a
-   * hover as the pointer moves and as what is drawn under a resting pointer
-   * changes; a reveal that keeps moving what it rests on settles, never loops.
+   * The surface applies a hover as the pointer moves and as what is drawn
+   * under a resting pointer changes; a reveal that keeps moving what it rests
+   * on settles, never loops.
    */
   export type BoxHoverProps = {
       /**
@@ -723,11 +916,25 @@ declare module 'claude-code' {
        * 64 characters, no control characters; no keyed Box needed; no hook runs.
        */
       scope?: string;
+      /**
+       * Restyles a border the Box has; it adds none.
+       */
       borderStyle?: string;
-      borderColor?: string;
+      borderColor?: Color;
       borderDimColor?: boolean;
-      backgroundColor?: string;
+      backgroundColor?: Color;
+      /**
+       * `"flex"` alone, on a Box drawn `display: "none"`: with a `scope`, every
+       * member of the lit group is revealed, in whichever site it sits.
+       *
+       * So a pointer on a glyph in the transcript can swap an entry into a fixed
+       * row of the band, or reveal an absolutely positioned card.
+       */
       display?: 'flex';
+      /**
+       * Moves a Box drawn `position: "absolute"`, as `left`, `right` and
+       * `bottom` do; none of the four moves a Box in the flow.
+       */
       top?: number;
       left?: number;
       right?: number;
@@ -800,31 +1007,37 @@ declare module 'claude-code' {
       alignItems?: 'flex-start' | 'center' | 'flex-end' | 'stretch';
       alignSelf?: 'flex-start' | 'center' | 'flex-end' | 'auto';
       justifyContent?: 'flex-start' | 'center' | 'flex-end' | 'space-between' | 'space-around' | 'space-evenly';
-      gap?: number;
-      columnGap?: number;
-      rowGap?: number;
+      /**
+       * Space between the children, across and down, in cells or a step name.
+       * Spacing flows from the parent: set `gap` on the Box rather than a margin
+       * on each child. A graphical surface draws `xs` between the Buttons of a
+       * row Box with no gap; the terminal draws them as written.
+       */
+      gap?: Space;
+      columnGap?: Space;
+      rowGap?: Space;
       width?: number | string;
       height?: number | string;
       minWidth?: number | string;
       minHeight?: number | string;
-      margin?: number;
-      marginX?: number;
-      marginY?: number;
-      marginTop?: number;
-      marginBottom?: number;
-      marginLeft?: number;
-      marginRight?: number;
-      padding?: number;
-      paddingX?: number;
-      paddingY?: number;
-      paddingTop?: number;
-      paddingBottom?: number;
-      paddingLeft?: number;
-      paddingRight?: number;
+      margin?: Space;
+      marginX?: Space;
+      marginY?: Space;
+      marginTop?: Space;
+      marginBottom?: Space;
+      marginLeft?: Space;
+      marginRight?: Space;
+      padding?: Space;
+      paddingX?: Space;
+      paddingY?: Space;
+      paddingTop?: Space;
+      paddingBottom?: Space;
+      paddingLeft?: Space;
+      paddingRight?: Space;
       borderStyle?: string;
-      borderColor?: string;
+      borderColor?: Color;
       borderDimColor?: boolean;
-      backgroundColor?: string;
+      backgroundColor?: Color;
       overflow?: 'visible' | 'hidden';
       display?: 'flex' | 'none';
   };
@@ -890,8 +1103,8 @@ declare module 'claude-code' {
   }
 
   /**
-   * The props of `Button`, every surface's pressable leaf: an address, a
-   * label, the closure a press runs, and the label styles a hover overrides.
+   * The props of `Button`, every surface's pressable: an address, a label or
+   * children, the closure a press runs, and the styles a hover overrides.
    *
    * The terminal draws `[ label ]` (when `plain`, `1: label` or the label
    * alone), a desktop a native button; a click, a `hotkey`, the chord for its
@@ -900,11 +1113,24 @@ declare module 'claude-code' {
   export type ButtonProps = {
       /**
        * The element's address: `e.element` at `ui.press`, what a matcher names.
-       * Defaults to the label.
+       * Defaults to the `label`, or the one string child.
+       *
+       * Needed where the Button holds other children and no `label`: a row's
+       * text holds what changes (a count, an age), its address must not.
+       *
+       * Give every Button in a list its own: a surface finds one again by it
+       * after a redraw, and cannot tell apart two that share it.
        */
       key?: string;
       /**
        * The text drawn on the button; or the one string child.
+       *
+       * Children of strings and `Text` (a chip, a dim part) are drawn in its
+       * place, one press wherever on them it lands; any other element is refused.
+       * The label then names the control; absent, it is the children's text.
+       *
+       * @example
+       * <Button key={id} onPress={open}>{name} <Text dimColor>2m</Text></Button>
        */
       label?: string;
       /**
@@ -913,7 +1139,8 @@ declare module 'claude-code' {
        *
        * Its site holds it after ctrl+x tab, a click or `open({ focus })`: the band
        * or its `Pane`; never the composer, save that a bare digit in an empty one
-       * answers a band Button (a survey). Shift+w is `"w"`; two clash, later wins.
+       * answers a band Button (a survey). Shift+w is `"w"`. Two of one plugin on
+       * one hotkey: the later wins. Two plugins on one hotkey: it presses neither.
        */
       hotkey?: string;
       /**
@@ -989,6 +1216,14 @@ declare module 'claude-code' {
        * onPress: press => $.ui.copy({ text: url, surface: press.surface })
        */
       onPress: (e: UiPressArgument) => void;
+  };
+
+  /**
+   * The argument of `$.ui.cancelNotify`.
+   */
+  type CancelNotifyArgs = {
+      /** The `key` the plugin gave `$.ui.notify`. */
+      key: string;
   };
 
   /**
@@ -1074,6 +1309,9 @@ declare module 'claude-code' {
    * The chain is [managed settings hooks, ...hooks modules, the other settings
    * hooks as core], so a managed block ends it above every module. In shape
    * `classic.PreToolUse` alone differs: its `e` is ToolCallEnvelope, no more.
+   *
+   * @remarks A hook that blocks and fails is skipped and the hooks beneath
+   *   decide, unless its `.catch` (CatchHandler) answers in its place.
    */
   export type ClassicEventOf = {
       [E in ClassicHookEvent as `classic.${E}`]: E extends 'PreToolUse' ? ToolCallEnvelope : ClassicHookInputs[E];
@@ -1227,13 +1465,13 @@ declare module 'claude-code' {
 
   /**
    * The element table a surface module draws with, `surface.elements`: the
-   * terminal's (Elements) less `Client` (none nests), `Raster` and `Image`.
+   * terminal's (Elements) less `Client`, `Raster`, `Image` and `Progress`.
    *
    * What `$.ui.resolve(e)` is to a hooks module; a Button, Input or Select
    * keeps its handler here. A tree of them keeps every tree's bounds (20,000
    * nodes, 32 deep, 100,000 characters serialized) or the instance unmounts.
    */
-  export type ClientElements = Omit<Elements['terminal'], 'Client' | 'Raster' | 'Image'>;
+  export type ClientElements = Omit<Elements['terminal'], 'Client' | 'Raster' | 'Image' | 'Progress'>;
 
   /**
    * One key the person pressed while a `Client` had the focus, as
@@ -1345,7 +1583,7 @@ declare module 'claude-code' {
        * Plain data (JsonValue) handed to the module function; a new value on a
        * redraw reaches the running instance, its state kept.
        *
-       * Bounded as a tree's text is; not a channel for closures.
+       * At most 100000 characters serialized; not a channel for closures.
        * Typed `unknown` so a matcher over a tree stays shallow.
        */
       props?: unknown;
@@ -1426,7 +1664,8 @@ declare module 'claude-code' {
        *
        * A later post in the same frame replaces an undelivered one; a hook
        * answering `{ props }` hands this instance its next props. At most
-       * 20,000 values, 32 deep, 100,000 characters, or the post is not sent.
+       * 20,000 values, 32 deep, 100,000 characters, with no named key on a list and
+       * no key named `__proto__`, `constructor` or `prototype`, or the post is not sent.
        */
       post: (data: JsonValue) => void;
   };
@@ -1447,7 +1686,7 @@ declare module 'claude-code' {
    * highlighter: coloured tokens, a line gutter on request, or a unified diff.
    *
    * A leaf: no children. `source` is the element's data as a string is a
-   * Text's, bounded and free of control characters the same way; the colour
+   * Text's, free of control characters the same way; the colour
    * on screen is the engine's, never the plugin's.
    */
   export type CodeProps = {
@@ -1455,8 +1694,8 @@ declare module 'claude-code' {
        * The text drawn: source code, or under `format: 'diff'` one or more
        * unified-diff hunks.
        *
-       * At most 10000 characters; tab and newline are the only control
-       * characters it may hold. A diff cut to fit mid-hunk no longer parses.
+       * Of any length, one drawing drawing 100000 characters in all; tab and
+       * newline its only control characters. A diff cut mid-hunk does not parse.
        */
       source: string;
       /**
@@ -1499,6 +1738,15 @@ declare module 'claude-code' {
        */
       wrap?: 'wrap' | 'truncate-end';
   };
+
+  /**
+   * What a prop that paints may hold: a theme key, which follows the person's
+   * theme, or any other string, a raw color (a name such as `"red"`, or hex).
+   *
+   * The keys are named so that an editor lists them; every string is
+   * admitted. What a surface draws for one it does not know is its own.
+   */
+  export type Color = ThemeKey | (string & {});
 
   /**
    * The input of `command.describe`: how one slash command presents in the
@@ -1667,6 +1915,16 @@ declare module 'claude-code' {
        * along; written, it keeps every entry that answer had (none empty).
        */
       context?: readonly string[];
+      /**
+       * Whether `text` is for the person alone and `context` is all the model
+       * reads: the output row is drawn and kept, and goes in no request.
+       *
+       * Read on a hook's own answer without `next`, when every plugin hooking the
+       * command is bundled with Claude Code, whose answer reads as the built-in
+       * command's own, on the queued lanes: a panel answered mid-turn keeps its
+       * text in requests. Any other plugin's text stays in requests.
+       */
+      isTextDisplayOnly?: true;
       /**
        * What the process exits with when this command was the whole prompt of a
        * headless run (`claude -p "/lint"`): a whole number from 0 to 255.
@@ -1888,8 +2146,9 @@ declare module 'claude-code' {
    * What a `config.set` hook returns and what `next(e)` resolves to:
    * `{ value }` once written, or `{ deny: reason }`, the row left as it was.
    *
-   * The menu shows a deny's reason beside the row; a plugin's `$.config.set`
-   * resolves with it.
+   * The menu shows a deny's reason; `$.config.set` resolves with it. A deny
+   * after a `next(e)` was answered fails the hook: its `.catch` is asked (a
+   * deny from it fails too), or it is skipped by name and its last `next` stands.
    */
   export type ConfigSetResult = {
       value: ConfigValue;
@@ -2060,7 +2319,7 @@ declare module 'claude-code' {
        * Where it came from, by the engine's word (`userSettings`, `plugin`,
        * `built-in`, `mcp`, `syncedSkills`); the display label is the renderer's.
        */
-      source: string;
+      source: SkillSource;
       /**
        * The providing plugin's name, when the skill comes from one.
        */
@@ -2165,12 +2424,14 @@ declare module 'claude-code' {
            * Re-runs an event whose results the engine caches: `ui.render` draws the
            * instances this plugin may draw again; the others drop the cached answers.
            *
-           * A render hook whose state changed (a countdown) calls it to redraw: ten a
-           * second at most, thirty in the terminal for its shown pane, expanded band
-           * and prompt hint (sooner calls fold); a cached answer: dropped next turn.
+           * A redraw: ten a second at most, thirty in the terminal for a shown pane,
+           * expanded band and prompt hint (sooner calls fold). A cached answer drops
+           * next turn; a changed tool or section text then waits, as
+           * `breakPromptCache` on its answer tells.
            *
-           * @remarks For `ui.render`, the instances this plugin's matchers on it may
-           *   select: one naming no `requestId`, every instance of its component.
+           * @remarks An ask ends with the process: a resumed thread sends what it
+           *   recorded; asked again, a `tool.describe` hook's answer that says
+           *   `breakPromptCache` goes over the recorded description where it differs.
            * @param event `ui.render`, or a cached-answer event: `prompt.section`,
            *   `prompt.context`, `prompt.attachment`, `tool/command/config.describe`
            */
@@ -2217,10 +2478,11 @@ declare module 'claude-code' {
            * not sent to the model), or with `{ to: "debug" }` to the debug log alone.
            *
            * A row of its own at the next frame, in logging order; a `-p` or SDK
-           * host receives it as `ui_log`; the debug log has every line under this
-           * plugin's name. Raised as `ui.log`: a hook above may rewrite `e.to`.
+           * host receives it as `ui_log`; the debug log has it either way, to 10000
+           * characters. Raised as `ui.log`: a hook above may rewrite `e.to`.
            *
-           * @param text the line's text
+           * @param text the line's text, of any length: the terminal draws its
+           *   first 2000 characters, a remote surface 10000
            * @param options `to`: `transcript` (the default) or `debug`
            * @example
            * $.ui.log(`prompt from ${e.origin.kind}: ${e.text.length} chars`)
@@ -2252,21 +2514,58 @@ declare module 'claude-code' {
            * is printed into scrollback (nothing to float over) it is one line on the
            * notification bar. It leaves the transcript and the model untouched.
            *
-           * @param text the line to show; an unpaired surrogate half in it is drawn
-           *   as U+FFFD
+           * @remarks While the pane shown was opened `holdToasts`, by any plugin, it
+           *   waits undrawn, its timer not started; past 50 waiting, an older leaves.
+           * @param text the line to show, its first 2000 characters drawn (10000
+           *   remotely); an unpaired surrogate half in it is drawn as U+FFFD
            * @param options `timeoutMs`: how long it stays (default 4000)
            * @example
            * $.ui.toast(`turn took ${Math.round(e.durationMs / 1000)} s`)
            */
           toast: (text: string, options?: ToastOptions) => void;
           /**
+           * Raises a native notification of `text` through the person's own
+           * notification channel, the one their `preferredNotifChannel` names.
+           *
+           * Their `Notification` hooks run first, reading `plugin_notification`,
+           * then the channel writes. Raised as `ui.notify`; nothing limits how
+           * often. With no terminal the hooks run, then a host that raises
+           * notifications is handed it; with none, the hooks alone.
+           * Unbound or exiting, none.
+           *
+           * @remarks A hook that notifies is left out of the hooks its own call
+           *   runs. Rejects on a hook's `{ deny }`, and on a failed write.
+           * @param text the notification's body, of any length. A terminal sends it
+           *   as given; a host gets it cleaned and cut to 1,000 characters
+           * @param options `title`: what heads it (default: the plugin's name); the
+           *   rest only a host acts on (NotifyOptions)
+           * @returns `{ isSent: true, channel }`, `client` for a host, or
+           *          `{ isSent: false, reason }`:
+           *          turned off (`disabled`), `no-channel`, `no-surface`, `refused`
+           * @example
+           * const sent = await $.ui.notify("tests passed", { title: "CI" })
+           */
+          notify: (text: string, options?: NotifyOptions) => Promise<UiNotifyResult>;
+          /**
+           * Takes back one of this plugin's own notifications by its `key`: a host
+           * that raises notifications removes it, shown or still booked. The frame
+           * names this plugin's source, which keys are scoped by. Await the
+           * `$.ui.notify` first: a cancel sent before it is out takes back nothing.
+           *
+           * @param key the `key` the notification was sent with
+           * @returns whether such a host was handed the cancel
+           */
+          cancelNotify: (key: string) => Promise<{
+              isSent: boolean;
+          }>;
+          /**
            * Pins `text` as this plugin's status line under the prompt, beside the
            * engine's own pinned notices, until the next call replaces it.
            *
            * One per plugin; `undefined` removes it.
            *
-           * @param text the line to keep on screen (an unpaired surrogate half is
-           *   drawn as U+FFFD); undefined clears it
+           * @param text the line to keep on screen, its first 2000 characters drawn
+           *   (10000 remotely); undefined clears it
            * @example
            * $.ui.status("thinking..."); return next(e)
            */
@@ -2280,22 +2579,26 @@ declare module 'claude-code' {
            * placed at any width; unasked, from 144 columns, 110 for one once asked.
            *
            * @remarks Below that it waits undrawn (`$.ui.panes()`: `isPlaced` false)
-           *   until they open it or the terminal widens; a `-p` run places all.
+           *   for their open or a wider terminal; with no surface attached, for one.
+           *   A pane another plugin holds is refused: the open rejects, naming it.
            * @param pane `id` (1-64 of letters, digits, `_`, `-`), `title`, `focus`,
-           *   `closeOnEscape` and `holdToasts` (a dialog), `rows` / `columns` wanted
+           *   `closeOnEscape` and `holdToasts` (a dialog), `backgroundColor` (what
+           *   is painted under its body), `rows` / `columns` wanted, `placement` (the
+           *   seat to start in: `"widget"`, its small form on the desktop app)
            * @returns `{ isPlaced: true }` once drawn (or retitled), else `{ isPlaced:
-           *   false, reason }` (UiOpenResult); `dock` or `inline` is on `Pane` props
+           *   false, reason }` (UiOpenResult); the seat it got is on `Pane` props
            * @example
            * await $.ui.open({ id: "clock", title: "Clock" })
            * @example
            * await $.ui.open({ id: "ask", focus: true, closeOnEscape: true, rows: 9 })
            * @example
            * const opened = await $.ui.open({ id: "clock" })
-           * if (!opened.isPlaced) $.ui.toast("clock: widen the terminal to see it")
+           * if (!opened.isPlaced) $.ui.log("clock: " + opened.reason)
            */
           open: (pane: PaneOpenArgs) => Promise<UiOpenResult>;
           /**
-           * Closes one of the open panes; an id that is not open is left alone.
+           * Closes one of the open panes; an id that is not open is left alone, and
+           * a pane another plugin holds is refused.
            *
            * Every close raises `ui.close`, `e.origin` naming whose it is: this call
            * (`plugin`), the person's mark or key (`person`), an unload (`unload`).
@@ -2321,6 +2624,18 @@ declare module 'claude-code' {
            * if (!isUp) await $.ui.open({ id: "clock", title: "Clock" })
            */
           panes: () => Promise<readonly UiPane[]>;
+          /**
+           * Places one row at the transcript's end, which scrolls with the
+           * conversation and draws what `ui.render` answers for `Placed`.
+           *
+           * A hook reads `e.props.id` and `e.props.plugin`. Display only: the model
+           * and the transcript file never read it, and `--resume` brings none back. A
+           * hook that passes draws nothing; the same id answers the row that stands.
+           *
+           * @example
+           * await $.ui.place({ id: "build" })
+           */
+          place: (args: UiPlaceArgs) => Promise<UiPlaceResult>;
           /**
            * Scrolls something into view as the DOM's `scrollIntoView` would: a
            * render instance by `requestId`, an element by `key`, a site's edge.
@@ -2375,11 +2690,68 @@ declare module 'claude-code' {
            * select again, dismiss it, or their next prompt or command has run.
            *
            * @returns the selection; `undefined` with nothing selected, and where
-           *          the engine sees none: fullscreen off, -p, a remote surface
+           *          none is seen: fullscreen off, -p, a surface that answers none
            * @example
            * const selected = await $.ui.selection()
            */
           selection: () => Promise<UiSelection | undefined>;
+          /**
+           * Puts an agent's transcript in the main view, as the person's own
+           * switch from the tasks list does; `{}` goes back to the main one.
+           *
+           * Only while the call answers the person's own input (a press, a pick,
+           * their prompt or command): the viewed agent takes the prompt's next
+           * Enter. A site reads the view in force as `e.props.view`.
+           *
+           * @param view `agentId`: the agent's `id` in `$.agent.list()`; absent for
+           *             the main conversation
+           * @returns `{}` once the view shows it, or `{ deny }` saying why not
+           * @example
+           * onPress: () => $.ui.view({ agentId: agent.id })
+           * @example
+           * onPress: () => $.ui.view({})
+           */
+          view: (view: SiteView) => Promise<UiViewResult>;
+      };
+      /**
+       * The session's one theme: how the app looks behind and around the
+       * conversation. One theme stands at a time, the latest set, whichever plugin
+       * set it; there is no stack.
+       */
+      theme: {
+          /**
+           * Sets the session's theme from one object of named top-level attributes,
+           * the whole theme: what a set leaves out is gone.
+           * `backdrop` is a scene, drawn behind the conversation by what `ui.render`
+           * answers for `Backdrop`: full window on desktop under its frosted panels,
+           * full screen on mobile under one veil (`tint` and `opacity`, not yet
+           * `blur`). Or it's a still ground, which a surface draws with no hook.
+           * `colors` is a theme for a surface to paint itself with, where it reads
+           * one. With no scene, no `ui.render` hook is asked to draw.
+           * Display only: `--resume` brings none back and a plugin that unloads
+           * takes its own with it, so set it at `session.start`.
+           *
+           * @param attributes `backdrop`: a scene, `scene` and `glass` (`blur`, `tint`,
+           *   `opacity`) or `false`, or a still ground, see `ThemeGround`;
+           *   `overrideColorScheme` (`light` or `dark`); `colors`: a whole palette
+           * @returns `{ isDrawn: true, requestId }`, or `isDrawn: false` and why
+           * @example
+           * await $.theme.set({ backdrop: { scene: "lagoon", glass: { blur: 14, opacity: 0.55 } } })
+           */
+          set: (attributes: ThemeSetArgs) => Promise<ThemeResult>;
+          /**
+           * Clears the session's theme, back to the app's own look.
+           *
+           * IT CLEARS WHATEVER THEME STANDS, WHICHEVER PLUGIN SET IT: there is one
+           * theme, so a clear is the session's and not the caller's own. Clear on a
+           * person's ask (a command, a button), never at `session.start` or on a
+           * reload: a plugin that clears there wipes another plugin's theme each time.
+           *
+           * @returns `isDrawn: false` and why
+           * @example
+           * await $.theme.clear() // a preview ends with no theme to go back to
+           */
+          clear: () => Promise<ThemeResult>;
       };
       /**
        * Completions through the session's own client and credentials.
@@ -2392,6 +2764,10 @@ declare module 'claude-code' {
            * No tools, no history, no system prompt beyond the CLI's identity block
            * and `request.system`; ModelCompleteRequest says the rest. Only a request
            * the engine refuses to send (a blocked model, a bad cap) rejects.
+           *
+           * An answered request counts toward the session's cost total, `/cost` and
+           * the cost and token metrics, with `query_source` `plugin_model_complete`;
+           * a call cut before an answer counts nothing. Nothing caps it per call.
            *
            * @param request the model (an alias such as `haiku`, or a full id
            *                resolved like `--model`), prompt, cap, effort, time limit
@@ -2418,17 +2794,25 @@ declare module 'claude-code' {
            *
            * The main thread's last request again (its model, system prompt, tools,
            * messages) with `prompt` after it: every tool denied, its own tail never
-           * cached, the prefix billed afresh once the entry lapsed or after `/model`.
+           * cached, the prefix billed afresh once the entry lapsed, after `/model`, or
+           * in a cloud session that continues a chat.
+           * It thinks as hard as the session does unless `effort` says otherwise;
+           * ModelForkRequest says what holds that level and when it costs the cache.
            *
-           * @param request the one user message the fork answers
+           * @param request the one user message the fork answers, and its effort
            * @returns always a result, never null: the reply (`isAnswered`, `text`,
-           *          `usage`), or why there is no text (`reason`: `nothing-to-fork`
-           *          before the first response and after `/clear`, `api-error` with
-           *          its HTTP `status` and `error` kind, `empty-reply`, or `aborted`
-           *          when the turn whose hook forked was interrupted)
+           *          `usage`, the `effort` sent), or why there is no text (`reason`:
+           *          `nothing-to-fork` before the first request and after `/clear`,
+           *          `api-error` with its HTTP `status` and `error` kind,
+           *          `empty-reply`, or `aborted` when the turn whose hook forked was
+           *          interrupted); a request of the wrong shape (no prompt, an
+           *          `effort` that is no level) rejects instead
            * @example
            * const reply = await $.model.fork({ prompt: "One line to learn?" })
            * $.ui.log(reply.isAnswered ? reply.text : `no reply: ${reply.reason}`)
+           * @example
+           * // a quick side job in a session the person runs at max
+           * const cut = await $.model.fork({ prompt: "Shorter.", effort: "low" })
            */
           fork: (request: ModelForkRequest) => Promise<ModelForkResult>;
           /**
@@ -2438,6 +2822,9 @@ declare module 'claude-code' {
            * `text` is data; the model answers with a label alone. It resolves
            * `undefined` when the answer named none of `labels`. A failed request,
            * an abort or a reply with no text rejects, naming the cause.
+           *
+           * An answered request counts as `complete`'s does, with `query_source`
+           * `plugin_model_classify`.
            *
            * @param text what to classify
            * @param labels the labels to choose from (2 or more)
@@ -2488,7 +2875,7 @@ declare module 'claude-code' {
       };
       /**
        * The engine's MCP servers: calling a connected one's tools, and
-       * connecting one the plugin lists itself.
+       * connecting one the plugin lists itself or /mcp lists.
        */
       mcp: {
           /**
@@ -2513,13 +2900,25 @@ declare module 'claude-code' {
            */
           call: (server: string, tool: string, args?: Record<string, unknown>) => Promise<McpToolResult>;
           /**
-           * Connects one of the MCP servers this plugin's own manifest lists; a
-           * server already connected answers at once.
+           * Connects an MCP server if the session has not already: one this
+           * plugin's own manifest lists, by its key, or any server /mcp lists.
            *
-           * The same server run under another name answers with that name. Never
-           * rejects for a refusal: the result says why (`reason`, `message`).
+           * A server joins the session at its start unless a hook on `mcp.connect`
+           * holds it back; this call brings a held one in, the hooks asked with this
+           * plugin as `next.origin`, by the session's own enable under its policy.
+           * Connected means its tools ride the next request of the turn. A refusal
+           * resolves with `reason`, `message`.
            *
-           * @param server the server's key in this plugin's manifest
+           * @remarks A key of the caller's own manifest is read first; the same
+           *   server run under another name answers with that name, and is only
+           *   read. A listed server that is off, waits on sign-in or failed answers
+           *   as it stands: this call never dials, switches or drops one no hook
+           *   holds. A key not yet in the session, when another server is listed
+           *   under the same name, answers `failed`.
+           *   Under `allowManagedHooksOnly` a `user`-tier plugin loads no hooks: its
+           *   gate is absent, yet its server connects. Ship it as managed.
+           * @param server the server's key in this plugin's manifest, or its name
+           *   as /mcp lists it
            * @returns connected, with the name `call` takes, or why not
            * @example
            * const browser = await $.mcp.connect("browser")
@@ -2567,6 +2966,9 @@ declare module 'claude-code' {
           messages: SessionMessagesCall;
           /**
            * Returns the directory the session runs in, absolute.
+           *
+           * A timer that outlives its hook reads the session's directory; keep the
+           * value read inside the hook if you need the hook's (a subagent's own).
            */
           cwd: () => Promise<string>;
           /**
@@ -2621,6 +3023,7 @@ declare module 'claude-code' {
           /**
            * Returns when the session began, and the context window's fill, the
            * rate-limit windows and the cost as the status line has them, itemized.
+           * The cost includes every mod's answered `$.model` calls.
            *
            * The plain call costs nothing; `"full"` counts each category with the
            * token-count API as /context does, `"summary"` estimates locally, and
@@ -2707,22 +3110,37 @@ declare module 'claude-code' {
            * await $.http.fetch(url, { auth: (await $.session.authorize())?.handle })
            */
           authorize: () => Promise<SessionAuthorization>;
+          /**
+           * Returns how the session is signed in, to a mod the organization's
+           * managed settings install; `{ deny }` to any other. No request is made.
+           *
+           * The account (organization, plan, email) only where managed
+           * `forceLoginOrgUUID` lists its organization; else `kind` alone. A
+           * contract, not a wall: any mod can read the person's own config file.
+           *
+           * @example
+           * const { kind, organizationId, email } = await $.session.identity()
+           */
+          identity: () => Promise<SessionIdentity>;
       };
       /**
        * The running model turn: ending it.
        */
       turn: {
           /**
-           * Cancels the running model turn: the one whose id `turn.start` handed
-           * this plugin, its running tools stopped, no interruption marker.
+           * Cancels the main loop's running model turn (the id its `turn.start`
+           * handed this plugin), its running tools stopped, no interruption marker.
            *
            * The event `turn.abort`, seen by the hooks above; the prompt this
            * plugin submits next is the context. Rejects, naming both ids, when
            * `turnId` is not the running turn's; a hook may end its own turn.
            *
-           * @param input `turnId`: the id `turn.start` carried
+           * @param input `turnId`: the id the main loop's `turn.start` carried
            * @example
-           * on("turn.start", ($, e, next) => { held = e.turnId; return next(e) })
+           * on("turn.start", ($, e, next) => {
+           *   if (e.agentId === undefined) held = e.turnId
+           *   return next(e)
+           * })
            */
           abort: (input: OpEventOf['turn.abort']) => Promise<void>;
       };
@@ -2755,6 +3173,18 @@ declare module 'claude-code' {
            */
           read: () => Promise<PromptBox>;
           /**
+           * Returns one image or document of the prompt being submitted, by the
+           * `id` `e.attachments` lists it under: its bytes, base64, 4 MiB a call.
+           *
+           * For a `prompt.submit` hook; else `{ deny }`, as once the submission
+           * has settled. The engine's own read, no event: no hook answers for it.
+           * `{ unreadable }`: no image.
+           *
+           * @example
+           * const media = id ? await $.prompt.media({ id }) : undefined
+           */
+          media: (args: PromptMediaArgs) => Promise<PromptMedia>;
+          /**
            * Puts `input.text` in the prompt box as the draft, by `mode`: `replace`
            * (the default) over it, `append` after it, `insert` at the cursor.
            *
@@ -2768,6 +3198,17 @@ declare module 'claude-code' {
            * ($, e, next) => next({ ...e, context: [...(e.context ?? []), hunk] })
            */
           fill: (input: PromptFillArgs) => Promise<PromptFilled>;
+          /**
+           * Sets this plugin's own decorations over the draft and nothing else.
+           *
+           * No text, caret or undo entry, no `prompt.change` or `prompt.edit`. Hooks
+           * may rewrite or `{ deny }` it. `isPainted: false`, the box handed back,
+           * when the draft no longer reads `text`, or another plugin hooks its read.
+           *
+           * @example
+           * await $.prompt.paint({ text, decorations: [{ start, end, bold: true }] })
+           */
+          paint: (input: PromptPaintArgs) => Promise<PromptPainted>;
           /**
            * Proposes `input.text` as the prompt box's dim suggestion, Tab to take:
            * the event `prompt.suggest`, as the engine's own guess after a turn.
@@ -2799,7 +3240,12 @@ declare module 'claude-code' {
       tool: {
           /**
            * Returns the tools the model can call now, built-in and MCP alike, in
-           * the order the model sees them.
+           * the order the model sees them, through the `tool.list` hooks.
+           *
+           * What those hooks answer the engine's own raise is the session's tool
+           * pool, for the model and for every agent: see `ToolInfo`. The hooks
+           * of the calling plugin are skipped here as on every op, so a tool it
+           * adds itself is not in what it reads back.
            *
            * @example
            * const names = (await $.tool.list()).map(t => t.name)
@@ -2810,8 +3256,14 @@ declare module 'claude-code' {
            * the model's tool calls, under a `tool_use_id` of its own.
            *
            * It runs through every hook but the calling one (the plugin's others
-           * see it), the permission check and its dialog, then the tool. Rejects
-           * when no tool has that name or the call is aborted.
+           * see it), the permission check, then the tool. The check opens no dialog
+           * and asks no classifier: `{ deny }` answers a deny rule, or any ask beyond
+           * no rule allowing the call, such as a hook's or an organization's.
+           * A hook that re-issues the model's call this way answers for its input:
+           * the model's command runs with nobody asked.
+           * `$.tool.check` still reports the session's own verdict, so it can say `ask`
+           * for a call that runs. Rejects when no tool has that name or the call is
+           * aborted.
            *
            * @example
            * const { text } = await $.tool.call({ tool: "Read", file_path: "a.md" })
@@ -2819,7 +3271,7 @@ declare module 'claude-code' {
           call: EventCalls['tool']['call'];
           /**
            * Asks the engine's permission decision for a tool call now: the event
-           * `tool.check`, resolved to `{ decision, reason?, rule? }`.
+           * `tool.check`, resolved to its verdict (`{ decision, reason?, ... }`).
            *
            * The hooks run (the calling hook's own frame skipped, `next.origin` this
            * plugin, no `tool_use_id`); nothing runs, no dialog opens, no PreToolUse
@@ -2838,7 +3290,7 @@ declare module 'claude-code' {
            * again is replaced. Rejects until the session binds, at `session.start`.
            *
            * @param tool `name`, `description` (what the model reads), `inputSchema`
-           *             (a JSON schema object; default `{ type: "object" }`)
+           *             (default `{ type: "object" }`), `isDeferred` (ToolSpec)
            * @returns `{ tool }`, the registered tool's full name
            *          `mcp__<plugin>__<name>`
            * @example
@@ -2862,9 +3314,10 @@ declare module 'claude-code' {
            * Runs a slash command as if the person typed `/command args`: the
            * event `command.run`, queued and run once the session is idle.
            *
-           * It runs through every hook but the calling one with `e.origin`
-           * `{ kind: 'plugin', name }`, its lines in the transcript. Rejects an
-           * unknown name, and inside a hook the turn is waiting on.
+           * It runs through every hook but the calling one with `e.origin` `{ kind:
+           * 'plugin', name }`, its lines in the transcript. Rejects an unknown name,
+           * inside a hook the turn or the session's start waits on, past a Stop or
+           * a host's limit.
            *
            * @example
            * const { text } = await $.command.run({ command: "status" })
@@ -2968,13 +3421,20 @@ declare module 'claude-code' {
            * background under this call's origin: `{ model, agentId }` once the
            * subagent started (its answer is its `turn.complete`), or `{ deny }`.
            *
+           * `{ deny }` is a hook's refusal, or the engine's own with its reason:
+           * past a Stop or a host's limit nothing is spawned, as for a prompt.
+           *
            * @example
            * const { agentId } = await $.agent.spawn({ prompt: "Read README.md." })
            */
           spawn: EventCalls['agent']['spawn'];
           /**
-           * Returns the session's subagents so far, the ones the model spawned and
-           * the ones plugins did alike.
+           * Returns the session's agents so far, subagents and teammates: the ones
+           * the model spawned and the ones plugins did alike.
+           *
+           * One entry an agent, until the engine drops its task: as a teammate ends
+           * or seconds after, a subagent's later. Loops the engine tracks as agents
+           * with no `agent.spawn` (a forked skill) are here; a workflow's are not.
            */
           list: () => Promise<AgentInfo[]>;
           /**
@@ -3274,6 +3734,25 @@ declare module 'claude-code' {
            * @example
            * const { ok, text } = await $.http.fetch("https://example.com/status")
            * @example
+           * // Every model request the engine sends raises this event too, with
+           * // `next.origin.plugin` "engine", once per send: after any signing (a
+           * // signed request a hook rewrites no longer verifies), above compression
+           * // (see `compress`). A hook rewrites the url, method, headers, Authorization
+           * // included, and body, answers `{ value }` or refuses with `{ deny }`,
+           * // which the caller reads as a 403. A hook that fails is skipped and the
+           * // request goes on, so one used as a gate carries a `.catch`. Where the
+           * // organization's guard loads, only its own mods see engine requests.
+           * //
+           * // A header that may hold a credential reads "[redacted]": left in place
+           * // it holds its value at the send, on the origin raised and no other, and
+           * // a hook writes its own to replace it. A request sent elsewhere is under
+           * // the policy `$.http.fetch` is under.
+           * on("http.fetch", ($, e, next) =>
+           *   next.origin.plugin === "engine" && !allowed(e.url)
+           *     ? { deny: "not on the list" }
+           *     : next(e),
+           * ).catch(() => ({ deny: "the gate failed" }))
+           * @example
            * await $.http.fetch("http://bridge/reload", {
            *   method: "POST",
            *   socketPath: `${runDirectory}/bridge.sock`,
@@ -3354,20 +3833,42 @@ declare module 'claude-code' {
        */
       settings: {
           /**
-           * Resolves with the settings merged over every source, as the engine
-           * reads them, or with one source's settings as loaded (`{ source }`).
+           * Resolves with the settings merged over every source, with one
+           * source's settings as loaded (`{ source }`), or with the value of one
+           * top-level key (`{ key }`), undefined when the settings hold none.
            *
            * A snapshot in plain data each call; a source with no file answers
-           * `{}`. The sources (SettingsSource) rise in precedence from `user` to
-           * `policy`: the merge takes a key from the last source that has it.
+           * `{}`. Every read raises `settings.read` once, its layers on `e`
+           * (SettingsReadInput); a read of one key is the read of the object,
+           * projected, and raises no event of its own.
            *
-           * @param args `{ source }` to read one source; nothing for the merge
-           * @returns the settings object, keyed as a settings.json is
+           * The sources (SettingsSource) rise in precedence from `user` to
+           * `policy`; with no hook the object is the engine's merge: a scalar
+           * from the last source that has it, lists joined, objects merged.
+           *
+           * Raised by a plugin's call, and by the engine for its own merge once
+           * the loaded plugins or the settings have changed, `next.origin` then
+           * the engine. What the hooks answer there is what every reader of the
+           * merged settings reads, and a changed answer takes effect as a changed
+           * settings file does.
+           *
+           * No key is closed to a hook, the keys that decide which plugins load
+           * included: those are read before any plugin is loaded, so the first set
+           * loads by the files' own values and an answer applies from the load
+           * after. A merge that never settles, an answer changing which plugins
+           * load and those answering otherwise, is told in the settings error
+           * list, and the files' own value stands for that key.
+           *
+           * @param args `{ source }` for one source, `{ key }` for one key's
+           *             value, nothing for the merge
+           * @returns the settings object, keyed as a settings.json is, or the
+           *          key's value
            * @example
            * const { permissions } = await $.settings.read()
            * const policy = await $.settings.read({ source: "policy" })
+           * const days = await $.settings.read({ key: "cleanupPeriodDays" })
            */
-          read: (args?: SettingsReadArgs) => Promise<Settings>;
+          read: SettingsReadOverloads;
       };
       /**
        * The environment of this process, the one every Bash child, MCP server
@@ -3395,10 +3896,11 @@ declare module 'claude-code' {
            * `name` must be a string literal; `claude plugin validate` lists the
            * names your module reads and writes.
            *
+           * @returns `{}` once it is set or unset, or `{ deny }` saying why not
            * @example
            * await $.env.set("GIT_PAGER", "cat")
            */
-          set: (name: string, value: string | undefined) => Promise<void>;
+          set: (name: string, value: string | undefined) => Promise<EnvSetResult>;
       };
   }
 
@@ -3424,8 +3926,8 @@ declare module 'claude-code' {
    * One `prompt.attachment` input of a type PromptAttachmentDetailOf names:
    * the attachment's text, and under `detail` the facts it was rendered from.
    *
-   * A row the engine made holds them. One a transcript edited by hand holds
-   * can lack them, and then carries no `detail` key: read it as it may be.
+   * A row the engine made holds them, unless its session keeps no plan file. That
+   * one, or one edited by hand, carries no `detail` key: read it as it may be.
    */
   type DeclaredAttachmentInput<K extends keyof PromptAttachmentDetailOf> = {
       /**
@@ -3584,14 +4086,25 @@ declare module 'claude-code' {
   }[RenderSurface];
 
   /**
-   * The element constructors each surface draws, by `e.surface`: what
-   * `$.ui.resolve(e)` returns and a `ui.resolve` hook passes on; no globals.
+   * Each surface's primitive tags and their prop types, by `e.surface`, for
+   * the surfaces the plugin was compiled against.
    *
-   * All carry `Box`, `Text`, `Button`, `Link`, `Code`, `Markdown`; every remote
-   * surface `Svg`; all but mobile `Input` and `Select`; terminal and desktop
-   * `Client`; terminal `Raster` and `Image`. Narrowed on `e.surface`, that table.
+   * A surface declares its own three (jsx, elements, components): an interface,
+   * so one not listed here adds its table by declaration merging. With the
+   * surface fixed, that table exactly; with none fixed, only what all share.
+   *
+   * @remarks On a surface unknown at compile time, an element it doesn't know
+   *   renders as a fragment. A surface that attaches again replaces all three.
+   * @example
+   * declare module "claude-code" { interface Elements { slack: SlackTable } }
    */
-  export type Elements = {
+  export interface Elements {
+      /**
+       * The terminal's, drawn with Ink: the nine every surface here carries and
+       * `Client`.
+       *
+       * The one surface with `Raster` and `Image`, and the one without `Svg`.
+       */
       terminal: {
           Box: ElementConstructor<BoxProps>;
           Text: ElementConstructor<TextProps>;
@@ -3601,6 +4114,7 @@ declare module 'claude-code' {
           Link: ElementConstructor<LinkProps>;
           Code: ElementConstructor<CodeProps>;
           Markdown: ElementConstructor<MarkdownProps>;
+          Progress: ElementConstructor<ProgressProps>;
           /**
            * A region one of the plugin's surface modules draws (ClientModule), named
            * by `module`: a string literal, the module's path relative to this file.
@@ -3613,6 +4127,10 @@ declare module 'claude-code' {
           Raster: ElementConstructor<RasterProps>;
           Image: ElementConstructor<ImageProps>;
       };
+      /**
+       * Claude Code Desktop's: the nine every surface here carries, `Svg` and
+       * `Client`.
+       */
       desktop: {
           Box: ElementConstructor<BoxProps>;
           Text: ElementConstructor<TextProps>;
@@ -3623,29 +4141,38 @@ declare module 'claude-code' {
           Link: ElementConstructor<LinkProps>;
           Code: ElementConstructor<CodeProps>;
           Markdown: ElementConstructor<MarkdownProps>;
+          Progress: ElementConstructor<ProgressProps>;
           Client: ElementConstructor<ClientProps>;
       };
       /**
-       * No `Input` or `Select`: the mobile app draws no field yet; not a limit
-       * of the device, nor of the control protocol (ui_input, ui_select).
+       * An app is sent an `Input` or `Select` only if it named it in `draws` on
+       * its `ui_attach`, and an empty Box otherwise; a `Progress` the same way, and
+       * its Box and Text otherwise. A hook cannot tell which the app got.
        *
-       * The table grows when the app draws them.
+       * On a tool row (`ToolUse`) in mobile apps, a `borderStyle` or
+       * `backgroundColor` on the Box that holds the row and something else asks for
+       * a card under the row;
+       * otherwise a tree that keeps the row usually draws as one quiet line under
+       * it, with the rest behind a tap, so plain Text suits a small status.
        */
       mobile: {
           Box: ElementConstructor<BoxProps>;
           Text: ElementConstructor<TextProps>;
           Button: ElementConstructor<ButtonProps>;
+          Input: ElementConstructor<InputProps>;
+          Select: ElementConstructor<SelectProps>;
           Svg: ElementConstructor<SvgProps>;
           Link: ElementConstructor<LinkProps>;
           Code: ElementConstructor<CodeProps>;
           Markdown: ElementConstructor<MarkdownProps>;
+          Progress: ElementConstructor<ProgressProps>;
       };
       /**
        * The desktop's table without `Client`: a remote `Client`'s module, presses
        * and posts (ui_client_module, ui_client_press, ui_message) name no surface.
        *
-       * They are the desktop's alone today, not a limit of the editor's webview:
-       * the table gains `Client` when those asks name a surface.
+       * They are the desktop's alone until those asks name a surface, no limit of
+       * the editor's webview.
        */
       vscode: {
           Box: ElementConstructor<BoxProps>;
@@ -3657,8 +4184,9 @@ declare module 'claude-code' {
           Link: ElementConstructor<LinkProps>;
           Code: ElementConstructor<CodeProps>;
           Markdown: ElementConstructor<MarkdownProps>;
+          Progress: ElementConstructor<ProgressProps>;
       };
-  };
+  }
 
   /**
    * The table `ui.resolve` answers for an argument of surface `P`.
@@ -3728,15 +4256,21 @@ declare module 'claude-code' {
    * At every one, a hook that fails (throws, overruns its budget: HookBudget,
    * answers a wrong shape) is skipped: the hooks beneath and core run in its
    * place, or its last `next` result stands; the failure is reported by name.
+   *
+   * @remarks So a guard fails open unless its registration carries a `.catch`
+   *   (Registration) that refuses in its place, at any event an answer refuses.
    */
   export type EngineEventOf = {
       /**
-       * Fires when the engine is about to run a tool. `next(e)` runs the hooks
-       * beneath, then core (the permission prompt, the tool itself).
+       * Fires when the engine is about to run a tool. Each `next(e)` runs the
+       * hooks beneath, then core (the permission prompt, the tool itself).
        *
-       * Return `{ deny: reason }` to refuse or `{ result }` to answer yourself; a
-       * hook that returns while its `next` is pending aborts what runs beneath.
-       * The managed-settings hooks run first: their deny is the call's result.
+       * `{ deny: reason }` refuses and `{ result }` answers in place of `next`: a
+       * deny after `next(e)` resolved undoes nothing it ran; returning with `next`
+       * pending aborts what runs beneath. Managed-settings hooks' deny comes first.
+       *
+       * @remarks A guard that fails is skipped and the tool runs, so give it
+       *   `.catch(($, e, next) => next.called ? next(e) : { deny: "no" })`.
        */
       'tool.call': ToolCallInput;
       /**
@@ -3744,9 +4278,11 @@ declare module 'claude-code' {
        * `tool.call` and PreToolUse hooks and before the mode settles an ask.
        *
        * `next(e)` resolves to the engine's verdict (rules, mode, the tool's own
-       * check, PreToolUse's decision); return any `{ decision }`. `$.tool.check`
-       * runs the same chain and executes nothing.
+       * check, PreToolUse's decision) and runs no tool: return any `{ decision }`,
+       * a deny after it too. `$.tool.check` runs the same chain, executing nothing.
        *
+       * @remarks A guard that fails is skipped, leaving the verdict beneath.
+       *   Nothing has run, so give it `.catch(() => ({ decision: "deny" }))`.
        * @example
        * on("tool.check", { tool: "Read" }, () => ({ decision: "allow" }))
        */
@@ -3756,8 +4292,8 @@ declare module 'claude-code' {
        * (props, viewport width), plugin load or `$.ui.invalidate("ui.render")`.
        *
        * A repaint reuses the answer; a clock invalidates. `next(e)` resolves to the
-       * drawing: return it, wrap it, draw your own, or rewrite `props`. A tree that
-       * does not validate draws the engine's own; `--plugin-dir` is told why.
+       * drawing: return it, wrap it, draw your own, or rewrite `props`. An invalid
+       * tree, or a throw while drawn, draws the engine's; `--plugin-dir` is told.
        *
        * @remarks Also on a write of `$.state` it read while drawn, at the redraw
        *   rate; an invalidate is any plugin's whose matcher may select it.
@@ -3809,6 +4345,20 @@ declare module 'claude-code' {
        */
       'ui.message': UiMessageArgument;
       /**
+       * Fires when a `Client` THIS plugin drew failed on a surface: its module
+       * did not load, its drawing failed, or its code failed after it had drawn.
+       *
+       * Only this plugin's hooks see it; `e.phase` says when, `e.reason` why.
+       * Observe only: core answers `{}`. The engine then draws that site again,
+       * unasked: fall back by leaving the `Client` out.
+       *
+       * @remarks A `Client` born in that redraw that fails is heard too, and the
+       *   engine draws nothing again for it: to go on, ask (`$.ui.invalidate`).
+       * @example
+       * on("ui.fault", ($, e, next) => ($.ui.log(e.reason), next(e)))
+       */
+      'ui.fault': UiFaultInput;
+      /**
        * Fires before a site's window moves: the person's wheel or scroll keys on
        * a `Pane` body or the `AbovePrompt` band, at its edges too; `$.ui.scroll`.
        *
@@ -3839,26 +4389,34 @@ declare module 'claude-code' {
        * Return `{ isOffered: false }` to keep the type out of the listing and
        * refuse its dispatch. A hook that fails passes it through.
        *
+       * @remarks So give a guard here
+       *   `.catch(($, e, next) => next.called ? next(e) : { isOffered: false })`.
        * @example
        * on("agent.offer", { agent: "Plan" }, () => ({ isOffered: false }))
        */
       'agent.offer': AgentOfferInput;
       /**
-       * Fires when the Agent tool is about to start a subagent, everything
-       * decided and its model not yet resolved.
+       * Fires when the Agent tool, or a workflow script's `agent()`
+       * (`e.workflow`), is about to start an agent, its model not yet resolved.
        *
        * `next(e)` resolves to `{ model }`. Return it, `next({ ...e, model })`,
        * `{ model }` of your own (an alias resolves like the tool's parameter), or
        * `{ deny: reason }`.
+       *
+       * @remarks A guard that fails is skipped and the subagent starts, so give
+       *   it `.catch(($, e, next) => next.called ? next(e) : { deny: "no" })`.
        */
       'agent.spawn': AgentSpawnInput;
       /**
        * Fires when a prompt is submitted, before the turn starts. `next(e)` runs
-       * the hooks beneath and the UserPromptSubmit settings hooks.
+       * the hooks beneath and the UserPromptSubmit settings hooks, then it enters.
        *
        * Rewrite with `next({ ...e, text })` (the user message on screen follows)
-       * or stop it with `{ drop: reason }`; a broken plugin never blocks a prompt.
-       * A prompt typed while a turn ran fires at Enter, with that turn's id.
+       * or, in its place, stop it with `{ drop: reason }`; a broken plugin never
+       * blocks one. Typed while a turn ran, it fires at Enter, with that turn's id.
+       *
+       * @remarks So a guard that fails lets the prompt through, unless given
+       *   `.catch(($, e, next) => next.called ? next(e) : { drop: "no" })`.
        */
       'prompt.submit': PromptSubmitInput;
       /**
@@ -3898,12 +4456,36 @@ declare module 'claude-code' {
        */
       'prompt.edit': PromptEditInput;
       /**
+       * Fires after the main prompt box's text changed and no `prompt.edit`
+       * carried it: a recalled history entry, a clear, a plugin's fill.
+       *
+       * `e` is the box as it stands and `e.origin` who changed it. Observe only:
+       * the change is in the box. One per batch of changes, one at a time.
+       *
+       * @example
+       * on("prompt.change", ($, e, next) => ($.ui.status(e.origin.kind), next(e)))
+       */
+      'prompt.change': PromptChangeInput;
+      /**
+       * Fires as the person types in the main prompt box, for the token at the
+       * cursor; `next(e)` resolves to `{ suggestions }`, rows for the typeahead.
+       *
+       * Nothing waits on it: the engine's own rows draw first and these join
+       * beneath them, unhighlighted, for the word still being typed. Taking one
+       * writes its `text` over the token. Only while a plugin hooks it.
+       *
+       * @example
+       * on("prompt.autocomplete", () => ({ suggestions: [{ text: "#123" }] }))
+       */
+      'prompt.autocomplete': PromptAutocompleteInput;
+      /**
        * Fires once per named section of the system prompt, when the engine
        * assembles it; `next(e)` resolves to `{ text }` as core computed it.
        *
        * `e.name` is the section's id, on every model the one `prompt.compose`
-       * lists. Cached until `$.ui.invalidate("prompt.section")`: an unstable
-       * answer spends the prompt cache every call; a failed hook passes through.
+       * lists. Cached, so keep it steady: after `$.ui.invalidate("prompt.section")`
+       * a changed answer waits for a new thread or a compaction, unless it carries
+       * `breakPromptCache: true` (PromptSectionResult). A failed hook passes through.
        *
        * @example
        * on("prompt.section", { name: "memory" }, () => ({ text: null }))
@@ -3914,8 +4496,8 @@ declare module 'claude-code' {
        * its first user message carries; `next(e)` resolves to `{ blocks }`.
        *
        * Append, drop, reorder or rewrite with `next({ ...e, blocks })`; the
-       * engine renders what comes back, in order, until
-       * `$.ui.invalidate("prompt.context")` or a re-read (compaction, `/clear`).
+       * answer stands until `$.ui.invalidate("prompt.context")` or a re-read
+       * (compaction, `/clear`). `PromptContextResult` says what the model is sent.
        *
        * @example
        * on("prompt.context", () => ({ blocks: [] }))
@@ -3943,13 +4525,32 @@ declare module 'claude-code' {
        */
       'prompt.attachment': PromptAttachmentInput;
       /**
-       * Fires once per tool, when the engine first renders the tool's schema in
-       * a session; `next(e)` resolves to `{ description, isDeferred? }`.
+       * Fires once per path a prompt names after an `@`, a directory aside,
+       * before the engine reads it; `next(e)` reads it and resolves `{ type }`.
        *
-       * Cached for the session until `$.ui.invalidate("tool.describe")`: an
-       * unstable answer spends the model's prompt cache. An explicit `isDeferred`
-       * moves the tool behind ToolSearch (true) or into the prompt's list (false).
+       * No `tool.call` is raised for this read. Add `context` to what `next`
+       * gave, read another `path` with `next({ ...e, path })`, or answer
+       * `{ deny: reason }` so nothing is read.
        *
+       * @remarks A guard that fails is skipped and the file is read, so give it
+       *   `.catch(($, e, next) => next.called ? next(e) : { deny: "no" })`.
+       * @example
+       * on("prompt.mention", { path: /\.env$/ }, () => ({ deny: "a secret" }))
+       */
+      'prompt.mention': PromptMentionInput;
+      /**
+       * Fires when the engine first renders the tool's schema in a session;
+       * `next(e)` resolves to `{ description, isDeferred? }`.
+       *
+       * An MCP tool behind ToolSearch fires twice: its short text, then the one
+       * loaded. Cached until `$.ui.invalidate("tool.describe")`: a changed answer
+       * for a tool a thread has sent waits for a new thread or a compaction, unless
+       * it carries `breakPromptCache: true` (ToolDescribeResult).
+       *
+       * @remarks Twice for an MCP tool behind ToolSearch: its short text, then
+       *   the one loaded.
+       * @remarks An explicit `isDeferred` moves the tool behind ToolSearch (true)
+       *   or into the prompt's list (false).
        * @example
        * on("tool.describe", { tool: "Bash" }, ($, e) => ({ ...e, description }))
        * @example
@@ -3964,6 +4565,8 @@ declare module 'claude-code' {
        * with `next`, or return `{ text }` without it to answer in its place; one
        * after `next` replaces a printed output, not a panel or prompt it opened.
        *
+       * @remarks A guard that fails is skipped and the command runs, so give it
+       *   `.catch(($, e, next) => next.called ? next(e) : { text: "no" })`.
        * @example
        * on("command.run", { command: "hello" }, () => ({ text: "hello" }))
        */
@@ -3988,6 +4591,8 @@ declare module 'claude-code' {
        * or `next({ ...e, value })` to clamp it; a value of the wrong kind for
        * the row is refused. A row a trusted source owns is core's to refuse.
        *
+       * @remarks A guard that fails is skipped and the row is written, so give
+       *   it `.catch(($, e, next) => next.called ? next(e) : { deny: "no" })`.
        * @example
        * on("config.set", { key: "theme" }, () => ({ deny: "the theme stays" }))
        */
@@ -4062,8 +4667,8 @@ declare module 'claude-code' {
        */
       'session.start': SessionStartInput;
       /**
-       * Fires when a delivery reaches the session (a relay's event, a peer's
-       * message, a Remote Control prompt), before it is queued; `{ text }`.
+       * Fires when a delivery reaches the session, before it is queued: a relay's
+       * event, a peer's message, a Remote Control prompt, room events; `{ text }`.
        *
        * Rewrite with `next({ ...e, text })`, or return `{ consumed: reason }` to
        * take it: nothing is queued, shown or read by the model. `origin`,
@@ -4161,13 +4766,19 @@ declare module 'claude-code' {
        * of it; the debug log names who refused. Its judges, `$` whole, are the
        * plugins admitted before it and the binary's; judge by `tier` and `uses`.
        *
+       * @remarks A judge that fails is skipped and the module joins, so give it
+       *   `.catch(($, e, next) => next.called ? next(e) : { refuse: "no" })`.
        * @example
        * on("plugin.register", { tier: "user" }, () => ({ refuse: "managed only" }))
        */
       'plugin.register': PluginRegisterInput;
       /**
-       * Fires when a model turn begins, before its first model call; `next(e)`
-       * resolves to `{ turnId }`. Observe: a different return changes nothing.
+       * Fires when a model turn begins, main's or a subagent's (`e.agentId`),
+       * before its first model call; `next(e)` resolves to `{ turnId }`.
+       *
+       * Observe: a different return changes nothing. For the main loop alone,
+       * return `next(e)` first when `e.agentId !== undefined`. An agent's start
+       * skips the hooks its spawn was nested in, as its `turn.step`s do.
        */
       'turn.start': TurnStartInput;
       /**
@@ -4186,15 +4797,20 @@ declare module 'claude-code' {
        * Return `{ text }` with a different text to show it beneath the answer (a
        * synopsis, a TL;DR line); the transcript's record is never rewritten. A
        * hook that fails leaves the answer as it was.
+       *
+       * @remarks Every hook hears an agent's end (`e.agentId`), the spawner's
+       *   too; a hook that heard the turn's start hears its end after it.
        */
       'turn.complete': TurnCompleteInput;
       /**
        * Runs while `$` is being built, once per load or reload of this plugin
        * and before any other hook of it; `next(e)` resolves to `$` built so far.
        *
-       * A step may ADD nouns and WITHHOLD nouns (leave one out, or return without
-       * `next`); it may NOT REPLACE one another step added: the step fails, named
-       * with both plugins. A step that fails unloads its plugin; `$` is rebuilt.
+       * A step may ADD nouns and, outside `user`, WITHHOLD them (leave one out, or
+       * return without `next`). It fails, and its plugin unloads, when it REPLACES
+       * another's; in `user`, also past its own stub, or adding a seated name.
+       * Throwing or answering a wrong shape unloads it too, where another event's
+       * hook is skipped.
        */
       'engine.create': EngineCreateInput;
   };
@@ -4234,7 +4850,7 @@ declare module 'claude-code' {
        */
       'tool.call': ToolCallResult;
       /**
-       * `{ decision, reason?, rule? }`.
+       * `{ decision, reason?, rule?, hook?, setting?, plugin?, ceiling? }`.
        */
       'tool.check': ToolCheckResult;
       /**
@@ -4264,6 +4880,10 @@ declare module 'claude-code' {
        * `{ props? }`: the posting instance's next props, when a hook hands some.
        */
       'ui.message': UiMessageResult;
+      /**
+       * `{}`: the fault was heard.
+       */
+      'ui.fault': UiFaultResult;
       /**
        * `{}` once the window moved, or `{ deny }`.
        */
@@ -4297,6 +4917,14 @@ declare module 'claude-code' {
        */
       'prompt.edit': PromptEditResult;
       /**
+       * `{ text }`.
+       */
+      'prompt.change': PromptChangeResult;
+      /**
+       * `{ suggestions }`, the rows the plugins add to the typeahead.
+       */
+      'prompt.autocomplete': PromptAutocompleteResult;
+      /**
        * `{ text }` (null leaves the section out).
        */
       'prompt.section': PromptSectionResult;
@@ -4313,6 +4941,10 @@ declare module 'claude-code' {
        * `{ text }` (null leaves the attachment out).
        */
       'prompt.attachment': PromptAttachmentResult;
+      /**
+       * `{ type, context? }` (null when nothing was attached) or `{ deny }`.
+       */
+      'prompt.mention': PromptMentionResult;
       /**
        * `{ description, isDeferred? }`.
        */
@@ -4394,7 +5026,8 @@ declare module 'claude-code' {
        */
       'turn.start': TurnStartResult;
       /**
-       * The response: `{ turnId, index, answer, toolUses, stopReason, usage }`.
+       * The response: `{ turnId, index, answer, toolUses, stopReason, usage }`,
+       * and `serverToolUses` when the API ran tools of its own in the request.
        */
       'turn.step': TurnStepResult;
       /**
@@ -4406,6 +5039,25 @@ declare module 'claude-code' {
        * withheld left out; `next(e)` resolves to EngineInterfaceBuilt.
        */
       'engine.create': EngineCreateResult;
+  };
+
+  /**
+   * What `$.env.set` resolves to and what an `env.set` hook's `{ value }`
+   * holds: `{}` once the variable is set or unset, or why it was not.
+   */
+  type EnvSetResult = {
+      /**
+       * Absent when the write was made; else why not, in one line.
+       *
+       * In a session that takes its settings from its organization, the engine
+       * holds a write a plugin that is not built in stands behind where a
+       * person's own settings file could not set the variable there.
+       *
+       * @remarks The engine's hold resolves; a hook's own `{ deny }` rejects the
+       *   caller, and one given after `next(e)` was answered fails the hook: deny
+       *   in its place. A hook above may answer another `{ value }`: no write.
+       */
+      deny?: string;
   };
 
   /**
@@ -4437,10 +5089,11 @@ declare module 'claude-code' {
           section: (input: PromptSectionInput) => Promise<PromptSectionResult>;
           context: (input: PromptContextInput) => Promise<PromptContextResult>;
           attachment: (input: PromptAttachmentInput) => Promise<PromptAttachmentResult>;
+          mention: (input: PromptMentionInput) => Promise<PromptMentionResult>;
           compose: (input?: PromptComposeArgs) => Promise<PromptComposeResult>;
       };
       skill: {
-          prompt: (input: SkillPromptInput) => Promise<SkillPromptResult>;
+          prompt: (input: SkillPromptArgs) => Promise<SkillPromptResult>;
       };
       attribution: {
           text: (input: AttributionTextInput) => Promise<AttributionTextResult>;
@@ -4531,8 +5184,9 @@ declare module 'claude-code' {
    * as declared: how a hook's `e` is typed.
    *
    * `e.command = 'x'` is a type error; `next({ ...e, command: 'x' })` compiles.
+   * A string is kept as typed, so a union that names some strings keeps them.
    */
-  export type Frozen<T> = T extends (...args: never[]) => unknown ? T : T extends readonly unknown[] ? {
+  export type Frozen<T> = T extends string | ((...args: never[]) => unknown) ? T : T extends readonly unknown[] ? {
       [K in keyof T]: Frozen<T[K]>;
   } : T extends object ? {
       readonly [K in keyof T]: Frozen<T[K]>;
@@ -4579,6 +5233,10 @@ declare module 'claude-code' {
   /**
    * The argument of `$.fs.ancestors`: the file names to look for in each
    * directory, the file to walk down to, and the directory to walk beneath.
+   *
+   * Where a rule or a hold confines the session's reads, a file is found
+   * only where every name its path goes by may be read; under a hold a
+   * folder above the working directory gives only instruction files of its own.
    */
   export type FsAncestorsRequest = {
       /**
@@ -4588,15 +5246,19 @@ declare module 'claude-code' {
       /**
        * The file the walk goes on down to the directory of, relative to the
        * working directory or absolute; absent, it ends at the working directory.
+       *
+       * Without `below`, a plain name or one under `.claude`, in the working
+       * directory or above it, is judged as the engine's start-up load is; any
+       * other file by the main session, and with none bound the call rejects.
        */
       of?: string;
       /**
        * The directory the walk starts beneath, relative to the working directory
        * or absolute; absent, the walk starts at the filesystem root.
        *
-       * Only directories strictly inside it are read, so with `of` a file under
-       * the project root the walk reads the directories between the two, as the
-       * engine reads a nested CLAUDE.md; a file not inside it finds nothing.
+       * Only directories strictly inside it are read, each file as the main
+       * session's rules on reads judge it, as the engine reads a nested
+       * CLAUDE.md; a file not inside it finds nothing.
        */
       below?: string;
   };
@@ -4796,6 +5458,7 @@ declare module 'claude-code' {
    * Each bounds the hook's OWN time: the clock stops while a `next(e)` call or
    * any `$` call of the hook's is in flight (a `$.clock` wait excepted), so a
    * slow chain beneath or a minute-long `$.model.complete` costs it nothing.
+   * On `tool.list` a hook's `$` calls hold it for 30 seconds in all, then fail it.
    *
    * @example
    * await $.model.complete(ask) // a minute; next.budget.remainingMs unmoved
@@ -4832,14 +5495,14 @@ declare module 'claude-code' {
    * Why a hook failed, as its `.catch` handler reads it on `next.error`: plain
    * frozen data.
    *
-   * `throw`: the hook threw, or returned what the site refuses, `message`
-   * saying what; `timeout`: it outran its budget, `message` then what its last
-   * `next()` rejected with, if it did. `budget` is the handler's own grace.
+   * `throw`: it threw, returned what the site refuses, or its hooks worker
+   * ended under it, `message` saying what; `timeout`: it outran its budget,
+   * `message` then what its last `next()` rejected with, if it did.
    */
   export type HookFailure = {
       readonly kind: 'throw' | 'timeout';
       /**
-       * The thrown error's message, or for a timeout what the hook's last
+       * What was thrown or why the worker ended, or for a timeout what the last
        * `next()` rejected with; absent for a timeout with nothing rejected.
        */
       readonly message?: string;
@@ -4893,6 +5556,21 @@ declare module 'claude-code' {
   };
 
   /**
+   * A request body: text, or bytes that are not valid UTF-8 as `{ base64 }`.
+   */
+  type HttpBody = string | {
+      base64: string;
+  };
+
+  /**
+   * The encoding the engine gives a request body beneath the hooks.
+   */
+  type HttpCompress = boolean | 'gzip' | 'deflate' | 'br' | 'zstd' | {
+      encoding: 'gzip' | 'deflate' | 'br' | 'zstd';
+      level?: number;
+  };
+
+  /**
    * Options of `$.http.fetch`.
    */
   export type HttpInit = {
@@ -4905,9 +5583,22 @@ declare module 'claude-code' {
        */
       headers?: Record<string, string>;
       /**
-       * The request body, as text.
+       * The request body: text, or `{ base64 }` for bytes that are not UTF-8,
+       * which only an engine request carries.
        */
-      body?: string;
+      body?: HttpBody;
+      /**
+       * What the engine does to the body beneath the hooks, on an engine request
+       * alone.
+       *
+       * `body` is the plain body. Delete this and it leaves as written; set this
+       * and the engine gzips it. For exact bytes, delete this and write them with
+       * your own `content-encoding` header.
+       *
+       * @example
+       * next({ ...e, init: { ...e.init, compress: undefined } })
+       */
+      compress?: HttpCompress;
       /**
        * The handle `$.session.authorize()` answered: the engine sets the
        * session's credential header itself, only for a first-party host.
@@ -4947,9 +5638,22 @@ declare module 'claude-code' {
        */
       headers: Record<string, string>;
       /**
-       * The body, as text.
+       * The body, as text: empty while `isStreaming` is set.
        */
       text: string;
+      /**
+       * Set on what `next(e)` gives for an engine request: the body stays the
+       * engine's, streaming to its reader, and hooks read the status and headers.
+       *
+       * Pass it on, with other headers or status if you like, and the body goes
+       * on under them; answer without it and `text` is the body instead.
+       */
+      isStreaming?: true;
+      /**
+       * Set beside `isStreaming`: which of the request's sends gave this answer.
+       * Pass it on, and that send's body is the one that goes on.
+       */
+      sendIndex?: number;
   };
 
   /**
@@ -4989,7 +5693,10 @@ declare module 'claude-code' {
 
   /**
    * The props of `Image`, the terminal surface's picture leaf: pixels over a
-   * box of cells where the terminal can (kitty, Ghostty), the `alt` elsewhere.
+   * box of cells where the terminal can (kitty and Ghostty, or iTerm2 3.5 and
+   * later for `png` and `rgba` bytes under fullscreen rendering; inside tmux
+   * too, for bytes only, with tmux's `allow-passthrough` and `focus-events`
+   * on), the `alt` elsewhere.
    *
    * A leaf: no children, `hover` or `onPress`; the cells are text, so the
    * picture scrolls and clips as a word does. Drawn again with another `source`
@@ -5149,12 +5856,12 @@ declare module 'claude-code' {
   };
 
   /**
-   * The props of `Input`, every surface's one-line text field: an address,
-   * optional texts, and the closures a change and a submit run. A leaf.
+   * The props of `Input`, every surface's text field: an address, optional
+   * texts, and the closures a change and a submit run. A leaf.
    *
-   * Focused through the same ring as `Button` (`abovePrompt:focus`); while it
-   * has focus every printable key reaches it alone and Esc returns them; a
-   * change and Enter raise `ui.input`, whose bottom is `onInput` / `onSubmit`.
+   * One line, or with `rows` several. Focused through the same ring as `Button`
+   * (`abovePrompt:focus`); while it has focus every printable key reaches it
+   * alone and Esc returns them. A change and Enter raise `ui.input`.
    */
   export type InputProps = {
       /**
@@ -5180,6 +5887,15 @@ declare module 'claude-code' {
        */
       submitLabel?: string;
       /**
+       * How many lines tall the field is, a whole number of at least 1; from 2
+       * it holds several lines, as the DOM's `<textarea rows>`. Defaults to 1.
+       *
+       * Drawn that tall whatever it holds, its site's window at most; a longer
+       * text scrolls within. Enter submits; a newline is typed as in the prompt
+       * box. Up and Down walk its rows, then go to the element before or after.
+       */
+      rows?: number;
+      /**
        * The site's focus ring starts here when the site takes the keyboard,
        * instead of on nothing, as the DOM's `autofocus`: Enter acts on it at once.
        *
@@ -5191,11 +5907,15 @@ declare module 'claude-code' {
       /**
        * Runs on every change of the text, in the plugin's own environment: the
        * bottom of a `ui.input` chain of kind `change`.
+       *
+       * The text is whole, its lines joined by `\n`.
        */
       onInput?: (value: string, e: UiInputArgument) => void;
       /**
        * Runs on Enter with the text, in the plugin's own environment: the bottom
        * of a `ui.input` chain of kind `submit`. No model turn unless it asks one.
+       *
+       * The text is whole, newlines kept and nothing trimmed.
        */
       onSubmit: (value: string, e: UiInputArgument) => void;
   };
@@ -5227,6 +5947,14 @@ declare module 'claude-code' {
        * The path of the file whose `@` import brought this one, when one did.
        */
       parent?: string;
+      /**
+       * Present where this session's own account could have written the file,
+       * or where a person's own plugin added or rewrote a `managed` file.
+       *
+       * It is then not told as the organization's. The host stamps it; a hook's
+       * own value for it is ignored.
+       */
+      isUnverified?: true;
   };
 
   /**
@@ -5246,10 +5974,14 @@ declare module 'claude-code' {
   };
 
   /**
-   * What `$.ui.invalidate` takes: a render event, or one of the six events
+   * What `$.ui.invalidate` takes: a render event, or one of the seven events
    * whose answers the engine caches for the session.
+   *
+   * For `ui.render`, the instances this plugin's matchers on it may select: one
+   * naming no `requestId`, every instance of its component. For a thread resumed
+   * in a new process the recorded `prompt.section` text stands, asked or not.
    */
-  export type InvalidatableEventName = RenderEventName | 'prompt.section' | 'prompt.context' | 'prompt.attachment' | 'tool.describe' | 'command.describe' | 'config.describe';
+  export type InvalidatableEventName = RenderEventName | 'prompt.section' | 'prompt.context' | 'prompt.attachment' | 'tool.describe' | 'tool.list' | 'command.describe' | 'config.describe';
 
   /**
    * Whether tag key `K` selects members of `I`: it does when each member gives
@@ -5280,8 +6012,9 @@ declare module 'claude-code' {
    * Plain data: what JSON holds, and what crosses between a plugin's hooks
    * module and its surface module whole (a `Client`'s props, a post's data).
    *
-   * A function, a class instance, `undefined` or a cycle is not plain data;
-   * the engine refuses one where it checks, and drops it where it clones.
+   * A function, a class instance, `undefined`, a cycle, a named key on a list or a
+   * key named `__proto__`, `constructor` or `prototype` is not plain data; the engine
+   * refuses one where it checks, and drops it where it clones.
    */
   export type JsonValue = string | number | boolean | null | readonly JsonValue[] | {
       readonly [key: string]: JsonValue;
@@ -5324,16 +6057,17 @@ declare module 'claude-code' {
    * terminal (else its text then the URL in dim), an anchor on desktop.
    *
    * An inline element: its children are the text, strings and inline
-   * elements; absent children the `label`, absent both the URL. The engine
-   * bounds `href` before the tree crosses.
+   * elements; absent children the `label`, absent both the URL. What `href`
+   * spells is the plugin's own; what a click opens is the surface's.
    */
   export type LinkProps = {
       /**
-       * Where the link goes: an `https:` URL (or `http://localhost`), at most
-       * 2048 characters of printable ASCII, spelled as `new URL(href).href`.
+       * Where the link goes, as written: any scheme, host and port; at most
+       * 2048 characters once what a terminal acts on is percent-encoded.
        *
-       * No `user@host` part, no raw `@`, space or non-ASCII letter (encode them);
-       * anything else refuses the tree the Link is in.
+       * A blank or no string, and on a remote surface anything but the
+       * `https:` URL its wire promises: the text is drawn plain, and said so;
+       * the tree stands. A click opens what the terminal, or the surface, opens.
        */
       href: string;
       /**
@@ -5360,7 +6094,7 @@ declare module 'claude-code' {
        */
       key?: string;
       /**
-       * The markdown drawn, bounded as a Text's string is.
+       * The markdown drawn, checked as a Text's string is.
        */
       text: string;
       /**
@@ -5379,7 +6113,7 @@ declare module 'claude-code' {
    * draws an assistant reply's text: its own renderer, links, tables, fences.
    *
    * A leaf: no children. `text` is the element's data as a `Text`'s string is,
-   * bounded the same way. With `onLinkPress` the links it draws are the
+   * checked the same way. With `onLinkPress` the links it draws are the
    * plugin's to answer: a press on one raises `ui.press` addressed to `key`.
    */
   export type MarkdownProps = {
@@ -5392,9 +6126,9 @@ declare module 'claude-code' {
        * The markdown drawn, as an assistant reply would write it; a `<context>`
        * block, hidden in a reply's own text, is drawn here as written.
        *
-       * At most 10000 characters, tab and newline its only control characters;
-       * a link whose scheme is not `https:`, `http:` or `file:` draws as text,
-       * never clickable. Not drawn around the approval dialog.
+       * Of any length (one drawing draws 100000 characters in all), tab and
+       * newline its only control characters; a link not `https:`, `http:` or
+       * `file:` draws as text. The terminal refuses it by the question dialog.
        */
       text: string;
       /**
@@ -5415,8 +6149,8 @@ declare module 'claude-code' {
        * writes it; absent, every link drawn. Only with `onLinkPress`.
        *
        * A link left out keeps the surface's own behaviour. At most 256 entries
-       * of at most 2048 characters; compared with the pressed link's target,
-       * never opened.
+       * of at most 2048 characters, compared with the pressed link's target;
+       * none where the drawing has no room left for them.
        */
       pressableLinks?: readonly string[];
   };
@@ -5484,6 +6218,12 @@ declare module 'claude-code' {
    * A leaf is `===` or a RegExp (`{ command: /^p4 / }`); an array is any-of;
    * an object is a partial of an OBJECT, so `{ command: { startsWith } }` is
    * a type error where `e` is typed and free where it is `unknown`.
+   *
+   * `plugin` is a default matcher key: where the engine sets it on `e`
+   * (`ui.press`, a band row), a matcher leaving it out is read as naming the
+   * hook's own plugin; `"*"` names every one, and hears an `e` without the key.
+   * `claude plugin validate` notes such a hook: `(default matcher key: plugin)`;
+   * a `component` there keeps the hook off `AbovePromptList`.
    */
   export type Matcher<I, All = I> = I extends unknown ? {
       readonly [K in KnownKeys<I>]?: MatcherValue<I[K & keyof I], MatcherValueOf<All, K>>;
@@ -5567,11 +6307,13 @@ declare module 'claude-code' {
   } & Record<PropertyKey, never>;
 
   /**
-   * Why `$.mcp.connect` left a server unconnected, in one word.
+   * Why `$.mcp.connect` left a server unconnected, in one word; `unlisted`
+   * too where the session's host runs the plugin's servers itself.
    *
-   * `unlisted`: not in the caller's own manifest. `unapproved`: a repository
-   * server not approved. `disabled`: turned off. `policy`: enterprise MCP
-   * policy. `auth`: needs sign-in. `failed`: not resolved, or did not connect.
+   * `unlisted`: neither in the caller's own manifest nor a server /mcp lists.
+   * `unapproved`: a repository server not approved. `disabled`: turned off.
+   * `policy`: enterprise MCP policy. `auth`: needs sign-in. `failed`: not
+   * resolved, did not connect, or another provider's than its hooks were shown.
    */
   type McpConnectRefusal = 'unlisted' | 'unapproved' | 'disabled' | 'policy' | 'auth' | 'failed';
 
@@ -5768,6 +6510,71 @@ declare module 'claude-code' {
   export type ModelApiError = ClassicHookInputs['StopFailure']['error'];
 
   /**
+   * What a hook on `model.complete` reads as `e`: the request with its text as
+   * strings, as it always was, and the caller's blocks beside them.
+   *
+   * A hook written when `prompt` was only ever a string reads what it read. A
+   * caller's list of blocks arrives joined in `prompt` (or `system`) and, as
+   * given, in `promptBlocks` (or `systemBlocks`), where its cache marks are.
+   *
+   * @example
+   * on("model.complete", ($, e, next) => (BAD.test(e.prompt) ? NO : next(e)))
+   */
+  export type ModelCompleteInput = {
+      /**
+       * Which model answers, as the request named it (ModelCompleteRequest).
+       */
+      model: string;
+      /**
+       * The one user message, as text: a string as the caller gave it, or the
+       * texts of its blocks joined in order with nothing between them.
+       *
+       * It is what the model is sent: a hook that passes another string down
+       * has rewritten the prompt, whatever `promptBlocks` still says.
+       */
+      prompt: string;
+      /**
+       * What precedes the completion as its system prompt, as text joined as
+       * `prompt` is; absent when the caller gave none.
+       *
+       * Passing `null` or `false` down sends none.
+       */
+      system?: string;
+      /**
+       * The caller's blocks of `prompt`, as given, when it gave a list: where
+       * the cache marks are. Absent for a string.
+       *
+       * They place marks and change no text. The leading blocks whose texts,
+       * joined, still open `prompt` are sent as they stand, marks kept; what is
+       * left of `prompt` follows unmarked, so a rewritten opening keeps no mark.
+       *
+       * @remarks A hook that strips or adds a `cache` here and leaves the texts
+       *   is taken at its word; one that rewrites both keeps them in step.
+       * @example
+       * next({ ...e, prompt: e.prompt + NOTE }) // the marks ahead of NOTE hold
+       */
+      promptBlocks?: readonly ModelTextBlock[];
+      /**
+       * The caller's blocks of `system`, read against `system` exactly as
+       * `promptBlocks` is against `prompt`. Absent for a string or none.
+       */
+      systemBlocks?: readonly ModelTextBlock[];
+      /**
+       * The reply's token cap, as the request gave it.
+       */
+      maxTokens?: number;
+      /**
+       * How hard the model thinks about it, as the request gave it.
+       */
+      effort?: ModelEffort;
+      /**
+       * How long the whole call may take, in milliseconds, as the request gave
+       * it.
+       */
+      timeoutMs?: number;
+  };
+
+  /**
    * Options of `$.model.complete`: what is no part of the request, so no hook
    * on `model.complete` reads it on `e`.
    */
@@ -5796,18 +6603,27 @@ declare module 'claude-code' {
        */
       model: string;
       /**
-       * The one user message.
+       * The one user message: a string, or blocks of text sent in order
+       * (ModelTextBlock), any of which may be marked for the prompt cache.
        *
        * The result always says what happened: the reply's text and usage when
        * the model answered, else a `reason` (an API error with its status, a
        * reply with no text, or the call cut short).
+       *
+       * @remarks Marks go uncounted: one too many is the API's own `api-error`
+       *   (status 400). A hook reads the text joined (ModelCompleteInput).
+       * @example
+       * await $.model.complete({ model, prompt: [{ text: RULES, cache: true }] })
        */
-      prompt: string;
+      prompt: string | readonly ModelTextBlock[];
       /**
        * Precedes the completion as its system prompt, after the CLI's identity
-       * block. Default none.
+       * block: a string, or blocks of text as `prompt` takes. Default none.
+       *
+       * @remarks On Bedrock, Vertex, Foundry or behind a gateway, text marked here
+       *   is found again only while `prompt` opens the same: mark it there.
        */
-      system?: string;
+      system?: string | readonly ModelTextBlock[];
       /**
        * The reply's token cap: any positive integer up to what one reply can
        * hold, the model's own output limit or 64000, whichever is lower.
@@ -5872,9 +6688,26 @@ declare module 'claude-code' {
        *
        * On a fork `cache_read_input_tokens` is how much of the transcript
        * the main thread's prompt cache served: near zero, the fork paid for
-       * the whole prefix (the entry lapsed, or the model changed since).
+       * the whole prefix (the entry lapsed, the model changed since, or its
+       * `effort` could not ride its own message: ModelForkRequest).
        */
       usage: ModelUsage;
+      /**
+       * On a fork, the effort its last response was asked for: what the
+       * request's `effort` came to under its limits, or the session's own
+       * level when it named none. The level stated after `prompt` where the
+       * model takes effort per message, else the request's own setting. A
+       * completion's result carries none.
+       *
+       * Absent too when the fork's request carried no named level: a model
+       * that takes none, `CLAUDE_CODE_EFFORT_LEVEL` set to `auto` or `unset`
+       * with no `maxEffortLevel` setting, or a fork that ran as if it had named
+       * none in a session on a numeric level.
+       *
+       * @example
+       * if (r.isAnswered) $.ui.log(`${r.effort}: ${r.usage.output_tokens}`)
+       */
+      effort?: ModelEffort;
   } | {
       isAnswered: false;
       /**
@@ -5903,6 +6736,11 @@ declare module 'claude-code' {
        * one request was the one refused); on a fork, the turns before it.
        */
       usage: ModelUsage;
+      /**
+       * On a fork, the effort of the last response before the error, as on
+       * the answered arm; absent when its first request was the one refused.
+       */
+      effort?: ModelEffort;
   } | {
       isAnswered: false;
       /**
@@ -5919,6 +6757,10 @@ declare module 'claude-code' {
        * What the call cost.
        */
       usage: ModelUsage;
+      /**
+       * On a fork, the effort of its last response, as on the answered arm.
+       */
+      effort?: ModelEffort;
   } | {
       isAnswered: false;
       /**
@@ -5938,6 +6780,11 @@ declare module 'claude-code' {
        * response arrived); on a fork, what came back before the abort.
        */
       usage: ModelUsage;
+      /**
+       * On a fork, the effort of the last response that had started, as on
+       * the answered arm; absent when none had.
+       */
+      effort?: ModelEffort;
   };
 
   /**
@@ -5961,6 +6808,48 @@ declare module 'claude-code' {
        * with its status, a reply with no text, or the turn's abort cut it).
        */
       prompt: string;
+      /**
+       * How hard the fork thinks about it (ModelEffort): `low` for a quick side
+       * job, whatever the person chose for the main work. Default: the level the
+       * session runs at, which is the main thread's and no ceiling: a fork may ask
+       * for more. Where the model does not take effort per message, a level other
+       * than the session's costs a cache write of the whole conversation: see the
+       * remarks.
+       *
+       * Held to what the person and the organization allow: the organization's
+       * cap, the `maxEffortLevel` setting and the model's own levels lower what is
+       * asked, and a model that takes no effort is sent none. A level that
+       * `CLAUDE_CODE_EFFORT_LEVEL` names is a ceiling: a fork may go under it, and
+       * one that asks for more runs as if it had named none, as every fork does
+       * where that variable is `auto` or `unset` (the session then sends no effort,
+       * or under a `maxEffortLevel` setting the model's default). The result's
+       * `effort` is what was sent. A value outside the five levels rejects the
+       * call. The main thread keeps its own level, and its next request and its
+       * cache entry are as after any fork.
+       *
+       * @remarks What a level other than the main thread's costs turns on how
+       *   the model takes effort. Per message: the level is stated after
+       *   `prompt`, everything before it stands as the main thread sent it, and
+       *   the cached transcript is read as for any fork. As one setting of the
+       *   whole request (a model or provider with no per-message effort, a
+       *   conversation whose per-message effort the API refused, a session on a
+       *   numeric level): the level is applied all the same, but the first fork
+       *   at it reads at most the system prompt and tools from the cache and
+       *   writes the whole conversation again as an entry of its own, billed as
+       *   `usage.cache_creation_input_tokens` and waited for, the longer the
+       *   conversation the longer; later forks at that level read that entry
+       *   while it lives. The main thread's entry stands. There are two ways
+       *   round that cost. The person can have the session's model take effort per
+       *   message, with `CLAUDE_CODE_MODEL_CAPABILITIES=per_turn_effort` in their
+       *   shell or in the `env` of their user or managed settings: first-party API
+       *   only, and until the API refuses it. Or the fork can name no effort and
+       *   ask for haste in `prompt` (that it has no tools, and should answer
+       *   straight away without thinking it over), which moves nothing ahead of
+       *   `prompt`, so the cache is read on every model.
+       * @example
+       * await $.model.fork({ prompt: "Say that again, shorter.", effort: "low" })
+       */
+      effort?: ModelEffort;
   };
 
   /**
@@ -5968,7 +6857,8 @@ declare module 'claude-code' {
    * or that there was nothing to fork yet.
    *
    * The completion's arms are the reply when the fork answered, else
-   * `api-error`, `empty-reply` or `aborted`, `usage` on each.
+   * `api-error`, `empty-reply` or `aborted`, `usage` on each and beside it,
+   * once a response came back at a named level, the `effort` it ran at.
    *
    * @example
    * const r = await $.model.fork({ prompt }); if (!r.isAnswered) log(r.reason)
@@ -5976,16 +6866,47 @@ declare module 'claude-code' {
   export type ModelForkResult = ModelCompleteResult | {
       isAnswered: false;
       /**
-       * Nothing to fork, so no request was made: this conversation's main
-       * thread has produced no response yet.
+       * Nothing to fork, so no request was made: the session holds no
+       * snapshot of this conversation's main thread that a fork may share.
        *
-       * A new session before its first turn ends; again right after a
-       * `/clear`, or a resume that starts the conversation afresh.
+       * Until a turn has run to its end, that is while none of its requests
+       * is out, and on a host that keeps none; again after a `/clear`, or a
+       * resume that starts the conversation afresh.
        *
        * @example
        * if (!r.isAnswered && r.reason === "nothing-to-fork") return next(e)
        */
       reason: 'nothing-to-fork';
+  };
+
+  /**
+   * One block of text in a `$.model.complete` request's `prompt` or `system`:
+   * sent as written, in the order given, and markable for the prompt cache.
+   *
+   * Put the text every call repeats first and mark its last block (`cache`);
+   * whatever follows the last mark is paid for whole on every call.
+   *
+   * @example
+   * const prompt = [{ text: RULES, cache: true }, { text: diff }]
+   */
+  export type ModelTextBlock = {
+      /**
+       * The block's text, sent as written; an empty one is the API's to
+       * refuse, as an `api-error` of status 400.
+       */
+      text: string;
+      /**
+       * Keeps the request up to and including this block in the prompt cache; a
+       * call within five minutes that opens with the same text reads it there.
+       *
+       * The result's `usage` shows it: `cache_creation_input_tokens` when the
+       * call wrote, `cache_read_input_tokens` when it read. Both zero, nothing
+       * was cached: text under the model's minimum, or caching switched off.
+       *
+       * @remarks On Bedrock, Vertex, Foundry or behind a gateway the text is found
+       *   again only while `prompt` opens the same way: put the fixed text first.
+       */
+      cache?: true;
   };
 
   /**
@@ -6018,7 +6939,8 @@ declare module 'claude-code' {
        *
        * On a fork, how much of the main thread's transcript the cache still
        * held: near zero, the fork paid for the whole prefix (the entry had
-       * lapsed, or the model changed since it was made).
+       * lapsed, the model changed since it was made, or the fork's `effort`
+       * could not ride its own message: ModelForkRequest).
        */
       cache_read_input_tokens: number;
       /**
@@ -6076,12 +6998,13 @@ declare module 'claude-code' {
    * when a key of `P` is impossible on it (ImpossibleKeys), else `E` narrowed.
    *
    * Each key `P` names is narrowed (NarrowedValue); every other key, and each
-   * key's optionality, stays as declared.
+   * key's optionality, stays as declared, as does `plugin` under `"*"`: a default
+   * matcher key's wildcard says nothing of the value.
    */
   type NarrowedMember<E, P, D extends readonly unknown[]> = [
   ImpossibleKeys<E, P, D>
   ] extends [never] ? {
-      [K in keyof E]: K extends keyof P ? NarrowedValue<E[K], P[K], D> : E[K];
+      [K in keyof E]: K extends keyof P ? K extends 'plugin' ? P[K] extends '*' ? E[K] : NarrowedValue<E[K], P[K], D> : NarrowedValue<E[K], P[K], D> : E[K];
   } : never;
 
   /**
@@ -6126,9 +7049,11 @@ declare module 'claude-code' {
        * Continues this dispatch at a tier: `next(e)` with every link between
        * this hook's own tier and that one skipped, by tier and narrowing only.
        *
-       * A managed hook's: prepend may name append, builtin or core, append core;
-       * it never skips a tier with more authority, so no user hook skips the
-       * org's. A literal on the hook's own `next`; skipped links are traced.
+       * A managed hook's: prepend may name user, append, builtin or core, append
+       * core; it never skips a tier with more authority, so no user hook skips
+       * the org's. `user` skips each prepend peer below the hook, never one
+       * above it, and an outer `next.to` to a deeper tier still wins. A literal
+       * on the hook's own `next`; skipped links are traced.
        */
       readonly to: {
           <T extends string>(e: E & ToolNamed<T>, tier: TargetTier): Promise<NextResultFor<N, O, T>>;
@@ -6280,6 +7205,40 @@ declare module 'claude-code' {
   };
 
   /**
+   * Options of `$.ui.notify`.
+   */
+  export type NotifyOptions = {
+      /**
+       * What heads the notification, sent as the mod gives it: the engine puts
+       * no name of its own beside it. Left out or empty, the plugin's name.
+       */
+      title?: string;
+      /**
+       * A name for this notification, unique within the plugin. Sent again, it
+       * replaces the one a client holds under that key; `$.ui.cancelNotify` takes
+       * it back. A terminal has nothing to replace and ignores it.
+       */
+      key?: string;
+      /**
+       * Milliseconds a client holds it before raising it, so it can fire with the
+       * session out of reach. More than 7 days rejects the call on every surface.
+       * A terminal otherwise ignores it and raises it now.
+       */
+      delayMs?: number;
+      /**
+       * The time a client raises it, in epoch milliseconds, for a moment fixed on
+       * the clock. Never beside `delayMs`. More than 7 days ahead rejects the call
+       * on every surface. A terminal otherwise ignores it and raises it now.
+       */
+      at?: number;
+      /**
+       * With `delayMs` or `at`: a client throws it away if the person returns to
+       * the session before it fires, so it can only speak to someone who left.
+       */
+      untilBack?: boolean;
+  };
+
+  /**
    * The declared plugin nouns' methods as event rows (NounEventRow), one per
    * `<noun>.<method>` that is a function; a member that is not is no event.
    */
@@ -6401,13 +7360,18 @@ declare module 'claude-code' {
    * A hook above the caller passes it on, rewrites it, refuses it with
    * `{ deny }` or answers with `{ value }`; core is the host's implementation.
    * The calling hook alone is skipped, and `next.origin` names the caller.
+   *
+   * @remarks A guard that fails is skipped and the call goes on, unless its
+   *   `.catch` (CatchHandler) answers `{ deny }` in its place.
    */
   export type OpEventOf = {
       /**
-       * The argument of `$.model.complete(request, { signal })`; the signal does
-       * not cross, it aborts the call.
+       * The argument of `$.model.complete(request, { signal })`, its text as
+       * strings and its blocks beside them (ModelCompleteInput).
+       *
+       * The signal does not cross, it aborts the call.
        */
-      'model.complete': ModelCompleteRequest;
+      'model.complete': ModelCompleteInput;
       /**
        * The argument of `$.model.classify(text, labels, options)`.
        */
@@ -6442,10 +7406,33 @@ declare module 'claude-code' {
           args: Record<string, unknown>;
       };
       /**
-       * The argument of `$.mcp.connect(server)`.
+       * The argument of `$.mcp.connect(server)`, `next.origin` the calling
+       * plugin; also raised by the engine, for each server it is about to join by
+       * itself, `next.origin` the engine's.
+       *
+       * A hook on the engine's raise that answers without calling `next` holds
+       * the server back: nothing is dialed, and `/mcp` lists it as held by that
+       * hook's plugin until `$.mcp.connect` or a later raise lets it through.
+       * There `next` answers once the hooks beneath pass, and the dial follows.
+       *
+       * @remarks Headless plugin install, sync and reload raise nothing: a server
+       *   they bring in first dials with no hook asked, and one held before stays
+       *   held. Nor is it raised for the dial `$.mcp.connect` itself starts.
        */
       'mcp.connect': {
+          /**
+           * The server as `$.mcp.connect(server)` spelled it, a key of the caller's
+           * manifest or a name /mcp lists; on the engine's raise the name /mcp lists
+           * it under, usually `plugin:<plugin>:<server>`. Pinned: a rewrite is refused.
+           */
           server: string;
+          /**
+           * Who provides the server, as at `tool.describe`: the plugin and its tier,
+           * or `mcp:<server>` for one that settings configure; the caller for its
+           * own key. Pinned: a rewrite is refused, and a `$.mcp.connect` that then
+           * resolves to another provider's server answers `failed`.
+           */
+          provider: Origin;
       };
       /**
        * The argument of `$.session.cwd()`.
@@ -6491,6 +7478,10 @@ declare module 'claude-code' {
        */
       'session.authorize': NoArgs;
       /**
+       * The argument of `$.session.identity()`.
+       */
+      'session.identity': NoArgs;
+      /**
        * The argument of `$.session.usage({ breakdown, columns })`.
        */
       'session.usage': SessionUsageArgs;
@@ -6509,13 +7500,19 @@ declare module 'claude-code' {
        */
       'prompt.read': NoArgs;
       /**
-       * The argument of `$.tool.list()`.
+       * The argument of `$.prompt.paint(...)`: the draft and this plugin's runs.
+       */
+      'prompt.paint': PromptPaintArgs;
+      /**
+       * The argument of `$.tool.list()`, and of the engine's own raise of its
+       * tools: what the hooks answer that raise is the session's tool pool
+       * (`ToolInfo`).
        */
       'tool.list': NoArgs;
       /**
        * The argument of `$.tool.register(spec)`.
        */
-      'tool.register': Required<ToolSpec>;
+      'tool.register': RegisteredToolSpec;
       /**
        * The argument of `$.command.list()`.
        */
@@ -6586,6 +7583,18 @@ declare module 'claude-code' {
        */
       'ui.panes': NoArgs;
       /**
+       * The argument of `$.ui.place({ id })`.
+       */
+      'ui.place': UiPlaceArgs;
+      /**
+       * The argument of `$.theme.set(attributes)`: the attributes themselves.
+       */
+      'theme.set': ThemeSetArgs;
+      /**
+       * The argument of `$.theme.clear()`.
+       */
+      'theme.clear': NoArgs;
+      /**
        * The argument of `$.ui.selection()`.
        */
       'ui.selection': NoArgs;
@@ -6594,6 +7603,35 @@ declare module 'claude-code' {
        * the session's first when left out; rewritable, deniable, answerable.
        */
       'ui.copy': UiCopyArgs;
+      /**
+       * The argument of `$.ui.view({ agentId })`: whose transcript the main view
+       * is to show, none for the main conversation; rewritable and deniable.
+       */
+      'ui.view': SiteView;
+      /**
+       * The argument of `$.ui.notify(text, { title, key, delayMs, at, untilBack })`,
+       * `title` the plugin's name when left out or empty; rewritable, deniable,
+       * answerable. A rewrite by another plugin's hook is marked, so a client can
+       * show that it may not be as the sender wrote it.
+       *
+       * A notification is heard twice: here, and by `classic.Notification`
+       * hooks. Two mods that each notify again from a timer on hearing one
+       * echo each other without end: nothing in the engine stops them.
+       */
+      'ui.notify': {
+          text: string;
+          title?: string;
+          key?: string;
+          delayMs?: number;
+          at?: number;
+          untilBack?: boolean;
+      };
+      /**
+       * The argument of `$.ui.cancelNotify(key)`: the key of the plugin's own
+       * notification to take back; rewritable, deniable, answerable, like
+       * `ui.notify`. Only a client's surface holds one to take.
+       */
+      'ui.cancelNotify': CancelNotifyArgs;
       /**
        * The argument of `$.ui.blit(...)`: a Raster's `cells` or a keyed Image's
        * `source`; a hook above may rewrite either with `next`, or `{ deny }`.
@@ -6671,7 +7709,8 @@ declare module 'claude-code' {
        * the value, the condition, and `previous`, what stood there (the host's).
        *
        * A hook above rewrites `value` with `next({ ...e, value })`; the
-       * reference is identity, pinned. Raised by the value's owner alone.
+       * reference is identity, pinned. Raised by the value's owner alone. A
+       * `{ deny }` after `next(e)` was answered, a `.catch`'s too, fails the hook.
        */
       'state.set': StateSetEvent;
       /**
@@ -6709,12 +7748,17 @@ declare module 'claude-code' {
       };
       /**
        * The argument of `$.process.spawn(request)`: the request itself.
+       *
+       * A hook's `{ deny }` rejects the caller's stream and lets the child go
+       * (one still running is killed). Once a child of the call handed up a
+       * piece or its exit, the rejection says it started or ran.
        */
       'process.spawn': ProcessSpawnRequest;
       /**
-       * The argument of `$.settings.read({ source })`.
+       * The argument of `$.settings.read({ source })`, and the layers the read
+       * is made of, which the engine fills; rewritable, deniable.
        */
-      'settings.read': SettingsReadArgs;
+      'settings.read': SettingsReadInput;
       /**
        * The argument of `$.env.get(name)`; `name` is identity, pinned.
        */
@@ -6724,6 +7768,9 @@ declare module 'claude-code' {
       /**
        * The argument of `$.env.set(name, value)`; `name` is identity, pinned,
        * and no `value` unsets.
+       *
+       * A `{ deny }` after `next(e)` was answered, a `.catch`'s too, fails the
+       * hook: deny in its place.
        */
       'env.set': {
           name: string;
@@ -6767,6 +7814,11 @@ declare module 'claude-code' {
        * credential (a third-party provider, a cloud gateway, no login or key).
        */
       'session.authorize': SessionAuthorization;
+      /**
+       * How the session is signed in and, under a pin of its organization, as
+       * whom, for a plugin managed settings install; the refusal for any other.
+       */
+      'session.identity': SessionIdentity;
       'session.usage': SessionUsage;
       /**
        * The engine's version, its release, and its build time when stamped.
@@ -6777,6 +7829,10 @@ declare module 'claude-code' {
        * The box as it stands; the empty box where the session draws none.
        */
       'prompt.read': PromptBox;
+      /**
+       * Whether the runs were painted, and the box as it stands.
+       */
+      'prompt.paint': PromptPainted;
       'tool.list': ToolInfo[];
       'tool.register': {
           tool: string;
@@ -6805,10 +7861,33 @@ declare module 'claude-code' {
        */
       'ui.panes': readonly UiPane[];
       /**
+       * The row's id, or why nothing draws it.
+       */
+      'ui.place': UiPlaceResult;
+      /**
+       * Its request id, or why nothing draws it.
+       */
+      'theme.set': ThemeResult;
+      /**
+       * `isDrawn: false`, and whether a theme stood to be cleared.
+       */
+      'theme.clear': ThemeResult;
+      /**
        * What the person last selected; `undefined` when there is nothing.
        */
       'ui.selection': UiSelection | undefined;
       'ui.copy': UiCopyResult;
+      'ui.view': UiViewResult;
+      /**
+       * The channel that sent the notification, or why none did.
+       */
+      'ui.notify': UiNotifyResult;
+      /**
+       * Whether a client was handed the cancel.
+       */
+      'ui.cancelNotify': {
+          isSent: boolean;
+      };
       'ui.blit': UiBlitResult;
       /**
        * The text; `{ base64 }` when asked for bytes.
@@ -6844,7 +7923,7 @@ declare module 'claude-code' {
       'process.spawn': ProcessSpawnResult;
       'settings.read': Settings;
       'env.get': string | undefined;
-      'env.set': void;
+      'env.set': EnvSetResult;
   };
 
   /**
@@ -6922,7 +8001,7 @@ declare module 'claude-code' {
 
   /**
    * The argument of `$.ui.open`: which pane, its title, whether it asks the
-   * person's keyboard, its dialog manners, its size: rows inline, columns docked.
+   * person's keyboard, its dialog manners, its size (rows, columns), its seat.
    *
    * An open answering the person's input (a command or prompt they entered, a
    * press) is placed at any width; one the plugin makes on its own waits
@@ -6968,13 +8047,29 @@ declare module 'claude-code' {
        */
       closeOnEscape?: true;
       /**
-       * While the pane is on screen the surface holds its transient toasts (the
-       * plugin toast stack, the notification line) and shows them once it closes.
+       * While the pane is the one shown the surface holds every transient toast:
+       * each other plugin's `$.ui.toast` and the engine's own, as this plugin's.
        *
-       * As it does behind the engine's own side panel; pinned warnings still
-       * show. Left out, toasts show as they come. Each open sets it anew.
+       * The toast stack is not drawn, its timers waiting; the notification line
+       * queues all but the engine's standing warnings, and one up as the pane opens
+       * may end unseen. After, the stack draws its newest few, the line one by one.
+       *
+       * @remarks For a dialog the person answers and leaves, not a pane that stays.
+       *   Left out, toasts show. Every open sets it; a `ui.open` hook may drop it.
        */
       holdToasts?: true;
+      /**
+       * What the surface paints under the pane's body while it is the one shown, as
+       * a Box takes it: a theme key, a raw color, or `"transparent"`.
+       *
+       * `"transparent"` paints nothing, so what lies behind the pane shows through;
+       * a color stops at the body. Left out, the surface's own look stands. Anything
+       * else is refused. Each open sets it anew; a `ui.open` hook may drop it.
+       *
+       * @remarks A request, not a grant: a surface with no counterpart for a theme
+       *   key keeps its own look.
+       */
+      backgroundColor?: Color;
       /**
        * The body rows the pane's content wants while seated inline above the
        * prompt: it opens that tall, up to what the layout spares, not a third.
@@ -6986,16 +8081,32 @@ declare module 'claude-code' {
       rows?: number;
       /**
        * The body columns the pane's content wants while docked beside a
-       * fullscreen transcript: the dock opens that wide, floor to ceiling.
+       * fullscreen transcript: the dock opens that wide, at most 45% of the
+       * terminal's columns and at least 24. Each open sets it anew.
        *
-       * A request, not a grant: a width the person dragged or keyed the dock
-       * to wins, this session's or a kept one, and the inline block ignores
-       * it. A positive whole number; left out, the share. Each open sets it anew.
+       * A request, not a grant: a width the person dragged or keyed the dock to,
+       * this session's or a kept one, wins under the same ceiling, and the
+       * inline block ignores it. A positive whole number; left out, the share.
        *
        * @example
-       * await $.ui.open({ id: "browser", focus: true, rows: 24, columns: 100 })
+       * await $.ui.open({ id: "browser", focus: true, rows: 24, columns: 60 })
        */
       columns?: number;
+      /**
+       * Asks that the pane start as a `"widget"`, the small form of a minimized pane
+       * on the desktop app; drawn so, its `Pane` props say `placement: "widget"`.
+       *
+       * A request: the surface decides, and the person can expand or minimize the
+       * pane afterwards. A surface with no widgets (the terminal, VS Code, a desktop
+       * app without them) opens the pane as if this were left out. Any other value
+       * is ignored.
+       *
+       * @remarks Each open sets it anew, but a surface is meant to read it only when
+       *   it first shows the pane. A `ui.open` hook may set or drop it.
+       * @example
+       * await $.ui.open({ id: "ticker", placement: "widget" })
+       */
+      placement?: 'widget';
   };
 
   /**
@@ -7179,6 +8290,10 @@ declare module 'claude-code' {
   /**
    * The nouns a plugin declared on `$` by merging into EngineInterface; never
    * one the engine's own events are under (`tool`, `session`, `ui`).
+   *
+   * Where a hook with no `.catch` is run again beneath its call to one and
+   * makes that call again for the same event, the third identical open call
+   * waits behind the second, and ends with it if the second goes unanswered.
    */
   type PluginNoun = Exclude<keyof EngineInterface & string, keyof CoreEngineInterface | Namespace<CoreEventName>>;
 
@@ -7662,12 +8777,45 @@ declare module 'claude-code' {
   };
 
   /**
+   * The props of `Progress`, how far along a task is. A leaf: no children.
+   *
+   * Use it for a task moving toward done. For a level that is not heading
+   * anywhere, such as usage against a limit, draw a bar of Boxes instead. The
+   * `ToolProgress` render site is unrelated.
+   */
+  export type ProgressProps = {
+      /**
+       * What is being done, drawn and read out by a screen reader. Not blank.
+       */
+      label: string;
+      /**
+       * From 0 to `max`. Absent or not finite, the task is running with no known
+       * end. Past either end it draws as that end.
+       */
+      value?: number;
+      /**
+       * Where `value` ends. Absent, 1. Zero or less, or not finite, makes no
+       * fraction, so the task draws as running.
+       */
+      max?: number;
+      /**
+       * The figure as a person reads it, such as `412 of 900`. Absent, a surface
+       * draws the whole percent, or says the task is running.
+       */
+      valueText?: string;
+      /**
+       * The fill, as Box's `backgroundColor` takes it. Absent, the surface's own.
+       */
+      color?: Color;
+  };
+
+  /**
    * The facts `prompt.attachment` pins under `e.detail`, by attachment type:
    * what the engine computed for the row, as it rendered the row's text.
    *
-   * A type named here carries them on every row the engine made; a type not
-   * named carries no `detail` at all. Read off the row, never computed again:
-   * a row sent in a later request says what it was made with.
+   * A type named here carries them on every row the engine made for a session
+   * whose plan goes in a file; a type not named carries no `detail` at all. Read
+   * off the row, never computed again: sent again, it says what it was made with.
    */
   export type PromptAttachmentDetailOf = {
       /**
@@ -7738,8 +8886,11 @@ declare module 'claude-code' {
       event: string;
   } | {
       /**
-       * Text a plugin's hook attached through a chain's `context`
-       * (`prompt.submit`, `tool.call`), as the model reads it.
+       * Text a plugin's hook attached through a chain's `context`, as the
+       * model reads it.
+       *
+       * The chains that carry one: `prompt.submit`, `prompt.mention`,
+       * `tool.call`.
        */
       kind: 'plugin';
       /**
@@ -7754,6 +8905,75 @@ declare module 'claude-code' {
    */
   export type PromptAttachmentResult = {
       text: string | null;
+  };
+
+  /**
+   * The input of `prompt.autocomplete`: the prompt box as the person left it
+   * and the token at its cursor, which a taken suggestion replaces.
+   *
+   * All four are pinned, facts of the box: a rewrite that changes one is
+   * refused, one left out is kept. Offsets count UTF-16 code units.
+   */
+  export type PromptAutocompleteInput = {
+      /**
+       * The whole draft in the prompt box.
+       */
+      text: string;
+      /**
+       * Where the person's caret stands in `text`, 0 to `text.length`.
+       */
+      cursor: number;
+      /**
+       * The run of characters that are not whitespace and that ends at the
+       * cursor: `text.slice(start, cursor)`, never empty.
+       *
+       * What a matcher names to answer one lead character only.
+       *
+       * @example
+       * on("prompt.autocomplete", { token: /^#/ }, hook)
+       */
+      token: string;
+      /**
+       * Where `token` begins in `text`.
+       */
+      start: number;
+  };
+
+  /**
+   * What a `prompt.autocomplete` hook returns and what `next(e)` resolves to:
+   * the rows the plugins add to the typeahead for the token.
+   */
+  export type PromptAutocompleteResult = {
+      /**
+       * The rows, in the order drawn beneath the engine's own; from core, none.
+       *
+       * A hook puts its rows before or after what `next(e)` gave; the engine's
+       * own rows are not on this event and stay where they were drawn.
+       *
+       * @example
+       * return { suggestions: [...(await next(e)).suggestions, mine] }
+       */
+      suggestions: readonly PromptAutocompleteSuggestion[];
+  };
+
+  /**
+   * One row a `prompt.autocomplete` hook adds to the prompt box's typeahead:
+   * what taking it writes, what the row shows, and a dim line beside it.
+   */
+  export type PromptAutocompleteSuggestion = {
+      /**
+       * What taking the row writes in place of the token, the cursor after it;
+       * never empty. The box's new token is then asked again.
+       */
+      text: string;
+      /**
+       * What the row shows, on one line; the `text` when absent.
+       */
+      label?: string;
+      /**
+       * The dim line drawn beside the label, cut to the row by the surface.
+       */
+      description?: string;
   };
 
   /**
@@ -7773,6 +8993,95 @@ declare module 'claude-code' {
        * code units, 0 at the start, `text.length` at the end.
        */
       cursor: number;
+  };
+
+  /**
+   * The input of `prompt.change` (prompt-change/): the prompt box after a
+   * change of its text that no `prompt.edit` carried, and who made it.
+   *
+   * The change is already in the box. Every field is the engine's: a hook
+   * observes, and `next(e)` passes them on as received.
+   */
+  export type PromptChangeInput = {
+      /**
+       * The draft as it stands when the event is raised; what `$.prompt.read()`
+       * answers then.
+       */
+      text: string;
+      /**
+       * Where the caret stands in `text` then, 0 to `text.length`.
+       */
+      cursor: number;
+      /**
+       * Who changed the box (PromptChangeOrigin), set by the engine: the act
+       * that left the box as it stands.
+       *
+       * @example on('prompt.change', { origin: { kind: 'history' } },
+       *   ($, e, next) => next(e))
+       */
+      origin: PromptChangeOrigin;
+  };
+
+  /**
+   * Who changed the prompt box at `prompt.change`, as the engine stamps it
+   * where the text is written; a matcher narrows on its `kind`.
+   *
+   * The set of kinds may grow: treat a kind you do not know as `engine`.
+   * `next(e)` passes it on as received; no hook sets one.
+   */
+  export type PromptChangeOrigin = {
+      /**
+       * A recalled entry of the prompt history was put in the box: the up
+       * and down arrows, the history search, the history picker.
+       *
+       * Stepping back out of a recall is `history` too: the newest entry
+       * passed, the search cancelled, the person's own draft put back.
+       */
+      kind: 'history';
+  } | {
+      /**
+       * The box was emptied by something other than an edit or an undo: a
+       * submit took the draft, a clear, a stash.
+       *
+       * `text` is the box when raised: a key typed since is in it.
+       */
+      kind: 'clear';
+  } | {
+      /**
+       * The person took an edit back (`chat:undo`): the box holds an
+       * earlier text of theirs, which may be empty.
+       */
+      kind: 'undo';
+  } | {
+      /**
+       * A plugin's `$.prompt.fill` landed, as its `prompt.fill` chain left it
+       * and as the engine finished it (an over-long text collapsed).
+       */
+      kind: 'plugin';
+      /**
+       * The filling plugin's name; a hook that fills tells its own fill by it.
+       */
+      name: string;
+  } | {
+      /**
+       * A remote surface's own Composer changed by the app's hand; reserved,
+       * nothing raises it as shipped.
+       */
+      kind: 'app';
+  } | {
+      /**
+       * Every other write: a draft put back, an accepted completion,
+       * dictation, a prefill, and an edit `prompt.edit` does not carry.
+       */
+      kind: 'engine';
+  };
+
+  /**
+   * What a `prompt.change` hook returns and what `next(e)` resolves to:
+   * `{ text }`, echoed by core; a hook's own value changes nothing.
+   */
+  export type PromptChangeResult = {
+      text: string;
   };
 
   /**
@@ -7953,10 +9262,24 @@ declare module 'claude-code' {
   /**
    * What a `prompt.context` hook returns: the blocks the conversation
    * carries, in order; one left out is not sent.
+   *
+   * By name: `userEmail`, `attachedProject` and `perforceMode` are sent again
+   * when the text differs, `workerToolsContext` too where the session's mode
+   * announces it; for `gitStatus` and `currentDate` the engine sends its own.
+   *
+   * @remarks After a failure to send the context as copies, the engine renders
+   *   it into the first message at each turn instead, from the latest answer.
    */
   export type PromptContextResult = {
       /**
        * What the conversation carries, in order.
+       *
+       * A block whose name the engine does not route reaches the model in one copy,
+       * made when the conversation holds none (first request, after a compaction).
+       * While it stands, a later answer adds, changes and takes back none.
+       *
+       * @remarks Text that changes goes in `instructionFiles`, sent again when
+       *   a file differs, or in a `prompt.submit` hook's `context`.
        */
       blocks: readonly PromptContextBlock[];
       /**
@@ -7964,7 +9287,9 @@ declare module 'claude-code' {
        *
        * Kept in step with the `claudeMd` text at every link: a changed list
        * renders the text the next reader gets, a rewritten text makes the files
-       * unknown from there on. Every kind is the hook's to add, drop or rewrite.
+       * unknown from there on. Every kind is the hook's to add, drop or rewrite;
+       * a `managed` file a person's own plugin added or rewrote keeps its text
+       * and is marked `isUnverified`.
        */
       instructionFiles?: readonly InstructionFile[];
   };
@@ -7973,9 +9298,10 @@ declare module 'claude-code' {
    * One styled run a surface paints over the prompt draft: `[start, end)` of
    * a text, in UTF-16 code units like PromptBox `cursor`. Paint only.
    *
-   * A range outside the text is clamped into it, an empty one dropped, and a
-   * boundary inside a grapheme moves back to its start. Later entries win per
-   * style key.
+   * Clamped into the text, an empty range with no `virtualText` dropped, and a
+   * boundary moved back to its grapheme's start. Later entries win per key. The
+   * caret's cell keeps its run's style, less a color that would hide the caret:
+   * `color` matching its background, or an end matching the terminal's other one.
    *
    * @example { start: 4, end: 8, color: 'warning', bold: true }
    */
@@ -7990,7 +9316,22 @@ declare module 'claude-code' {
        * once clamped, paints nothing.
        */
       end: number;
-  } & Pick<TextProps, 'color' | 'backgroundColor' | 'dimColor' | 'bold' | 'italic' | 'underline' | 'strikethrough'>;
+      /**
+       * Drawn in bold; a decoration takes no `weight`.
+       */
+      bold?: boolean;
+      /**
+       * A text drawn before the character at `start`, in this entry's own style
+       * keys: never in the draft, counted by no offset, never holding the cursor.
+       *
+       * Typed text at `start` lands before it. A tab is drawn as four spaces, and
+       * control characters but a newline are dropped. Not drawn in the empty box,
+       * by a remote host, or in screen-reader mode, where it is heard as typed.
+       *
+       * @example { start: 7, end: 7, virtualText: ' bug', dimColor: true }
+       */
+      virtualText?: string;
+  } & Pick<TextProps, 'color' | 'backgroundColor' | 'dimColor' | 'italic' | 'underline' | 'strikethrough'>;
 
   /**
    * The input of `prompt.edit` (prompt-edit/): one edit the person makes in the
@@ -8003,8 +9344,8 @@ declare module 'claude-code' {
        */
       origin: PromptEditOrigin;
       /**
-       * The one key that made the edit, in `Client` `onKey`'s shape, when one
-       * did; absent for a paste and for a burst of keys folded into one edit.
+       * The one key that made the edit, in `Client` `onKey`'s shape; absent for
+       * a paste, a keybinding's newline and a burst of keys folded into one edit.
        *
        * Pinned: which key the person pressed is a fact, not the hook's to change.
        */
@@ -8097,6 +9438,18 @@ declare module 'claude-code' {
        *   decorations: [{ start: 1, end: 5, italic: true }] })
        */
       decorations?: PromptDecoration[];
+      /**
+       * Where the caret stands after the write, counted as PromptFilled `cursor`
+       * is: an offset into the whole draft the box then holds.
+       *
+       * In every `mode`, hidden code points gone, accents counted as NFC; clamped
+       * to the draft, moved to the start of a character or chip it falls inside;
+       * not an integer is refused. Left out: past an `insert`, else at the end.
+       *
+       * @example const box = await $.prompt.read()
+       *   await $.prompt.fill({ text: box.text.toUpperCase(), cursor: box.cursor })
+       */
+      cursor?: number;
   };
 
   /**
@@ -8126,8 +9479,9 @@ declare module 'claude-code' {
        */
       text: string;
       /**
-       * Where the person types next: an offset into `text`, past the fill's text
-       * for `insert`, at the end for `replace` and `append`.
+       * Where the person types next: an offset into `text`, where the call's
+       * `cursor` stood it, else past the fill's text for `insert`, at the end
+       * for `replace` and `append`.
        */
       cursor: number;
   };
@@ -8165,6 +9519,16 @@ declare module 'claude-code' {
        *   next({ ...e, decorations: [] }))
        */
       decorations?: PromptDecoration[];
+      /**
+       * Where the caret stands after the write (PromptFillArgs `cursor`), an
+       * offset into the whole draft; absent when the call named none.
+       *
+       * What the chain passes down is what moves it: left out of a rewrite, the
+       * box stands the caret by `mode`.
+       *
+       * @example on('prompt.fill', ($, e, next) => next({ ...e, cursor: 0 }))
+       */
+      cursor?: number;
   };
 
   /**
@@ -8229,6 +9593,175 @@ declare module 'claude-code' {
   };
 
   /**
+   * What `$.prompt.media({ id })` answers: one attached item's bytes as the
+   * engine would send them now, or why there are none to read.
+   *
+   * An image is read after the engine's own resize, a document as held. One
+   * call answers at most 4 MiB: `size` is the whole item's, `next` goes on.
+   * Only a hook on the `prompt.submit` that lists the item is answered.
+   */
+  export type PromptMedia = {
+      /**
+       * The item's kind.
+       */
+      type: 'image' | 'document';
+      /**
+       * The MIME type of the bytes answered (`image/png`), after the resize.
+       */
+      mediaType: string;
+      /**
+       * This call's slice of the item, base64. The slices' strings, joined in
+       * order, are the whole item's base64.
+       */
+      base64: string;
+      /**
+       * How many bytes the whole item holds, decoded.
+       */
+      size: number;
+      /**
+       * The offset the following slice starts at; absent on the last one.
+       */
+      next?: number;
+      unreadable?: undefined;
+      deny?: undefined;
+  } | {
+      /**
+       * Why the model will not receive the item as media: the engine could
+       * not process it, and sends a line of text in its place.
+       */
+      unreadable: string;
+      type?: undefined;
+      mediaType?: undefined;
+      base64?: undefined;
+      size?: undefined;
+      next?: undefined;
+      deny?: undefined;
+  } | {
+      /**
+       * Why this read is refused: no submission in flight carries the id
+       * for this caller, the item is not held as inline bytes, or the offset
+       * is past its end.
+       */
+      deny: string;
+      type?: undefined;
+      mediaType?: undefined;
+      base64?: undefined;
+      size?: undefined;
+      next?: undefined;
+      unreadable?: undefined;
+  };
+
+  /**
+   * What `$.prompt.media(args)` takes: which attached item of the prompt
+   * being submitted to read, and from where in it.
+   */
+  export type PromptMediaArgs = {
+      /**
+       * The item's handle, as `e.attachments` of the `prompt.submit` in flight
+       * lists it.
+       */
+      id: string;
+      /**
+       * Where the slice starts, in bytes of the item: an earlier read's `next`.
+       * Absent, the start.
+       */
+      offset?: number;
+  };
+
+  /**
+   * How the engine attached a mentioned file, in the names `prompt.attachment`
+   * gives its `type`.
+   *
+   * `file`: read now, whole or in part. `already_read_file`: the model holds
+   * it unchanged, nothing is sent again. `pdf_reference`: a PDF too long to
+   * inline, named for the model to open by pages.
+   */
+  export type PromptMentionAttached = 'file' | 'already_read_file' | 'pdf_reference';
+
+  /**
+   * The input of `prompt.mention`: one file a prompt names after an `@`, as
+   * the engine resolved it and before it is read for the model.
+   *
+   * A hook rewrites what is read (`path`, `offset`, `limit`); `mention` and
+   * `agentId` are pinned. A directory and a path a deny rule covers raise
+   * nothing; whether a file is there is the read's to find.
+   */
+  export type PromptMentionInput = {
+      /**
+       * What followed the `@`, a path as the person typed it, a fragment
+       * included (`#L10-20`). Pinned: what the prompt said.
+       */
+      mention: string;
+      /**
+       * The file's absolute path, as the engine resolved the mention.
+       *
+       * `next({ ...e, path })` reads another file, judged by the deny rules
+       * where it lands, links followed. One read per mention: a second `next`
+       * settles with the first's.
+       */
+      path: string;
+      /**
+       * The first line read, counted from 1, when the mention names lines
+       * (`#L10`); absent for a whole file. A rewrite is where the read starts.
+       */
+      offset?: number;
+      /**
+       * How many lines are read when the mention names lines (`#L10-20` reads
+       * 11); absent for a whole file. A rewrite is how many are read.
+       */
+      limit?: number;
+      /**
+       * The loop whose prompt carries the mention: a subagent's id, the `id`
+       * `$.agent.list()` gives it; absent on main.
+       *
+       * Pinned: a different value is refused, one left out is kept.
+       */
+      agentId?: string;
+  };
+
+  /**
+   * What a `prompt.mention` hook returns and what `next(e)` resolves to: how
+   * the file was attached (`{ type, context? }`), or `{ deny: reason }`.
+   *
+   * The file's text is its attachment's, which `prompt.attachment` rewrites.
+   * A hook that answers without `next` had no file read.
+   */
+  export type PromptMentionResult = {
+      /**
+       * How the engine attached the file; null when it attached nothing: no
+       * file is there, it is too large, or it cannot be read.
+       *
+       * From a hook answering without `next`: null, nothing was read.
+       */
+      type: PromptMentionAttached | null;
+      /**
+       * What the model reads after the prompt's mentioned files and the
+       * person never sees, each entry one block. From core, none.
+       *
+       * An answer keeps every entry its `next` gave, none empty: one with
+       * no `context` over a `next` that had one is refused. Past 100,000
+       * characters (200,000 together) the model reads a head and a path.
+       *
+       * @example
+       * return { ...result, context: [...(result.context ?? []), mine] }
+       */
+      context?: readonly string[];
+      deny?: undefined;
+  } | {
+      /**
+       * Refuses the mention: nothing of the file is attached, and a read
+       * already made is forgotten. The debug log names the reason.
+       *
+       * From core: a deny rule covers the path a hook passed on. A context
+       * beside it is dropped. A hook that throws or outlasts its budget is
+       * skipped, and the file is read as if the hook were not there.
+       */
+      deny: string;
+      type?: undefined;
+      context?: undefined;
+  };
+
+  /**
    * Where a `prompt.submit` submission came from, as the engine knows it at
    * the site it was queued from; a closed set, never a text prefix.
    *
@@ -8266,7 +9799,7 @@ declare module 'claude-code' {
       kind: 'task-notification';
   } | {
       /**
-       * A scheduled task, routine or /loop firing its stored prompt.
+       * A scheduled task or /loop firing its stored prompt.
        */
       kind: 'scheduled-trigger';
   } | {
@@ -8354,6 +9887,58 @@ declare module 'claude-code' {
   };
 
   /**
+   * What a plugin's `$.prompt.paint(args)` takes, and a hook on `prompt.paint`
+   * sees as `e` and may rewrite.
+   *
+   * Whose runs they are is the caller's name, which no argument or hook sets.
+   */
+  export type PromptPaintArgs = {
+      /**
+       * The draft `decorations` were computed for: nothing paints unless the box
+       * reads exactly this. May be left out only with an empty list.
+       */
+      text?: string;
+      /**
+       * This plugin's runs over the draft (PromptDecoration), replacing those it
+       * painted before; an empty list clears them.
+       *
+       * Another plugin's stand, a later one winning per style key. The draft's next
+       * change drops them, but for a `prompt.edit` hook in the terminal.
+       *
+       * @example await $.prompt.paint({ text,
+       *   decorations: [{ start: 0, end: 4, underline: true }] })
+       */
+      decorations: PromptDecoration[];
+  };
+
+  /**
+   * What `$.prompt.paint` resolves to: whether the runs were painted, and the
+   * box as it stands (PromptBox).
+   *
+   * A mod whose text went stale computes again from `text`.
+   *
+   * The box goes to a plugin whose module calls `$.prompt.read`, through the
+   * hooks on it; one that never does, or is refused there, gets the empty box.
+   */
+  export type PromptPainted = {
+      /**
+       * True once the runs stand over the draft, or a clear took them off; false
+       * where the box does not read `text`, or no box can take them.
+       */
+      isPainted: boolean;
+      /**
+       * The draft as it stands, which the call did not change; `''` where no box
+       * is drawn or the caller may not read it (see above).
+       */
+      text: string;
+      /**
+       * Where the person types next: an offset into `text`, which the call did
+       * not move.
+       */
+      cursor: number;
+  };
+
+  /**
    * The input of `prompt.section`: one named section of the system prompt, at
    * the moment the engine assembles it.
    */
@@ -8375,6 +9960,14 @@ declare module 'claude-code' {
    */
   export type PromptSectionResult = {
       text: string | null;
+      /**
+       * Sends a changed answer at the next turn, rewriting the cache from the
+       * system prompt on and dropping the model's earlier thinking.
+       *
+       * Left out, it waits for a new thread or a compaction. The outermost hook's
+       * answer says so: a hook above that keeps it spreads what `next` gave.
+       */
+      breakPromptCache?: boolean;
   };
 
   /**
@@ -8384,7 +9977,7 @@ declare module 'claude-code' {
    * `origin` is the calling plugin's name; `turnId` is the turn a prompt typed
    * mid-turn ran over; `wait` is false, as a plugin's prompt runs once idle.
    */
-  export type PromptSubmitArgs = Omit<PromptSubmitInput, 'origin' | 'turnId' | 'wait' | 'context'> & {
+  export type PromptSubmitArgs = Omit<PromptSubmitInput, 'origin' | 'turnId' | 'wait' | 'context' | 'command' | 'isMeta'> & {
       /**
        * Submit the text as the person's own words, read bare without the "The
        * <plugin> plugin sent a message" frame; absent means framed.
@@ -8401,7 +9994,7 @@ declare module 'claude-code' {
 
   /**
    * A pasted or attached non-text item of a submitted prompt; its kind, never
-   * its bytes.
+   * its bytes, which `$.prompt.media` reads by the item's `id`.
    */
   export type PromptSubmitAttachment = {
       /**
@@ -8416,6 +10009,34 @@ declare module 'claude-code' {
        * The pasted file's name, when it had one.
        */
       filename?: string;
+      /**
+       * The engine's handle for the item while this `prompt.submit` is in flight:
+       * `$.prompt.media({ id })` reads its bytes.
+       *
+       * Opaque, and the engine's to set, as the whole list is: whatever a hook
+       * passes down for it, the hooks beneath read the engine's.
+       */
+      id?: string;
+  };
+
+  /**
+   * The slash command a submission runs, as the engine tells `prompt.submit`:
+   * the command as `command.run`'s hooks left it, their change of arguments included.
+   *
+   * @example
+   * const typed = { name: 'review', args: 'the diff' } // "/review the diff"
+   */
+  export type PromptSubmitCommand = {
+      /**
+       * Which command, without its slash (`compact`, `hello`), aliases and
+       * folds resolved: `command.run`'s `command`.
+       */
+      name: string;
+      /**
+       * Everything after the command: what was typed, or what a
+       * `command.run` hook left of it; `""` when there was nothing.
+       */
+      args: string;
   };
 
   /**
@@ -8424,9 +10045,34 @@ declare module 'claude-code' {
    */
   export type PromptSubmitInput = {
       /**
-       * The prompt's text as it will reach the model (pastes already expanded).
+       * The prompt's text as typed, pastes already expanded: what will reach
+       * the model, or a slash command's line as `command.run` left it (`command`).
        */
       text: string;
+      /**
+       * The slash command the submission runs (PromptSubmitCommand), set by the
+       * engine; a rewrite of `text` is then not applied, and the person is told.
+       *
+       * A `{ drop }` stops a skill or prompt command before it is rendered, and only
+       * the turn of a built-in that asks the model, which has run. A command that
+       * runs as a fork raises no `prompt.submit`. Mask arguments at `command.run`, a
+       * skill's body at `skill.prompt`. Pinned: left out it is put back, changed it
+       * fails the hook.
+       *
+       * @example
+       * on('prompt.submit', ($, e, next) => next(e.command ? e : masked(e)))
+       */
+      command?: PromptSubmitCommand;
+      /**
+       * True, set by the engine, on a prompt the person does not see as typed.
+       * Delivered into a running turn it takes a rewrite; starting a turn, none.
+       *
+       * Pinned: left out it is put back, changed it fails the hook.
+       *
+       * @example
+       * ($, e, next) => (e.isMeta && bad(e) ? { drop: 'no' } : next(masked(e)))
+       */
+      isMeta?: true;
       /**
        * Present only when the submission carried images or other non-text items.
        */
@@ -8500,10 +10146,12 @@ declare module 'claude-code' {
       drop?: undefined;
   } | {
       /**
-       * The prompt did not enter: a hook's refusal, answered without `next`,
-       * or a settings hook's block beneath.
+       * The prompt did not enter: a hook's refusal, a settings hook's block
+       * beneath, or the engine's own (a Stop stands, a host's limit reached).
        *
-       * The text is shown to the user as the reason.
+       * A hook's text is shown to the user as the reason; the engine's is
+       * logged. After a `next(e)` of the hook's was answered, a drop fails it:
+       * its `.catch` is asked, or it is skipped by name, its last `next` kept.
        */
       drop: string;
       text?: undefined;
@@ -8673,12 +10321,28 @@ declare module 'claude-code' {
   export type Register = (on: On, options: PluginOptions) => unknown;
 
   /**
+   * A ToolSpec as `$.tool.register` hands it on: the input schema filled in,
+   * `isDeferred` as the plugin gave it.
+   */
+  export type RegisteredToolSpec = {
+      name: string;
+      description: string;
+      inputSchema: Record<string, unknown>;
+      isDeferred?: ToolDeferral;
+  };
+
+  /**
    * What `on(...)` returns for a hook of type `F`: the registration, which
    * takes one `.catch` (CatchHandler); without it a failed hook is absent.
    *
    * A second `.catch` on one registration throws, as does one after
    * register() returned and one on `engine.create`, whose hook has no budget
    * and whose failure is the load's.
+   *
+   * @remarks A guard judges before it calls `next` and carries one, or what
+   *   it judges goes on when it fails: refuse where `next` was not called.
+   * @example
+   * on(...).catch(($, e, next) => next.called ? next(e) : { deny: "no" })
    */
   export type Registration<F> = {
       /**
@@ -8687,6 +10351,9 @@ declare module 'claude-code' {
        *
        * The budget is HookBudget's `ms` and the grace its `catchMs`, both on
        * the clock that stops while the code waits on `next` or `$`.
+       *
+       * @remarks `claude plugin validate` lists each gating hook with or
+       *   without one.
        */
       readonly catch: (handler: CatchHandler<F>) => void;
   };
@@ -8707,9 +10374,13 @@ declare module 'claude-code' {
    *
    * The permission dialog is drawn by the engine alone, since its answer
    * authorises an action; a plugin adds context with `$.ui.notice`. `Pane` is
-   * the one component whose instances a plugin opens (`$.ui.open`).
+   * a component whose instances a plugin opens (`$.ui.open`), `Placed`
+   * another (`$.ui.place`), and `Backdrop` the one a plugin sets
+   * (`$.theme.set`), drawn behind the conversation by the desktop and mobile
+   * apps alone. `AbovePromptList` is the band's arrangement of its `AbovePrompt`
+   * rows.
    */
-  export type RenderComponent = 'AskUserQuestion' | 'UserMessage' | 'AssistantMessage' | 'ToolUse' | 'ToolResult' | 'ToolGroup' | 'ToolProgress' | 'CommandOutput' | 'Spinner' | 'TurnDuration' | 'InfoNotice' | 'SessionMode' | 'PromptHint' | 'AbovePrompt' | 'Pane';
+  export type RenderComponent = 'AskUserQuestion' | 'UserMessage' | 'AssistantMessage' | 'ToolUse' | 'ToolResult' | 'ToolGroup' | 'ToolProgress' | 'CommandOutput' | 'Spinner' | 'TurnDuration' | 'InfoNotice' | 'SessionMode' | 'PromptHint' | 'AbovePrompt' | 'AbovePromptList' | 'Pane' | 'Placed' | 'Backdrop';
 
   /**
    * What a render hook returns, and what `next(e)` resolves to: a plain-data
@@ -8726,7 +10397,7 @@ declare module 'claude-code' {
        *
        * Built by `<Button>` or the table's `t.Button`. The `onPress` closure
        * stays in the plugin's own environment under `press.handle`; the host
-       * holds the handle for the lifetime of the drawing. A leaf: no children.
+       * holds the handle for the lifetime of the drawing.
        */
       type: 'Button';
       props: {
@@ -8736,7 +10407,8 @@ declare module 'claude-code' {
            */
           key: string;
           /**
-           * The text drawn on the button.
+           * The text drawn on the button; where it holds `children`, the name
+           * of the control, which a surface that draws no children draws.
            */
           label: string;
           /**
@@ -8745,7 +10417,8 @@ declare module 'claude-code' {
            *
            * The band after ctrl+x tab or a click, a focused `Pane`: on keydown,
            * lowercased; never from the composer, save a bare digit in an empty
-           * one pressing a band Button. Two on one hotkey: the later wins.
+           * one pressing a band Button. Two of one plugin on one hotkey: the
+           * later wins. Two plugins on one hotkey: it presses neither.
            */
           hotkey?: string;
           /**
@@ -8811,10 +10484,17 @@ declare module 'claude-code' {
        * nearest keyed Box, or the group `scope` names, is hovered; plain data.
        */
       hover?: TextHoverProps;
+      /**
+       * What is drawn in the label's place, all of it one pressable: strings
+       * and `Text` (a chip, a dim part), any other element refused.
+       *
+       * Absent for a Button of a label alone, drawn as it always was.
+       */
+      children?: RenderNode[];
   } | {
       /**
-       * A one-line text field on every surface; a change and Enter raise
-       * `ui.input` (`e.element` the key, `e.kind` which, `e.value` the text).
+       * A text field on every surface, of one line or of `rows`; a change and
+       * Enter raise `ui.input` (`e.element`, `e.kind`, `e.value` the text).
        *
        * Built by `<Input>` or the table's `t.Input`. The `onInput` and
        * `onSubmit` closures stay in the plugin's own environment under
@@ -8843,6 +10523,11 @@ declare module 'claude-code' {
            * What Enter does, drawn beside the field while it has focus.
            */
           submitLabel?: string;
+          /**
+           * How many lines tall the field is; from 2 it holds several lines.
+           * Absent is one.
+           */
+          rows?: number;
           /**
            * The site's ring starts on this element when the site takes the
            * keyboard; the first drawn of several. Absent draws as before.
@@ -8912,8 +10597,8 @@ declare module 'claude-code' {
        * text then the URL in dim where unsupported), an anchor on desktop.
        *
        * Inline: its children are the text, strings and inline elements;
-       * absent children the label, absent both the URL. `href` is `https:`
-       * (or `http://localhost`) and bounded, or the tree is refused.
+       * absent children the label, absent both the URL. `href` is drawn as
+       * written; one that is no string draws the text plain.
        */
       type: 'Link';
       props: LinkProps;
@@ -8925,7 +10610,7 @@ declare module 'claude-code' {
        *
        * A leaf: a dim gutter numbers the lines from `startLine`; a diff has
        * both gutters, markers, add and remove backgrounds. `source` is
-       * bounded as a Text's string is, or the tree is refused.
+       * checked as a Text's string is, or the tree is refused.
        */
       type: 'Code';
       props: CodeProps;
@@ -8936,11 +10621,16 @@ declare module 'claude-code' {
        * reply's text: its own renderer, theme, hyperlinks and highlighting.
        *
        * Built by `<Markdown>` or the table's `t.Markdown`. A leaf: `text` is
-       * bounded as a Text's string is, or the tree is refused. Without a
+       * checked as a Text's string is, or the tree is refused. Without a
        * `press` its links are the surface's own, opened as it opens links.
        */
       type: 'Markdown';
       props: MarkdownLeafProps;
+      /**
+       * Whose `key` it is, set by the engine on a keyed one as the tree
+       * leaves its hook, as a Box's `part` is.
+       */
+      part?: PluginStamp;
       children?: undefined;
   } | {
       /**
@@ -8990,6 +10680,16 @@ declare module 'claude-code' {
        */
       type: 'Svg';
       props: SvgProps;
+      children?: undefined;
+  } | {
+      /**
+       * How far along a task is, or that it is still running. Hooks above wrap
+       * it, replace it or rewrite its props. A mobile client that names it in
+       * `draws` is sent this node; any other client, on any surface, gets its
+       * Box and Text. A surface module cannot draw one.
+       */
+      type: 'Progress';
+      props: ProgressProps;
       children?: undefined;
   } | {
       /**
@@ -9077,6 +10777,15 @@ declare module 'claude-code' {
        */
       requestId: string;
       /**
+       * Whose this drawing is, where it is one plugin's: the plugin an
+       * `AbovePrompt` row is asked of, the plugin that opened a `Pane`.
+       *
+       * The engine's word, pinned: a rewrite carries it on as received. It is a
+       * default matcher key: a hook leaving it out hears its own plugin's drawings
+       * alone here; one naming it is read as written, `{ plugin: "*" }` for all.
+       */
+      plugin?: string;
+      /**
        * The size of what the surface draws into, in character cells, and whether
        * its layout docks a pane; absent where no surface has measured.
        *
@@ -9108,7 +10817,11 @@ declare module 'claude-code' {
       /**
        * The dialog the AskUserQuestion tool opens.
        *
-       * Raised on every surface.
+       * A tree for it holds the engine's node once, nothing below it, in at most
+       * 12 rows on the terminal and 48 on desktop, vscode and mobile, counted at
+       * 40 columns; Markdown on those three alone; no size or place on any.
+       *
+       * Raised on every attached surface.
        */
       AskUserQuestion: {
           /**
@@ -9117,7 +10830,8 @@ declare module 'claude-code' {
           tool: string;
           /**
            * The tool's `questions` input, as the dialog will draw them; a rewrite
-           * must still fit the tool's schema or the original is drawn.
+           * must still fit the tool's schema or the original is drawn. Claude Code's
+           * own confirmations are drawn as asked, whatever a rewrite says.
            */
           questions: unknown[];
           /**
@@ -9134,16 +10848,17 @@ declare module 'claude-code' {
        * of `text` draws in the row alone: the stored message, and the model's
        * framing of another party's words as that party's, stay as they were.
        *
-       * Raised on every surface.
+       * Raised on every attached surface.
        */
       UserMessage: {
           /**
            * What the row shows: the prompt as typed, a notification's summary, or
            * a message's body less the engine's framing (summary line included).
+           * A plugin's prompt is the text it sent; `origin.name` names the plugin.
            *
-           * A rewrite is printable, bounded text and draws where the engine draws
-           * the body; a teammate block of several frames or with a summary line
-           * keeps the engine's drawing, one string not being those parts.
+           * A rewrite is printable text, drawn up to its first 100000 characters
+           * where the engine draws the body; a teammate block of several frames or
+           * with a summary line keeps the engine's drawing: one string is not those.
            */
           text: string;
           /**
@@ -9156,12 +10871,14 @@ declare module 'claude-code' {
           origin: PromptOrigin;
           /**
            * Whether the view draws the row in full: the ctrl+o transcript,
-           * `--verbose`, a surface with no ctrl+o (an export), a row under a
-           * speaker label whose body fits the label view's cap. Read-only.
+           * `--verbose`, a surface with no ctrl+o (an export). Read-only.
            *
-           * False, a message row is one dim line naming its sender (under a
-           * speaker label, the capped head of a long body); a hook that draws a
-           * compact row of its own passes when true, so ctrl+o shows all.
+           * So does a row under a speaker label whose body fits the label view's
+           * cap. False, a message row is one dim line naming its sender (under a
+           * speaker label, the capped head of a long body).
+           *
+           * @remarks A hook that draws a compact row of its own passes when true,
+           *   so ctrl+o shows all.
            */
           isExpanded: boolean;
           /**
@@ -9185,10 +10902,13 @@ declare module 'claude-code' {
           onScreen?: OnScreen | null;
       };
       /**
-       * One text block of an assistant reply in the transcript; a rewrite
-       * changes the drawing and leaves the stored message alone (ctrl+o).
+       * One block of an assistant reply in the transcript: its text, or a summary
+       * of the text the model wrote between two tool calls.
        *
-       * Raised on every surface.
+       * A rewrite changes the drawing and leaves the stored message alone
+       * (ctrl+o). `isSummary` tells the two apart.
+       *
+       * Raised on every attached surface.
        */
       AssistantMessage: {
           /**
@@ -9200,6 +10920,18 @@ declare module 'claude-code' {
            * True on the block that draws the bullet opening a reply.
            */
           isFirstOfReply: boolean;
+          /**
+           * True on a block that holds a summary of the model's text, not the text
+           * itself; absent on any other block, and where the surface does not say.
+           *
+           * Where the terminal marks such a row (a faint ` · summary` after its last
+           * line), it marks a rewritten `text` too; a hook's own tree draws without
+           * the mark. Read-only.
+           *
+           * @remarks A rewrite carries it on as received; one that changes or drops
+           *   it, or adds it, is refused, the hook that passed it failing.
+           */
+          isSummary?: true;
           /**
            * Which of its rows the transcript's viewport shows now: `null` while
            * drawn outside it, absent where the surface does not say. Read-only.
@@ -9214,7 +10946,12 @@ declare module 'claude-code' {
        * A tool call's row in the transcript (`Bash(ls -la)` and its result); the
        * call was decided by `tool.call`, so a rewrite here changes the row alone.
        *
-       * Raised on every surface.
+       * In mobile apps, a `borderStyle` or `backgroundColor` on the Box that holds
+       * the row and something else asks for a card under the row; otherwise a tree
+       * that keeps the row usually draws as one quiet line under it, with the rest
+       * behind a tap, so plain Text suits a small status.
+       *
+       * Raised on every attached surface.
        */
       ToolUse: {
           /**
@@ -9247,6 +10984,15 @@ declare module 'claude-code' {
            */
           isInterrupted: boolean;
           /**
+           * Whether the view draws the row in full: the ctrl+o transcript,
+           * `--verbose`, or a `ToolGroup` that a hook unfolded into rows. Absent
+           * where the surface does not say. Read-only.
+           *
+           * A hook that draws a compact row of its own passes when true, so ctrl+o
+           * shows all.
+           */
+          isExpanded?: boolean;
+          /**
            * The stored result once the call has resolved (`{ stdout, stderr, ... }`
            * for Bash: `BuiltinToolResults[tool]`); undefined while it runs.
            *
@@ -9273,7 +11019,7 @@ declare module 'claude-code' {
        * that does not fit draws nothing; one the renderer cannot read hits the
        * row's error boundary). The stored result is untouched.
        *
-       * Raised on every surface.
+       * Raised on every attached surface.
        */
       ToolResult: {
           /**
@@ -9300,6 +11046,14 @@ declare module 'claude-code' {
            */
           isErrored: boolean;
           /**
+           * Whether the view draws the row in full: the ctrl+o transcript,
+           * `--verbose`. Absent where the surface does not say. Read-only.
+           *
+           * A hook that draws a compact row of its own passes when true, so ctrl+o
+           * shows all.
+           */
+          isExpanded?: boolean;
+          /**
            * Which of its rows the transcript's viewport shows now: `null` while
            * drawn outside it, absent where the surface does not say. Read-only.
            *
@@ -9314,11 +11068,12 @@ declare module 'claude-code' {
        * files, ran 2 shell commands`): reads, searches, listings.
        *
        * A hook that sets `isExpanded` unfolds the group where it is, and each row
-       * it unfolds into is a `ToolUse` drawing a `ToolUse` hook then sees. In
-       * fullscreen mode the ctrl+o transcript does not fold runs: each call
-       * there is a `ToolUse` row and no `ToolGroup` is drawn.
+       * it unfolds into is a `ToolUse` drawing a `ToolUse` hook then sees.
        *
-       * Raised on every surface.
+       * @remarks In fullscreen mode the ctrl+o transcript does not fold runs: each
+       *   call there is a `ToolUse` row and no `ToolGroup` is drawn.
+       *
+       * Raised on every attached surface.
        */
       ToolGroup: {
           /**
@@ -9331,13 +11086,25 @@ declare module 'claude-code' {
            */
           isActive: boolean;
           /**
-           * Whether each call draws as its own `ToolUse` row (true under
-           * `--verbose` and in the non-fullscreen ctrl+o transcript) or the group
-           * draws one line.
+           * Whether each call draws as its own `ToolUse` row, or the group draws
+           * one line.
            *
-           * The one prop of the three a rewrite changes on the screen.
+           * True under `--verbose` and in the non-fullscreen ctrl+o transcript. The
+           * only prop a rewrite changes on the screen.
            */
           isExpanded: boolean;
+          /**
+           * True when the group holds nothing but `calls` and the model's thinking
+           * between them, and no call errored or was interrupted: no recalled
+           * memory, hook timing or other row. What the line shows from the calls'
+           * own input and output (paths, patterns, git results) counts as calls.
+           * Absent where the surface does not say. Read-only.
+           *
+           * A hook that draws a group of its own calls in its own way checks it is
+           * true. Such a hook still replaces the summary of the current task that
+           * the live group's line can show in place of its counts.
+           */
+          isCallsOnly?: boolean;
           /**
            * Which of its rows the transcript's viewport shows now: `null` while
            * drawn outside it, absent where the surface does not say. Read-only.
@@ -9356,7 +11123,7 @@ declare module 'claude-code' {
        * rewrite of `text` draws there and the stored row keeps what the model
        * reads; a hook's own tree draws in the row's place, the transcript's width.
        *
-       * Raised on every surface.
+       * Raised on every attached surface.
        */
       CommandOutput: {
           /**
@@ -9431,7 +11198,7 @@ declare module 'claude-code' {
        * the surface keeps and no prop carries: elapsed time, tokens, effort. A
        * hook rewrites the first three, or draws a tree in place of all of it.
        *
-       * Raised on the terminal and desktop surfaces only.
+       * Raised on the terminal, desktop and vscode surfaces only.
        */
       Spinner: {
           /**
@@ -9476,6 +11243,28 @@ declare module 'claude-code' {
            * `1m 4s`).
            */
           durationMs: number;
+          /**
+           * Whether the view is the ctrl+o transcript or `--verbose`. Absent where
+           * the surface does not say. Read-only.
+           *
+           * A hook that draws a compact row of its own passes when true, so ctrl+o
+           * shows all.
+           */
+          isExpanded?: boolean;
+          /**
+           * What the line waits on while it draws only its waiting text
+           * (`Waiting for 2 background agents to finish`: no budget, no
+           * hidden-messages count), read when the row mounts: the pending agents
+           * that started at or before the line's time. That can include an agent
+           * the line did not count, such as one resumed since the line, or, in a
+           * subagent's transcript, one that is not that subagent's child. Absent
+           * while it draws anything else, or when their count differs from the
+           * count it draws. Read-only.
+           *
+           * A hook that redraws the line for its own agents checks that each agent
+           * is its own and that `workflows` is 0.
+           */
+          waitingFor?: WaitingFor;
           /**
            * Which of its rows the transcript's viewport shows now: `null` while
            * drawn outside it, absent where the surface does not say. Read-only.
@@ -9533,10 +11322,12 @@ declare module 'claude-code' {
        *
        * A hook rewrites `hint`, drawn in the line's place, sets `tail` to add to
        * the line as the engine draws it, or draws its own tree; `isDraft` and
-       * `isWorking` say what the line is for. On the terminal, until a new answer
-       * lands the last keeps its row (the engine's line before any).
+       * `isWorking` say what the line is for.
        *
-       * Raised on the terminal and desktop surfaces only.
+       * @remarks On the terminal, until a new answer lands the last keeps its row
+       *   (the engine's line before any).
+       *
+       * Raised on the terminal, desktop and mobile surfaces only.
        */
       PromptHint: {
           /**
@@ -9560,26 +11351,46 @@ declare module 'claude-code' {
            *
            * The terminal keeps the engine's line (its pills stay live) and draws
            * `tail` dim at its end, cut where the row ends and left out where under
-           * four columns of it would show; no other surface draws it yet. A
-           * rewritten `hint` replaces the line, `tail` with it.
+           * four columns of it would show; no other surface draws it yet.
+           *
+           * @remarks A rewritten `hint` replaces the line, `tail` with it.
            */
           tail?: string;
       };
       /**
-       * The band directly above the prompt input, where the surveys draw; the
-       * engine draws nothing of its own here.
+       * The band directly above the prompt input, where the surveys draw; of its
+       * own the engine draws a `[-]` beside the tree, an `n more` row under it.
        *
-       * A hook draws a tree, or passes; one instance. The person collapses it
-       * (ctrl+x ctrl+a, `[-]`) or focuses it (a click, ctrl+x tab): an Input
-       * types, a Button arms the hotkeys, a tree taller than it scrolls.
+       * Asked once for each plugin that hooks it, `e.plugin` naming the plugin:
+       * a hook draws that plugin's row, or passes. `AbovePromptList` stacks them.
        *
-       * Raised on the terminal and desktop surfaces only.
+       * A row costs only itself: one that does not validate draws nothing, and so
+       * does one past a tree's limits: they count across the rows, kept from the
+       * top, and stacking adds a level of depth. While the session hot-reloads a
+       * plugin folder that is told as
+       * `ui.render (AbovePrompt) refused: a row past the limits of the band`, whose
+       * `nothing was drawn` means that row. Another plugin takes a row away by a
+       * hook above naming its plugin or `"*"` that answers over it, or an
+       * `AbovePromptList` hook leaving it out. On the terminal, a tree that throws
+       * while drawn empties the band.
+       *
+       * The person collapses the band (ctrl+x ctrl+a, `[-]`) or focuses it (a
+       * click, ctrl+x tab): an Input types, a Button arms the hotkeys, a tree
+       * taller than it scrolls.
+       *
+       * Raised on the terminal, desktop and mobile surfaces only.
        */
       AbovePrompt: {
           /**
            * True while a survey holds the band; a hook yields to it. Read-only.
            */
           hasSurvey: boolean;
+          /**
+           * True while the person has collapsed the band: a tree still returns, and
+           * nothing of it is on screen. False where the band cannot collapse.
+           * Read-only.
+           */
+          isCollapsed: boolean;
           /**
            * True while a model turn is running. Read-only.
            */
@@ -9590,16 +11401,19 @@ declare module 'claude-code' {
            *
            * That slot is capped at half the terminal's rows, the prompt's included.
            * A tree of at most `maxRows` rows shows whole; a taller one scrolls in a
-           * window of `scroll.bodyRows`, and a bare digit arms only the hotkeys of
-           * the Buttons wholly inside that window, never one scrolled out of view.
+           * window of `scroll.bodyRows`.
+           *
+           * @remarks A bare digit arms only the hotkeys of the Buttons wholly inside
+           *   that window, never one scrolled out of view.
            */
           maxRows: number;
           /**
-           * Cells across the band: the terminal's width, or the transcript
-           * column's while a `Pane` is docked beside it. Read-only.
+           * Cells the band's tree is laid out in, none under a mark of the engine's:
+           * its column's width less the engine's five at the right end. Read-only.
            *
-           * A tree wider than this wraps or truncates as its Text props say; size
-           * a table or a rule to it rather than to `viewport.columns`.
+           * The column is the terminal, or the transcript's beside a docked `Pane`;
+           * the five hold the `[-]`. A wider tree wraps or truncates as its Text
+           * props say; size a table to it rather than to `viewport.columns`.
            */
           bodyColumns: number;
           /**
@@ -9620,6 +11434,63 @@ declare module 'claude-code' {
           view: SiteView;
       };
       /**
+       * The band's arrangement once its rows settled, heard by a hook naming it or
+       * a bare `on("*")`; what settles is the whole band.
+       *
+       * Core stacks `rows`. A hook hides or reorders them in what `next(e)` gets,
+       * and wraps them by answering around it, never with rows copied by value; an
+       * organization's mod wins by the chain's order. A bad answer is passed over:
+       * to fail closed, answer no rows in its `.catch`.
+       *
+       * A wrapper counts toward a tree's limits with the rows. Past one, the rows
+       * that no longer fit are left out; where several hooks' wrappers together
+       * pass it, the band is blank. While the session hot-reloads a plugin folder
+       * either is told as `ui.render (AbovePromptList) refused:`, whatever that
+       * line's ending says.
+       *
+       * Raised on the terminal, desktop and mobile surfaces only.
+       */
+      AbovePromptList: {
+          /**
+           * The settled rows that fit, in chain order, one for each plugin that drew
+           * one.
+           *
+           * A rewrite holds rows it was handed, in any order and no more often than
+           * they came, compared by value: an unchanged copy passes, one changed or
+           * repeated fails the hook. What it leaves is what core stacks.
+           */
+          rows: readonly AbovePromptRow[];
+          /**
+           * As `AbovePrompt`'s. Read-only.
+           */
+          hasSurvey: boolean;
+          /**
+           * As `AbovePrompt`'s. Read-only.
+           */
+          isCollapsed: boolean;
+          /**
+           * As `AbovePrompt`'s. Read-only.
+           */
+          isWorking: boolean;
+          /**
+           * As `AbovePrompt`'s: the rows the band may take, all its rows together.
+           * Read-only.
+           */
+          maxRows: number;
+          /**
+           * As `AbovePrompt`'s. Read-only.
+           */
+          bodyColumns: number;
+          /**
+           * As `AbovePrompt`'s: the window over the whole stacked tree. Read-only.
+           */
+          scroll: SiteScroll;
+          /**
+           * As `AbovePrompt`'s. Read-only: a rewrite carries it on as received.
+           */
+          view: SiteView;
+      };
+      /**
        * The framed region a plugin opened with `$.ui.open({ id })`: one instance
        * per id (`requestId`), its body the hook's tree, one shown, the rest tabs.
        *
@@ -9627,7 +11498,7 @@ declare module 'claude-code' {
        * keyed by the person (ctrl+x tab, Esc), who closes it from the engine's mark
        * or ctrl+x x: `ui.close` with origin `person`, which a hook may refuse.
        *
-       * Raised on every surface.
+       * Raised on every attached surface.
        */
       Pane: {
           /**
@@ -9644,20 +11515,51 @@ declare module 'claude-code' {
            */
           isFocused: boolean;
           /**
-           * Cells across the body, inside the frame. Read-only.
+           * Present, and true, while keys typed in the terminal may go to something
+           * other than the prompt or this pane: a dialog (a permission prompt,
+           * `/model`), a search, a field in the band. Read-only.
+           */
+          isPromptCovered?: true;
+          /**
+           * Cells across the body, inside the frame, none under a mark of the
+           * engine's: the close mark sits on a row of the frame's own. Read-only.
            */
           bodyColumns: number;
           /**
            * Where the surface seated the pane: `dock` beside the transcript (the
            * terminal in fullscreen from 110 columns), or `inline` above the prompt.
            *
+           * On the desktop app also `widget`, the small form of a minimized pane.
+           * Draw what reads at a glance there: clicks may not reach it. The hook runs
+           * again when the seat changes. Treat any other value as `dock`.
+           *
            * Read-only: a rewrite carries it on as received; one that changes or
            * drops it is refused, the hook that passed it failing.
+           *
+           * @example
+           * return e.props.placement === "widget" ? glance(e) : fullApp(e)
            */
-          placement: 'dock' | 'inline';
+          placement: 'dock' | 'inline' | 'widget';
+          /**
+           * The edges of the chat area that a `widget` is anchored on, to align the
+           * drawing by: `["bottom", "right"]` in that corner, `["right"]` stacked on
+           * another widget there, `[]` in the session rail (the column beside the
+           * chat).
+           *
+           * Absent in every other seat. The hook runs again when they change. Ignore
+           * a value outside these four. No call moves a widget.
+           *
+           * @example
+           * const isOnBottom = e.props.anchoredEdges?.includes("bottom") ?? false
+           */
+          anchoredEdges?: readonly ('top' | 'right' | 'bottom' | 'left')[];
           /**
            * The body's window over the tree: engine-owned, moved by the person's
            * keys while the pane is focused. Read-only.
+           *
+           * `bodyRows` is the room's rows, never the rows showing: the most the frame
+           * may take less the engine's (an inline border's two, the tab row while one
+           * shows, a dock's row for the close mark). Inline the frame fits the tree.
            */
           scroll: SiteScroll;
           /**
@@ -9670,6 +11572,69 @@ declare module 'claude-code' {
            */
           view: SiteView;
       };
+      /**
+       * A row a plugin placed in the transcript (`$.ui.place`): empty until a hook
+       * draws it, in the row's place in the conversation.
+       *
+       * Every plugin's hook hears every row, so read `plugin` beside `id`. Outside
+       * fullscreen a compaction ends the row, and the same id then places a new one.
+       *
+       * Raised on every attached surface.
+       */
+      Placed: {
+          /**
+           * What `$.ui.place` was given, unique among that plugin's rows. Read-only.
+           */
+          id: string;
+          /**
+           * Who placed the row, so a hook can leave another's alone. Read-only.
+           */
+          plugin: string;
+          /**
+           * Which of its rows the transcript's viewport shows now: `null` while
+           * drawn outside it, absent where the surface does not say. Read-only.
+           *
+           * Reported once drawn and again when it changes: on a scroll, for the
+           * messages at the viewport's edges only. A rewrite carries it on as
+           * received; one that changes or drops it is refused.
+           */
+          onScreen?: OnScreen | null;
+      };
+      /**
+       * The session's backdrop (`$.theme.set`), drawn behind the conversation by
+       * the desktop and mobile apps alone: empty until a hook draws it.
+       *
+       * Every plugin's hook hears it, so read `plugin` beside `scene`. The surface
+       * sizes the drawing to its window or screen and lets presses through to what
+       * is over it. Each surface asks separately, so a hook can read `e.surface` to
+       * draw a different scene on each; a `Client` draws nothing on mobile.
+       *
+       * Raised on the desktop and mobile surfaces only.
+       */
+      Backdrop: {
+          /**
+           * The `scene` `$.theme.set` was given in `backdrop`. Read-only.
+           */
+          scene: string;
+          /**
+           * Who set the backdrop, so a hook can leave another's alone. Read-only.
+           */
+          plugin: string;
+          /**
+           * How the surface frosts its panels over the drawing, defaults filled in;
+           * `false` where they stay as they are. Read-only.
+           */
+          glass: {
+              blur: number;
+              tint?: string;
+              opacity: number;
+          } | false;
+          /**
+           * The `overrideColorScheme` of `$.theme.set`; absent where the plugin named
+           * none. Read-only.
+           */
+          overrideColorScheme?: 'light' | 'dark';
+      };
   };
 
   /**
@@ -9681,18 +11646,21 @@ declare module 'claude-code' {
   };
 
   /**
-   * Where a render event's component is drawn: `terminal` is Ink, which draws
-   * the hook's whole tree; the rest are remote surfaces drawing it themselves.
+   * The surface a render event's component is drawn on, by name. Plugins draw
+   * into surfaces; they do not provide them.
    *
-   * `desktop` is Claude Code Desktop, `mobile` the Claude mobile app, `vscode`
-   * Claude Code for VS Code. A remote surface asks over the wire (ui_render),
-   * draws with the props the hook handed core, and draws the tree where it has
-   * a slot for it.
+   * The surfaces the plugin was compiled against (the keys of Elements):
+   * `terminal` is Ink, drawing the hook's whole tree; `desktop`, `mobile` and
+   * `vscode` (Claude Code Desktop, the mobile app, VS Code) ask over the wire.
    *
-   * Each surface's ask is its own evaluation, since a tree may hold an element
-   * only some surfaces draw (Svg, Client).
+   * A name here is no promise that its host draws. Under a host that attaches
+   * no surface, hooks, tools and commands run and nothing drawn shows:
+   * `$.session.surfaces()` is empty there.
+   *
+   * @remarks A surface unknown at compile time may ask at run time under a
+   *   name of its own; `e.surface` then holds a name outside this type.
    */
-  export type RenderSurface = 'terminal' | 'desktop' | 'mobile' | 'vscode';
+  export type RenderSurface = keyof Elements & string;
 
   /**
    * The size of what a surface draws into, in character cells of the
@@ -9867,8 +11835,13 @@ declare module 'claude-code' {
   /**
    * Which door a row came in by, decided from the row alone; a closed set,
    * pinned on the event and the key a matcher narrows on.
+   *
+   * `queue` is no row of the conversation: it is the text of a message
+   * queue record (the transcript file's `queue-operation` entries), a
+   * prompt's or a machine-made one's alike, raised as a user row the
+   * conversation never keeps, a prompt's as `prompt.submit` left it.
    */
-  type SessionAppendDoor = 'prompt' | 'command' | 'response' | 'tool-result' | 'tool-message' | 'delivery' | 'attachment' | 'hook-context' | 'note' | 'compaction' | 'notice';
+  type SessionAppendDoor = 'prompt' | 'command' | 'response' | 'tool-result' | 'tool-message' | 'delivery' | 'attachment' | 'hook-context' | 'note' | 'compaction' | 'notice' | 'queue';
 
   /**
    * The input of `session.append`: one row being appended to a conversation of
@@ -10294,7 +12267,8 @@ declare module 'claude-code' {
    */
   export type SessionCost = {
       /**
-       * US dollars, summed over every priced API response this session.
+       * US dollars, summed over every priced API response this session, a mod's
+       * `$.model` calls among them; the engine's own side queries stay out.
        */
       usd: number;
   };
@@ -10397,6 +12371,66 @@ declare module 'claude-code' {
    */
   export type SessionEndResult = {
       sessionId: string;
+  };
+
+  /**
+   * What `$.session.identity()` answers: how the session is signed in and,
+   * under a managed pin of its organization, the account the session holds.
+   *
+   * Answered only to a mod the organization's managed settings install. That
+   * is a contract, not a wall: any mod can read the person's own config file,
+   * where a login keeps the same facts.
+   */
+  export type SessionIdentity = {
+      /**
+       * How the session is authenticated: `claude.ai`, `console`, `api-key`,
+       * `oauth-token` (a token its host handed it), `none`, or a cloud
+       * provider's name (`bedrock`, `vertex`, ...).
+       *
+       * Builds add kinds: read an unknown one as a session with no identity.
+       */
+      kind: string;
+      /**
+       * The organization the account belongs to, by its id, only where
+       * managed `forceLoginOrgUUID` lists that organization.
+       *
+       * Absent everywhere else, as are the two fields below: with no pin, a
+       * pin on another organization, an API key or a cloud provider. So an
+       * organization's mod never learns of another organization's account.
+       */
+      organizationId?: string;
+      /**
+       * The organization's plan as the server names it (`claude_team`,
+       * `claude_enterprise`, ...), when the login recorded one.
+       *
+       * Always read from the login record on disk, which the person can
+       * edit, whatever `isVerified` says.
+       */
+      organizationType?: string;
+      /**
+       * The account's email address, where the session holds one.
+       */
+      email?: string;
+      /**
+       * Whether `organizationId` and `email` are the account the server told
+       * this process its credential signed in as, not the login record on disk.
+       *
+       * The person can edit that record. False until the server has answered
+       * this process, as with nonessential traffic off, and with no account.
+       */
+      isVerified: boolean;
+      deny?: undefined;
+  } | {
+      /**
+       * Why nothing is answered: the calling mod is not one managed settings
+       * enable and load in place from a source they name.
+       */
+      deny: string;
+      kind?: undefined;
+      organizationId?: undefined;
+      organizationType?: undefined;
+      email?: undefined;
+      isVerified?: undefined;
   };
 
   /**
@@ -10617,7 +12651,7 @@ declare module 'claude-code' {
    */
   export type SessionReceiveEvent = {
       /**
-       * The producing service (`github`).
+       * The producing service (`github`; `artifact-room` for a page's events).
        */
       source: string;
       /**
@@ -10632,6 +12666,10 @@ declare module 'claude-code' {
       from?: string;
       /**
        * The envelope's JSON body (`{ pr: "acme/app#12", outcome: "merged" }`).
+       *
+       * For `artifact-room`, kind `events`: `{ artifact, events, overflow }`, one
+       * burst under origin `task-notification`, each event `{ topic, from,
+       * isOwnViewer, data, isTruncated }` as the page's viewers wrote it.
        */
       data: Record<string, unknown>;
       /**
@@ -10727,12 +12765,15 @@ declare module 'claude-code' {
        */
       teammate: string;
       /**
-       * Whether this process's harness wrote the mailbox entry itself (an
-       * in-process teammate's or the lead's own send).
+       * Whether this process can vouch for the mailbox entry: it wrote it (the
+       * lead's process, for its own and in-process teammates' sends), or it is
+       * a teammate in its own pane that accepted the lead's signature on it.
        *
-       * `false`: read from the team's inbox file with nothing to check it
-       * against (a teammate in its own pane, the person editing the file, any
-       * same-user process); in an all-in-process team, one no member sent.
+       * `false`: this process could not check it, or it failed the check. The
+       * lead's process cannot check a pane teammate's send, and a pane teammate
+       * can check only what its lead sends, with a key from that lead. A failed
+       * check is no proof of forgery: such a teammate fails every entry its
+       * lead writes after restarting.
        *
        * @example
        * on("session.receive", { origin: { isVerified: false } }, hook)
@@ -10819,7 +12860,7 @@ declare module 'claude-code' {
    *
    * The engine spells the two id forms the tool's way before the send, and a
    * `session.send` hook reads that spelling on `e.to`: `{ agentId }` as the
-   * id, `{ sessionId }` as the live local session's or remote one's address.
+   * id (a live teammate's as its name), `{ sessionId }` as its address.
    */
   export type SessionSendAddress = string | {
       /**
@@ -10836,7 +12877,7 @@ declare module 'claude-code' {
        * lists and `agent.spawn` answered.
        *
        * A finished subagent is resumed from its transcript with the message,
-       * as the tool does.
+       * as the tool does. A live teammate's `teammateId` reaches it too.
        */
       agentId: string;
   };
@@ -11035,8 +13076,9 @@ declare module 'claude-code' {
        */
       rateLimits: SessionRateLimit[];
       /**
-       * What the session has cost so far, as /cost totals it; absent only where
-       * the host keeps no cost ledger (the CLI always has one).
+       * What the session has cost so far, as /cost totals it, every mod's answered
+       * `$.model` calls included; absent only where the host keeps no cost ledger
+       * (the CLI always has one).
        */
       cost?: SessionCost;
   };
@@ -11105,7 +13147,49 @@ declare module 'claude-code' {
   export type Settings = Readonly<Record<string, unknown>>;
 
   /**
-   * What `$.settings.read(args)` takes.
+   * A read of one key: the key, and optionally the one source asked. It is
+   * the read of the object, projected: no event of its own.
+   */
+  type SettingsKeyRead = {
+      key: string;
+      source?: SettingsSource;
+  };
+
+  /**
+   * One layer a settings read is made of: what one source holds, as that
+   * source loads. The engine's merge is a fold over the layers.
+   */
+  type SettingsLayer = {
+      /**
+       * Pinned: whose settings these are. `policy` is the managed settings,
+       * every managed tier merged; a matcher cannot narrow on it.
+       */
+      source: SettingsLayerSource;
+      /**
+       * As a person or an administrator wrote them, so a value may be of any
+       * type.
+       */
+      settings: Settings;
+  };
+
+  /**
+   * Whose settings one layer of a read holds: a settings source, or `plugin`,
+   * the base the enabled plugins' own settings make, beneath `user`.
+   */
+  type SettingsLayerSource = 'plugin' | SettingsSource;
+
+  /**
+   * A read of a settings object: the settings merged over every source, or
+   * the one source asked. It names no key.
+   */
+  type SettingsObjectRead = {
+      source?: SettingsSource;
+      key?: undefined;
+  };
+
+  /**
+   * What a `settings.read` call carries to the host: the one source asked,
+   * or none for the settings merged over every source.
    */
   export type SettingsReadArgs = {
       /**
@@ -11113,6 +13197,45 @@ declare module 'claude-code' {
        * source, as the engine runs under them.
        */
       source?: SettingsSource;
+      /**
+       * The engine's to fill, for the event (SettingsReadInput): what a call
+       * passes here is replaced.
+       */
+      layers?: readonly SettingsLayer[];
+  };
+
+  /**
+   * The event `settings.read` as a hook receives it: what was asked, and the
+   * layers the answer is made of. One event, one granularity: the whole read.
+   *
+   * A hook awaits `next(e)` and answers the settings object rewritten; the
+   * law it keeps is that its answer is a function of `layers` and of what
+   * `next` gave, so the same read gives the same answer.
+   */
+  type SettingsReadInput = {
+      /**
+       * Present for a read of one source, as loaded: its one layer.
+       *
+       * Pinned: changed, the hook fails and is skipped; left out, kept.
+       */
+      source?: SettingsSource;
+      /**
+       * What each source holds, lowest precedence first; a source with no
+       * settings, or that the engine bars from the read, is left out.
+       *
+       * The engine's: whatever is passed down in their place, the same ones
+       * reach the hooks beneath.
+       */
+      layers: readonly SettingsLayer[];
+  };
+
+  /**
+   * `$.settings.read` by what it is asked: a key resolves to that key's
+   * value, anything else to a settings object.
+   */
+  type SettingsReadOverloads = {
+      (args: SettingsKeyRead): Promise<unknown>;
+      (args?: SettingsObjectRead): Promise<Settings>;
   };
 
   /**
@@ -11158,12 +13281,17 @@ declare module 'claude-code' {
    */
   export type SiteScroll = {
       /**
-       * The first row of the tree the window shows; 0 at the top. Read-only.
+       * The first row of the tree the window showed when the hook was asked; 0
+       * at the top. Read-only.
+       *
+       * A move through `ui.scroll` (the person's, `$.ui.scroll`) asks again. On
+       * the terminal the engine's own does not (an end followed, a clamp, a held
+       * element kept in view): the next ask reads where the window stands then.
        */
       offset: number;
       /**
-       * How many rows of the tree the window shows at once: the rows the
-       * surface gave the body. Read-only.
+       * How many rows of the tree the window may show at once: the rows the
+       * surface gave the body, whatever the tree's own height. Read-only.
        */
       bodyRows: number;
   };
@@ -11172,25 +13300,63 @@ declare module 'claude-code' {
    * Which transcript the person has on screen where a site draws: the main
    * conversation's, or one agent's, opened from the tasks list.
    *
-   * The person's to switch, the plugin's to read: a switch re-runs the site's
-   * hooks with the new view, the site itself staying where it is.
+   * A site reads it: a switch re-runs the site's hooks with the new view, the
+   * site itself staying where it is. `$.ui.view` takes the same shape to ask
+   * for a switch, which only the person's own input brings about.
    */
   export type SiteView = {
       /**
        * The agent whose transcript is in view: the `id` `$.agent.list()` gives
        * it, the `agentId` its `turn.step` and `tool.call` events carry.
        *
-       * Absent while the main conversation is in view. Read-only.
+       * Absent while the main conversation is in view. Read-only on a site.
        */
       agentId?: string;
   };
 
   /**
+   * What a skill's file declares above its text, parsed and JSON-safe: each
+   * key as YAML reads it, none respelled, each value whatever JSON holds.
+   *
+   * Plain data within its bounds (32 levels, 20,000 values, 100,000
+   * characters): a block past them is handed as `{}`. An interface, since a
+   * JSON type that is one recursive alias fails where `e` is passed to `next`.
+   */
+  export interface SkillFrontmatter {
+      readonly [key: string]: SkillFrontmatterValue;
+  }
+
+  /**
+   * A YAML sequence in a skill's frontmatter, as JSON holds it.
+   */
+  export interface SkillFrontmatterList extends ReadonlyArray<SkillFrontmatterValue> {
+  }
+
+  /**
+   * One value in a skill's frontmatter: what JSON holds, and assignable to
+   * and from `JsonValue`.
+   *
+   * A date is the text its author wrote. What JSON cannot hold (NaN, an
+   * infinity) is null.
+   */
+  export type SkillFrontmatterValue = null | boolean | number | string | SkillFrontmatterList | SkillFrontmatter;
+
+  /**
+   * `skill.prompt`'s input as a call takes it: `frontmatter` and `source` may
+   * be left out, as a caller written before the event carried them does.
+   *
+   * Left out, they read `{}` and `built-in`: a skill with no file. What a
+   * call states is the caller's word, which the hooks it reaches are handed.
+   */
+  export type SkillPromptArgs = Omit<SkillPromptInput, 'frontmatter' | 'source'> & Partial<Pick<SkillPromptInput, 'frontmatter' | 'source'>>;
+
+  /**
    * The input of `skill.prompt`: one skill's prompt, at the moment the engine
    * expanded it for the model.
    *
-   * Typed as `/name`, called through the Skill tool, or preloaded into a
-   * subagent: the same event at each.
+   * Typed as `/name`, run by the Skill tool, or preloaded into a subagent
+   * (named there as its agent wrote it). `text` and `frontmatter` are a hook's
+   * to rewrite for the hooks beneath it; the rest is pinned.
    */
   export type SkillPromptInput = {
       /**
@@ -11201,6 +13367,44 @@ declare module 'claude-code' {
        * The prompt's text as the skill computed it (its text blocks, joined).
        */
       text: string;
+      /**
+       * What the skill's file declares above its text, as its author wrote it: keys
+       * as YAML reads them, a remote author's strings scrubbed.
+       *
+       * No key `__proto__`, `constructor` or `prototype` (left out of a file, the
+       * last two named in `frontmatterProblem`). Not the effective grants: a plugin
+       * manifest or managed setting may differ; a call's are read at `tool.check`.
+       */
+      frontmatter: SkillFrontmatter;
+      /**
+       * Why the file's frontmatter was left out (`{}`), or a key of it: prose for
+       * a person, not to match on; absent if handed whole or none exists.
+       *
+       * The engine refuses nothing for it: a hook that decides on frontmatter
+       * is the one to refuse a skill whose problem is set.
+       */
+      frontmatterProblem?: string;
+      /**
+       * Whose words these are, in `SkillSource`'s words.
+       *
+       * A `projectSettings` skill's words are its repository's, wherever its
+       * checkout is read (another machine's too), an `mcp` skill's its server's:
+       * as loaded, vouched for by none. A call's is the caller's word.
+       */
+      source: SkillSource;
+      /**
+       * An installed plugin's name, when the skill comes from one.
+       */
+      pluginName?: string;
+      /**
+       * Where the file it was loaded from is, as an absolute path: a skill's
+       * SKILL.md, or a command's own `.md` file.
+       *
+       * As the loader joined it, no link resolved; on a call, the caller's word.
+       * Absent with no file on this machine: a built-in, an MCP server's, a
+       * plugin command written inline in its manifest.
+       */
+      path?: string;
   };
 
   /**
@@ -11210,6 +13414,16 @@ declare module 'claude-code' {
   export type SkillPromptResult = {
       text: string;
   };
+
+  /**
+   * Whose words a skill is, in the engine's own words: the settings tier whose
+   * skills folder holds it, or what else provides it.
+   *
+   * `built-in` ships in the build, which holds no file: its frontmatter is
+   * `{}`. `plugin` comes with a plugin, `mcp` from a server, `syncedSkills`
+   * from the account. The list is open: a newer source is a word of its own.
+   */
+  export type SkillSource = 'userSettings' | 'projectSettings' | 'policySettings' | 'plugin' | 'built-in' | 'mcp' | 'syncedSkills' | (string & {});
 
   /**
    * Options of `$.clock.sleep`.
@@ -11230,6 +13444,16 @@ declare module 'claude-code' {
   };
 
   /**
+   * A Box's spacing: a number of character cells, the same on every surface,
+   * or a step name that each surface sizes its own way. The terminal and VS
+   * Code draw a step as cells: across, `xs` and `sm` 1, `md` 2, `lg` 3, `xl` 4;
+   * down, `xs` and `sm` 0, `md` and `lg` 1, `xl` 2. Desktop and the phones each
+   * use their own spacing scale, so there a step can be larger or smaller than
+   * those cells.
+   */
+  export type Space = number | 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+
+  /**
    * Options of `$.audio.speak`.
    */
   export type SpeakOptions = {
@@ -11245,7 +13469,7 @@ declare module 'claude-code' {
    */
   type SpeakRequest = SpeakOptions & {
       /**
-       * What to say, as plain text, of at most 4096 characters.
+       * What to say, as plain text: its first 4096 characters are spoken.
        */
       text: string;
   };
@@ -11508,7 +13732,8 @@ declare module 'claude-code' {
 
   /**
    * The shape a `Box` and a `Text` share in a render tree: allowlisted props,
-   * an optional `hover`, the group stamp a `hover.scope` earns, and children.
+   * an optional `hover`, the group stamp a `hover.scope` earns, the mark of
+   * the plugin whose drawing starts there, and children.
    *
    * `Tag` is which of the two; `Hover` is that element's hover props. Every
    * surface draws both: Ink's Box and Text on the terminal, a flex div and a
@@ -11534,6 +13759,12 @@ declare module 'claude-code' {
        * Whose group `hover.scope` names; absent without a `scope`.
        */
       group?: PluginStamp;
+      /**
+       * Whose part of the drawing starts here, set by the engine on each hook's
+       * returned root. A hook's own mark is kept; another plugin's at most as
+       * often as `next(e)` handed it, and it may move. It proves no author.
+       */
+      part?: PluginStamp;
       /**
        * In order: a Box holds elements and strings (core wraps each string in
        * a Text); a Text holds strings and inline elements, never an engine node.
@@ -11572,8 +13803,9 @@ declare module 'claude-code' {
    * element's data, as a string is a Text's, drawn isolated.
    *
    * A leaf: no children. The surface never lets the markup reach the page
-   * (the engine bounds it; the desktop and the editor draw it as an image, or
-   * in a sandboxed frame when `isInteractive`; the mobile app in a web view).
+   * (the engine bounds it; the desktop draws it as an image, or in a sandboxed
+   * frame when `isInteractive`; the editor as an image; the mobile app in a
+   * web view).
    */
   export type SvgProps = {
       /**
@@ -11596,6 +13828,9 @@ declare module 'claude-code' {
       /**
        * `true` draws the SVG in a script-less sandboxed frame so hover, CSS
        * `:hover`, SMIL animation and `<title>` tooltips work; absent, an image.
+       * The editor ignores it and always draws an image, where SMIL and CSS
+       * animation can run but hover, CSS `:hover` and `<title>` tooltips never
+       * work.
        *
        * It never enables script or event-handler attributes (the frame has no
        * allow-scripts and the scrub strips them); presses that other plugins
@@ -11614,10 +13849,11 @@ declare module 'claude-code' {
   type TagKeys<I, Among> = Among extends MatcherKeys<I> ? IsLiteralValued<MatcherValueOf<I, Among>> extends true ? IsDiscriminant<I, Among> extends true ? Among : never : never : never;
 
   /**
-   * A tier `next.to(e, tier)` may name: one a floor can reach past a tier of
-   * less authority to, so never `prepend` or `user`, which nothing skips to.
+   * A tier `next.to(e, tier)` may name: one a floor can reach past links of
+   * less authority to, so never `prepend`, which nothing skips to; `user` is
+   * for a prepend hook alone, and skips the peers below it.
    */
-  export type TargetTier = Exclude<Tier, 'prepend' | 'user'>;
+  export type TargetTier = Exclude<Tier, 'prepend'>;
 
   type TaskCompletedHookInput = BaseHookInput & {
       hook_event_name: 'TaskCompleted';
@@ -11852,8 +14088,8 @@ declare module 'claude-code' {
        * terminal a Text nested in a Text follows its group but cannot heat it.
        */
       scope?: string;
-      color?: string;
-      backgroundColor?: string;
+      color?: Color;
+      backgroundColor?: Color;
       dimColor?: boolean;
       bold?: boolean;
       italic?: boolean;
@@ -11863,8 +14099,8 @@ declare module 'claude-code' {
   };
 
   /**
-   * The props of `Text`: the color and style props of Ink's Text a tree may
-   * set. Colors are a theme key or a raw color.
+   * The props of `Text`: colors, styles, and the size, weight, face and digits
+   * each surface draws its own way. Colors are a theme key or a raw color.
    */
   export type TextProps = {
       /**
@@ -11875,24 +14111,464 @@ declare module 'claude-code' {
        * Box unless it names a `scope`.
        */
       hover?: TextHoverProps;
-      color?: string;
-      backgroundColor?: string;
+      color?: Color;
+      backgroundColor?: Color;
+      /**
+       * The run dimmed: on the terminal, drawn in the theme's dim color.
+       *
+       * Faint too where that color is the palette's own white or black, as
+       * plain text is, unless the run is bold, inverse or on a background of
+       * any other color.
+       */
       dimColor?: boolean;
+      /**
+       * The text size, a step on a scale each surface maps to its own type sizes.
+       *
+       * Absent, the enclosing Text's, or `body`. The terminal has one size and
+       * ignores it.
+       */
+      size?: 'caption' | 'footnote' | 'body' | 'heading' | 'title';
+      /**
+       * How heavy the text is, drawn at the nearest weight the surface has.
+       *
+       * Absent, the enclosing Text's. The terminal draws `semibold` and `bold`
+       * as bold and cannot draw a lighter weight inside a bold Text.
+       */
+      weight?: 'regular' | 'medium' | 'semibold' | 'bold';
+      /**
+       * The surface's monospaced face at the same size. The terminal is always
+       * monospaced and ignores it.
+       */
+      mono?: boolean;
+      /**
+       * Digits of one width, for a number that changes by itself on screen (a
+       * timer, a percentage) or numbers stacked in a column to line up.
+       *
+       * The terminal's digits are already one cell each.
+       */
+      tabular?: boolean;
+      /**
+       * The older spelling of a semibold weight.
+       *
+       * @deprecated Use `weight`. `bold: true` is read as `weight: 'semibold'`,
+       * and an explicit `weight` outranks it; a `hover`'s `bold` still applies.
+       */
       bold?: boolean;
       italic?: boolean;
       underline?: boolean;
       strikethrough?: boolean;
       inverse?: boolean;
+      /**
+       * The direction the text reads in: `rtl` for a right-to-left script, so a
+       * row of it that opens with a Latin word or a number reads right to left.
+       *
+       * Absent, each row reads by its first strong letter. Where the engine
+       * orders the letters itself, `rtl` rows are also flush right; a terminal
+       * that reorders text by itself draws the Text exactly as without `dir`.
+       */
+      dir?: 'ltr' | 'rtl';
       wrap?: 'wrap' | 'end' | 'middle' | 'truncate' | 'truncate-start' | 'truncate-middle' | 'truncate-end';
   };
+
+  /**
+   * The `backdrop` attribute of `$.theme.set`: what is behind the conversation.
+   * `scene` makes a live scene, and `color`, `gradient`, `vector` or `image` make a
+   * still ground.
+   */
+  export type ThemeBackdrop = ThemeScene | ThemeGround;
+
+  /**
+   * How a surface keeps its text readable over a backdrop: the desktop app
+   * frosts its own panels, and the mobile app lays one veil over the backdrop.
+   * Each key absent takes the surface's default, so `{}` is the default glass.
+   */
+  export type ThemeBackdropGlass = {
+      /**
+       * How far the backdrop blurs behind a panel, in points: 0 to 64. Absent, 16.
+       */
+      blur?: number;
+      /**
+       * What colors a panel or veil over the backdrop: a raw color, `#hex` or `rgb()`,
+       * `rgba()`, `hsl()` or `hsla()` of numbers; a theme key or a name is refused.
+       * Absent, the surface's own panel color.
+       */
+      tint?: string;
+      /**
+       * How opaque the tinted panel or veil is over the backdrop: 0 to 1. Absent,
+       * 0.6.
+       */
+      opacity?: number;
+  };
+
+  /**
+   * A color in a still `backdrop`. A surface uses a raw color as it is, works out a
+   * name from the look's `colors` in the look's mode, or from the app's own colors where
+   * the look gives none, and refuses the ground over anything else. Annotate a color kept
+   * in an object or a list with this type, or it widens to `string`.
+   */
+  export type ThemeColor = ThemeColorName | 'transparent' | `#${string}` | `rgb${string}` | `hsl${string}`;
+
+  interface ThemeColorGround extends ThemeGroundBase {
+      /**
+       * The one color of the ground.
+       */
+      color: ThemeColor;
+      gradient?: never;
+      vector?: never;
+      image?: never;
+  }
+
+  /**
+   * One mode's colors in `ThemeColors`: a six-digit hex color such as `#1e1e2e`
+   * under the name of each design system token the theme sets. The type checks
+   * the leading `#` alone.
+   *
+   * The names are the design system's and change with it, so the type lists
+   * none. A surface keeps its own color for a token that is left out.
+   */
+  export type ThemeColorInputs = {
+      [token: string]: `#${string}`;
+  };
+
+  /**
+   * The design system's color names. A surface works each one out from the look's
+   * `colors`, so one rule serves light and dark.
+   * A name is not a key of `colors`, and a `ThemeKey` from a drawn tree isn't one of
+   * these names. In the stock palette `fill-primary` is near-black in light and
+   * near-white in dark, not the brand color.
+   */
+  export type ThemeColorName = 'surface-0' | 'surface-1' | 'surface-2' | 'surface-3' | 'text-primary' | 'text-secondary' | 'text-muted' | 'text-disabled' | 'fill-primary' | 'on-primary' | 'border' | 'border-strong' | 'border-stronger' | 'fill-accent' | 'text-accent' | 'bg-accent' | 'on-accent' | 'border-accent' | 'fill-danger' | 'text-danger' | 'bg-danger' | 'on-danger' | 'border-danger' | 'fill-success' | 'text-success' | 'bg-success' | 'on-success' | 'border-success' | 'fill-warning' | 'text-warning' | 'bg-warning' | 'on-warning' | 'border-warning' | 'fill-pro' | 'text-pro' | 'bg-pro' | 'on-pro' | 'border-pro';
+
+  /**
+   * The `colors` attribute of `$.theme.set`: a whole palette as JSON data, for a
+   * surface to paint itself with, where it reads one.
+   *
+   * Its token names are the design system's, and a wrong one paints nothing. A palette kept in a constant is annotated with this type, or its
+   * `v` and its colors widen and no longer fit.
+   *
+   * The engine holds `colors` only to bounded JSON data with no key `__proto__`,
+   * `constructor` or `prototype` and no named key on a list, so a surface judges what
+   * it reads, and so does a `theme.set` hook over another mod's call. A surface refuses
+   * a whole palette whose text contrast is too low, and `isDrawn` stays true.
+   */
+  export type ThemeColors = {
+      /**
+       * The version of this shape.
+       */
+      v: 1;
+      /**
+       * The id the palette was made with.
+       */
+      id?: string;
+      /**
+       * The palette's name, for a surface to show: 1 to 64 characters.
+       */
+      label: string;
+      /**
+       * The colors for a surface's light mode, and for its dark mode. Give one alone
+       * and a surface acts as if `overrideColorScheme` named that mode. Where it names
+       * the other, the surface keeps its own colors.
+       */
+      inputs: {
+          light?: ThemeColorInputs;
+          dark?: ThemeColorInputs;
+      };
+      /**
+       * The code highlighting theme to pair with each mode, by name. A surface
+       * keeps its own for a name it does not offer.
+       */
+      codeTheme?: {
+          light?: string;
+          dark?: string;
+      };
+      /**
+       * `more` asks for stronger borders and focus rings, as a high contrast theme
+       * needs. Absent, the surface's own.
+       */
+      contrast?: 'more';
+  };
+
+  /**
+   * Colors that run across their box.
+   */
+  interface ThemeGradient extends ThemeTiling {
+      /**
+       * Two to 16 colors, evenly spaced, or `{ at, color }` with `at` from 0 to 1. A
+       * bare color in a list with `at` stops takes the place its index gives, and the
+       * places must run in order, or the gradient is refused.
+       */
+      stops: readonly (ThemeColor | {
+          at: number;
+          color: ThemeColor;
+      })[];
+      /**
+       * Degrees from -360 to 360, as in CSS: 0 runs up, 90 runs right and 180, the
+       * default, runs down.
+       */
+      angle?: number;
+      /**
+       * `radial` makes an ellipse out to the edges of its box, and ignores `angle`.
+       * Absent, `linear`.
+       */
+      shape?: 'linear' | 'radial';
+  }
+
+  interface ThemeGradientGround extends ThemeGroundBase {
+      gradient: ThemeGradient;
+      color?: never;
+      vector?: never;
+      image?: never;
+  }
+
+  /**
+   * A still ground behind the conversation: a flat color, a gradient, a drawing in
+   * paths or a picture. A scene draws what moves, and any other pattern.
+   *
+   * @example
+   * backdrop: { gradient: { stops: ['surface-0', 'surface-2'] } }
+   */
+  export type ThemeGround = ThemeColorGround | ThemeGradientGround | ThemeImageGround | ThemeVectorGround;
+
+  /**
+   * A scene's keys, which no ground has.
+   */
+  interface ThemeGroundBase {
+      /**
+       * A scene's key, which no ground has.
+       */
+      scene?: never;
+      /**
+       * A scene's key, which no ground has.
+       */
+      glass?: never;
+  }
+
+  /**
+   * A picture from the mod's folder, filling its box unless `size` and `repeat` tile it.
+   */
+  interface ThemeImage extends ThemeTiling {
+      /**
+       * An 8-bit JPEG or a PNG, as a path relative to the mod's folder, with `/` between
+       * folders and no `..`: at most 1 MiB and 4096 on a side.
+       */
+      source: string;
+  }
+
+  interface ThemeImageGround extends ThemeGroundBase {
+      image: ThemeImage;
+      color?: never;
+      gradient?: never;
+      vector?: never;
+  }
+
+  /**
+   * How a `Theme` answer names a ground's image: a surface pulls the bytes by `id`,
+   * and lays them out by `size` and `repeat` as the mod gave them. The bytes are the
+   * mod's own, so `width` and `height`, the size in the file's header before any EXIF
+   * rotation, are hints: a surface reads the file's header with its own decoder, decodes
+   * off the main thread, caps the pixels at 4096 on a side and, if it can't draw the
+   * picture, keeps the app's own ground.
+   */
+  export type ThemeImageWire = {
+      type: 'jpeg' | 'png';
+      width: number;
+      height: number;
+      /**
+       * Names the picture for this run of the engine: it's keyed with a secret the engine
+       * keeps, so a copy of the file can't be matched to it.
+       */
+      id: string;
+  };
+
+  /**
+   * The theme keys named for what a color means: text, status, the prompt box
+   * and its modes, and diffs, as the custom theme reference lists them.
+   *
+   * A tree that names one follows the person's theme. Another key the theme
+   * holds resolves too, typed as any string is (Color).
+   */
+  export type ThemeKey = 'text' | 'inverseText' | 'inactive' | 'subtle' | 'suggestion' | 'remember' | 'success' | 'error' | 'warning' | 'merged' | 'claude' | 'permission' | 'planMode' | 'autoAccept' | 'promptBorder' | 'bashBorder' | 'ide' | 'diffAdded' | 'diffRemoved' | 'diffAddedDimmed' | 'diffRemovedDimmed' | 'diffAddedWord' | 'diffRemovedWord';
+
+  /**
+   * What `$.theme.set` and `$.theme.clear` resolve to, and what a `theme.set` or
+   * `theme.clear` hook's `{ value }` holds.
+   *
+   * A theme that was set stands for the session either way, so a surface that
+   * attaches later draws it; a clear resolves `isDrawn: false` with its reason.
+   *
+   * @example
+   * const set = await $.theme.set({ backdrop: { scene: "lagoon" } })
+   */
+  export type ThemeResult = {
+      /**
+       * True: a client that says it draws the theme is attached. It says nothing of
+       * whether that client paints `colors`, follows `overrideColorScheme` or draws
+       * each part of a look.
+       */
+      isDrawn: true;
+      /**
+       * `backdrop`, the `e.requestId` of every backdrop at `ui.render`, where
+       * `e.props.scene` and `e.props.plugin` say which; `theme` with no scene, a
+       * still ground included.
+       */
+      requestId: string;
+  } | {
+      /**
+       * False: a client it needs is missing, or the theme was cleared. `reason`
+       * says which.
+       */
+      isDrawn: false;
+      /**
+       * The theme's request id, when it stands for a surface yet to attach.
+       */
+      requestId?: string;
+      /**
+       * Why nothing draws it, one line to show or log.
+       */
+      reason: string;
+  };
+
+  /**
+   * A live scene: what `ui.render` answers for `Backdrop`, and how the surface
+   * frosts its panels over it.
+   */
+  export type ThemeScene = {
+      /**
+       * Names the scene among this plugin's: 1 to 64 of letters, digits, `_` and `-`.
+       * A `ui.render` hook reads it as `e.props.scene`.
+       */
+      scene: string;
+      /**
+       * How the surface frosts its panels over the backdrop: absent, the default
+       * glass; `false`, the panels stay as they are.
+       */
+      glass?: ThemeBackdropGlass | false;
+      /**
+       * A ground's key, which no scene has.
+       */
+      color?: never;
+      /**
+       * A ground's key, which no scene has.
+       */
+      gradient?: never;
+      /**
+       * A ground's key, which no scene has.
+       */
+      vector?: never;
+      /**
+       * A ground's key, which no scene has.
+       */
+      image?: never;
+  };
+
+  /**
+   * The argument of `$.theme.set`: one object of named attributes, so a later
+   * attribute is an addition and never a change of the call.
+   *
+   * A set names the whole theme, so what it leaves out is gone, and it names at
+   * least one attribute. An attribute the build does not know is refused by
+   * name, never dropped.
+   */
+  export type ThemeSetArgs = {
+      /**
+       * What is behind the conversation: a live scene or a still ground. Absent, the
+       * app's own.
+       */
+      backdrop?: ThemeBackdrop;
+      /**
+       * Overrides the person's own mode with `light` or `dark`, so a surface can draw
+       * its own text to suit; the desktop app ignores it for now. Absent, a surface
+       * acts as if it named the only mode `colors.inputs` gives, else the person's own
+       * stands. Set it for a look or a scene made for one mode, where `colors` gives
+       * both.
+       */
+      overrideColorScheme?: 'light' | 'dark';
+      /**
+       * Every surface, word and line of the app, in each mode, by the design system's
+       * token names. The engine doesn't read it, so a wrong name paints nothing and says
+       * nothing.
+       */
+      colors?: ThemeColors;
+  };
+
+  /**
+   * How a drawing, a gradient or a picture lies in its box.
+   */
+  interface ThemeTiling {
+      /**
+       * `[width, height]` in points, such as `[24, 8]`: the box one copy fills under
+       * `repeat`, each side from 1 to 256. Absent, a drawing takes its own
+       * size, and a gradient or a picture fills its box.
+       */
+      size?: readonly [number, number];
+      /**
+       * Tiles the art at its size.
+       * Absent, a drawing or a gradient stretches to the box.
+       */
+      repeat?: boolean;
+  }
+
+  /**
+   * A drawing in SVG path data, the text of a path's `d` attribute.
+   */
+  interface ThemeVector extends ThemeTiling {
+      /**
+       * A square's side, or `[width, height]`, from 1 to 256.
+       */
+      viewBox: number | readonly [number, number];
+      /**
+       * At most 64 paths. A string or `{ d }` is filled by the even-odd rule, and
+       * `{ d, strokeWidth }` is stroked at a width that doesn't scale, above 0 and at
+       * most 64. A surface refuses a ground whose `d` isn't whole path data of at most
+       * 16,384 characters, with no number past 1,000,000 either way.
+       */
+      paths: readonly (string | {
+          d: string;
+          strokeWidth?: number;
+          color?: ThemeColor;
+      })[];
+      /**
+       * Each path's color, where it names none of its own: a path with neither draws
+       * nothing, and a surface refuses a drawing left with no path.
+       */
+      color?: ThemeColor;
+  }
+
+  interface ThemeVectorGround extends ThemeGroundBase {
+      vector: ThemeVector;
+      color?: never;
+      gradient?: never;
+      image?: never;
+  }
 
   /**
    * One of the chain's five tiers (TIERS), outermost first; on every
    * `next.trace` entry, and what `next.to(e, tier)` names.
    *
-   * `prepend` and `append` are the managed plugins an administrator lists,
-   * `user` everything a person installs, `builtin` the plugins bundled in the
+   * `prepend` and `append` are the managed plugins an administrator lists. With
+   * no managed settings, they are a person's own plugins listed in user settings,
+   * except where plugin-authoring's reference says that list is set aside. `user`
+   * is every other plugin a person installs, `builtin` the plugins bundled in the
    * binary, `core` the engine's innermost link.
+   *
+   * Under an organization's managed settings, a mod from a marketplace with a
+   * remote source (`github`, `git`, `url` or inline `settings`) takes the
+   * organization's tier when those settings do three things: set it true in
+   * `enabledPlugins`, declare that marketplace in `extraKnownMarketplaces`, and
+   * list it in `prependPlugins` or `appendPlugins`. Missing any of the three, it
+   * stays in `user`. A marketplace's `pluginDigests` is deprecated and ignored, so
+   * a new release reaches machines with no settings change.
+   *
+   * Claude Code stores a hash (`copyHash`) on a listed mod's install record when it
+   * writes a copy from the marketplace's declared origin that fits this build, and
+   * checks the copy against it at each load, so an edit made after that is caught.
+   * A copy that doesn't match is fetched afresh once before the first turn. Some
+   * starts run no fetch, such as `--bare` or a session with hooks modules off
+   * (`--safe-mode`, a managed `disableAllHooks`). Where a fetch
+   * ran and the copy still isn't mended, the session carries on and the debug log
+   * says `listed mod <id> does not run in this session: <why>`. A copy that doesn't
+   * match runs without its hooks module, and a copy outside its
+   * `engines["claude-code"]` range is off whole.
    */
   export type Tier = (typeof TIERS)[number];
 
@@ -11900,9 +14576,8 @@ declare module 'claude-code' {
    * The chain's five tiers, outermost first: earlier is outer is more
    * authority, and same-event hooks nest in this order and no other way.
    *
-   * The managed plugins an administrator prepends, everything a person
-   * installs, the managed plugins appended, the plugins bundled in the binary,
-   * the engine's innermost link; a built-in's `$` calls still raise everywhere.
+   * `Tier` says which plugins are in each; a built-in's `$` calls still raise
+   * everywhere.
    */
   const TIERS: readonly ["prepend", "user", "append", "builtin", "core"];
 
@@ -11957,8 +14632,9 @@ declare module 'claude-code' {
    * A union discriminated by `tool`: after `if (e.tool === "Bash")`, `e.command`
    * is a string and a rewrite is checked against Bash's schema. `tool`,
    * `tool_use_id` and `agentId` are reserved: a rewrite of any is refused.
+   * `requestMeta` is a hook's to set (ToolRequestMeta).
    */
-  export type ToolCallInput = ToolCallEnvelope & AgentLoop;
+  export type ToolCallInput = ToolCallEnvelope & AgentLoop & ToolRequestMeta;
 
   /**
    * `$.tool.call(input)`: resolves with `result` typed for the tool `input`
@@ -11998,6 +14674,10 @@ declare module 'claude-code' {
       /**
        * Refuses the call: the model receives the text as an error result.
        * Absent when the call was answered.
+       *
+       * Returned after the tool answered without error it withholds that
+       * result and undoes nothing: in its place the model reads `<tool> ran,
+       * and a plugin withheld its result: <text>`.
        */
       deny: string;
       result?: undefined;
@@ -12082,23 +14762,34 @@ declare module 'claude-code' {
   };
 
   /**
-   * `tool.check`'s input as `$.tool.check` takes it: the tool and its
-   * arguments; `tool_use_id` is the engine's to set, never a query's.
+   * Who answers the asks of a `tool.check` evaluation.
+   *
+   * `host`, the program that answers a hosted session's asks or a served call's
+   * own session; `person`, a dialog or a card the person answers.
+   */
+  type ToolCheckApprover = 'host' | 'person';
+
+  /**
+   * `tool.check`'s input as `$.tool.check` takes it: the tool and its arguments;
+   * the call's id, `agentId`, ceiling, approver and `isReadOnly` are the
+   * engine's to set.
    */
   type ToolCheckArgs = Pick<ToolCheckInput, 'tool' | 'input'>;
 
   /**
    * The verdict of `tool.check`: run the tool, put it to the mode's decider
-   * (the dialog, the auto-mode classifier, a headless host), or refuse it.
+   * (the dialog, the auto-mode classifier, a headless host) or, a hook's ask, to
+   * a person, or refuse it.
    */
   type ToolCheckDecision = 'allow' | 'ask' | 'deny';
 
   /**
-   * The input of `tool.check`: the tool, its arguments, and the call's id when
-   * the engine is deciding a real call.
+   * The input of `tool.check`: the tool, its arguments, the organization's
+   * ceiling if it set one, and on a real call its id and the loop's `agentId`.
    *
-   * All three are the question's identity and are pinned: a hook decides
-   * about this call, it does not change it (`tool.call` rewrites a call).
+   * All are the question's identity and are pinned: a hook decides about
+   * this call, it does not change it (`tool.call` rewrites a call). A
+   * `$.tool.check` query is asked outside any loop and carries no `agentId`.
    */
   type ToolCheckInput = {
       /**
@@ -12120,11 +14811,44 @@ declare module 'claude-code' {
        * for the model's own call, the plugin for its `$.tool.call` or its query.
        */
       tool_use_id?: string;
+      /**
+       * The id of the loop the call is decided in, on a real call inside a
+       * subagent's or a teammate's loop: the one its `tool.call` carried.
+       *
+       * Absent on the main loop and on a query. Which loop, not which plugin
+       * caused the call (that is `next.origin`).
+       */
+      agentId?: string;
+      /**
+       * The most permissive verdict the organization lets a call of the tool
+       * reach (`ask`), as its administrators set it on a connector's tool.
+       *
+       * Set by the engine, from the tool, never by a query, and pinned. A
+       * hook's own `ceiling`, on its answer, is dropped. Absent where none is
+       * set.
+       */
+      ceiling?: ToolCheckDecision;
+      /**
+       * Who answers this evaluation's asks, known before any hook runs.
+       *
+       * `host` where a host's permission callback does, `person` where a person
+       * can be asked, a pane's card included; absent where nobody can be. Pinned.
+       */
+      approver?: ToolCheckApprover;
+      /**
+       * Set by the engine, present only when the tool's own `isReadOnly` holds
+       * this input read-only, and pinned; a matcher can select reads, never writes.
+       *
+       * Absent also means the tool cannot say: a careful hook reads it as a write.
+       * It is the tool's word, no proof of no effect (a fetch, a sent message, an
+       * agent that delegates all say it); an MCP tool's is its server's, unproven.
+       */
+      isReadOnly?: true;
   };
 
   /**
    * What a `tool.check` hook returns and what `next(e)` resolves to: the
-   * verdict, why, and the settings rule behind it when one decided.
+   * verdict, why, and what stands behind it, never who answers it.
    *
    * From core, the engine's declarative decision for the session's mode and
    * rules. A hook may answer any verdict in either direction; the last word up
@@ -12132,8 +14856,13 @@ declare module 'claude-code' {
    */
   type ToolCheckResult = {
       /**
-       * `allow` runs the tool; `ask` puts it to the mode's decider; `deny`
-       * refuses it, the reason the model's error.
+       * `allow` runs the tool; `ask` puts it to the mode's decider, or to a
+       * person when a hook made it (`plugin`); `deny` refuses it, the reason the
+       * model's error.
+       *
+       * For a tool that requires the person (a question put to them, a plan to
+       * approve) a hook only tightens: its `allow` does not dismiss the dialog.
+       * In plan mode a hook only tightens a call not shown to be a read, too.
        */
       decision: ToolCheckDecision;
       /**
@@ -12147,6 +14876,47 @@ declare module 'claude-code' {
        * Absent for a mode or a tool's own check.
        */
       rule?: string;
+      /**
+       * The classic hook event that decided, or whose ask the verdict was reached
+       * under (`PreToolUse`), whoever configured the hook.
+       *
+       * Absent on a `$.tool.check` query, which runs no classic hook.
+       */
+      hook?: string;
+      /**
+       * The key of the option whose own check asked, whoever configured it
+       * (`permissions.blockReadsOutsideWorkingDirectories`).
+       *
+       * From core, for the read block: its ask on a shell command that reads
+       * outside the working directories or, the block on, leaves the sandbox.
+       */
+      setting?: string;
+      /**
+       * The plugin whose hook made this ask, set by the engine and pinned:
+       * whatever a hook writes here is dropped.
+       *
+       * On an `ask` a hook answered, rewording included; one it hands up as it
+       * heard it keeps what it carried, so core's own names none. Such an ask is
+       * a person's: the dialog, the host's callback or a PermissionRequest hook
+       * answers. No classifier's allow settles it, its block still refuses, and
+       * a rule for the whole tool is not kept; a narrower rule the person saves
+       * is theirs and settles nothing while the hook asks. Where nobody can be
+       * asked it is a deny, this verdict's reason the model's error. A tool no
+       * prompt is raised for keeps its own rule. A hook above may answer anything
+       * over it.
+       */
+      plugin?: string;
+      /**
+       * The most permissive verdict the organization lets a call of the tool
+       * reach (`ask`), as its administrators set it on a connector's tool.
+       *
+       * The question's own (`e.ceiling`), set by the engine, from the tool, on
+       * every verdict for it, core's and each hook's alike: a hook's own
+       * `ceiling` is dropped. Where the question has none, it is the one that
+       * core's check found for this call, on core's verdict and on each hook's
+       * that asked beneath. Absent where none is set.
+       */
+      ceiling?: ToolCheckDecision;
   };
 
   /**
@@ -12176,7 +14946,8 @@ declare module 'claude-code' {
        * schema loads when the model asks for it by name); absent for one listed.
        *
        * By the engine's rule an MCP server's tool, or one that asks to be,
-       * unless a rule keeps it in front.
+       * unless a rule keeps it in front (a plugin's `$.tool.register` tool
+       * whose spec says `isDeferred: false` is kept in front).
        */
       isDeferred?: true;
       /**
@@ -12200,6 +14971,14 @@ declare module 'claude-code' {
   export type ToolDescribeResult = {
       description: string;
       isDeferred?: ToolDeferral;
+      /**
+       * Sends a changed description or placement at the next turn, rewriting the
+       * whole prompt cache and dropping the model's earlier thinking.
+       *
+       * Left out, a description waits for a new thread or a compaction, and a
+       * placement for a new thread or `/clear`, as a compaction keeps the tool block.
+       */
+      breakPromptCache?: boolean;
   };
 
   /**
@@ -12257,7 +15036,75 @@ declare module 'claude-code' {
   };
 
   /**
-   * One tool as `$.tool.list()` returns it.
+   * One tool as `$.tool.list()` returns it and a `tool.list` hook answers it.
+   *
+   * What the hooks answer the engine's own raise is the session's tool pool: for
+   * the model, every agent, foreground or background, ToolSearch and `$.tool.call`.
+   * The tools of an MCP server that joins later are asked about before a request
+   * carries them. What the hooks answer a mod's `$.tool.list()` is only what that
+   * call reads. `next(e)` holds the tools as the engine built them, with what an
+   * earlier answer removed and without what it added, so answer the whole list
+   * each time. The order of the list is ignored, so that the prompt cache holds.
+   *
+   * The engine raises the event before a thread's first request, once a load of
+   * hooks modules is over or 10 seconds have passed, and again when the loaded
+   * plugins, the names of the tools or a setting change, or at the turn after
+   * `$.ui.invalidate('tool.list')`. It never raises it per turn: a pool that moves
+   * breaks the prompt cache.
+   *
+   * Leave an entry out and the tool goes, with what a deny rule on it takes out;
+   * what such a rule brings back, such as Glob and Grep without Bash, is asked
+   * about too. A tool no deny rule can leave out stays while any other does. A
+   * call of a removed tool is refused, by a script, an agent, the host's `mcp_call`,
+   * an `mcp_tool` settings hook or a Monitor poll, and a running watch of it ends.
+   * Those last three don't wait for a hooks load, so one made before a module has
+   * loaded isn't refused by what that module removes. A tool a thread already
+   * declared stays declared until a compaction, so as not to break the prompt
+   * cache, and a call of it is refused saying why. `$.ui.ask` and `$.agent.spawn`
+   * are the host's: removing their tools does not reach them.
+   *
+   * Add `{ name, description, mcp: false, inputSchema? }` under a new name and the
+   * tool joins, checked as `$.tool.register` checks a spec: an entry that fails is
+   * left out. A `tool.call`
+   * hook on its name answers its calls, with no permission prompt; a call no hook
+   * answers is a tool error naming it. A schema the API refuses is declared with no
+   * parameters. New words reach a thread at its next compaction. An `mcp__` name, a
+   * name a request declares itself (`advisor`, `DeferredToolPlaceholder`), or a
+   * tool's or a built-in's name in any case or with its words apart, on or off,
+   * cannot be added. An entry with the name or alias of a tool that exists leaves
+   * that tool as it is: `tool.describe` changes a description. A deny rule, a
+   * `--tools` list and an agent's `tools:` hold over an added tool as over any
+   * other, and a real tool takes its name when it joins.
+   *
+   * A hook that throws, crashes or runs past its 10-second budget is skipped, unless
+   * its `.catch` answers: the answer is what the others said, without what the hook
+   * removed or added on any run, and the event is raised again at the next turn. So
+   * is one whose `$` ops hold it past 30 seconds in all: they are aborted. A crash
+   * traced to a mod can unload it, and a mod's removals lapse when it is unloaded,
+   * with no retry owed. A `{ deny }` or a list with nothing in it to read
+   * leaves the last answer standing, and the event is raised again at the next turn.
+   * A turn waits at most 10 seconds for a raise, then goes on with the answer that
+   * stood, or the tools as built before the first; the raise goes on, and its answer
+   * counts unless a later raise has answered. A `$.tool.call` of a `tool.list` hook,
+   * or an agent it spawns, reads the answer that stood, or the tools as built on the
+   * first raise. `$.prompt.submit` and `$.command.run` are refused there.
+   *
+   * Where sec-default is seated, a person's hook can't remove a tool of the
+   * organization's managed MCP servers or seated plugins, or bring back a tool an
+   * organization's hook removed. Its addition is dropped while managed
+   * `allowedMcpServers` is set, or where the name reads as a tool the organization
+   * delivers. A person's hook that overruns or crashes is skipped and sec-default
+   * still answers, though that hook can delay the answer. The engine puts no other
+   * limit on the answer; a policy is a mod's to hold.
+   *
+   * @example
+   * on('tool.list', async ($, e, next) => {
+   *   const listed = await next(e)
+   *
+   *   return listed.value === undefined
+   *     ? listed
+   *     : { value: listed.value.filter(t => t.name !== 'AskUserQuestion') }
+   * })
    */
   export type ToolInfo = {
       /**
@@ -12273,6 +15120,12 @@ declare module 'claude-code' {
        * True for an MCP server's tool.
        */
       mcp: boolean;
+      /**
+       * On an entry a `tool.list` hook adds: a JSON schema object for the input
+       * (`{ type: "object", properties, required }`), default `{ type: "object" }`
+       * as on `$.tool.register`. Never on a tool the session lists.
+       */
+      inputSchema?: Record<string, unknown>;
   };
 
   /**
@@ -12297,14 +15150,34 @@ declare module 'claude-code' {
   };
 
   /**
+   * What a `tool.call` hook sets for the request of an MCP server's tool.
+   */
+  export type ToolRequestMeta = {
+      /**
+       * Entries for the `_meta` of the request this call sends its MCP server,
+       * set with `next({ ...e, requestMeta })`; never an argument of the tool.
+       *
+       * The one key a hook may set is `anthropic/sources`, its value a string
+       * (JSON for anything structured) of at most 256 KiB in UTF-8: any other
+       * shape is refused. It is carried only to the session's own relay to a
+       * connector, which takes it off before a vendor sees the call; a call to
+       * any other server, and any tool that is not an MCP server's, goes out
+       * without it. The engine's own request keys are not shown here and stay
+       * as they are. Left out of a rewrite, what a hook above set is kept; `{}`
+       * clears it.
+       */
+      requestMeta?: Record<string, string>;
+  };
+
+  /**
    * The structured result of the tool named `Name`: its BuiltinToolResults
    * entry for a built-in tool, else `unknown`.
    *
-   * Agent's is its entry or an AgentCallRecord (what a plugin-raised call
-   * answers). `unknown` covers an MCP tool, a name the results table lacks
-   * (one merged into the inputs table alone too), and `Name` left at `string`.
+   * Agent's is its entry, an AgentTeammateRecord (a started teammate's) or an
+   * AgentCallRecord (a plugin-raised call's). `unknown` covers an MCP tool, a
+   * name the results table lacks, and `Name` left at `string`.
    */
-  export type ToolResultOf<Name extends string> = string extends Name ? unknown : Name extends keyof BuiltinToolResults & string ? BuiltinToolResults[Name] | (Name extends 'Agent' ? AgentCallRecord : never) : unknown;
+  export type ToolResultOf<Name extends string> = string extends Name ? unknown : Name extends keyof BuiltinToolResults & string ? BuiltinToolResults[Name] | (Name extends 'Agent' ? AgentCallRecord | AgentTeammateRecord : never) : unknown;
 
   /**
    * One tool_result block of a user message.
@@ -12331,6 +15204,18 @@ declare module 'claude-code' {
        * stores none; `text` is what the model read either way.
        */
       result?: unknown;
+      /**
+       * What the tool's MCP server addressed to plugins in the stored result's
+       * `_meta`: its entries under `"claude/plugins"` and `"anthropic/sources"`,
+       * by key and as the server wrote them. The model never reads it.
+       * `anthropic/sources` is handed over only from the session's own relay to a
+       * connector; `claude/plugins` is any server's own claim. A key over
+       * 256 KiB is left out and named in the list under `"claude/omitted"`.
+       *
+       * Off by default. Absent on an error result, and when the server
+       * addressed nothing; a subagent's transcript keeps at most 8 KiB.
+       */
+      meta?: Record<string, unknown>;
   };
 
   /**
@@ -12352,6 +15237,14 @@ declare module 'claude-code' {
        * required }`); default `{ type: "object" }`.
        */
       inputSchema?: Record<string, unknown>;
+      /**
+       * Where the tool waits: `false` puts its schema in the prompt's tool list,
+       * `true` behind ToolSearch.
+       *
+       * Left out, the engine's rule places it: behind ToolSearch, as it places
+       * an MCP server's tool. A `tool.describe` hook's answer is read first.
+       */
+      isDeferred?: ToolDeferral;
   };
 
   /**
@@ -12408,6 +15301,18 @@ declare module 'claude-code' {
        * Absent while it runs, on a background launch, and on every other tool.
        */
       durationMs?: number;
+      /**
+       * What the tool's MCP server addressed to plugins in the stored result's
+       * `_meta`: its entries under `"claude/plugins"` and `"anthropic/sources"`,
+       * by key and as the server wrote them. The model never reads it.
+       * `anthropic/sources` is handed over only from the session's own relay to a
+       * connector; `claude/plugins` is any server's own claim. A key over
+       * 256 KiB is left out and named in the list under `"claude/omitted"`.
+       *
+       * Off by default. Absent on an error result, and when the server
+       * addressed nothing; a subagent's transcript keeps at most 8 KiB.
+       */
+      meta?: Record<string, unknown>;
   };
 
   /**
@@ -12479,6 +15384,10 @@ declare module 'claude-code' {
       /**
        * The assistant's final visible text this turn ("" if none, e.g.
        * thinking-only).
+       *
+       * For a subagent's run that handed its report back to its spawner, the
+       * report delivered: whole, made safe as the spawner's copy is, and led by
+       * the review's warning if it raised one. A refused hand-back changes nothing.
        */
       answer: string;
       /**
@@ -12491,7 +15400,11 @@ declare module 'claude-code' {
       isAborted: boolean;
       /**
        * The turn's id, the same one its `turn.start` and every `turn.step`
-       * carried; a subagent's run raises no `turn.start`, its steps carry it.
+       * carried, on the main loop and in a subagent's run alike.
+       *
+       * A hook that heard a turn's start hears its end after it, an aborted
+       * run's too. One that heard no start of an agent's turn hears the end
+       * alone: its spawn was nested in it, or the start was held past its bound.
        */
       turnId: string;
       /**
@@ -12499,8 +15412,8 @@ declare module 'claude-code' {
        * it, each run of its loop one turn; absent on the main loop.
        *
        * Pinned: a different value is refused, one left out is kept. Every hook
-       * sees a subagent's turn, so a hook that spawns sees its children's turns
-       * too and bounds itself.
+       * hears an agent's end, the spawner's too: so a plugin gets its child's
+       * answer, and a hook that spawns at each end sees them and bounds itself.
        */
       agentId?: string;
       /**
@@ -12541,11 +15454,14 @@ declare module 'claude-code' {
    * `{ text }`; a text other than a main-loop answer's is shown beneath it.
    *
    * Core fills `usage` from `e.usage` when the turn had one; a hook above reads
-   * it, and one that answers its own may leave it out.
+   * it, and one that answers its own may leave it out. `by` is the engine's: the
+   * plugins that wrote the text or rewrote the answer they passed down, which
+   * head its note. What a hook puts there is replaced.
    */
   export type TurnCompleteResult = {
       text: string;
       usage?: TurnUsage;
+      by?: readonly string[];
   };
 
   /**
@@ -12566,13 +15482,21 @@ declare module 'claude-code' {
   };
 
   /**
-   * The input of `turn.start`: the prompt a model turn begins with, after
-   * `prompt.submit` settled the text and the UserPromptSubmit settings hooks ran.
+   * The input of `turn.start`: the prompt a model turn begins with, the main
+   * loop's or a subagent's or teammate's run (`agentId`).
+   *
+   * On the main loop it comes after `prompt.submit` settled the text and the
+   * UserPromptSubmit settings hooks ran; a hook that follows the main loop
+   * alone returns `next(e)` first when `e.agentId !== undefined`.
    */
   export type TurnStartInput = {
       /**
        * The user's text as the turn proceeds with it ("" for a turn started without
        * a typed prompt, e.g. a continuation).
+       *
+       * In a subagent's run, the prompt the run begins with: the Agent call's
+       * as the `agent.spawn` hooks left it, or the message that woke the loop;
+       * "" for a continued turn and for a run whose steps no hook sees.
        */
       text: string;
       /**
@@ -12580,6 +15504,15 @@ declare module 'claude-code' {
        * `turn.complete` of this turn carry.
        */
       turnId: string;
+      /**
+       * The loop the turn runs in: a subagent's or teammate's id, as `agent.spawn`
+       * answers it and `$.agent.list()` lists it; absent on the main loop.
+       *
+       * Each run of the loop is one turn. Pinned: a different value is refused,
+       * one left out is kept. The hooks an agent's spawn was nested in do not
+       * hear its start, as at its `turn.step`s; every other hook does.
+       */
+      agentId?: string;
   };
 
   /**
@@ -12604,9 +15537,9 @@ declare module 'claude-code' {
    * An item of the engine's stream the other chunk kinds do not model (the
    * envelope, a block's start and end, a retry marker), opaque by `ref`.
    *
-   * Pass it on where it came. A hook that yields its own response has none
-   * to yield, and the engine supplies what the response needs around the
-   * chunks it does yield.
+   * A tool call the API runs itself streams as these too: the step's result
+   * lists it (`serverToolUses`). Pass each on where it came; a hook that
+   * yields its own response has none, and the engine supplies the rest.
    */
   export type TurnStepEngineChunk = {
       kind: 'engine';
@@ -12627,8 +15560,8 @@ declare module 'claude-code' {
    */
   export type TurnStepInput = {
       /**
-       * The turn this step belongs to (`turn.start`'s id; inside a subagent's
-       * loop, the id the run's `turn.complete` will carry). Pinned.
+       * The turn this step belongs to: its `turn.start`'s id, which its
+       * `turn.complete` will carry too. Pinned.
        */
       turnId: string;
       /**
@@ -12637,12 +15570,19 @@ declare module 'claude-code' {
       index: number;
       /**
        * Which model the request names, as the engine resolved it for this step
-       * (the session's, a fallback's). `next({ ...e, model })` names another.
+       * (the session's, a fallback's). `next({ ...e, model })` names another, by
+       * an alias (`haiku`) or a full id.
        */
       model: string;
       /**
-       * How hard the request asks the model to think: the session's setting or
-       * the model's default, absent for a model without effort; rewritable.
+       * How hard the request asks the model to think: the level its loop,
+       * `CLAUDE_CODE_EFFORT_LEVEL`, turn or session set, or the model's default.
+       * Absent on a model without effort, or if that variable is `unset` or `auto`
+       * with no `maxEffortLevel` cap. A rewrite lasts one step. On a model that
+       * takes effort per message, a level on tool results alone is not sent if
+       * another is in force, and one on a step with input stays for later tool
+       * steps whose `effort` is a level. A number goes out at once on internal
+       * builds only, unless that cap makes it a level; public ones refuse a hook's.
        */
       effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | number;
       /**
@@ -12700,9 +15640,22 @@ declare module 'claude-code' {
        */
       answer: string;
       /**
-       * The tool calls the response made, in order; empty for a text-only step.
+       * The tool calls the response asks the engine to run, in order; empty
+       * for a step that asks for none.
        */
       toolUses: readonly TurnStepToolUse[];
+      /**
+       * The tool calls the API ran itself inside the request (the advisor is
+       * one), in order, each with when it started and ended.
+       *
+       * Absent when the response made none. The engine runs nothing for them:
+       * no `tool.check` and no `tool.call` chain, so a hook reads them here and
+       * cannot refuse or rewrite one. `toolUses` never lists them.
+       *
+       * @example
+       * for (const use of response.serverToolUses ?? []) $.ui.log(use.name)
+       */
+      serverToolUses?: readonly TurnStepServerToolUse[];
       /**
        * Why the model stopped; null when no response arrived (the request
        * failed or was interrupted before a message, or no request was made).
@@ -12713,6 +15666,42 @@ declare module 'claude-code' {
        * answered; null when no response arrived or it carried no usage.
        */
       usage: TurnUsage | null;
+  };
+
+  /**
+   * One tool call of a step that the API ran itself, inside the request (the
+   * advisor is one): the engine ran nothing for it.
+   *
+   * No `tool.check`, `tool.call` or `tool.describe` chain runs for it, and no
+   * classic PreToolUse or PostToolUse hook: a hook cannot refuse, rewrite or
+   * answer it. A tool the engine runs (`WebSearch` too) is in `toolUses`.
+   */
+  export type TurnStepServerToolUse = {
+      /**
+       * The call's id, as its result block names it (`tool_use_id` there).
+       */
+      id: string;
+      /**
+       * The server tool's name as the API spells it (`advisor`).
+       */
+      name: string;
+      /**
+       * The arguments the model gave it.
+       */
+      input: unknown;
+      /**
+       * When the model had written the call and the API began to run it, in
+       * `$.clock.now()`'s milliseconds.
+       */
+      startedAt: number;
+      /**
+       * When the call's result had arrived, in the same milliseconds.
+       *
+       * The API answers in the same response, so the step's result has it.
+       * Absent when the response ended before the result (a stream cut short,
+       * a turn paused); a response that came whole stamps both alike.
+       */
+      endedAt?: number;
   };
 
   /**
@@ -12828,10 +15817,17 @@ declare module 'claude-code' {
        * Absent when the cells or source were taken; else why not.
        *
        * Nothing of this plugin's is mounted there (another plugin's reads so),
-       * the size is not the mounted one, the cells or source are bad, or the
-       * Image draws its `alt` there, the reason spelled out for a fallback.
+       * the size is not the mounted one, the cells or source are bad, or the Image
+       * draws its `alt` there. With no surface attached `no-surface` heads it.
        */
       deny?: string;
+      /**
+       * With `deny`, a stable code to key on instead of the words of `deny`.
+       * `tmux-passthrough`: tmux 3.3 or later holds back images the terminal
+       * outside it can draw, because `allow-passthrough` or `focus-events` is off;
+       * both must be on. Absent for every other cause.
+       */
+      fix?: 'tmux-passthrough';
   };
 
   /**
@@ -12887,13 +15883,89 @@ declare module 'claude-code' {
        *
        * `no-surface`: nothing draws (a `-p` run, the SDK), or the named
        * surface is not attached. `no-clipboard`: it draws but nothing was
-       * written (OSC 52 past its bound; a remote app declined or was silent).
+       * written (no clipboard tool ran and OSC 52 was past its bound or left
+       * out, as for VTE before 0.53; a remote app declined or was silent).
        *
        * @example
        * on('ui.copy', { surface: 'mobile' }, () => ({ value: REFUSED }))
        */
       reason: 'no-surface' | 'no-clipboard' | 'refused';
   };
+
+  /**
+   * The input of `ui.fault`: a `Client` this plugin drew failed on a surface,
+   * addressed by where the instance is drawn.
+   *
+   * Every key is the engine's word, pinned: `next(e)` passes them on, a
+   * rewrite that leaves one out keeps it, one that changes it fails the hook.
+   */
+  type UiFaultInput = {
+      /**
+       * Where the instance failed: `terminal`, or the remote surface that told
+       * the engine (`desktop`).
+       */
+      surface: RenderSurface;
+      /**
+       * The render component the `Client` was drawn in (`AbovePrompt`, `Pane`,
+       * ...).
+       */
+      component: RenderComponent;
+      /**
+       * The engine's id for the drawing the `Client` sits in: the `requestId` the
+       * `ui.render` hook that drew it saw.
+       */
+      requestId: string;
+      /**
+       * The `Client`'s `key`: which instance failed.
+       */
+      element: string;
+      /**
+       * The `Client`'s `module`: which surface module ran there, as its path
+       * under the plugin's folder.
+       */
+      module: string;
+      /**
+       * When it failed (UiFaultPhase): loading, drawing, or running after it
+       * had drawn.
+       *
+       * A tree the terminal itself threw on while drawing it (`render`) is tried
+       * again, state dropped, once drawn with props of another value or at another
+       * terminal size, so an `element` may fail again; others wait for a reload.
+       */
+      phase: UiFaultPhase;
+      /**
+       * Why, as the surface said it: one line of 1 to 200 characters, no
+       * control character in it, a longer one cut and ended with an ellipsis.
+       *
+       * With no message: `the module failed without a message`, or in the
+       * terminal a named error's name (`RangeError`). Untrusted text, it may quote
+       * what the plugin's module threw: show or log it, never act on or parse it.
+       */
+      reason: string;
+  };
+
+  /**
+   * When a `Client` failed, as `ui.fault` names it; a closed set a matcher
+   * narrows on.
+   *
+   * `load`: before its module ran (not fetched, refused, a throw at mount).
+   * `render`: a throw while drawing, a tree the surface cannot draw, a render
+   * that never answered. `run`: a listener, timer or handler; a loop; a flood.
+   */
+  type UiFaultPhase = 'load' | 'render' | 'run';
+
+  /**
+   * What a `ui.fault` hook returns and what `next(e)` resolves to: `{}`, the
+   * fault was heard.
+   *
+   * Observe only. Once the hooks have answered the engine draws the site the
+   * `Client` failed in again, unasked: the plugin's `ui.render` hook falls back
+   * by leaving the `Client` out of that drawing.
+   *
+   * @remarks A redraw a fault caused causes no other: a `Client` born in it that
+   *   fails is heard, and no more is drawn for it until `$.ui.invalidate`.
+   */
+  type UiFaultResult = Record<string, never>;
 
   /**
    * What a plugin's `$.ui.focus(args)` takes: one of its own elements, by the
@@ -12946,7 +16018,8 @@ declare module 'claude-code' {
       requestId: string;
       /**
        * Whose `ui.render` hook drew the element taking the ring; absent with
-       * `element`. Read-only.
+       * `element`. Read-only. A hook naming no `plugin` hears its own plugin's
+       * elements and the engine's stops; `{ plugin: "*" }` every plugin's.
        */
       plugin?: string;
       /**
@@ -12998,9 +16071,12 @@ declare module 'claude-code' {
        * Absent when the ring is where the chain left it; else why nothing
        * moved.
        *
-       * A hook kept the ring (no `next`); the site is not this plugin's, does
-       * not hold the keyboard, or another plugin's element holds it; no element
-       * of `plugin` is drawn under `element`; another move landed first.
+       * A hook kept the ring; the site is not this plugin's, holds no keyboard, or
+       * another plugin's element does; no element of `plugin` is drawn under
+       * `element`; another move came first. With no surface `no-surface` heads it.
+       *
+       * @remarks A `{ deny }` after `next(e)` was answered, a `.catch`'s too,
+       *   fails the hook, and its last `next` stands: deny in its place.
        */
       deny?: string;
   };
@@ -13009,7 +16085,8 @@ declare module 'claude-code' {
    * The argument of `ui.input`: a change of, or a submit from, an `Input` a
    * render hook drew. Flat and frozen like every event's.
    *
-   * Another plugin addresses one field by matcher:
+   * A hook naming no `plugin` hears its own plugin's fields alone. Another
+   * plugin addresses one field by matcher, `{ plugin: "*" }` for every one:
    * `on("ui.input", { plugin: "roster", element: "reply" }, ...)`.
    */
   export type UiInputArgument = {
@@ -13043,6 +16120,8 @@ declare module 'claude-code' {
       /**
        * The field's whole text at that moment; a hook above may rewrite it for
        * the plugins beneath and the element's own handler.
+       *
+       * A field of several lines joins them with `\n`; a submit trims nothing.
        */
       value: string;
   };
@@ -13118,8 +16197,8 @@ declare module 'claude-code' {
        */
       module: string;
       /**
-       * What the instance posted: plain data (JsonValue), bounded as a tree's
-       * text is; typed `unknown` since it came from code. Rewritable.
+       * What the instance posted: plain data (JsonValue) of at most 100000
+       * characters; typed `unknown` since it came from code. Rewritable.
        */
       data: unknown;
   };
@@ -13141,6 +16220,52 @@ declare module 'claude-code' {
   };
 
   /**
+   * What `$.ui.notify` resolves to and what a `ui.notify` hook's `{ value }`
+   * holds: whether a channel sent it (`isSent`) and which, else why not.
+   *
+   * @example
+   * if (!(await $.ui.notify(text)).isSent) $.ui.toast(text)
+   */
+  export type UiNotifyResult = {
+      /**
+       * True: the person's notification channel wrote it to their terminal,
+       * as its notification sequence, its bell, or both.
+       *
+       * A terminal does not report back: one that drops the sequence, or a
+       * system that mutes its banners, still reads true.
+       */
+      isSent: true;
+      /**
+       * Which channel sent it, spelt as the `preferredNotifChannel` setting
+       * spells it; under `auto`, the one their terminal resolved to.
+       *
+       * `terminal_bell` rings and shows neither the text nor the title.
+       * `client` means a host that raises notifications was handed it to raise;
+       * it does not report back.
+       */
+      channel: 'iterm2' | 'iterm2_with_bell' | 'kitty' | 'ghostty' | 'terminal_bell' | 'client';
+  } | {
+      /**
+       * False: no channel sent it.
+       */
+      isSent: false;
+      /**
+       * Why not, a closed set: `disabled`, `no-channel`, `no-surface` or
+       * `refused`, which a hook above says when it answers without sending.
+       *
+       * `disabled`: they set `notifications_disabled`. `no-channel`: `auto`
+       * found no terminal that notifies. `no-surface`: no terminal and no host
+       * that raises it (a `-p` run, the SDK, a cloud session), no session bound
+       * yet, the session is exiting, or the mod unloaded before the notification
+       * went out.
+       *
+       * @example
+       * on('ui.notify', { title: 'CI' }, () => ({ value: REFUSED }))
+       */
+      reason: 'disabled' | 'no-channel' | 'no-surface' | 'refused';
+  };
+
+  /**
    * What `$.ui.open` resolves to and what a `ui.open` hook's `{ value }` holds.
    *
    * Whether a surface draws the pane now, in `$.ui.panes()`' word
@@ -13154,7 +16279,7 @@ declare module 'claude-code' {
    * opened from this plugin before, in this session or an earlier one, and
    * has not closed by hand since) and waits undrawn below that, no
    * `ui.render` raised, until the person opens it or the terminal widens to
-   * the floor. Where a surface seated it (`dock`, `inline`) is on the `Pane`
+   * the floor. Where a surface seated it (`placement`) is on the `Pane`
    * render props, per surface; a plugin's tests answer with a hook beneath.
    *
    * @example
@@ -13168,17 +16293,21 @@ declare module 'claude-code' {
       isPlaced: true;
   } | {
       /**
-       * False: the pane is open but waits undrawn: opened unasked on a narrow
-       * terminal, or in a session whose attached surfaces place no panes.
+       * False: the pane is open but undrawn: opened unasked on a narrow
+       * terminal, or where no surface places panes, or none is attached.
+       *
+       * With none attached keep the pane, which stays open: `session.attach`
+       * is raised when one is, `$.ui.panes()` then says placed, and a surface
+       * that places panes asks the pane's `ui.render`.
        */
       isPlaced: false;
       /**
        * Why it waits and what seats it: the floor it fell under (144 columns
        * unasked, 110 for an id the person once opened) and the width now.
        *
-       * Or the attached surfaces that place nothing (an older desktop); it is
-       * seated when one that places panes attaches. With no terminal measured
-       * and no surface attached (a bare `-p` run) this arm never comes back.
+       * Or the attached surfaces that place nothing, until one that does
+       * attaches or they leave. Or, starting `no-surface` (`$.ui.copy`'s word),
+       * that none is: every open's in a `-p` run, and until a page attaches.
        *
        * @example
        * on('ui.open', { id }, () => ({ value: { isPlaced: false, reason } }))
@@ -13190,8 +16319,8 @@ declare module 'claude-code' {
    * One of this plugin's open panes as `$.ui.panes()` lists it: the pane's
    * id and title, and where it stands with the person right now.
    *
-   * Where a surface seated it (`dock` or `inline`) is that surface's to say, on
-   * the `Pane` render props (`placement`); a session may draw on several.
+   * Where a surface seated it (`dock`, `inline`, `widget`) is that surface's to
+   * say, on the `Pane` render props (`placement`); a session may draw on several.
    */
   export type UiPane = {
       /**
@@ -13216,16 +16345,62 @@ declare module 'claude-code' {
        * for an unrequested pane, its `$.ui.open` answered `{ isPlaced: false }`.
        *
        * It turns true when the person opens the pane or the terminal is widened
-       * to its floor (UiOpenResult `reason`).
+       * to its floor (UiOpenResult `reason`). False on every row, none shown or
+       * focused, while an open answers `no-surface`.
        */
       isPlaced: boolean;
+  };
+
+  /**
+   * The argument of `$.ui.place`.
+   */
+  type UiPlaceArgs = {
+      /**
+       * Names the row among this plugin's: 1 to 64 of letters, digits, `_` and
+       * `-`, as a pane's id. A `ui.render` hook reads it as `e.props.id`.
+       */
+      id: string;
+  };
+
+  /**
+   * What `$.ui.place` resolves to and what a `ui.place` hook's `{ value }` holds.
+   *
+   * The row stands in the conversation either way but past the cap and with no
+   * conversation, where there is no `requestId`.
+   *
+   * @example
+   * const placed = await $.ui.place({ id: "build" })
+   */
+  type UiPlaceResult = {
+      /**
+       * True: a surface is attached to draw the row.
+       */
+      isPlaced: true;
+      /**
+       * The row's `e.requestId` at `ui.render`, and what `$.ui.scroll` takes.
+       */
+      requestId: string;
+  } | {
+      /**
+       * False: nothing draws the row now, for the `reason` given.
+       */
+      isPlaced: false;
+      /**
+       * The row's id when it stands for a surface yet to attach.
+       */
+      requestId?: string;
+      /**
+       * Why nothing draws it, one line to show or log.
+       */
+      reason: string;
   };
 
   /**
    * The argument of `ui.press`: a press on a `Button` a render hook drew, or
    * on an answered `Markdown` link. Flat and frozen like every event's.
    *
-   * Another plugin addresses one button by matcher:
+   * A hook naming no `plugin` hears its own plugin's presses alone. Another
+   * plugin addresses one button by matcher, `{ plugin: "*" }` for every one:
    * `on("ui.press", { plugin: "explainer", element: "explain" }, ...)`.
    */
   export type UiPressArgument = {
@@ -13412,20 +16587,20 @@ declare module 'claude-code' {
    *
    * The DOM's `clientY - body.top` in cells, the window's offset not added: a
    * hook drawing its own window reads `row` as its tree's row, one the engine
-   * scrolls adds the `scroll.offset` it drew with. The frame lies outside.
+   * scrolls adds the row its window shows. The frame lies outside.
    */
   export type UiScrollPointer = {
       /**
        * 0 at the body's left edge, as `bodyColumns` counts them; negative, or
-       * `bodyColumns` and past, over an inline pane's side borders.
+       * `bodyColumns` and past, over an inline pane's sides or the band's `[-]`.
        */
       column: number;
       /**
        * 0 at the body's first showing row, as `bodyRows` counts them.
        *
-       * The tree's row is `scroll.offset + row` under the engine's window, and
-       * `row` itself under a hook's own (offset 0); negative over a pane's top
-       * border or tab row, `bodyRows` or more over its bottom border.
+       * The tree's row is `row` under a hook's own window, the window's row plus
+       * `row` under the engine's: the `scroll.offset` last read, short of a move
+       * the engine made since. Negative above the body, `bodyRows` or more below.
        */
       row: number;
   };
@@ -13433,15 +16608,21 @@ declare module 'claude-code' {
   /**
    * What a `ui.scroll` hook returns, what `next(e)` resolves to, and what
    * `$.ui.scroll` hands back: `{}` once the window moved, or why it did not.
+   *
+   * `{}` doesn't say the person saw the move: a band folded away shows nothing,
+   * and a mobile app's closed Mods sheet shows nothing and keeps nothing.
    */
   export type UiScrollResult = {
       /**
        * Absent when the window is where the chain left it; else why nothing
        * moved, as `tool.call` and `config.set` spell a refusal.
        *
-       * A hook kept the window (no `next`); the target is not this plugin's;
-       * another move landed first (`the window moved meanwhile`); a transcript
-       * row is not the person's ask (`not person-initiated`) or none scrolls.
+       * A hook kept the window; the target is not this plugin's; another move came
+       * first (`the window moved meanwhile`); a transcript row was unasked (`not
+       * person-initiated`) or none scrolls. With no surface `no-surface` heads it.
+       *
+       * @remarks A `{ deny }` after `next(e)` was answered, a `.catch`'s too,
+       *   fails the hook, and its last `next` stands: deny in its place.
        */
       deny?: string;
   };
@@ -13467,7 +16648,8 @@ declare module 'claude-code' {
    * The argument of `ui.select`: a pick from a `Select` a render hook drew.
    * Flat and frozen like every event's.
    *
-   * Another plugin addresses one picker by matcher:
+   * A hook naming no `plugin` hears its own plugin's pickers alone. Another
+   * plugin addresses one picker by matcher, `{ plugin: "*" }` for every one:
    * `on("ui.select", { plugin: "roster", element: "peer" }, ...)`.
    */
   export type UiSelectArgument = {
@@ -13541,6 +16723,27 @@ declare module 'claude-code' {
        * What the handler received: the option's value as the chain left it.
        */
       value: string;
+  };
+
+  /**
+   * What `$.ui.view` hands back and what a `ui.view` hook's `{ value }` holds:
+   * `{}` once the main view shows what was asked, or why it does not.
+   *
+   * As `ui.scroll` spells it.
+   *
+   * @example
+   * $.ui.view({ agentId }).then(shown => shown.deny && $.ui.toast(shown.deny))
+   */
+  export type UiViewResult = {
+      /**
+       * Absent when the main view shows the transcript asked for; else why the
+       * view did not move.
+       *
+       * The call did not answer the person's own input; no agent holds the id,
+       * or the tasks list shows none for it; a teammate was stopped, or runs in
+       * a pane of its own; the view moved meanwhile; the session draws none.
+       */
+      deny?: string;
   };
 
   /**
@@ -13688,7 +16891,7 @@ declare module 'claude-code' {
       hook_event_name: 'UserPromptSubmit';
       prompt: string;
       /**
-       * Who authored/injected the prompt: `user` = submitted from the interactive composer, `sdk` = non-interactive entrypoint (`-p` / Agent SDK), `loop_wakeup` = dynamic /loop wakeup, `schedule_wakeup` = scheduled-task fire (CronCreate/routine), `system` = other machine-injected turns (peer/channel messages, task notifications, auto-continuation), `poll_event` = the poll-event channel enqueue-time pass (the hook fires when the host submits an event, before its delivery ack exists - a blocking verdict rejects the event). Payloads may omit it while the field rolls out.
+       * Who authored/injected the prompt: `user` = submitted from the interactive composer, `sdk` = non-interactive entrypoint (`-p` / Agent SDK), `loop_wakeup` = dynamic /loop wakeup, `schedule_wakeup` = scheduled-task fire (CronCreate or a cloud scheduled task), `system` = other machine-injected turns (peer/channel messages, task notifications, auto-continuation), `poll_event` = the poll-event channel enqueue-time pass (the hook fires when the host submits an event, before its delivery ack exists - a blocking verdict rejects the event). Payloads may omit it while the field rolls out.
        */
       source?: 'user' | 'sdk' | 'system' | 'loop_wakeup' | 'schedule_wakeup' | 'poll_event';
       session_title?: string;
@@ -13704,6 +16907,41 @@ declare module 'claude-code' {
   } | {
       deny: string;
       value?: undefined;
+  };
+
+  /**
+   * One background agent a line waits on, as `ui.render` sees it under
+   * `waitingFor.agents`.
+   */
+  type WaitingAgent = {
+      /**
+       * The same id as `task.id` on the UserMessage notification row that
+       * reports its end.
+       */
+      id: string;
+      /**
+       * Which agent it runs (`general-purpose`, `<plugin>:<agent>`).
+       */
+      agentType: string;
+      /**
+       * The call that started it, as `tool.call` carried it
+       * (`e.tool_use_id`), when its task records one.
+       */
+      tool_use_id?: string;
+  };
+
+  /**
+   * What a line waits on, as `ui.render` sees it under `waitingFor`.
+   */
+  type WaitingFor = {
+      /**
+       * Each background agent the line waits on.
+       */
+      agents: ReadonlyArray<WaitingAgent>;
+      /**
+       * How many workflows the line waits on.
+       */
+      workflows: number;
   };
 
   type WorktreeCreateHookInput = BaseHookInput & {
@@ -13767,7 +17005,10 @@ declare module 'claude-code' {
    * needs compiled code runs it in a process of its own through `$.process.run`).
    * A surface module's environment (Client) has the same globals and a
    * `console`; neither has timers (a hooks module waits on `$.clock`, a
-   * surface module on `surface.every`).
+   * surface module on `surface.every`). In both, `obj.__proto__ = p` on
+   * anything but a function writes an own key named `__proto__`, as data
+   * handed in holds one; set a prototype with `Object.setPrototypeOf` or
+   * `Object.create`.
    */
   global {
     /**
@@ -13898,6 +17139,7 @@ declare module 'claude-code' {
 }
 
 declare module 'claude-code/testing' {
+  import type { AgentLoop } from 'claude-code';
   import type { Args } from 'claude-code';
   import type { Chunk } from 'claude-code';
   import type { ClassicEventName } from 'claude-code';
@@ -13920,8 +17162,12 @@ declare module 'claude-code/testing' {
   import type { RenderSurface } from 'claude-code';
   import type { RenderViewport } from 'claude-code';
   import type { ResultOf } from 'claude-code';
+  import type { SessionAppendInput } from 'claude-code';
   import type { StreamingEventName } from 'claude-code';
   import type { Tier } from 'claude-code';
+  import type { ToolCallArgs } from 'claude-code';
+  import type { ToolCallReserved } from 'claude-code';
+  import type { ToolCallResult } from 'claude-code';
   import type { UiInputArgument } from 'claude-code';
   import type { UiInputResult } from 'claude-code';
   import type { UiPressResult } from 'claude-code';
@@ -13989,9 +17235,9 @@ declare module 'claude-code/testing' {
    * The element each surface-dependent act of a mounted drawing reaches: a
    * handle carries the act only where the surface's table has the element.
    *
-   * `input` needs `Input` and `select` needs `Select` (every surface but
-   * mobile today); `key`, `pointer`, `post`, `advance` and `resize` reach a
-   * `Client` (terminal and desktop today). The rest need nothing but a tree.
+   * `input` needs `Input` and `select` needs `Select` (every surface today);
+   * `key`, `pointer`, `post`, `advance` and `resize` reach a `Client`
+   * (terminal and desktop today). The rest need nothing but a tree.
    */
   export type ElementOfAct = {
       input: 'Input';
@@ -14008,8 +17254,8 @@ declare module 'claude-code/testing' {
    * field given at once: its tag, its `key`, and the text it shows.
    *
    * `text` matches the element's whole shown text (string children, a Button
-   * or Link's label, a Markdown's text, a Code's source, an Input's value):
-   * a string by inclusion, a RegExp by test.
+   * or Link's label, a Markdown's text, a Code's source, an Input's value, a
+   * Progress's label and figure): a string by inclusion, a RegExp by test.
    *
    * @example
    * await ui.findAll({ type: 'Text', text: /overdue/, in: 'board' })
@@ -14101,22 +17347,24 @@ declare module 'claude-code/testing' {
        *
        * Resolves once the tree validated and every `Client` in it drew once.
        *
-       * @param target whose elements, the surface, the component, its props,
-       *   the instance's requestId, and what the surface measured
+       * @param target whose elements, the surface, component, props and requestId
        * @returns the mounted drawing; rejects when no `surface` (or an unknown
-       *   one) is named, when the surface cannot draw the tree the chain
-       *   returned (with the reason: an element its table lacks, a prop not
-       *   allowed), or when a `Client`'s module failed or drew nothing
+       *   one) is named, when the surface cannot draw the tree returned (with
+       *   the reason: an element or a prop it lacks, a dialog's tree past its
+       *   rows), or when a `Client`'s module failed or drew nothing
        */
       mount: <P extends RenderSurface, C extends RenderComponent>(target: MountTarget<P, C>) => Promise<Mounted<P, C>>;
   };
 
   /**
    * One noun of the engine's `$`: each of its events as the engine calls it,
-   * `tool.call` and `ui.render` typed per tool and component, `ui.resolve` out.
+   * `tool.call` typed per tool and `ui.render` per component, `ui.resolve` out.
+   *
+   * `skill.prompt` takes a call's input: its frontmatter and source may be
+   * left out, as a test written before the event carried them does.
    */
   export type EngineNoun<N extends keyof EventCalls> = {
-      [V in EngineNounEvent<N>]: `${N}.${V}` extends 'tool.call' | 'ui.render' ? EventCalls[N][V] : EngineCall<`${N}.${V}` & EventName>;
+      [V in EngineNounEvent<N>]: `${N}.${V}` extends 'tool.call' ? EngineToolCall : `${N}.${V}` extends 'ui.render' | 'skill.prompt' ? EventCalls[N][V] : EngineCall<`${N}.${V}` & EventName>;
   };
 
   /**
@@ -14168,8 +17416,28 @@ declare module 'claude-code/testing' {
   };
 
   /**
+   * `$.tool.call` on a test's `$`: a call as the engine raises one, `agentId`
+   * the loop it runs in (a subagent's, a teammate's); left out, the main loop.
+   *
+   * A hooked `tool.check` runs as for a background subagent: a test's
+   * `classic.PermissionRequest` answers an ask; no test plays a person's yes. A
+   * test states `isReadOnly` on `$.tool.check`; `$.ui.ask` states its own.
+   *
+   * @example
+   * await $.tool.call({ tool: 'Bash', command: 'ls', agentId: 'a1' })
+   */
+  export type EngineToolCall = {
+      <T extends string>(input: ToolCallArgs & Pick<ToolCallReserved<T>, 'tool'> & AgentLoop): Promise<ToolCallResult<T>>;
+      (input: ToolCallArgs & AgentLoop): Promise<ToolCallResult>;
+  };
+
+  /**
    * The checks on a value (`expect(received)`), and with them the matchers
    * that stand inside an expected value (`expect.any(Number)`).
+   *
+   * A check that fails throws. In a hook the test registered with `on` the
+   * engine skips the hook as it skips any that throws, and the test fails all
+   * the same, with the check's message and the hook's event.
    */
   export type Expect = Expecting & Matching;
 
@@ -14209,8 +17477,8 @@ declare module 'claude-code/testing' {
    * One element of a mounted drawing as `find` returns it: the description
    * the plugin's hook (or a `Client`'s module) built, read as plain data.
    *
-   * What every surface is handed to draw, not what any surface painted: the
-   * same on the terminal, the desktop, VS Code and mobile.
+   * What each surface is handed to draw, not what it painted: the same on all,
+   * except that a Progress is Box and Text on every surface but mobile.
    */
   export type FoundElement = {
       /**
@@ -14487,14 +17755,26 @@ declare module 'claude-code/testing' {
        * @param variables the environment the plugins read
        */
       env: (on: On, variables: Readonly<Record<string, string>>) => void;
+      /**
+       * Records what is appended to the session's conversations: each row the
+       * kit stored for a plugin's `$.session.append`, or for the test's own.
+       *
+       * The kit answers with or without this, as a session stores the row: a
+       * plugin's minted or refused, a raised one's pinned blocks put back. This is
+       * the test's `session.append` hook: one more needs a matcher (`{ door }`).
+       *
+       * @param on the test's `on`
+       * @returns the session: the rows appended so far
+       */
+      session: (on: On) => MockSession;
   };
 
   /**
    * The world beneath the plugins, mocked noun by noun: `mock.clock`,
-   * `mock.store` and `mock.env`.
+   * `mock.store`, `mock.env` and `mock.session`.
    *
    * Each registers hooks of the test's on the `on` it is handed, visible where
-   * the test calls it, and answers its noun from memory.
+   * the test calls it, and answers its noun from memory or records it.
    */
   export const mock: Mock;
 
@@ -14556,12 +17836,29 @@ declare module 'claude-code/testing' {
   };
 
   /**
+   * The session `mock.session` hands back: what was appended to its
+   * conversations while the test ran.
+   */
+  export type MockSession = {
+      /**
+       * The rows stored so far, oldest first, each as the event carried it:
+       * `message` as stored, `door`, `origin`, `uuid` and `agentId`.
+       *
+       * A plugin's own row has the door `note`, the plugin as `origin` and a
+       * fresh `uuid`; a row a hook above refused, or the kit, is left out.
+       *
+       * @returns the rows
+       */
+      appended: () => readonly SessionAppendInput[];
+  };
+
+  /**
    * A drawing of component `C` the test mounted on surface `P`: reads over its
    * description, acts on its elements by key, `Client` acts where `P` has one.
    *
    * Narrowed by the `surface` the test passed, as `e.surface` narrows
-   * `$.ui.resolve(e)`: no `input` on `mobile`, no `key` on `vscode`, whose
-   * tables (Elements) lack `Input` and `Client`; over a union, their meet.
+   * `$.ui.resolve(e)`: no `key` on `mobile` or `vscode`, whose tables
+   * (Elements) lack `Client`; over a union, their meet.
    */
   export type Mounted<P extends RenderSurface = RenderSurface, C extends RenderComponent = RenderComponent> = {
       [K in keyof MountedMembers<P, C> as K extends keyof ElementOfAct ? ElementOfAct[K] extends keyof Elements[P] ? K : never : K]: MountedMembers<P, C>[K];
@@ -14581,8 +17878,8 @@ declare module 'claude-code/testing' {
        */
       readonly surface: P;
       /**
-       * The tree as last drawn: what the plugins' `ui.render` chain returned
-       * for this instance, validated by the surface's table, as plain data.
+       * The tree as last drawn, as plain data: what the `ui.render` chain returned,
+       * checked by the surface's table, with a Progress as Box and Text except on mobile.
        *
        * With `in`, what that `Client`'s surface module last drew instead.
        *
@@ -14712,6 +18009,19 @@ declare module 'claude-code/testing' {
        * await ui.redraw({ ...TOOL_ROW, isRunning: false, output: 'done' })
        */
       redraw: (props?: RenderPropsOf[C]) => Promise<void>;
+      /**
+       * Whether the tree as last drawn holds what `next(e)` answered, so what is
+       * beneath the plugins is drawn with it; false when a hook left it out.
+       *
+       * Calling it says the test has looked: `claude plugin test` then prints no
+       * advice for this drawing, whichever answer the test expects.
+       *
+       * @returns whether what is beneath was kept; rejects when it is not in the
+       *   tree and the test has its own `ui.render` hook at this site: `find` it
+       * @example
+       * expect(await ui.keepsBeneath()).toBe(true)
+       */
+      keepsBeneath: () => Promise<boolean>;
       /**
        * Lets the drawing go, as the surface dropping the instance does: its
        * `Client`s and their timers end. Later acts on the handle reject.
@@ -14916,8 +18226,9 @@ declare module 'claude-code/testing' {
    * A test: the engine's `$`, and `on`, a plugin's registrar, whose hooks sit
    * beneath every plugin; beneath them the bottom hook throws, naming its event.
    *
-   * The plugins load at the test's first call on `$`, so a test registers its
-   * hooks before it, as a module registers its own in `register()`.
+   * It registers hooks before its first call on `$`, which loads the plugins.
+   * Beneath `$.state`, `ui.render`, its `$.ui.invalidate` and `session.append`
+   * the kit answers. A check that fails in a hook, or a refused answer, fails it.
    */
   export type TestBody = ($: Engine, on: On) => unknown;
 
@@ -14985,6 +18296,8 @@ declare module 'claude-code' {
       subagent_type?: string
       /** Optional model override for this agent. Takes precedence over the agent definition's model frontmatter and the configured default subagent model. If omitted, uses the agent definition's model, else the default (inherits from the parent unless a default subagent model is configured). Ignored for subagent_type: "fork" — forks always inherit the parent model. */
       model?: "sonnet" | "opus" | "haiku" | "fable"
+      /** Reasoning effort for this agent. Set this ONLY when the user, or instructions such as CLAUDE.md or a skill, explicitly ask that this agent or delegated work run at a specific effort level, never on your own judgment; otherwise omit it and the agent runs at its usual effort. Ignored for subagent_type: "fork": a fork runs at your own effort. */
+      effort?: "low" | "medium" | "high" | "xhigh" | "max"
       /** Name for the spawned agent. Makes it addressable via SendMessage({to: name}) while running. */
       name?: string
       /** Deprecated; ignored. The session has a single implicit team. */
@@ -15003,8 +18316,8 @@ declare module 'claude-code' {
       code: string
     }
     Artifact: {
-      /** One of 'publish', 'list', 'read', 'read_page_data', 'delete', 'open', 'pin', 'unpin', 'quickstart'. Omitting it means 'publish'. **Calls** in the description says what each one does and takes, except as noted here. 'read_page_data' reads the declared data island from the published artifact at `url`, validates it against the interaction schema named by `schema` (available: 'workshop-decisions'), and returns only its validated typed entries, never page content. It refuses when the island does not match its contract. */
-      action?: "publish" | "list" | "read" | "read_page_data" | "delete" | "open" | "pin" | "unpin" | "quickstart"
+      /** One of 'publish', 'list', 'read', 'delete', 'open', 'pin', 'unpin', 'quickstart'. Omitting it means 'publish'. **Calls** in the description says what each one does and takes, except as noted here. */
+      action?: "publish" | "list" | "read" | "delete" | "open" | "pin" | "unpin" | "quickstart"
       /** publish: the local page Claude publishes (.html, or .md only when a skill says so). For an Artifact created from an Artifact type, it is one of that Artifact's data files. With `asset: true`, it is the local file Claude uploads. A short, distinctive basename also serves as the title when nothing else gives one. */
       file_path?: string
       /** publish with `url`: true uploads `file_path` (or each of `file_paths`) to that artifact's asset store instead of publishing it as the page — or, with `from_url` and `asset_ids` in place of `file_path`, copies those assets of another artifact into it server side (see **Calls**). */
@@ -15026,19 +18339,28 @@ declare module 'claude-code' {
         /** Servable media type; inferred from the extension for common types (css/js/json/png/…) — pass explicitly otherwise. */
         contentType?: string
       }> | {}
-      /** The base directory that relative `files` sources resolve against, like a bundler root. It never changes published paths. It is relative to the working directory, or absolute within it or within Claude's scratchpad directory. It requires `files`, except on an Artifact made from a type, where a data `file_path` under it is served at its path relative to it. */
+      /** publish: small changes Claude makes to the file at `file_path` in this same call, instead of editing the file with Edit and publishing after. Use it on a page (add `url` to update an artifact from another conversation) or on one data file of an artifact made from a type (its `url`, with that file as `file_path`). Not allowed with `type_url` or `files`. Each old_str is text copied exactly from the file as it now stands and must occur in it exactly once; new_str takes its place (empty deletes it). The edits apply in order, all or none: the file is published with them and then saved with them on disk, so it stays the source for later changes; on a miss nothing is changed or published, and the result says which edit failed and why. */
+      edits?: Array<{
+        /** Text copied exactly from the file; must occur once. */
+        old_str: string
+        /** Its replacement; empty deletes old_str. */
+        new_str: string
+      }>
+      /** The base directory that relative `files` sources resolve against, like a bundler root. It never changes the published path of a `files` entry. It is relative to the working directory, or absolute within it or within Claude's scratchpad directory. It requires `files`, except on an Artifact made from a type, where a data `file_path` is served at its path relative to `root`, unless a `files` map entry states its served path. Claude sends it with every such publish, set to the folder that holds the Artifact's files at their served paths. */
       root?: string
       /** publish only: true also pins the published artifact to the person's claude.ai sidebar once it is published. Claude passes it only when the person asked for that. A failed pin never fails the publish, and the result says so. */
       pin?: boolean
       /** list only: the maximum number of artifacts to return (default 25). */
       limit?: number
+      /** list only: the `next_page_token` a listing of the same scope gave, to list the artifacts after it. */
+      page_token?: string
       /** list: which listing to return. 'mine' is the default. The others are 'shared', 'all', 'types', 'files' (with `url`) and 'assets' (with `url`, continued with `after`). See **Calls**. */
       scope?: "mine" | "shared" | "all" | "types" | "files" | "assets"
       /** list with scope 'types' only: limits the listing to the types whose title or description match this text best, ignoring case; a type that matches less well is left out, so a narrowed listing is not the whole catalog. Claude omits it when choosing a type for a request, unless a listing made without it says more types exist than it shows. */
       type_query?: string
       /** list only: the name of a published Artifact type, as a 'types' listing shows it (case does not matter). The listing then shows the Artifacts made from that type instead of the person's gallery. Claude passes this or `type_url`, not both. */
       type?: string
-      /** quickstart only (required): what is being made — 'document' (text to read or edit together), 'slides' (a deck or one slide), 'design' (a visual design or prototype on a canvas), 'other' (anything else, or unsure). */
+      /** quickstart only (required): what is being made — 'document' (writing people will keep editing or pass around as text, such as a memo, plan, spec, proposal or notes), 'slides' (a deck or one slide), 'design' (a visual design or prototype on a canvas), 'other' (a page to look at or use: an explainer, a diagram, anything interactive, a dashboard that shows data, a spreadsheet, anything else, or unsure). */
       intent?: "document" | "slides" | "design" | "other"
       /** quickstart only: false when a design system's link is already in hand (it is then read with its own call) or one was declined. Omitted or true, the result lists the design systems (not for a document) and, for slides or a design, attaches the default one's README. */
       design_systems?: boolean
@@ -15070,8 +18392,6 @@ declare module 'claude-code' {
       after?: string
       /** read only: true returns the rendered page in cases where a read otherwise returns something else. A typed Artifact's read leaves out the type's own page. */
       page?: boolean
-      /** The registered interaction schema to validate the page's data island against. Required for read_page_data (e.g. "workshop-decisions"), and meaningless for every other action. */
-      schema?: string
       /** publish: the runtime capabilities this page declares, as {name: config}. Claude loads the `artifact-capabilities` skill before passing it. On a redeploy Claude omits the field to keep what the page has, and {} clears it. */
       capabilities?: {}
       /** publish: the artifact's runtime version. Leaving it out keeps the current version (the default), 'latest' upgrades, and an exact version pins or rolls back. It changes how the published page behaves, so Claude passes it only when the author explicitly intends that change. */
@@ -15179,7 +18499,7 @@ declare module 'claude-code' {
     Bash: {
       /** The command to execute */
       command: string
-      /** Optional timeout in milliseconds (max 10000 for a foreground command) */
+      /** Optional timeout in milliseconds (max 600000 for a foreground command) */
       timeout?: number
       /** Clear, concise description of what this command does in active voice. Never use words like "complex" or "risk" in the description - just describe what it does. Say what the command does in plain words: do not echo the command's text, its flags, or file paths - the user reads this description, often without seeing the command. For simple commands (git, npm, standard CLI tools), keep it brief (5-10 words): - ls → "List files in current directory" - git status → "Show working tree status" - npm install → "Install package dependencies" For commands that are harder to parse at a glance (piped commands, obscure flags, etc.), add enough context to clarify what it does: - find . -name "*.tmp" -exec rm {} \; → "Find and delete all .tmp files recursively" - git reset --hard origin/main → "Discard all local changes and match remote main" - curl -s url | jq '.data[]' → "Fetch JSON from URL and extract data array elements" */
       description?: string
@@ -15400,6 +18720,10 @@ declare module 'claude-code' {
       /** The type of edit to make (replace, insert, delete). Defaults to replace. */
       edit_mode?: "replace" | "insert" | "delete"
     }
+    OfferChromeSetup: {
+      /** A short phrase naming what the task needs the user's own browser for. */
+      reason?: string
+    }
     Poll: {}
     Projects: {
       method: "project_info" | "project_read" | "project_search" | "project_write" | "project_delete" | "project_memory_list" | "project_memory_read"
@@ -15427,8 +18751,15 @@ declare module 'claude-code' {
         description: string
         /** memory file paths where this procedure was observed */
         evidence?: string[]
-        /** The complete SKILL.md exactly as it should be saved: frontmatter plus the full body. When the user saves, the body below the frontmatter becomes the skill's entire instructions and the name and description come from the fields above; other frontmatter keys are not kept. For an improvement this replaces the existing skill's SKILL.md entirely, so read that skill's current SKILL.md first and include everything worth keeping, not only the changes. */
-        skillMd: string
+        /** For an improvement, in place of skillMd: your changes to the skill's SKILL.md, applied in order. They apply to that file as it is now, not to an earlier proposal of yours. The card shows the whole updated file. The name and description come from the fields above, not from the frontmatter. */
+        edits?: Array<{
+          /** Text to replace. It must occur exactly once in that SKILL.md */
+          old_string: string
+          /** Text to put in its place */
+          new_string: string
+        }>
+        /** For a new skill or a full rewrite. The complete SKILL.md exactly as it should be saved: frontmatter plus the full body. When the user saves, the body below the frontmatter becomes the skill's entire instructions and the name and description come from the fields above; other frontmatter keys are not kept. For an improvement this replaces the existing skill's SKILL.md entirely, so read that skill's current SKILL.md first and include everything worth keeping, not only the changes. */
+        skillMd?: string
       }>
     }
     ProposeGoal: {
@@ -15437,10 +18768,79 @@ declare module 'claude-code' {
       /** Whether to ask the user for approval before the goal is set. Defaults to true — an approval dialog is shown. Set false ONLY when the user's own words in this conversation stated this outcome as what they want; the goal is then set directly, with a visible notice in the transcript, and the user can clear it with /goal clear. */
       ask_user?: boolean
     }
+    PublishPlugin: {
+      /** The plugin's folder on this machine: the one that holds .claude-plugin/plugin.json, or a mod's hooks/ where there is no manifest yet. */
+      path: string
+      /** Where to publish. The one destination is the library of the organization the session is signed in to. */
+      destination?: "organization"
+      /** What the plugin does, in a sentence: used only for a manifest written for a folder that has none. */
+      description?: string
+      /** True only when the person said to replace the plugin of the same name that is already in their uploads on claude.ai. */
+      replace?: boolean
+      /** Leave out. The tool fills it for the question the person answers: the organization, the folder, the steps, and the files sent. */
+      shown?: string[]
+      /** Leave out. The tool fills it with the same question as data, for a surface that draws its own: what a yes binds to, every file sent, and the entries that stay and are named. */
+      question?: {
+        /** What a yes binds to: the publish is of this, or refused. */
+        digest: string
+        title: string
+        organization: {
+          id: string
+          name?: string
+        }
+        plugin: {
+          name: string
+          version?: string
+        }
+        folder: string
+        /** Whether a plugin of this name on the shelf is replaced. */
+        mode: "new" | "replace"
+        /** What a yes sets off, a sentence each, in order. */
+        steps: string[]
+        /** What the person is warned of, a sentence each: a file sent although its name is one a secret hides under, and that other entries stay behind unnamed. */
+        warnings: string[]
+        /** The manifest a yes writes into the folder first, if any. */
+        writes?: {
+          path: string
+          text: string
+        }
+        /** The whole count and size of what is sent. */
+        sends: {
+          files: number
+          bytes: number
+        }
+        /** The files sent, in the order of their paths. */
+        files: Array<{
+          path: string
+          bytes: number
+          sha256: string
+          /** Whether it is sent as runnable. */
+          runs: boolean
+        }>
+        /** How many entries stay on the machine and are counted here. */
+        staying: number
+        /** The entries that stay and are named, each with why. */
+        stays: Array<{
+          path: string
+          why: "link" | "hard-link" | "ignored" | "secret" | "never" | "generated" | "special" | "backslash"
+          words: string
+        }>
+        /** The list, a line each, of every file sent and every entry that stays and is named, and a last line saying so where entries stay unnamed: its sha256, and the file that holds it. */
+        list: {
+          sha256: string
+          path?: string
+        }
+        /** Present only when the lists are over the bound: how many files and entries they do not name. The list file names them. */
+        unnamed?: {
+          files: number
+          stays: number
+        }
+      }
+    }
     PushNotification: {
       /** The notification body. Keep it under 200 characters; mobile OSes truncate. */
       message: string
-      status: "proactive"
+      status?: "proactive"
     }
     Read: {
       /** The absolute path to the file to read */
@@ -15451,6 +18851,8 @@ declare module 'claude-code' {
       limit?: number
       /** Page range for PDF files (e.g., "1-5", "3", "10-20"). Only applicable to PDF files. Maximum 20 pages per request. */
       pages?: string
+      /** Set to true to read a text file, or a line range of one, that is over the usual size limits, up to what still fits in your context. Only use this when you genuinely need all of it or the user asked for the whole file; otherwise read it in parts with offset and limit, or search it. */
+      allow_large?: boolean
     }
     ReadMcpResourceDirTool: {
       /** The MCP server name */
@@ -15465,13 +18867,17 @@ declare module 'claude-code' {
       uri: string
     }
     ReadNotifications: {}
+    ReadWidgetContext: {
+      /** A widget_id as a reminder or an earlier answer named it, to read only that view; omit it to read every held view. */
+      widget_id?: string
+    }
     RemoteTrigger: {
       action: "list" | "get" | "create" | "update" | "run" | "create_webhook_trigger" | "list_runs" | "get_run_log"
       /** Required for get, update, run, and list_runs */
       trigger_id?: string
       /** Required for get_run_log: a run session id (cse_… or session_…, from list_runs) */
       session_id?: string
-      /** next_cursor from a previous list_runs or get_run_log page */
+      /** The next_cursor from the previous page of the same listing (list_runs with the same trigger_id, or get_run_log with the same session_id), passed back unchanged. Not an offset, a count or an event number. */
       cursor?: string
       /** Required for create and update; optional for run */
       body?: {}
@@ -15558,6 +18964,42 @@ declare module 'claude-code' {
       /** Ask a session ON THIS MACHINE to send you ONE notice when it next goes idle (finishes its turn with nothing queued) or exits — opt-in, one-shot, no polling. With a message: deliver it now AND subscribe. Without a message (omit it): a pure subscription that costs the other session nothing. */
       notify_when_idle?: boolean
     }
+    SendToProject: {
+      /** Name for the new project — normally the repository or folder name the skill reported. Kept to one line of at most 46 characters. */
+      project_name: string
+      /** Only when /send-to-project named an existing Claude Project to send to: its id as the command gave it, unchanged. Omit to create a new project. */
+      project_id?: string
+      /** Add this folder’s GitHub origin as the project’s repository. The tool reads the remote from git itself; pass false when the folder has no GitHub origin or the user said not to add it. */
+      attach_git_remote: boolean
+      /** Where this tool’s description says it sends one message: summary alone, which is the message. Otherwise the brief you drafted of the work to carry on, in the propose_project_setup shape: summary (2–3 plain sentences, no markdown: what the work is, where it stands and what is left; it is also saved in project memory), sessions (≤4 threads for work left unfinished: title, self-contained prompt, one-line description, basis, who ∈ claude|you, produces ∈ pr|doc|decision), routines (≤3, only when asked for or when a check was run by hand on more than one day: name, 5-field UTC cron at most hourly, prompt, description), and, for a new project only (never with project_id), instructions (standing rules that recurred, as a few short bullet lines; never a description of the project or the work), icon (one of Projects, Folder, Code, Database, HandHeart, Beaker, Wrench, Activity, Chart, Team, Users, Book, Box, Note, File, Lightbulb, Palette, Star, Flag, Home, Sun, Clock, Calendar, Scroll, …) and color. Leave name out: project_name names a new project and an existing one keeps its own. evidence.sessions_matched = how many of the quoted sessions the brief draws on (the tool fills the other counts). Every field is optional; send only what the work supports. Shown to the user on the confirmation pane, or on Claude Desktop’s permission card. After their Yes on the pane, or a click on Desktop’s card that Desktop attests, the brief is posted as the project’s setup card as given (a new project’s icon, color and instructions are set on the project at create instead of going on the setup card). After any other allow (another host application, a hook, or a Desktop build that does not attest clicks), everything goes on the setup card for the user to confirm. No thread starts on approval in either case: the setup card lists them and the user starts each one there. */
+      proposal: {
+        name?: string
+        icon?: "Projects" | "Folder" | "Code" | "Database" | "HandHeart" | "Beaker" | "Wrench" | "Activity" | "Chart" | "Team" | "Users" | "Book" | "Box" | "Note" | "File" | "Lightbulb" | "Palette" | "Star" | "Flag" | "Home" | "Sun" | "Clock" | "Calendar" | "Scroll" | "Moon" | "MoonStars" | "SunHorizon" | "Owl" | "Atom" | "DNA" | "Orbit" | "Globe" | "Cloud" | "Hammer" | "Key" | "Lock" | "Camera" | "Microphone" | "CoffeeCup" | "Gift" | "Ghost" | "GraduationCap" | "Library" | "Spreadsheet" | "Slides" | "Checklist" | "Clipboard" | "Image" | "Bookmark" | "Bank" | "Signpost" | "MapPin" | "Mailbox" | "Heart" | "Lightning" | "Shapes" | "Goal" | "Scale" | "Eye" | "Binoculars" | "Bullhorn" | "PaperPlane" | "ChartLine" | "Timer"
+        color?: "red" | "orange" | "green" | "aqua" | "blue" | "violet" | "magenta"
+        summary?: string
+        instructions?: string
+        routines?: {
+          name: string
+          cron_expression: string
+          prompt: string
+          description?: string
+        }[]
+        sessions?: Array<{
+          title: string
+          prompt: string
+          description: string
+          basis: string
+          who: "claude" | "you"
+          produces: "pr" | "doc" | "decision"
+        }>
+        evidence?: {
+          sessions_matched?: number
+          sessions_considered?: number
+          window_days?: number
+        }
+      }
+    }
+    SendToProjectContext: {}
     SendUserFile: {
       /** File paths (absolute or relative to cwd) to send to the user. Always pass an array, even for a single file. */
       files: string[]
@@ -15573,9 +19015,9 @@ declare module 'claude-code' {
       message: string
     }
     ShareOnboardingGuide: {
-      /** 'check' (default): if ONBOARDING.md is present locally, uploads it to the most-recent guide (creates one if none exist); otherwise reports the existing link without uploading. 'update': upload to a specific guide by short_code. 'create': always make a new link. 'delete': remove a guide. */
+      /** 'check' (default): if ONBOARDING.md is present locally, uploads it to the most-recent guide (creates one if none exist); otherwise reports the existing link without uploading. 'update': upload to a specific guide by short_code. 'create': always make a new link. 'delete': remove the guide named by short_code; with no short_code, nothing is deleted and the user's guides are listed. */
       mode: "check" | "update" | "create" | "delete"
-      /** Short code of a specific guide to target (returned by a previous call). Honored by check, update, and delete — skips the org-wide lookup and targets this guide directly. */
+      /** Short code of one guide, from an earlier call's result. Required by delete. With check or update, targets that guide instead of the most recently updated one. */
       short_code?: string
     }
     ShowOnboardingRolePicker: {}
@@ -15676,6 +19118,8 @@ declare module 'claude-code' {
       url: string
       /** The prompt to run on the fetched content */
       prompt: string
+      /** Character position in the page text to start reading from. Use it to read on through a page too long for one call, with the value the previous result gave. */
+      offset?: number
     }
     WebSearch: {
       /** The search query to use */
@@ -15703,12 +19147,29 @@ declare module 'claude-code' {
       /** Run ID of a prior Workflow invocation to resume from. Completed agent() calls with unchanged (prompt, opts) return their cached results instantly; only edited or new calls re-run. Same-session only. Stop the prior run first (TaskStop) before resuming. */
       resumeFromRunId?: string
     }
+    WrapUp: {
+      /** Two or three short sentences to the user, under 300 characters if you can: what is now true or changed, then where it stands, including what is not done or not verified. */
+      recap: string
+      /** The one decision that is the user's call, under 100 characters if you can: a choice, a go-ahead, an approval. No reason, no recommendation, no list of the options the buttons give. */
+      ask?: string
+      /** true when your work stops here until the user answers; omit when the answer can wait. */
+      blocked?: boolean
+      /** One or two buttons that answer ask, your recommendation first; a second only when it is a realistic alternative. Needs ask. */
+      actions?: Array<{
+        /** A reply: the button's text, which a click sends you as the user's message. 1-3 plain words, at most 24 characters ("Yes, fix 1", "Not now"). The first button is your pick, so no need to say so. Each word starts with a letter or digit. No quotes, code marks, arrows, emoji, @ or =. Write & only between blanks. */
+        label: string
+      } | {
+        /** One of the app's own buttons, which asks you to check this turn's changes (verify) or, on an open pull request, to fix its failing checks, address its requested changes or resolve its merge conflicts. The app shows it only while that applies, so prefer a reply. */
+        action: "verify" | "fix_ci" | "address_comments" | "resolve_conflicts"
+      }>
+    }
     Write: {
       /** The absolute path to the file to write (must be absolute, not relative) */
       file_path: string
       /** The content to write to the file */
       content: string
     }
+    Yield: {}
   }
 }
 
@@ -15767,6 +19228,7 @@ declare module 'claude-code' {
         } | null
         fallback_credit?: unknown
       }
+      toolsUsed?: string[]
       toolStats?: {
         readCount: number
         searchCount: number
@@ -15781,6 +19243,14 @@ declare module 'claude-code' {
       prompt: string
       worktreePath?: string
       worktreeBranch?: string
+      /** @internal False when the calling agent cannot continue this agent with a follow-up message (it holds no messaging tool); absent means it can. */
+      canContinueAgent?: boolean
+      /** @internal The subagent's TaskCreate and TaskUpdate calls that succeeded, in order: each call's tool, its input as the model wrote it, and its result text. The subagent writes the session's task list, and no other row of the main transcript shows these calls. A missing member does not mean that no call ran. A host may read it, so a later build only adds keys to a call: see "For another program that reads a sub-agent's task calls" in docs/task-list-across-compaction.md */
+      taskCalls?: Array<{
+        name: "TaskCreate" | "TaskUpdate"
+        input: unknown
+        result: string
+      }>
     } | {
       status: "async_launched"
       isAsync?: true
@@ -15798,6 +19268,8 @@ declare module 'claude-code' {
       outputFile: string
       /** Whether the calling agent has Read/Bash tools to check progress */
       canReadOutputFile?: boolean
+      /** @internal False when the calling agent cannot continue this agent with a follow-up message (it holds no messaging tool); absent means it can. */
+      canContinueAgent?: boolean
       /** @internal True when this unisolated write-capable agent was launched into a working directory where another one is already running and a worktree could have been made here (drives a model-facing note; not a stable consumer field) */
       sharesCwd?: boolean
     } | {
@@ -15834,12 +19306,15 @@ declare module 'claude-code' {
           data: string
         }>
       }>
+      /** The tools the script's artifact calls reached whose names this conversation's prompt did not yet carry: the tool_result opens with a tools-used-before-summary line naming them */
+      toolsUsed?: string[]
     }
     Artifact: {
       created_from_type: true
       already_created?: true
       url: string
       version: string
+      owned?: boolean
       path?: string
       title?: string
       type: {
@@ -15848,6 +19323,8 @@ declare module 'claude-code' {
       }
       own_files: string[]
       type_files: string[]
+      served_at?: string
+      served_root?: string
       files_written?: {
         path: string
         sha256: string
@@ -15899,6 +19376,7 @@ declare module 'claude-code' {
           created_at?: string
           rel?: string
           audience?: string
+          outsiders_may_have_written?: true
           default?: string
         }[]
         more?: boolean
@@ -15925,6 +19403,7 @@ declare module 'claude-code' {
       url: string
       artifact_id: string
       title?: string
+      owned?: boolean
     } | {
       url: string
       path: string
@@ -15944,6 +19423,7 @@ declare module 'claude-code' {
       publishesResetAt?: number
       contract?: string
       updated?: boolean
+      owned?: boolean
       icon?: string
       faviconSent?: true
       iconDropped?: true
@@ -15961,6 +19441,8 @@ declare module 'claude-code' {
       }
       liveSubscription?: string
       verifyGuide?: string
+      editsApplied?: number
+      editsNotWritten?: "write_failed" | "not_writable" | "changed_during_publish" | "hard_linked"
       seededThread?: string
       copied?: {
         path: string
@@ -15987,6 +19469,10 @@ declare module 'claude-code' {
       }
       own_files?: string[]
       type_files?: string[]
+      served_at?: string
+      served_root?: string
+      new_files?: string[]
+      unchanged_files?: string[]
     } | {
       artifacts: Array<{
         title: string
@@ -15996,9 +19482,13 @@ declare module 'claude-code' {
         rel?: "mine" | "shared"
         external?: true
         role?: "editor" | "commenter" | "reader" | "viewer"
+        outsidersMayHaveWritten?: true
         pinned?: boolean
       }>
       truncated?: boolean
+      total?: number
+      total_at_least?: true
+      next_page_token?: string
       pins_enabled?: boolean
       scope?: "shared" | "all"
       external_listed?: true
@@ -16012,6 +19502,7 @@ declare module 'claude-code' {
         durationMs: number
         title?: string
       }
+      owned?: boolean
       artifactRead?: {
         slug: string
         ver?: string
@@ -16052,9 +19543,17 @@ declare module 'claude-code' {
         content?: string
         chars?: number
         clipped?: boolean
-        unread?: "withheld" | "not_listed" | "not_text" | "too_large" | "unavailable"
+        unread?: "withheld" | "not_listed" | "not_text" | "too_large" | "unavailable" | "result_full"
         why?: string
       }
+      type_files_read?: Array<{
+        path: string
+        content?: string
+        chars?: number
+        clipped?: boolean
+        unread?: "withheld" | "not_listed" | "not_text" | "too_large" | "unavailable" | "result_full"
+        why?: string
+      }>
     } | {
       type_instances: {
         type?: string
@@ -16067,6 +19566,7 @@ declare module 'claude-code' {
           created_at?: string
           rel?: string
           audience?: string
+          outsiders_may_have_written?: true
           default?: string
         }[]
         more?: boolean
@@ -16084,6 +19584,7 @@ declare module 'claude-code' {
           tier?: string
         }
         match_of?: number
+        ask_first?: boolean
         types?: {
           title: string
           type_url: string
@@ -16092,6 +19593,18 @@ declare module 'claude-code' {
         }[]
         types_more?: boolean
         dashboard_type?: {
+          title: string
+          type_url: string
+          description?: string
+          tier?: string
+        }
+        motion_type?: {
+          title: string
+          type_url: string
+          description?: string
+          tier?: string
+        }
+        whiteboard_type?: {
           title: string
           type_url: string
           description?: string
@@ -16115,6 +19628,7 @@ declare module 'claude-code' {
             created_at?: string
             rel?: string
             audience?: string
+            outsiders_may_have_written?: true
             default?: string
           }[]
           more?: boolean
@@ -16365,6 +19879,7 @@ declare module 'claude-code' {
       written?: {
         url: string
       }
+      owned?: boolean
       as_level?: string
       as_level_confirmed?: boolean
       db_write: {
@@ -16418,6 +19933,7 @@ declare module 'claude-code' {
       written?: {
         url: string
       }
+      owned?: boolean
       asset_upload: {
         id: string
         url: string
@@ -16430,6 +19946,7 @@ declare module 'claude-code' {
       written?: {
         url: string
       }
+      owned?: boolean
       asset_uploads: {
         url: string
         results: Array<{
@@ -16486,6 +20003,7 @@ declare module 'claude-code' {
       written?: {
         url: string
       }
+      owned?: boolean
       asset_delete: {
         id: string
         deleted: boolean
@@ -16614,6 +20132,17 @@ declare module 'claude-code' {
         title?: string
       }
     } | {
+      page_versions: {
+        url: string
+        rows: {
+          id: string
+          createdAt?: string
+          current?: true
+        }[]
+        degraded?: true
+        cut?: true
+      }
+    } | {
       verify: {
         url: string
         ver: string
@@ -16645,6 +20174,19 @@ declare module 'claude-code' {
         }[]
         issuesDropped?: number
         renderError?: string
+      }
+    } | {
+      emulatorPreview: {
+        file: string
+        outcome: string
+        pictures: {
+          path: string
+          base64?: string
+        }[]
+        marks?: string[]
+        errors?: string[]
+        outline?: string
+        stopped?: string
       }
     }
     ArtifactCheck: {
@@ -16652,6 +20194,7 @@ declare module 'claude-code' {
       already_created?: true
       url: string
       version: string
+      owned?: boolean
       path?: string
       title?: string
       type: {
@@ -16660,6 +20203,8 @@ declare module 'claude-code' {
       }
       own_files: string[]
       type_files: string[]
+      served_at?: string
+      served_root?: string
       files_written?: {
         path: string
         sha256: string
@@ -16711,6 +20256,7 @@ declare module 'claude-code' {
           created_at?: string
           rel?: string
           audience?: string
+          outsiders_may_have_written?: true
           default?: string
         }[]
         more?: boolean
@@ -16737,6 +20283,7 @@ declare module 'claude-code' {
       url: string
       artifact_id: string
       title?: string
+      owned?: boolean
     } | {
       url: string
       path: string
@@ -16756,6 +20303,7 @@ declare module 'claude-code' {
       publishesResetAt?: number
       contract?: string
       updated?: boolean
+      owned?: boolean
       icon?: string
       faviconSent?: true
       iconDropped?: true
@@ -16773,6 +20321,8 @@ declare module 'claude-code' {
       }
       liveSubscription?: string
       verifyGuide?: string
+      editsApplied?: number
+      editsNotWritten?: "write_failed" | "not_writable" | "changed_during_publish" | "hard_linked"
       seededThread?: string
       copied?: {
         path: string
@@ -16799,6 +20349,10 @@ declare module 'claude-code' {
       }
       own_files?: string[]
       type_files?: string[]
+      served_at?: string
+      served_root?: string
+      new_files?: string[]
+      unchanged_files?: string[]
     } | {
       artifacts: Array<{
         title: string
@@ -16808,9 +20362,13 @@ declare module 'claude-code' {
         rel?: "mine" | "shared"
         external?: true
         role?: "editor" | "commenter" | "reader" | "viewer"
+        outsidersMayHaveWritten?: true
         pinned?: boolean
       }>
       truncated?: boolean
+      total?: number
+      total_at_least?: true
+      next_page_token?: string
       pins_enabled?: boolean
       scope?: "shared" | "all"
       external_listed?: true
@@ -16824,6 +20382,7 @@ declare module 'claude-code' {
         durationMs: number
         title?: string
       }
+      owned?: boolean
       artifactRead?: {
         slug: string
         ver?: string
@@ -16864,9 +20423,17 @@ declare module 'claude-code' {
         content?: string
         chars?: number
         clipped?: boolean
-        unread?: "withheld" | "not_listed" | "not_text" | "too_large" | "unavailable"
+        unread?: "withheld" | "not_listed" | "not_text" | "too_large" | "unavailable" | "result_full"
         why?: string
       }
+      type_files_read?: Array<{
+        path: string
+        content?: string
+        chars?: number
+        clipped?: boolean
+        unread?: "withheld" | "not_listed" | "not_text" | "too_large" | "unavailable" | "result_full"
+        why?: string
+      }>
     } | {
       type_instances: {
         type?: string
@@ -16879,6 +20446,7 @@ declare module 'claude-code' {
           created_at?: string
           rel?: string
           audience?: string
+          outsiders_may_have_written?: true
           default?: string
         }[]
         more?: boolean
@@ -16896,6 +20464,7 @@ declare module 'claude-code' {
           tier?: string
         }
         match_of?: number
+        ask_first?: boolean
         types?: {
           title: string
           type_url: string
@@ -16904,6 +20473,18 @@ declare module 'claude-code' {
         }[]
         types_more?: boolean
         dashboard_type?: {
+          title: string
+          type_url: string
+          description?: string
+          tier?: string
+        }
+        motion_type?: {
+          title: string
+          type_url: string
+          description?: string
+          tier?: string
+        }
+        whiteboard_type?: {
           title: string
           type_url: string
           description?: string
@@ -16927,6 +20508,7 @@ declare module 'claude-code' {
             created_at?: string
             rel?: string
             audience?: string
+            outsiders_may_have_written?: true
             default?: string
           }[]
           more?: boolean
@@ -17177,6 +20759,7 @@ declare module 'claude-code' {
       written?: {
         url: string
       }
+      owned?: boolean
       as_level?: string
       as_level_confirmed?: boolean
       db_write: {
@@ -17230,6 +20813,7 @@ declare module 'claude-code' {
       written?: {
         url: string
       }
+      owned?: boolean
       asset_upload: {
         id: string
         url: string
@@ -17242,6 +20826,7 @@ declare module 'claude-code' {
       written?: {
         url: string
       }
+      owned?: boolean
       asset_uploads: {
         url: string
         results: Array<{
@@ -17298,6 +20883,7 @@ declare module 'claude-code' {
       written?: {
         url: string
       }
+      owned?: boolean
       asset_delete: {
         id: string
         deleted: boolean
@@ -17426,6 +21012,17 @@ declare module 'claude-code' {
         title?: string
       }
     } | {
+      page_versions: {
+        url: string
+        rows: {
+          id: string
+          createdAt?: string
+          current?: true
+        }[]
+        degraded?: true
+        cut?: true
+      }
+    } | {
       verify: {
         url: string
         ver: string
@@ -17457,6 +21054,19 @@ declare module 'claude-code' {
         }[]
         issuesDropped?: number
         renderError?: string
+      }
+    } | {
+      emulatorPreview: {
+        file: string
+        outcome: string
+        pictures: {
+          path: string
+          base64?: string
+        }[]
+        marks?: string[]
+        errors?: string[]
+        outline?: string
+        stopped?: string
       }
     }
     ArtifactComments: {
@@ -17464,6 +21074,7 @@ declare module 'claude-code' {
       already_created?: true
       url: string
       version: string
+      owned?: boolean
       path?: string
       title?: string
       type: {
@@ -17472,6 +21083,8 @@ declare module 'claude-code' {
       }
       own_files: string[]
       type_files: string[]
+      served_at?: string
+      served_root?: string
       files_written?: {
         path: string
         sha256: string
@@ -17523,6 +21136,7 @@ declare module 'claude-code' {
           created_at?: string
           rel?: string
           audience?: string
+          outsiders_may_have_written?: true
           default?: string
         }[]
         more?: boolean
@@ -17549,6 +21163,7 @@ declare module 'claude-code' {
       url: string
       artifact_id: string
       title?: string
+      owned?: boolean
     } | {
       url: string
       path: string
@@ -17568,6 +21183,7 @@ declare module 'claude-code' {
       publishesResetAt?: number
       contract?: string
       updated?: boolean
+      owned?: boolean
       icon?: string
       faviconSent?: true
       iconDropped?: true
@@ -17585,6 +21201,8 @@ declare module 'claude-code' {
       }
       liveSubscription?: string
       verifyGuide?: string
+      editsApplied?: number
+      editsNotWritten?: "write_failed" | "not_writable" | "changed_during_publish" | "hard_linked"
       seededThread?: string
       copied?: {
         path: string
@@ -17611,6 +21229,10 @@ declare module 'claude-code' {
       }
       own_files?: string[]
       type_files?: string[]
+      served_at?: string
+      served_root?: string
+      new_files?: string[]
+      unchanged_files?: string[]
     } | {
       artifacts: Array<{
         title: string
@@ -17620,9 +21242,13 @@ declare module 'claude-code' {
         rel?: "mine" | "shared"
         external?: true
         role?: "editor" | "commenter" | "reader" | "viewer"
+        outsidersMayHaveWritten?: true
         pinned?: boolean
       }>
       truncated?: boolean
+      total?: number
+      total_at_least?: true
+      next_page_token?: string
       pins_enabled?: boolean
       scope?: "shared" | "all"
       external_listed?: true
@@ -17636,6 +21262,7 @@ declare module 'claude-code' {
         durationMs: number
         title?: string
       }
+      owned?: boolean
       artifactRead?: {
         slug: string
         ver?: string
@@ -17676,9 +21303,17 @@ declare module 'claude-code' {
         content?: string
         chars?: number
         clipped?: boolean
-        unread?: "withheld" | "not_listed" | "not_text" | "too_large" | "unavailable"
+        unread?: "withheld" | "not_listed" | "not_text" | "too_large" | "unavailable" | "result_full"
         why?: string
       }
+      type_files_read?: Array<{
+        path: string
+        content?: string
+        chars?: number
+        clipped?: boolean
+        unread?: "withheld" | "not_listed" | "not_text" | "too_large" | "unavailable" | "result_full"
+        why?: string
+      }>
     } | {
       type_instances: {
         type?: string
@@ -17691,6 +21326,7 @@ declare module 'claude-code' {
           created_at?: string
           rel?: string
           audience?: string
+          outsiders_may_have_written?: true
           default?: string
         }[]
         more?: boolean
@@ -17708,6 +21344,7 @@ declare module 'claude-code' {
           tier?: string
         }
         match_of?: number
+        ask_first?: boolean
         types?: {
           title: string
           type_url: string
@@ -17716,6 +21353,18 @@ declare module 'claude-code' {
         }[]
         types_more?: boolean
         dashboard_type?: {
+          title: string
+          type_url: string
+          description?: string
+          tier?: string
+        }
+        motion_type?: {
+          title: string
+          type_url: string
+          description?: string
+          tier?: string
+        }
+        whiteboard_type?: {
           title: string
           type_url: string
           description?: string
@@ -17739,6 +21388,7 @@ declare module 'claude-code' {
             created_at?: string
             rel?: string
             audience?: string
+            outsiders_may_have_written?: true
             default?: string
           }[]
           more?: boolean
@@ -17989,6 +21639,7 @@ declare module 'claude-code' {
       written?: {
         url: string
       }
+      owned?: boolean
       as_level?: string
       as_level_confirmed?: boolean
       db_write: {
@@ -18042,6 +21693,7 @@ declare module 'claude-code' {
       written?: {
         url: string
       }
+      owned?: boolean
       asset_upload: {
         id: string
         url: string
@@ -18054,6 +21706,7 @@ declare module 'claude-code' {
       written?: {
         url: string
       }
+      owned?: boolean
       asset_uploads: {
         url: string
         results: Array<{
@@ -18110,6 +21763,7 @@ declare module 'claude-code' {
       written?: {
         url: string
       }
+      owned?: boolean
       asset_delete: {
         id: string
         deleted: boolean
@@ -18238,6 +21892,17 @@ declare module 'claude-code' {
         title?: string
       }
     } | {
+      page_versions: {
+        url: string
+        rows: {
+          id: string
+          createdAt?: string
+          current?: true
+        }[]
+        degraded?: true
+        cut?: true
+      }
+    } | {
       verify: {
         url: string
         ver: string
@@ -18269,6 +21934,19 @@ declare module 'claude-code' {
         }[]
         issuesDropped?: number
         renderError?: string
+      }
+    } | {
+      emulatorPreview: {
+        file: string
+        outcome: string
+        pictures: {
+          path: string
+          base64?: string
+        }[]
+        marks?: string[]
+        errors?: string[]
+        outline?: string
+        stopped?: string
       }
     }
     ArtifactData: {
@@ -18276,6 +21954,7 @@ declare module 'claude-code' {
       already_created?: true
       url: string
       version: string
+      owned?: boolean
       path?: string
       title?: string
       type: {
@@ -18284,6 +21963,8 @@ declare module 'claude-code' {
       }
       own_files: string[]
       type_files: string[]
+      served_at?: string
+      served_root?: string
       files_written?: {
         path: string
         sha256: string
@@ -18335,6 +22016,7 @@ declare module 'claude-code' {
           created_at?: string
           rel?: string
           audience?: string
+          outsiders_may_have_written?: true
           default?: string
         }[]
         more?: boolean
@@ -18361,6 +22043,7 @@ declare module 'claude-code' {
       url: string
       artifact_id: string
       title?: string
+      owned?: boolean
     } | {
       url: string
       path: string
@@ -18380,6 +22063,7 @@ declare module 'claude-code' {
       publishesResetAt?: number
       contract?: string
       updated?: boolean
+      owned?: boolean
       icon?: string
       faviconSent?: true
       iconDropped?: true
@@ -18397,6 +22081,8 @@ declare module 'claude-code' {
       }
       liveSubscription?: string
       verifyGuide?: string
+      editsApplied?: number
+      editsNotWritten?: "write_failed" | "not_writable" | "changed_during_publish" | "hard_linked"
       seededThread?: string
       copied?: {
         path: string
@@ -18423,6 +22109,10 @@ declare module 'claude-code' {
       }
       own_files?: string[]
       type_files?: string[]
+      served_at?: string
+      served_root?: string
+      new_files?: string[]
+      unchanged_files?: string[]
     } | {
       artifacts: Array<{
         title: string
@@ -18432,9 +22122,13 @@ declare module 'claude-code' {
         rel?: "mine" | "shared"
         external?: true
         role?: "editor" | "commenter" | "reader" | "viewer"
+        outsidersMayHaveWritten?: true
         pinned?: boolean
       }>
       truncated?: boolean
+      total?: number
+      total_at_least?: true
+      next_page_token?: string
       pins_enabled?: boolean
       scope?: "shared" | "all"
       external_listed?: true
@@ -18448,6 +22142,7 @@ declare module 'claude-code' {
         durationMs: number
         title?: string
       }
+      owned?: boolean
       artifactRead?: {
         slug: string
         ver?: string
@@ -18488,9 +22183,17 @@ declare module 'claude-code' {
         content?: string
         chars?: number
         clipped?: boolean
-        unread?: "withheld" | "not_listed" | "not_text" | "too_large" | "unavailable"
+        unread?: "withheld" | "not_listed" | "not_text" | "too_large" | "unavailable" | "result_full"
         why?: string
       }
+      type_files_read?: Array<{
+        path: string
+        content?: string
+        chars?: number
+        clipped?: boolean
+        unread?: "withheld" | "not_listed" | "not_text" | "too_large" | "unavailable" | "result_full"
+        why?: string
+      }>
     } | {
       type_instances: {
         type?: string
@@ -18503,6 +22206,7 @@ declare module 'claude-code' {
           created_at?: string
           rel?: string
           audience?: string
+          outsiders_may_have_written?: true
           default?: string
         }[]
         more?: boolean
@@ -18520,6 +22224,7 @@ declare module 'claude-code' {
           tier?: string
         }
         match_of?: number
+        ask_first?: boolean
         types?: {
           title: string
           type_url: string
@@ -18528,6 +22233,18 @@ declare module 'claude-code' {
         }[]
         types_more?: boolean
         dashboard_type?: {
+          title: string
+          type_url: string
+          description?: string
+          tier?: string
+        }
+        motion_type?: {
+          title: string
+          type_url: string
+          description?: string
+          tier?: string
+        }
+        whiteboard_type?: {
           title: string
           type_url: string
           description?: string
@@ -18551,6 +22268,7 @@ declare module 'claude-code' {
             created_at?: string
             rel?: string
             audience?: string
+            outsiders_may_have_written?: true
             default?: string
           }[]
           more?: boolean
@@ -18801,6 +22519,7 @@ declare module 'claude-code' {
       written?: {
         url: string
       }
+      owned?: boolean
       as_level?: string
       as_level_confirmed?: boolean
       db_write: {
@@ -18854,6 +22573,7 @@ declare module 'claude-code' {
       written?: {
         url: string
       }
+      owned?: boolean
       asset_upload: {
         id: string
         url: string
@@ -18866,6 +22586,7 @@ declare module 'claude-code' {
       written?: {
         url: string
       }
+      owned?: boolean
       asset_uploads: {
         url: string
         results: Array<{
@@ -18922,6 +22643,7 @@ declare module 'claude-code' {
       written?: {
         url: string
       }
+      owned?: boolean
       asset_delete: {
         id: string
         deleted: boolean
@@ -19050,6 +22772,17 @@ declare module 'claude-code' {
         title?: string
       }
     } | {
+      page_versions: {
+        url: string
+        rows: {
+          id: string
+          createdAt?: string
+          current?: true
+        }[]
+        degraded?: true
+        cut?: true
+      }
+    } | {
       verify: {
         url: string
         ver: string
@@ -19081,6 +22814,19 @@ declare module 'claude-code' {
         }[]
         issuesDropped?: number
         renderError?: string
+      }
+    } | {
+      emulatorPreview: {
+        file: string
+        outcome: string
+        pictures: {
+          path: string
+          base64?: string
+        }[]
+        marks?: string[]
+        errors?: string[]
+        outline?: string
+        stopped?: string
       }
     }
     AskUserQuestion: {
@@ -19142,6 +22888,8 @@ declare module 'claude-code' {
       isImage?: boolean
       /** ID of the background task if command is running in background */
       backgroundTaskId?: string
+      /** @internal Path of the background task's output file on the machine that keeps the command, when that is not this process */
+      backgroundOutputPath?: string
       /** True if the user manually backgrounded the command with Ctrl+B */
       backgroundedByUser?: boolean
       /** @internal True if a plugin's turn abort moved the running command to the background */
@@ -19150,10 +22898,14 @@ declare module 'claude-code' {
       backgroundedToDeliverMessage?: boolean
       /** Set when the command hit its timeout and was auto-backgrounded; the timeout value in ms */
       timedOutAfterMs?: number
+      /** @internal True if the async subagent foreground cap shortened the command's timeout */
+      subagentCapApplied?: true
       /** Model-facing note that the session cwd was not changed by a backgrounded command containing a directory-change builtin (cd/pushd/popd/chdir) */
       backgroundCwdHint?: string
-      /** True when this backgrounded command is owned by a synchronous subagent and is therefore terminated when that agent gives its final response; absent when the command survives (main loop, async subagents) */
+      /** True when this backgrounded command is terminated at its caller's final response, so no completion notification can follow (a synchronous subagent's command, or a headless session that takes no further input and is not waiting for background commands); absent when the command survives */
       backgroundEndsWithFinalResponse?: true
+      /** True when the subagent that owns this backgrounded command parks for its end and is woken by it */
+      backgroundWakesOwner?: true
       /** Flag to indicate if sandbox mode was overridden */
       dangerouslyDisableSandbox?: boolean
       /** Semantic interpretation for non-error exit codes with special meaning */
@@ -19166,6 +22918,16 @@ declare module 'claude-code' {
       persistedOutputPath?: string
       /** Total size of the output in bytes (set when output is too large for inline) */
       persistedOutputSize?: number
+      /** @internal True when stdout holds the first part of the persisted output, a line saying that the middle was left out, and then its last lines */
+      stdoutHoldsOutputEnd?: boolean
+      /** @internal Path to a saved copy of the output that the command piped into tail */
+      tailInputPath?: string
+      /** @internal Model-facing note about the file at tailInputPath */
+      tailInputNote?: string
+      /** @internal Tells the model that the kernel killed a process for lack of memory while the command ran */
+      memoryLimitNote?: string
+      /** @internal One line of advice for the model after a finished command, set by a rule in a feature flag */
+      triggeredNote?: string
       /** Model-facing note listing readFileState entries whose mtime bumped during this command (set when WRITE_COMMAND_MARKERS matches) */
       staleReadFileStateHint?: string
       /** Model-facing system-reminder appended when a gh command reports a GitHub API rate-limit error */
@@ -19221,19 +22983,24 @@ declare module 'claude-code' {
       humanSchedule: string
       recurring: boolean
       durable?: boolean
+      /** Epoch ms of the job's next run, the scheduler's per-job offset included */
+      nextFireAt?: number
     }
     CronDelete: {
       id: string
+      endedLoopWakeup?: true
     }
     CronList: {
-      jobs: {
+      jobs: Array<{
         id: string
         cron: string
         humanSchedule: string
         prompt: string
         recurring?: boolean
         durable?: boolean
-      }[]
+        /** Epoch ms of the job's next run, the scheduler's per-job offset included */
+        nextFireAt?: number
+      }>
     }
     DesignSync: {
       method: "list_projects"
@@ -19254,6 +23021,7 @@ declare module 'claude-code' {
       ownerDisplayName?: string
       isOwned?: boolean
       canEdit?: boolean
+      moveState?: "moving" | "moved"
     } | {
       method: "list_files"
       notice?: string
@@ -19330,6 +23098,8 @@ declare module 'claude-code' {
       }
       /** True when the edit was held for the machine owner to review instead of written; the file is unchanged */
       staged?: boolean
+      /** @internal Which message a staged result gave (see stagedResultWording); absent unless staged */
+      stagedWording?: "review" | "card" | "cloud" | "linked" | "policy"
     }
     "enable__mcp__claude-in-chrome": {
       message: string
@@ -19376,7 +23146,7 @@ declare module 'claude-code' {
       tmuxSessionName?: string
       discardedFiles?: number
       discardedCommits?: number
-      /** @internal Where the session's cwd ended up: originalCwd, or a fallback when it was gone. */
+      /** @internal Where the session's cwd ended up: originalCwd, or a fallback when it was gone or led outside what the launch gave. */
       restoredCwd?: string
       /** @internal originalCwd was gone (or a network path the session will not touch), so restoredCwd is a fallback directory. */
       originalCwdMissing?: boolean
@@ -19409,10 +23179,17 @@ declare module 'claude-code' {
       lastUpdatedAt: string
       status: "completed"
       result: {
-        content: {
+        content: Array<{
           type: "text"
           text: string
-        }[]
+        } | {
+          type: "image"
+          source: {
+            type: "base64"
+            media_type: "image/jpeg" | "image/png" | "image/gif" | "image/webp"
+            data: string
+          }
+        }>
         isError: boolean
       }
     } | {
@@ -19435,6 +23212,21 @@ declare module 'claude-code' {
     ListAgents: {
       /** Formatted list of reachable agents */
       listing: string
+      sections?: {
+        kind: string
+        total: number
+        rows: {
+          name?: string
+          ref?: string
+          id?: string
+          type?: string
+          status?: string
+        }[]
+      }[]
+      notes?: {
+        kind: string
+        text: string
+      }[]
     }
     ListConnectors: {
       connectors: {
@@ -19465,6 +23257,7 @@ declare module 'claude-code' {
         presents_as?: string | null
         installation_preference?: string | null
       }>
+      note?: string
     }
     ListSkills: {
       results: Array<{
@@ -19476,6 +23269,7 @@ declare module 'claude-code' {
         presents_as?: string | null
         installation_preference?: string | null
       }>
+      note?: string
     }
     LSP: {
       /** The LSP operation that was performed */
@@ -19560,6 +23354,9 @@ declare module 'claude-code' {
       /** The updated notebook content after modification */
       updated_file: string
     }
+    OfferChromeSetup: {
+      outcome: "connected" | "not_now" | "no_attempt_yet"
+    }
     Poll: {
       /** Rendered event envelopes, or "(no pending events)" */
       content: string
@@ -19583,6 +23380,7 @@ declare module 'claude-code' {
           data: string
         }
       }>>
+      toolsUsed?: string[]
       provenance?: Array<{
         authority: "human-principal" | "human-other" | "peer-agent" | "world-event"
         senderId?: string
@@ -19597,6 +23395,7 @@ declare module 'claude-code' {
     Projects: {
       method: "project_info"
       notice?: string
+      local_file?: string
       name: string
       description: string
       instructions: string
@@ -19621,9 +23420,13 @@ declare module 'claude-code' {
       method: "project_read"
       notice?: string
       path: string
+      /** @internal Lowercase hex SHA-256 of the UTF-8 bytes of a text doc's whole text; never on a project_read that delivered only part of the doc. Set where docVersionsOffered; also, while tengu_lovely_rain is on, on a project_read that saved the whole text to a file, and on a project_write by local_path in a conversation (not a script's inner call). A later checked write by path looks for this hash. */
+      version?: string
       file_kind?: string
       content?: string
       local_file?: string
+      /** @internal Size in UTF-8 bytes of the document's whole text. Set only when the text is in local_file and project_read had a token limit on inline text. */
+      size_bytes?: number
       created_at: string | null
     } | {
       method: "project_search"
@@ -19633,13 +23436,24 @@ declare module 'claude-code' {
         name?: string
         doc_uuid?: string
         text?: string
+        image_attached?: boolean
+        page?: number
       }[]
+      /** @internal Page images for the hits, sent to the model as image blocks after the JSON. Absent when there are none. stripForStorage removes it before the result is stored or sent to SDK clients. */
+      images?: Array<{
+        content_id: string
+        page?: number
+        media_type: "image/jpeg" | "image/png" | "image/gif" | "image/webp"
+        data: string
+      }>
       docs?: string[]
     } | {
       method: "project_write"
       notice?: string
       path: string
       doc_uuid: string
+      /** @internal Lowercase hex SHA-256 of the UTF-8 bytes of a text doc's whole text; never on a project_read that delivered only part of the doc. Set where docVersionsOffered; also, while tengu_lovely_rain is on, on a project_read that saved the whole text to a file, and on a project_write by local_path in a conversation (not a script's inner call). A later checked write by path looks for this hash. */
+      version?: string
       replaced: boolean
       present_to_user?: boolean
       local_path?: string
@@ -19677,6 +23491,11 @@ declare module 'claude-code' {
       condition: string
       /** Whether the user was asked for approval (true) or the goal was set directly (false) */
       askUser: boolean
+    }
+    PublishPlugin: {
+      state: "published" | "in-review" | "publishing" | "on-shelf" | "refused"
+      refusal?: string
+      lines: string[]
     }
     PushNotification: {
       message: string
@@ -19760,6 +23579,8 @@ declare module 'claude-code' {
       }
       /** Document page number of the first extracted page (1 when no range was requested); labels the page images in the model-facing tool_result */
       firstPage?: number
+      /** @internal Number of pages in the document. Set only when the call named no page range and the PDF was too long to read whole, so only its first pages were extracted */
+      totalPages?: number
       /** Extracted page images, in page order. Present only transiently in-process: the page image bytes are delivered solely as image blocks in the model-facing tool_result content and are not retained on the tool_use_result, so this key is absent on the emitted/persisted result */
       pages?: Array<{
         /** Base64-encoded page image; empty when the page could not be processed */
@@ -19768,15 +23589,9 @@ declare module 'claude-code' {
         mediaType: "image/jpeg" | "image/png" | "image/gif" | "image/webp"
         /** Why the page could not be processed as an image; set only when base64 is empty */
         error?: string
+        /** @internal The page's text layer. Set only when the call named no page range and the PDF was too large to read whole */
+        text?: string
       }>
-    } | {
-      type: "file_unchanged"
-      file: {
-        /** The path to the file */
-        filePath: string
-      }
-      /** Set when the dedup matched a startup-seeded entry (CLAUDE.md / nested memory) rather than a prior Read tool_result */
-      source?: "seeded"
     }
     ReadMcpResourceDirTool: {
       /** Direct children of the directory resource. Subdirectories appear with mimeType "inode/directory". */
@@ -19815,9 +23630,28 @@ declare module 'claude-code' {
         queued_at: string
         /** Verbatim notification body. */
         content: string
+        /** RFC3339 timestamp, by this machine's clock, of when the notification reached this session's queue. Missing from results saved before this field existed. */
+        arrived_at?: string
       }>
       /** Notifications still queued after this drain (drains are size-budgeted); call the tool again to read them. */
       remaining: number
+      /** RFC3339 timestamp, by this machine's clock, of when this call read the queue. Missing from results saved before this field existed. */
+      read_at?: string
+    }
+    ReadWidgetContext: {
+      /** The views' shared text and images, or a note. */
+      blocks: Array<{
+        type: "text"
+        text: string
+      } | {
+        type: "image"
+        source: {
+          type: "base64"
+          media_type: "image/png" | "image/jpeg" | "image/gif" | "image/webp"
+          data: string
+        }
+      }>
+      isError: boolean
     }
     RemoteTrigger: {
       status: number
@@ -19911,6 +23745,33 @@ declare module 'claude-code' {
       }[]
     }
     SendMessage: unknown
+    SendToProject: {
+      /** Whether the call went through: a project was created (mode 'new') or the existing project was reached (mode 'existing'; savedToMemory and handedOff say what landed there). False means nothing was created or sent; see reason and mayExist. */
+      created: boolean
+      reason?: string
+      mayExist?: boolean
+      projectId?: string
+      projectName?: string
+      projectUrl?: string
+      attachedRepo?: string | null
+      appInstallPending?: boolean
+      mode?: "new" | "existing"
+      savedToMemory?: boolean
+      memoryOmitted?: boolean
+      handedOff?: boolean
+      setupSubmitted?: boolean
+      setupUncertain?: boolean
+      threadsOnCard?: number
+      message?: "sent" | "uncertain" | "not_sent" | null
+      openedInBrowser?: boolean
+      browserOpenPending?: boolean
+      notes?: string[]
+    }
+    SendToProjectContext: {
+      /** delivered: context holds what the command read. already_delivered: an earlier call in this run returned it. nothing_read: the run sends one message and read no context. no_run: no /send-to-project run of the user’s waits in this turn. */
+      status: "delivered" | "already_delivered" | "nothing_read" | "no_run"
+      context?: string
+    }
     SendUserFile: {
       caption?: string
       display?: "render" | "attach"
@@ -19924,11 +23785,16 @@ declare module 'claude-code' {
         pathValidated?: boolean
         upload_error?: string
         upload_error_code?: string
+        upload_suspected_limit_bytes?: number
         scaled?: {
           width: number
           height: number
           original_width: number
           original_height: number
+        }
+        thumbnail?: {
+          width: number
+          height: number
         }
         project_path?: string
         partial_error?: string
@@ -19948,11 +23814,16 @@ declare module 'claude-code' {
         pathValidated?: boolean
         upload_error?: string
         upload_error_code?: string
+        upload_suspected_limit_bytes?: number
         scaled?: {
           width: number
           height: number
           original_width: number
           original_height: number
+        }
+        thumbnail?: {
+          width: number
+          height: number
         }
       }[]
       /** ISO timestamp captured at tool execution on the emitting process. Optional — resumed sessions replay pre-sentAt outputs verbatim. */
@@ -19995,6 +23866,8 @@ declare module 'claude-code' {
       result: string
       /** True when the sub-agent was launched in the background: `result` describes the launch, and the skill outcome arrives later as a task notification. */
       background?: boolean
+      /** The tools-used-before-summary line the tool_result opens with: the tools the sub-agent called that this conversation's requests did not yet name */
+      toolsUsedLine?: string
     }
     SuggestConnectors: {
       connectors: {
@@ -20029,6 +23902,8 @@ declare module 'claude-code' {
       task: {
         id: string
         subject: string
+        /** The task's description as saved. It can differ from the tool_use input if Claude Code corrects a malformed call or a PreToolUse hook changes the input. Absent in results from older Claude Code versions. */
+        description?: string
       }
     }
     TaskGet: {
@@ -20119,6 +23994,8 @@ declare module 'claude-code' {
       durationMs: number
       /** The URL that was fetched */
       url: string
+      /** @internal The model may get the result as a search result that it can cite. */
+      citable?: true
       artifactRead?: {
         slug: string
         ver?: string
@@ -20138,6 +24015,8 @@ declare module 'claude-code' {
           title: string
           /** The URL of the search result */
           url: string
+          /** Page text. PostToolUse hooks get it; tool_use_result does not. */
+          snippet?: string
         }>
       } | string>
       /** Time taken to complete the search operation */
@@ -20165,6 +24044,27 @@ declare module 'claude-code' {
       warning?: string
       /** Set if syntax check failed */
       error?: string
+    }
+    WrapUp: {
+      /** Whether the call put a question to the user */
+      asks: boolean
+      /** The next-step box for this call, to draw without reading the tool's input. Open the box when blocked is true or actions isn't empty; otherwise draw no box. Trust it only when the result's entry in tool_result_meta has built_in_tool set to this tool. It is built from the input the call ran with; where a permission answer or a hook before the call changed that input, the entry has no built_in_tool. The recap and the question are each cleaned to one line of at most 500 UTF-16 units, ending in an ellipsis where that limit cut it, with no whole <cc-memory> markers, no terminal escape sequences and no invisible characters other than those an emoji or a word needs. A placeholder such as [REDACTED] or <token> stands in place of most keys and tokens recognised by their shape. A private key that could not be masked, or a tool call's own markup, is cut with all the text after it, and an ellipsis then shows only if what is left still passes that limit or the text ran past 2000 units. Draw the recap and the question as plain text, as they stand: they may hold Markdown, HTML or links, and normalizing them can undo the cleaning. Absent from a result stored by an earlier version of Claude Code. */
+      nextStep?: {
+        /** Claude's short summary of the turn. Empty when nothing visible is left, or when it holds a key that cannot be masked alone (one that an invisible character, an accent or nested markers part, or whose rest comes to stand right after its mask), even when ask is present. */
+        recap: string
+        /** The decision Claude asks of the user. Absent when Claude asked none, when nothing visible is left, or when it holds a key that cannot be masked alone, as for recap. */
+        ask?: string
+        /** Whether Claude's work stops here until the user answers. Can be true with no question. */
+        blocked: boolean
+        /** The buttons to draw under the question, in Claude's order, its pick first. Two replies with the same label are listed once, and a reply whose label holds a key or token is left out. Empty when there is no question, and when the first button is left out. */
+        actions: Array<{
+          /** A reply button's text. Draw it as plain text with no links. On a click, put exactly this text into the message box and let the person send it. Never send it yourself. */
+          label: string
+        } | {
+          /** One of the app's own buttons: verify checks this turn's changes; fix_ci, address_comments and resolve_conflicts act on an open pull request. The app shows each only while it applies. */
+          action: "verify" | "fix_ci" | "address_comments" | "resolve_conflicts"
+        }>
+      }
     }
     Write: {
       /** Whether a new file was created or an existing file was updated */
@@ -20197,6 +24097,43 @@ declare module 'claude-code' {
       userModified?: boolean
       /** True when the write was held for the machine owner to review instead of written; the file is unchanged */
       staged?: boolean
+      /** @internal Which message a staged result gave (see stagedResultWording); absent unless staged */
+      stagedWording?: "review" | "card" | "cloud" | "linked" | "policy"
+    }
+    Yield: {
+      /** Rendered event envelopes, or "(no pending events)" */
+      content: string
+      /** Number of events delivered in this result */
+      eventCount: number
+      /** Wake events still queued after this chunk; they follow in the next delivery */
+      remainingWakeCount: number
+      /** Each delivered event's images and documents, 1:1 with the events. Absent when none has any */
+      media?: Array<Array<{
+        type: "image"
+        source: {
+          type: "base64"
+          media_type: "image/jpeg" | "image/png" | "image/gif" | "image/webp"
+          data: string
+        }
+      } | {
+        type: "document"
+        source: {
+          type: "base64"
+          media_type: "application/pdf"
+          data: string
+        }
+      }>>
+      toolsUsed?: string[]
+      provenance?: Array<{
+        authority: "human-principal" | "human-other" | "peer-agent" | "world-event"
+        senderId?: string
+        senderText?: string
+      } | null>
+      declared?: Array<{
+        kind: string
+        at: string
+        fields: {}
+      } | null>
     }
   }
 }

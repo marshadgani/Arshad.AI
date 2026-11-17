@@ -1,6 +1,6 @@
 # Anthropic CLI (`ant`)
 
-The `ant` CLI exposes every Claude API resource as a shell subcommand. Compared to `curl`: request bodies are built from typed flags or piped YAML instead of hand-written JSON, `@path` inlines file contents into any string field, `--transform` extracts fields with a GJSON path (no `jq`), list endpoints auto-paginate (cap total results with `--max-items N`; `--limit` only sets the server page size), and the `beta:` prefix auto-sets the right `anthropic-beta` header.
+The `ant` CLI exposes every Claude API resource as a shell subcommand. Compared to `curl`: request bodies are built from typed flags or piped YAML instead of hand-written JSON, `@path` inlines file contents into piped bodies and structured flag values, `--transform` extracts fields with a GJSON path (no `jq`), list endpoints auto-paginate (cap total results with `--max-items N`; `--limit` only sets the server page size), and the `beta:` prefix auto-sets the right `anthropic-beta` header.
 
 ## When to use the CLI vs the SDK
 
@@ -18,23 +18,24 @@ The `ant` CLI exposes every Claude API resource as a shell subcommand. Compared 
 ```sh
 # macOS
 brew install anthropics/tap/ant
-xattr -d com.apple.quarantine "$(brew --prefix)/bin/ant"
 
 # Linux / WSL - pick the release from github.com/anthropics/anthropic-cli/releases
 curl -fsSL "https://github.com/anthropics/anthropic-cli/releases/download/v${VERSION}/ant_${VERSION}_$(uname -s | tr A-Z a-z)_$(uname -m | sed -e s/x86_64/amd64/ -e s/aarch64/arm64/).tar.gz" \
   | sudo tar -xz -C /usr/local/bin ant
 
 # Or from source (Go 1.25+)
-go install github.com/anthropics/anthropic-cli/cmd/ant@latest
+go install github.com/anthropics/anthropic-cli/v2/cmd/ant@latest
 ```
 
-**Auth** - the CLI resolves credentials the same way the SDKs do (first match wins): explicit flags, then `ANTHROPIC_API_KEY`, then `ANTHROPIC_AUTH_TOKEN`, then the `ANTHROPIC_PROFILE`-selected or active profile, then Workload Identity Federation env vars, then the default profile on disk. Override the host with `ANTHROPIC_BASE_URL` or `--base-url`.
+**Auth** - the CLI resolves credentials in this order (first match wins): `ANTHROPIC_API_KEY` or `--api-key-stdin`, then `ANTHROPIC_AUTH_TOKEN` or `--auth-token-stdin`, then the profile named by `--profile` or `ANTHROPIC_PROFILE`, then Workload Identity Federation env vars, then the Claude Models on Google Cloud (Anthropic managed) settings, then the Claude Platform on AWS settings (both below), then the active or default profile on disk. Override the host with `ANTHROPIC_BASE_URL` or `--base-url`.
 
 - **API key**: set `ANTHROPIC_API_KEY` in the environment.
 - **OAuth profile** (no static key to manage): `ant auth login` opens a browser, exchanges for a short-lived token, and stores a profile under `$ANTHROPIC_CONFIG_DIR` (default `~/.config/anthropic/` on Linux/macOS, `%APPDATA%\Anthropic` on Windows - `configs/<profile>.json` for settings, `credentials/<profile>.json` for tokens). Subsequent `ant` (and SDK) calls pick it up automatically - a bare `Anthropic()` client works after login, but scripts that read `ANTHROPIC_API_KEY` directly do not. Claude Code and the Claude Agent SDK honor the same profile resolution. `ant auth status` shows which credential source and profile won (it reports status only - don't script against its exit code as a health check); `ant auth logout` clears the active profile (`--all` for every profile). On a remote host without a browser, `ant auth login --no-browser` prints the authorize URL and accepts the code back in the terminal.
 - **Non-interactive workloads** (CI, servers, containers): interactive login is for development on your own machine - use Workload Identity Federation instead (see the authentication docs via `shared/live-sources.md`).
+- **Claude Platform on AWS** (needs `ant` 1.42.0 or later): set `AWS_REGION` and `ANTHROPIC_AWS_WORKSPACE_ID`, or pass `--aws-region` and `--aws-workspace-id`. Every command, `ant apply` included, then goes to the AWS gateway, SigV4-signed with whatever the AWS default credential chain finds (`AWS_PROFILE`, SSO, environment keys, a role). To use an API key generated in the AWS Console instead, set `ANTHROPIC_AWS_API_KEY` or pipe it to `--aws-api-key-stdin`. The workspace ID, `--aws-region` or an AWS API key selects AWS; `AWS_REGION` alone doesn't. `ant auth login` doesn't apply there. Unset `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN` and `ANTHROPIC_PROFILE`, leave out `--profile`, and set no federation variables, `ANTHROPIC_GOOGLE_CLOUD_PROJECT`, `ANTHROPIC_GOOGLE_CLOUD_WORKSPACE_ID` or `ANTHROPIC_GOOGLE_CLOUD_LOCATION`, since each outranks these settings, then confirm with `ant auth status` that AWS is the active credential. `--base-url` and `ANTHROPIC_BASE_URL` aren't used (`--aws-base-url` or `ANTHROPIC_AWS_BASE_URL` overrides the gateway URL), and `ant beta:worker` doesn't read these settings. Platform details: `shared/claude-platform-on-aws.md`.
+- **Claude Models on Google Cloud (Anthropic managed)**: set `ANTHROPIC_GOOGLE_CLOUD_PROJECT` and `ANTHROPIC_GOOGLE_CLOUD_WORKSPACE_ID`, or pass `--google-cloud-project` and `--google-cloud-workspace-id`. `ant auth login` doesn't apply there, and other credentials can outrank these settings: follow `shared/google-cloud-anthropic-managed.md` -> `ant` CLI.
 
-> **The #1 auth trap:** profiles are only consulted when no API key is set. A stale exported `ANTHROPIC_API_KEY` silently overrides every profile - requests hit whatever org/workspace that key is scoped to. `ant auth status` shows which source won; unset the key (or per-command: `env -u ANTHROPIC_API_KEY ant ...`) before relying on a profile. Truly **unset** it - an empty `ANTHROPIC_API_KEY=""` still wins its precedence slot and authenticates with an empty key. The same shadowing applies in reverse to Claude Code: after `ant auth login`, Claude Code may warn about an auth conflict between the profile and its own `/login` credential - keep one (use the profile and `/logout` in Claude Code, or `ant auth logout` to keep Claude Code's own login).
+> **The #1 auth trap:** a stale exported `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` overrides every profile. `ant` says so in a note on stderr, and `ant auth status` shows which source won. To use the profile, **unset** the variable (per-command: `env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN ant ...`) - an empty `ANTHROPIC_API_KEY=""` still wins its precedence slot and authenticates with an empty key.
 
 **Named profiles** - an interactive-login token is bound to a single org+workspace, and the API only shows resources belonging to that workspace. If an agent, session, or file you created "disappears", the usual cause is a token scoped to a different workspace than the one that created it (`ant auth status` shows the active workspace). Multi-workspace work means one profile per workspace:
 
@@ -57,7 +58,7 @@ To hand the active credential to a subprocess or raw-HTTP script:
 # Bare access token - for curl's Authorization header
 curl https://api.anthropic.com/v1/messages \
   -H "Authorization: Bearer $(ant auth print-credentials --access-token)" \
-  -H "anthropic-version: 2023-06-01" \
+  -H "anthropic-version: 2026-10-21" \
   -H "anthropic-beta: oauth-2025-04-20" \
   -H "content-type: application/json" \
   -d '{"model": "claude-opus-5-5", "max_tokens": 1024, "messages": [{"role": "user", "content": "Hello"}]}'
@@ -68,7 +69,7 @@ set -a; eval "$(ant auth print-credentials --env)"; set +a
 python my_script.py   # SDK picks up ANTHROPIC_AUTH_TOKEN
 ```
 
-OAuth tokens go on `Authorization: Bearer` (not `x-api-key:`) **plus the `anthropic-beta: oauth-2025-04-20` header** - converting a raw curl/httpx script from an API key is a header change, not a key swap. The beta header requirement is endpoint-dependent (some endpoints happen to work without it; `/v1/messages` does not) - always send it so requests don't break when you switch endpoints. The token is short-lived and not auto-refreshed when passed via env var, so re-run `print-credentials` before it expires for long-running scripts (`print-credentials` itself refreshes the token if needed). If both `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` are set, the SDKs send both and the API rejects the request - unset `ANTHROPIC_API_KEY` before `eval`ing the `--env` output.
+OAuth tokens go on `Authorization: Bearer` (not `x-api-key:`) **plus the `anthropic-beta: oauth-2025-04-20` header** - converting a raw curl/httpx script from an API key is a header change, not a key swap. The beta header requirement is endpoint-dependent (some endpoints happen to work without it; `/v1/messages` does not) - always send it so requests don't break when you switch endpoints. The token is short-lived and not auto-refreshed when passed via env var, so re-run `print-credentials` before it expires for long-running scripts (`print-credentials` itself refreshes the token if needed). If both `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` are set, the API key wins over the token, so unset `ANTHROPIC_API_KEY` before `eval`ing the `--env` output.
 
 **Foot-gun:** `ant auth print-credentials` with **no flags** prints the entire credentials JSON, not the bare token - putting that in an `Authorization` header yields an empty response or HTTP/2 protocol error. Always use `--access-token` for headers (it always reads the named/active profile; a set `ANTHROPIC_API_KEY` doesn't override credential printing).
 
@@ -121,10 +122,11 @@ AGENT_ID=$(ant beta:agents create --name "My Agent" --model '{id: claude-sonnet-
 **Flags** - scalar fields map directly. Structured fields accept relaxed-YAML syntax (unquoted keys) or strict JSON. Repeatable flags build arrays (each `--tool`, `--event`, `--message` appends one element):
 
 ```sh
+# a research agent needs the web; otherwise set both to false
 ant beta:agents create \
   --name "Research Agent" \
   --model '{id: claude-opus-5-5}' \
-  --tool '{type: agent_toolset_20260401}' \
+  --tool '{type: agent_toolset_20260401, default_config: {permission_policy: {type: auto}}, configs: [{name: web_fetch, enabled: true}, {name: web_search, enabled: true}]}' \
   --tool '{type: custom, name: search_docs, input_schema: {type: object, properties: {query: {type: string}}}}'
 ```
 
@@ -138,13 +140,19 @@ system: |
   You are a research assistant. Cite sources for every claim.
 tools:
   - type: agent_toolset_20260401
+    default_config: {permission_policy: {type: auto}}
+    configs:   # a research agent needs the web; otherwise set both to false
+      - {name: web_fetch, enabled: true}
+      - {name: web_search, enabled: true}
 YAML
 ```
 
-**`@file` references** - inline a file's contents into any string-valued field. Inside structured flag values, quote the path. Binary files are auto-base64'd; force with `@file://` (text) or `@data://` (base64). Escape a literal leading `@` as `\@`.
+**`@file` references** - in a piped body or a structured flag value, a string that starts with `@` is replaced by the contents of the file it names (quote it: `system: "@./prompt.txt"`). Binary files are auto-base64'd; force with `@file://` (text) or `@data://` (base64). In those two places, write a literal leading `@` as `\@`, unquoted or in single quotes. On plain scalar flags `@path` is not reliable: some, such as `--system` on `beta:agents` and `--content` on `beta:memory-stores:memories`, send it as written. To load a file into one of those fields, set the field in a piped body instead:
 
 ```sh
-ant beta:agents create --name "Researcher" --model '{id: claude-sonnet-5-5}' --system @./prompts/researcher.txt
+ant beta:agents create --name "Researcher" --model '{id: claude-sonnet-5-5}' <<'YAML'
+system: "@./prompts/researcher.txt"
+YAML
 
 ant messages create --model claude-opus-5-5 --max-tokens 1024 \
   --message '{role: user, content: [
@@ -158,13 +166,14 @@ Flags that natively take a file path (e.g. `--file` on `beta:files upload`) acce
 
 ## Version-controlled Managed Agents resources (`ant apply`)
 
-This is the recommended flow for defining agents, environments, skills, memory stores and deployments: one file (or skill directory) per resource in your repo, synced with `ant apply` (needs `ant` 1.30.0 or later - check `ant --version`). It prints a plan, creates or updates what differs, and records each resource's ID in `claude-lock.json`. See `shared/managed-agents-core.md` for the field reference, and the `ant apply` page in `shared/live-sources.md` for `--force`, `--prune`, `--lock-file`, renamed or deleted files and CI setup (written for a person at a terminal; the rules below still apply).
+This is the recommended flow for defining agents, environments, skills, memory stores, vaults and deployments: one file (or skill directory) per resource in your repo, synced with `ant apply` (needs `ant` 1.30.0 or later, 1.34.0 for vaults, 1.40.0 for file paths in an agent's `predefined_agents` lists - check `ant --version`). It prints a plan, creates or updates what differs, and records each resource's ID in `claude-lock.json`. See `shared/managed-agents-core.md` for the field reference, and the `ant apply` page in `shared/live-sources.md` for `--force`, `--prune`, `--lock-file`, renamed or deleted files and CI setup (written for a person at a terminal; the rules below still apply).
 
 ```
 agents/summarizer.md          # YAML frontmatter = agent config, Markdown body = system prompt
 environments/cloud.yaml       # the environment create body
 skills/pr-summary/SKILL.md    # a skill is a directory with SKILL.md at its root
 memory_stores/notes.yaml
+vaults/team.yaml              # display_name (+ metadata) only - the container, never a credential
 deployments/nightly.md        # frontmatter = deployment create body, Markdown body = the message that starts each run
 claude-lock.json              # written by ant apply - commit it
 ```
@@ -176,6 +185,10 @@ name: Summarizer
 model: claude-sonnet-5-5
 tools:
   - type: agent_toolset_20260401
+    default_config: {permission_policy: {type: auto}}
+    configs:
+      - {name: web_fetch, enabled: false}
+      - {name: web_search, enabled: false}
 ---
 
 You are a helpful assistant that writes concise summaries.
@@ -184,7 +197,7 @@ You are a helpful assistant that writes concise summaries.
 ```yaml
 # environments/cloud.yaml
 name: summarizer-env
-config: {type: cloud, networking: {type: unrestricted}}
+config: {type: cloud, networking: {type: limited, allow_package_managers: true}}
 ```
 
 ```sh
@@ -193,13 +206,15 @@ ant apply agents/summarizer.md environments/cloud.yaml   # print the plan, then 
 ant apply   # later: reconcile every file claude-lock.json already tracks
 ```
 
-- **Name the files you wrote; pass `.` or a directory only when the user asks for the whole tree.** A directory is walked to any depth and everything that looks like a resource is applied: any file that has a top-level `type:`, sits directly in `agents/`, `environments/`, `memory_stores/` or `deployments/`, or is named after one of them (`environment_staging.yaml`), plus any directory holding a `SKILL.md`. Claude Code plugins, conda (`environment.yml`) and Kubernetes (`deployments/`) use the same names, and a cloned repo can hold files its user never read.
+- **Name the files you wrote; pass `.` or a directory only when the user asks for the whole tree.** A directory is walked to any depth and everything that looks like a resource is applied: any file that has a top-level `type:`, sits directly in `agents/`, `environments/`, `memory_stores/`, `vaults/` or `deployments/`, or has a filename that is or starts with `agent`, `environment`, `memory_store` or `deployment` (`agent.md`, `environment_staging.yaml`; the kind has to lead, so `staging-environment.yaml` is not recognized), plus any directory holding a `SKILL.md`. A filename never makes a vault: outside `vaults/`, a vault file needs `type: vault`. Claude Code plugins, conda (`environment.yml`) and Kubernetes (`deployments/`) use the same names, and a cloned repo can hold files its user never read.
 - **Without a terminal (a coding agent's shell), `ant apply` prints the plan and exits; it applies only with `--yes`.** If you are a coding agent running this for a user, that flag is their approval, not yours: show them the dry-run plan and add `--yes` (or answer the prompt) only once they say go ahead. The plan also covers whatever `claude-lock.json` already tracks: if it would create or change anything you did not write, or a file you did not write sits at a path you need, stop and ask; never add `--force` or `--prune` on your own.
 - **Reference other resources by path, not ID** (relative to the file that names it): `skills: [../skills/pr-summary]` on an agent; `agent: ../agents/summarizer.md` and `environment_id: ../environments/cloud.yaml` on a deployment. `ant apply` also applies whatever the files you pass reference, in dependency order, and fills in the IDs. For a resource these files don't manage, write its ID (`agent_01...`, `env_01...`); anything else is sent as written.
 - **Commit `claude-lock.json`** (the first run writes it where you run the command - use the repo root). The next run uses it to update the same resources instead of creating duplicates. A resource created any other way (Console, `ant beta:agents create`, an SDK) cannot be adopted: a file describing it creates a second one.
 - **To change a resource, edit its file and run `ant apply` again** (an agent gets a new version; whatever references it is updated in the same run).
 - **CI in the user's own repository:** run from the directory that holds `claude-lock.json` (normally the repo root) and name the resource directories the project has, not `.` (a walk of `.` also applies look-alike files elsewhere in the repo): `ant apply --dry-run agents environments` on pull requests, `ant apply --yes agents environments` only on push to the default branch (there the merge is the approval), then commit `claude-lock.json`.
-- **Not managed:** vaults and credentials (`ant beta:vaults`, `ant beta:vaults:credentials`, or an SDK), uploaded files, sessions.
+- **One directory per agent works too:** `agents/<agent-name>/agent.md` with `environment.yaml`, `vault.yaml` (`type: vault`) and `deployment-<name>.yaml` beside it. A file named for its kind alone takes the directory's name. Full layout: `shared/managed-agents-onboarding-from-url.md` §4.
+- **Vaults are managed as containers only.** The file creates and renames the vault; credentials are added separately (`ant beta:vaults:credentials create`, or an SDK) and are never read or diffed. `vault_ids` on a deployment takes `vlt_...` IDs, not paths: apply the vault first, then copy its ID from `claude-lock.json`. Removing a vault with `--prune` archives it, which purges its secrets.
+- **Not managed:** credentials, uploaded files, sessions.
 
 **One-off provisioning** can still use `ant beta:agents create <<'YAML'` (see Input above) and `ant beta:agents update --agent-id ... --version N`; you keep track of the IDs yourself.
 
@@ -274,7 +289,7 @@ done
 exec {stream}<&-
 ```
 
-This works for interactive exploration and demos. For application code that needs to react to `agent.tool_use` / `agent.custom_tool_use` events, reconnect after drops, or dedup against `events.list`, use the SDK - see `shared/managed-agents-client-patterns.md`.
+This works for interactive exploration and demos; it stops at the first `session.status_idle`, even one that is waiting on you (`stop_reason.type: requires_action`, such as a call paused for approval - answer it with `ant beta:sessions connect`). For application code that needs to react to `agent.tool_use` / `agent.custom_tool_use` events, reconnect after drops, or dedup against `events.list`, use the SDK - see `shared/managed-agents-client-patterns.md`.
 
 ## Scripting patterns
 
@@ -293,4 +308,4 @@ ant beta:agents retrieve --agent-id bogus --transform-error error.message --form
 
 Shell completion: `ant @completion {zsh|bash|fish|powershell}`.
 
-For the full, always-current reference (including per-endpoint flags), WebFetch the **Anthropic CLI** URL in `shared/live-sources.md`.
+For the full, always-current reference (including per-endpoint flags), fetch the **Anthropic CLI** URL in `shared/live-sources.md`.

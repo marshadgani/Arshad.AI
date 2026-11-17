@@ -39,7 +39,6 @@ No Storybook - the component list comes from the package's shipped `.d.ts` expor
    Top-level config keys are validated strictly: an unknown or removed key fails the run immediately with the fix named in the message (a `config: ...` error line, prefixed with a cross mark). That is the migration path when the schema changes - fix the config as the message says; the scripts carry no compat code.
 
    **`.design-sync/NOTES.md`** is where repo-specific quirks live (workspace build order, flaky stories, odd entry paths, anything a future re-sync should know). Write it as multi-line markdown - one bullet per gotcha. **Append to it whenever the user tells you about an issue or you learn something during the verify loop**, so the next sync picks it up without the user repeating themselves. Before finishing, also write the forward-looking part - a **Re-sync risks** section listing what can silently go stale (data inlined into config, neutralized or owned previews tied to upstream code), what was only partially verified, and what the build assumed (toolchain version, network-fetched assets). Fixes record what you did; this section tells the next run what to watch. Commit it alongside the config.
-
 7. **Run the converter.** For large DSes (200+ components) the ts-morph `.d.ts` parse can take several minutes - `[DTS]` progress lines on stderr show it's working. Stage scripts into `.ds-sync/` and install converter deps there (isolated from the repo's lockfile/package manager):
 
 ```bash
@@ -186,7 +185,7 @@ Build emits **`ds-bundle/.review.html`** - a local page iframing every card (the
 node .ds-sync/storybook/http-serve.mjs ./ds-bundle   # prints "serving ... at http://127.0.0.1:<port>/", stays running
 ```
 
-Run it as a background task through your shell tool's background mode, with `timeout: 7200000` (a plain `&` inside the command dies with the shell). With no `timeout` a background command is stopped after 30 minutes; if you are told the server was stopped at its time limit, do not restart it in that turn; start it again the same way when the user next asks to review. Tell the user: "open `http://127.0.0.1:<port>/.review.html` (port from the serve line) - N components, M authored and graded good, K flagged: [names]. Tell me anything that looks wrong."
+Run it as a background task through your shell tool's background mode, with `timeout: 7200000` (a plain `&` inside the command dies with the shell). With no `timeout` a background command may be stopped after 30 minutes; if you are told the server was stopped at its time limit, do not restart it in that turn; start it again the same way when the user next asks to review. Tell the user: "open `http://127.0.0.1:<port>/.review.html` (port from the serve line) - N components, M authored and graded good, K flagged: [names]. Tell me anything that looks wrong."
 
 **Headless / `-p` session (no user to review):** skip serving. Note the `.review.html` path in your final output as the thing a human should open, and treat the grades + render check as the gate.
 
@@ -265,7 +264,7 @@ The converter does NOT emit the adherence config, the `ds_manifest`, a version f
 
 ## Troubleshooting
 
-**Previews show "context" or "provider" errors** (e.g. "No `<X>` context", "use`<Hook>` must be inside `<Provider>`") -> the DS needs a provider wrapper. Set `cfg.provider` to the DS's top-level provider. For a chain, nest via `inner`:  
+**Previews show "context" or "provider" errors** (e.g. "No `<X>` context", "use`<Hook>` must be inside `<Provider>`") -> the DS needs a provider wrapper. Set `cfg.provider` to the DS's top-level provider. For a chain, nest via `inner`:
 ```json
 {"provider": {"component": "ThemeProvider", "props": {"theme": {}}, "inner": {"component": "RouterProvider"}}}
 ```

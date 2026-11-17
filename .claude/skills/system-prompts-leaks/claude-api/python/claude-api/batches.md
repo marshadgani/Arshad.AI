@@ -8,7 +8,7 @@ The Batches API (`POST /v1/messages/batches`) processes Messages API requests as
 - Most batches complete within 1 hour; maximum 24 hours
 - Results available for 29 days after creation
 - 50% cost reduction on all token usage
-- All Messages API features supported (vision, tools, caching, etc.)
+- Most Messages API features supported (vision, tools, caching, etc.); a batch request can't set `stream`, `speed`, `fallbacks` or `max_tokens: 0`
 
 ---
 
@@ -164,8 +164,10 @@ requests = [
     Request(
         custom_id=f"classify-{i}",
         params=MessageCreateParamsNonStreaming(
-            model="claude-haiku-4-5",
-            max_tokens=50,
+            model="claude-haiku-5-5",
+            # Claude Haiku 5.5 thinks by default, and thinking counts toward max_tokens
+            max_tokens=1024,
+            output_config={"effort": "low"},
             messages=[{
                 "role": "user",
                 "content": f"Classify as positive/negative/neutral (one word): {text}"

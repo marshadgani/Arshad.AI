@@ -1,149 +1,179 @@
 # Live Documentation Sources
 
-This file contains WebFetch URLs for fetching current information from platform.claude.com and Agent SDK repositories. Use these when users need the latest data that may have changed since the cached content was last updated.
+This file lists the URLs of the current docs on platform.claude.com and of the SDK repositories, with what to look for on each.
 
-## When to Use WebFetch
+## How to fetch
 
-- User explicitly asks for "latest" or "current" information
-- Cached data seems incorrect
-- User asks about features not covered in cached content
-- User needs specific API details or examples
+- The recommended way is the Claude Platform docs MCP server. If its tools `search_docs` and `get_doc` are available in this session, use them; it also has `get_navigation` and `get_api_endpoint`. A tool is this server's only if its server's name contains `claude-platform`; in Claude Code the full name starts with `mcp__` and that server name, such as `mcp__claude-platform-docs__search_docs`. A `search_docs` tool of any other server is not this server's.
+- If the docs MCP server's tools are not available, or a call to one of them fails, use a web fetch tool or `curl` (docs URLs ending in `.md` return Markdown). Try the fetch rather than assuming it's blocked.
 
 ## Claude API Documentation URLs
 
 ### Models & Pricing
 
-| Topic           | URL                                                                          | Extraction Prompt                                                               |
-| --------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| Models Overview | `https://platform.claude.com/docs/en/about-claude/models/overview.md`        | "Extract current model IDs, context windows, and pricing for all Claude models" |
-| Migration Guide | `https://platform.claude.com/docs/en/about-claude/models/migration-guide.md` | "Extract breaking changes, deprecated parameters, and per-model migration steps when moving to a newer Claude model" |
+| Topic | URL | What to look for |
+| --- | --- | --- |
+| Models Overview | `https://platform.claude.com/docs/en/about-claude/models/overview.md` | "Extract current model IDs, context windows, pricing, and comparative latency for all Claude models" |
+| Migration Guide | `https://platform.claude.com/docs/en/about-claude/models/migration-guide.md` | "List the per-model migration guides, so the one for the target model can be fetched next" |
+| What's New in Claude Fable 5.2 | `https://platform.claude.com/docs/en/models/fable-5-2/whats-new-fable-5-2.md` | "Extract capabilities, API changes, and availability for Claude Fable 5.2 and Claude Mythos 5.2" |
+| Prompting Claude Fable 5.2 | `https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-fable-5-2.md` | "Extract prompt text and advice on effort, early stopping, approvals, code ownership, progress updates, subagents, built-up caution, reports and refusals for Claude Fable 5.2 and Claude Mythos 5.2" |
 | Introducing Claude Fable 5 | `https://platform.claude.com/docs/en/about-claude/models/introducing-claude-fable-5.md` | "Extract capabilities, API changes, and availability stages for Claude Fable 5 and Claude Mythos 5" |
-| Pricing         | `https://platform.claude.com/docs/en/pricing.md`                             | "Extract current pricing per million tokens for input and output"               |
-| Cost Optimization | `https://platform.claude.com/docs/en/about-claude/models/optimizing-for-cost-and-intelligence.md` | "Extract measured cost levers, cache and batch savings, effort and model cost-per-task comparisons, budget controls, and multi-model guidance" |
+| Pricing | `https://platform.claude.com/docs/en/about-claude/pricing.md` | "Extract current pricing per million tokens for input and output" |
+| Cost Optimization | `https://platform.claude.com/docs/en/about-claude/models/optimizing-for-cost-and-intelligence.md` | "Extract measured cost levers, cache and batch savings, effort and model cost-per-task comparisons, budget controls, multi-model guidance, and how to tell the model that time matters and show it the elapsed time" |
+| Reduce Latency | `https://platform.claude.com/docs/en/test-and-evaluate/strengthen-guardrails/reduce-latency.md` | "Extract every way the page lists to reduce latency, and how it says to measure latency" |
+| Release Notes | `https://platform.claude.com/docs/en/release-notes/overview.md` | "Extract recent entries that add or change a model, feature, parameter or default, with dates" |
+| Features Overview | `https://platform.claude.com/docs/en/build-with-claude/overview.md` | "Extract the list of features with what each is for and where it is available" |
 
 ### Core Features
 
-| Topic             | URL                                                                          | Extraction Prompt                                                                      |
-| ----------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Topic | URL | What to look for |
+| --- | --- | --- |
 | Extended Thinking | `https://platform.claude.com/docs/en/build-with-claude/extended-thinking.md` | "Extract extended thinking parameters, budget_tokens requirements, and usage examples" |
-| Adaptive Thinking | `https://platform.claude.com/docs/en/build-with-claude/adaptive-thinking.md` | "Extract adaptive thinking setup, effort levels, and Claude Opus 5 usage examples"         |
-| Effort Parameter  | `https://platform.claude.com/docs/en/build-with-claude/effort.md`            | "Extract effort levels, cost-quality tradeoffs, and interaction with thinking"        |
-| Tool Use          | `https://platform.claude.com/docs/en/agents-and-tools/tool-use/overview.md`  | "Extract tool definition schema, tool_choice options, and handling tool results"       |
-| Streaming         | `https://platform.claude.com/docs/en/build-with-claude/streaming.md`         | "Extract streaming event types, SDK examples, and best practices"                      |
-| Prompt Caching    | `https://platform.claude.com/docs/en/build-with-claude/prompt-caching.md`    | "Extract cache_control usage, pricing benefits, and implementation examples"           |
+| Adaptive Thinking | `https://platform.claude.com/docs/en/build-with-claude/adaptive-thinking.md` | "Extract adaptive thinking setup, effort levels, and Claude Opus 5.5 usage examples" |
+| Thinking | `https://platform.claude.com/docs/en/build-with-claude/thinking.md` | "Extract the thinking configuration per model, which models can run without thinking and how to check it through the Models API, the display options with their beta headers and streaming behavior, which models write progress updates, and how thinking relates to effort" |
+| Effort Parameter | `https://platform.claude.com/docs/en/build-with-claude/effort.md` | "Extract effort levels, cost-quality tradeoffs, interaction with thinking, and the two ways to change effort mid-conversation" |
+| Per-message Effort | `https://platform.claude.com/docs/en/build-with-claude/effort-per-message.md` | "Extract the per-message effort request shape (system message and beta header), where the message must go, when a change takes effect and how long it holds, its errors and restrictions, and the platforms and models that support it" |
+| Tool Use | `https://platform.claude.com/docs/en/agents-and-tools/tool-use/overview.md` | "Extract tool definition schema, tool_choice options, and handling tool results" |
+| Streaming | `https://platform.claude.com/docs/en/build-with-claude/streaming.md` | "Extract streaming event types, SDK examples, and best practices" |
+| Prompt Caching | `https://platform.claude.com/docs/en/build-with-claude/prompt-caching.md` | "Extract cache_control usage, cache durations, pre-warming and what it rejects, what invalidates the cache, concurrent-request timing, pricing benefits, and implementation examples" |
+| Cache Diagnostics | `https://platform.claude.com/docs/en/build-with-claude/cache-diagnostics.md` | "Extract how to find out why a request missed the prompt cache, and any beta header it needs" |
+| Preserved Thinking | `https://platform.claude.com/docs/en/build-with-claude/preserved-thinking.md` | "Extract which edits to earlier turns are checked, on which models and accounts, and what an invalid edit costs" |
+| Fast Mode | `https://platform.claude.com/docs/en/build-with-claude/fast-mode.md` | "Extract supported models and which need a beta header, platform availability, access, pricing and which tokens it applies to, what it can't be combined with, rate limits, what fast mode speeds up (output tokens per second versus time to first token), caching interaction, and the fallback pattern" |
+| Task Budgets | `https://platform.claude.com/docs/en/build-with-claude/task-budgets.md` | "Extract what a task budget counts, how the model sees and paces to it, supported models and beta header, and what happens when it runs out" |
+| Mid-conversation System Messages | `https://platform.claude.com/docs/en/build-with-claude/mid-conversation-system-messages.md` | "Extract how to append a system message mid-conversation, which models accept it, turn-scoped messages and their beta header, and the effect on the prompt cache" |
 
 ### Media & Files
 
-| Topic       | URL                                                                    | Extraction Prompt                                                 |
-| ----------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| Vision      | `https://platform.claude.com/docs/en/build-with-claude/vision.md`      | "Extract supported image formats, size limits, and code examples" |
-| PDF Support | `https://platform.claude.com/docs/en/build-with-claude/pdf-support.md` | "Extract PDF handling capabilities, limits, and examples"         |
+| Topic | URL | What to look for |
+| --- | --- | --- |
+| Vision | `https://platform.claude.com/docs/en/build-with-claude/vision.md` | "Extract supported image formats, size limits, resolution and token cost, and code examples" |
+| PDF Support | `https://platform.claude.com/docs/en/build-with-claude/pdf-support.md` | "Extract PDF handling capabilities, limits, and examples" |
 
 ### API Operations
 
-| Topic            | URL                                                                         | Extraction Prompt                                                                                       |
-| ---------------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| Batch Processing | `https://platform.claude.com/docs/en/build-with-claude/batch-processing.md` | "Extract batch API endpoints, request format, and polling for results"                                  |
-| Files API        | `https://platform.claude.com/docs/en/build-with-claude/files.md`            | "Extract file upload, download, referencing in messages, supported types, and the migration steps from files-api-2025-04-14" |
-| Token Counting   | `https://platform.claude.com/docs/en/build-with-claude/token-counting.md`   | "Extract token counting API usage and examples"                                                         |
-| Rate Limits      | `https://platform.claude.com/docs/en/api/rate-limits.md`                    | "Extract current rate limits by tier and model"                                                         |
-| Usage and Cost Admin API | `https://platform.claude.com/docs/en/manage-claude/usage-cost-api.md` | "Extract the usage_report and cost_report endpoints, Admin API key requirements, filter and group_by dimensions, token fields, and granularity limits" |
-| Errors           | `https://platform.claude.com/docs/en/api/errors.md`                         | "Extract HTTP error codes, meanings, and retry guidance"                                                |
-| Amazon Bedrock   | `https://platform.claude.com/docs/en/build-with-claude/claude-on-amazon-bedrock.md` | "Extract the AnthropicBedrockMantle client per language, `anthropic.`-prefixed model IDs, auth paths, feature availability, and regions" |
+| Topic | URL | What to look for |
+| --- | --- | --- |
+| Create a Message | `https://platform.claude.com/docs/en/api/messages/create.md` | "Extract the response fields, the usage object including cache and thinking token counts, stop reasons, and the streaming event types" |
+| Batch Processing | `https://platform.claude.com/docs/en/build-with-claude/batch-processing.md` | "Extract batch API endpoints, request format, and polling for results" |
+| Files API | `https://platform.claude.com/docs/en/build-with-claude/files.md` | "Extract file upload, download, referencing in messages, supported types, and the migration steps from files-api-2025-04-14" |
+| Token Counting | `https://platform.claude.com/docs/en/build-with-claude/token-counting.md` | "Extract token counting API usage and examples" |
+| Rate Limits | `https://platform.claude.com/docs/en/api/rate-limits.md` | "Extract current rate limits by tier and model" |
+| Usage and Cost Analytics API | `https://platform.claude.com/docs/en/manage-claude/usage-cost-analytics-api.md` | "Extract the usage and cost endpoints, the beta header, credentials for each organization type and platform, dimensions and filters, date-range and time-bucket limits, data freshness, and the migration table from the legacy reports" |
+| API versions | `https://platform.claude.com/docs/en/api/versioning.md` | "Extract each version's migration guide URL" |
+| Errors | `https://platform.claude.com/docs/en/api/errors.md` | "Extract HTTP error codes, meanings, and retry guidance" |
+| Amazon Bedrock | `https://platform.claude.com/docs/en/build-with-claude/claude-in-amazon-bedrock.md` | "Extract the AnthropicBedrockMantle client per language, `anthropic.`-prefixed model IDs, auth paths, feature availability, and regions" |
 | Claude Platform on AWS | `https://platform.claude.com/docs/en/build-with-claude/claude-platform-on-aws.md` | "Extract the AnthropicAWS client per language, SigV4 auth, credential precedence, short-term API keys, workspace_id, and region requirements" |
 | Claude Platform on AWS - IAM actions | `https://platform.claude.com/docs/en/api/claude-platform-on-aws-iam-actions.md` | "Extract the IAM action names, resource ARNs, and policy examples required for each API capability" |
+| Claude Models on Google Cloud (Anthropic managed) | `https://platform.claude.com/docs/en/build-with-claude/claude-models-on-google-cloud/anthropic-managed.md` | "Extract the AnthropicGoogleCloud client per language, credentials, settings, and unsupported features" |
+
+### OpenTelemetry
+
+| Topic | URL | What to look for |
+| --- | --- | --- |
+| OpenTelemetry overview | `https://platform.claude.com/docs/en/manage-claude/opentelemetry.md` | "Extract SDK vs API tracing coverage, content modes and limits, example traces, and token counting rules" |
+| SDK tracing | `https://platform.claude.com/docs/en/manage-claude/opentelemetry/sdk.md` | "Extract the install command for my language, tracer provider setup, SDK options and environment variables" |
+| API tracing | `https://platform.claude.com/docs/en/manage-claude/opentelemetry/api.md` | "Extract how to add a destination through the Admin API or the Console, workspace selection, traceparent propagation, delivery rules, limits and delivery errors" |
+| Telemetry destinations API reference | `https://platform.claude.com/docs/en/api/beta/organization/telemetry_destinations.md` | "Extract the create, list, update and delete requests for telemetry destinations and their workspaces, every request field, and the response fields including state and delivery_health" |
+| Span reference | `https://platform.claude.com/docs/en/api/opentelemetry/spans.md` | "Extract span names, parents and children, and the attributes of the span I ask about" |
+
+If a fetch fails, use `shared/opentelemetry.md`.
 
 ### Admin API (Organization Management)
 
-| Topic                | URL                                                                     | Extraction Prompt                                                                     |
-| -------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| Admin API Guide      | `https://platform.claude.com/docs/en/manage-claude/admin-api.md`        | "Extract Admin API authentication, SDK/CLI usage, and member/invite/key management"   |
-| Admin API Reference  | `https://platform.claude.com/docs/en/api/admin.md`                      | "Extract endpoint parameters, responses, and pagination for the Admin API"            |
-| Workspaces           | `https://platform.claude.com/docs/en/manage-claude/workspaces.md`       | "Extract workspace create/list/archive and member management via API"                  |
-| Rate Limits API      | `https://platform.claude.com/docs/en/manage-claude/rate-limits-api.md`  | "Extract org and workspace rate limit report endpoints and filters"                    |
-| WIF Admin            | `https://platform.claude.com/docs/en/manage-claude/wif-admin-api.md`    | "Extract service account, federation issuer, and federation rule management"           |
-| Usage & Cost Reports | `https://platform.claude.com/docs/en/manage-claude/usage-cost-api.md`   | "Extract usage and cost report endpoints (curl-only, not in the SDKs)"                 |
+| Topic | URL | What to look for |
+| --- | --- | --- |
+| Admin API Guide | `https://platform.claude.com/docs/en/manage-claude/admin-api.md` | "Extract Admin API authentication, SDK/CLI usage, and member/invite/key management" |
+| Admin API Reference | `https://platform.claude.com/docs/en/api/admin.md` | "Extract endpoint parameters, responses, and pagination for the Admin API" |
+| Workspaces | `https://platform.claude.com/docs/en/manage-claude/workspaces.md` | "Extract workspace create/list/archive and member management via API" |
+| Rate Limits API | `https://platform.claude.com/docs/en/manage-claude/rate-limits-api.md` | "Extract org and workspace rate limit report endpoints and filters" |
+| WIF Admin | `https://platform.claude.com/docs/en/manage-claude/wif-admin-api.md` | "Extract service account, federation issuer, and federation rule management" |
+| Usage & Cost Reports (legacy) | `https://platform.claude.com/docs/en/manage-claude/usage-cost-api.md` | "Extract the legacy usage_report and cost_report endpoints (curl-only, not in the SDKs) and which platforms offer them" |
 
 ### Tools
 
-| Topic          | URL                                                                                    | Extraction Prompt                                                                        |
-| -------------- | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Topic | URL | What to look for |
+| --- | --- | --- |
 | Code Execution | `https://platform.claude.com/docs/en/agents-and-tools/tool-use/code-execution-tool.md` | "Extract code execution tool setup, file upload, container reuse, and response handling" |
-| Computer Use   | `https://platform.claude.com/docs/en/agents-and-tools/tool-use/computer-use.md`        | "Extract computer use tool setup, capabilities, and implementation examples"             |
-| Bash Tool      | `https://platform.claude.com/docs/en/agents-and-tools/tool-use/bash-tool.md`           | "Extract bash tool schema, reference implementation, and security considerations"        |
-| Text Editor    | `https://platform.claude.com/docs/en/agents-and-tools/tool-use/text-editor-tool.md`    | "Extract text editor tool commands, schema, and reference implementation"                |
-| Memory Tool    | `https://platform.claude.com/docs/en/agents-and-tools/tool-use/memory-tool.md`         | "Extract memory tool commands, directory structure, and implementation patterns"         |
-| Tool Search    | `https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool.md`    | "Extract tool search setup, when to use, and cache interaction"                          |
-| Programmatic Tool Calling | `https://platform.claude.com/docs/en/agents-and-tools/tool-use/programmatic-tool-calling.md` | "Extract PTC setup, script execution model, and tool invocation from code"    |
-| Skills         | `https://platform.claude.com/docs/en/agents-and-tools/skills.md`                       | "Extract skill folder structure, SKILL.md format, and loading behavior"                  |
-| Skills Guide   | `https://platform.claude.com/docs/en/build-with-claude/skills-guide.md`                | "Extract the Skills API (/v1/skills) usage and the migration steps from skills-2025-10-02" |
+| Computer Use | `https://platform.claude.com/docs/en/agents-and-tools/tool-use/computer-use-tool.md` | "Extract the computer_toolset_20260801 setup (configs, member tools, batch actions, toolset_name on results), the API support section, and the migration steps from computer_20251124" |
+| Bash Tool | `https://platform.claude.com/docs/en/agents-and-tools/tool-use/bash-tool.md` | "Extract bash tool schema, reference implementation, and security considerations" |
+| Text Editor | `https://platform.claude.com/docs/en/agents-and-tools/tool-use/text-editor-tool.md` | "Extract text editor tool commands, schema, and reference implementation" |
+| Memory Tool | `https://platform.claude.com/docs/en/agents-and-tools/tool-use/memory-tool.md` | "Extract memory tool commands, directory structure, and implementation patterns" |
+| Tool Search | `https://platform.claude.com/docs/en/agents-and-tools/tool-use/tool-search-tool.md` | "Extract tool search setup, when to use, and cache interaction" |
+| Parallel Tool Use | `https://platform.claude.com/docs/en/agents-and-tools/tool-use/parallel-tool-use.md` | "Extract execution semantics for several tool calls in one response, the result-formatting rules that keep parallel calls working, and how to disable them" |
+| Programmatic Tool Calling | `https://platform.claude.com/docs/en/agents-and-tools/tool-use/programmatic-tool-calling.md` | "Extract PTC setup, script execution model, tool invocation from code, and when it pays" |
+| Fine-grained Tool Streaming | `https://platform.claude.com/docs/en/agents-and-tools/tool-use/fine-grained-tool-streaming.md` | "Extract how to stream tool inputs as they are written, availability, and how to handle invalid or partial JSON" |
+| Skills | `https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview.md` | "Extract skill folder structure, SKILL.md format, and loading behavior" |
+| Skills Guide | `https://platform.claude.com/docs/en/build-with-claude/skills-guide.md` | "Extract the Skills API (`/v1/skills`) usage and the migration steps from skills-2025-10-02" |
 
 ### Advanced Features
 
-| Topic              | URL                                                                           | Extraction Prompt                                   |
-| ------------------ | ----------------------------------------------------------------------------- | --------------------------------------------------- |
-| Structured Outputs | `https://platform.claude.com/docs/en/build-with-claude/structured-outputs.md` | "Extract output_config.format usage and schema enforcement"                           |
-| Compaction         | `https://platform.claude.com/docs/en/build-with-claude/compaction.md`         | "Extract compaction setup, trigger config, and streaming with compaction"             |
-| Context Editing    | `https://platform.claude.com/docs/en/build-with-claude/context-editing.md`    | "Extract context editing thresholds, what gets cleared, and configuration"            |
-| Citations          | `https://platform.claude.com/docs/en/build-with-claude/citations.md`          | "Extract citation format and implementation"        |
-| Context Windows    | `https://platform.claude.com/docs/en/build-with-claude/context-windows.md`    | "Extract context window sizes and token management" |
+| Topic | URL | What to look for |
+| --- | --- | --- |
+| Structured Outputs | `https://platform.claude.com/docs/en/build-with-claude/structured-outputs.md` | "Extract output_config.format usage, schema enforcement, and grammar compilation and caching" |
+| Compaction | `https://platform.claude.com/docs/en/build-with-claude/compaction.md` | "Extract compaction setup, every way it can be triggered, trigger config, supported models and beta headers, and streaming with compaction" |
+| Message Threads | `https://platform.claude.com/docs/en/build-with-claude/message-threads.md` | "Extract the thread field rules, replay and what ends a thread, how long a thread lasts, cache_control on a thread, effect on price and rate limits, the SDK helper for my language, unsupported features, availability, and data retention" |
+| Context Editing | `https://platform.claude.com/docs/en/build-with-claude/context-editing.md` | "Extract context editing thresholds, what gets cleared, the minimum-to-clear setting, the effect on the prompt cache, and configuration" |
+| Citations | `https://platform.claude.com/docs/en/build-with-claude/citations.md` | "Extract citation format and implementation" |
+| Context Windows | `https://platform.claude.com/docs/en/build-with-claude/context-windows.md` | "Extract context window sizes and token management" |
 
 ### Managed Agents
 
 Use these when a managed-agents binding, behavior, or wire-level detail isn't covered in the cached `shared/managed-agents-*.md` concept files or in `{lang}/managed-agents/README.md`.
 
-| Topic                 | URL                                                                              | Extraction Prompt                                                                               |
-| --------------------- | -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| Overview              | `https://platform.claude.com/docs/en/managed-agents/overview.md`                 | "Extract the high-level architecture and how agents/sessions/environments/vaults fit together" |
-| Quickstart            | `https://platform.claude.com/docs/en/managed-agents/quickstart.md`               | "Extract the minimal end-to-end agent -> environment -> session -> stream code path"              |
-| Agent Setup           | `https://platform.claude.com/docs/en/managed-agents/agent-setup.md`              | "Extract agent create/update/list-versions/archive lifecycle and parameters"                   |
-| Define Outcomes       | `https://platform.claude.com/docs/en/managed-agents/define-outcomes.md`          | "Extract outcome definitions, evaluation hooks, and success criteria configuration"             |
-| Sessions              | `https://platform.claude.com/docs/en/managed-agents/sessions.md`                 | "Extract session lifecycle, status transitions, idle/terminated semantics, and resume rules"    |
-| Environments          | `https://platform.claude.com/docs/en/managed-agents/environments.md`             | "Extract environment config (cloud/networking), management endpoints, and reuse model"          |
-| Self-Hosted Sandboxes | `https://platform.claude.com/docs/en/managed-agents/self-hosted-sandboxes.md`    | "Extract config:{type:self_hosted}, ANTHROPIC_ENVIRONMENT_KEY, EnvironmentWorker.run/handle_item, environments.work.poller(drain), beta_agent_toolset, ant beta:worker poll/run, webhook-driven wake, memory stores (ANTHROPIC_WORK_SECRET, memory_sync_interval/memory_sync_deletes)" |
+| Topic | URL | What to look for |
+| --- | --- | --- |
+| Overview | `https://platform.claude.com/docs/en/managed-agents/overview.md` | "Extract the high-level architecture and how agents/sessions/environments/vaults fit together" |
+| Quickstart | `https://platform.claude.com/docs/en/managed-agents/quickstart.md` | "Extract the minimal end-to-end agent -> environment -> session -> stream code path" |
+| Agent Setup | `https://platform.claude.com/docs/en/managed-agents/agent-setup.md` | "Extract agent create/update/list-versions/archive lifecycle and parameters" |
+| Define Outcomes | `https://platform.claude.com/docs/en/managed-agents/define-outcomes.md` | "Extract outcome definitions, evaluation hooks, and success criteria configuration" |
+| Sessions | `https://platform.claude.com/docs/en/managed-agents/sessions.md` | "Extract session lifecycle, status transitions, idle/terminated semantics, and resume rules" |
+| Environments | `https://platform.claude.com/docs/en/managed-agents/environments.md` | "Extract environment config (cloud/networking), management endpoints, and reuse model" |
+| Self-Hosted Sandboxes | `https://platform.claude.com/docs/en/managed-agents/self-hosted-sandboxes.md` | "Extract config:{type:self_hosted}, ANTHROPIC_ENVIRONMENT_KEY, EnvironmentWorker.run/handle_item, environments.work.poller(drain), beta_agent_toolset, ant beta:worker poll/run, webhook-driven wake, memory stores (ANTHROPIC_WORK_SECRET, memory_sync_interval/memory_sync_deletes)" |
 | Self-Hosted Sandboxes - Security | `https://platform.claude.com/docs/en/managed-agents/self-hosted-sandboxes-security.md` | "Extract what the customer owns (hardening, egress, key custody, trust boundaries) vs what Anthropic cannot do" |
-| Events and Streaming  | `https://platform.claude.com/docs/en/managed-agents/events-and-streaming.md`     | "Extract event stream types, stream-first ordering, reconnect/dedupe, and steering patterns"    |
-| Tools                 | `https://platform.claude.com/docs/en/managed-agents/tools.md`                    | "Extract built-in toolset, custom tool definitions, and tool result wire format"                |
-| Files                 | `https://platform.claude.com/docs/en/managed-agents/files.md`                    | "Extract file upload, mount paths, session resources, and listing/downloading session outputs"  |
-| Permission Policies   | `https://platform.claude.com/docs/en/managed-agents/permission-policies.md`      | "Extract permission policy types (`always_allow` / `always_ask` / `auto`), the three `auto` outcomes, the `evaluated_permission` + `evaluation` event fields, and per-tool config" |
-| Multi-Agent           | `https://platform.claude.com/docs/en/managed-agents/multiagent-orchestration.md` | "Extract multi-agent composition patterns, sub-agent invocation, and result handoff"            |
-| Observability         | `https://platform.claude.com/docs/en/managed-agents/observability.md`            | "Extract logging, tracing, and usage telemetry exposed by managed agents"                       |
-| Webhooks              | `https://platform.claude.com/docs/en/managed-agents/webhooks.md`                 | "Extract webhook endpoint registration, HMAC signature verification, supported event types, and delivery semantics" |
-| GitHub                | `https://platform.claude.com/docs/en/managed-agents/github.md`                   | "Extract github_repository resource shape, multi-repo mounting, and token rotation"             |
-| MCP Connector         | `https://platform.claude.com/docs/en/managed-agents/mcp-connector.md`            | "Extract MCP server declaration on agents and vault-based credential injection at session"     |
-| Vaults                | `https://platform.claude.com/docs/en/managed-agents/vaults.md`                   | "Extract vault create, credential add/rotate, OAuth refresh shape, and archive"                 |
-| Skills                | `https://platform.claude.com/docs/en/managed-agents/skills.md`                   | "Extract skill packaging and loading model for managed agents"                                  |
-| Memory                | `https://platform.claude.com/docs/en/managed-agents/memory.md`                   | "Extract memory resource shape, scoping, and lifecycle"                                         |
-| Onboarding            | `https://platform.claude.com/docs/en/managed-agents/onboarding.md`               | "Extract first-run setup, prerequisites, and account/region requirements"                      |
-| Cloud Containers      | `https://platform.claude.com/docs/en/managed-agents/cloud-containers.md`         | "Extract cloud container runtime, image config, and network/storage knobs"                     |
-| Migration             | `https://platform.claude.com/docs/en/managed-agents/migration.md`                | "Extract migration paths from earlier APIs/preview shapes to GA managed agents"                 |
+| Events and Streaming | `https://platform.claude.com/docs/en/managed-agents/events-and-streaming.md` | "Extract event stream types, stream-first ordering, reconnect/dedupe, and steering patterns" |
+| Tools | `https://platform.claude.com/docs/en/managed-agents/tools.md` | "Extract built-in toolset, custom tool definitions, and tool result wire format" |
+| Files | `https://platform.claude.com/docs/en/managed-agents/files.md` | "Extract file upload, mount paths, session resources, and listing/downloading session outputs" |
+| Web Search & Fetch Restrictions | `https://platform.claude.com/docs/en/managed-agents/tools-web-restrictions.md` | "Extract `allowed_domains` / `blocked_domains` rules and validation errors, how `allowed_hosts` and the organization's Console web settings apply in a session, and mid-session changes" |
+| Permission Policies | `https://platform.claude.com/docs/en/managed-agents/permission-policies.md` | "Extract permission policy types (`always_allow` / `always_ask` / `auto`), the three `auto` outcomes, the `evaluated_permission` + `evaluation` event fields, and per-tool config" |
+| Multi-Agent | `https://platform.claude.com/docs/en/managed-agents/multiagent-orchestration.md` | "Extract multi-agent composition patterns, sub-agent invocation, and result handoff" |
+| Observability | `https://platform.claude.com/docs/en/managed-agents/observability.md` | "Extract logging, tracing, and usage telemetry exposed by managed agents" |
+| Webhooks | `https://platform.claude.com/docs/en/managed-agents/webhooks.md` | "Extract webhook endpoint registration, HMAC signature verification, supported event types, and delivery semantics" |
+| GitHub | `https://platform.claude.com/docs/en/managed-agents/github.md` | "Extract github_repository resource shape, multi-repo mounting, and token rotation" |
+| MCP Connector | `https://platform.claude.com/docs/en/managed-agents/mcp-connector.md` | "Extract MCP server declaration on agents and vault-based credential injection at session" |
+| Vaults | `https://platform.claude.com/docs/en/managed-agents/vaults.md` | "Extract vault create, credential add/rotate, OAuth refresh shape, and archive" |
+| Skills | `https://platform.claude.com/docs/en/managed-agents/skills.md` | "Extract skill packaging and loading model for managed agents" |
+| Memory | `https://platform.claude.com/docs/en/managed-agents/memory.md` | "Extract memory resource shape, scoping, and lifecycle" |
+| Onboarding | `https://platform.claude.com/docs/en/managed-agents/onboarding.md` | "Extract first-run setup, prerequisites, and account/region requirements" |
+| Cloud Containers | `https://platform.claude.com/docs/en/managed-agents/cloud-containers.md` | "Extract cloud container runtime, image config, and network/storage knobs" |
+| Migration | `https://platform.claude.com/docs/en/managed-agents/migration.md` | "Extract migration paths from earlier APIs/preview shapes to GA managed agents" |
 
 ### Anthropic CLI
 
-The `ant` CLI provides terminal access to the Claude API. Every API resource is exposed as a subcommand. It is the recommended way to create agents and environments from version-controlled YAML (`ant beta:agents create < agent.yaml` - see `shared/anthropic-cli.md`), and also exposes sessions and every other API resource for scripting and interactive inspection.
+The `ant` CLI provides terminal access to the Claude API. Every API resource is exposed as a subcommand. It is the recommended way to keep agents, environments, skills, memory stores, vaults and deployments as version-controlled files (`ant apply` - see `shared/anthropic-cli.md`), and also exposes sessions and every other API resource for scripting and interactive inspection.
 
-| Topic         | URL                                                     | Extraction Prompt                                                                                  |
-| ------------- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| Anthropic CLI | `https://platform.claude.com/docs/en/api/sdks/cli.md`   | "Extract CLI install, authentication, command structure, and the beta:agents/environments/sessions commands" |
+| Topic | URL | What to look for |
+| --- | --- | --- |
+| Anthropic CLI | `https://platform.claude.com/docs/en/cli-sdks-libraries/cli/quickstart.md` | "Extract CLI install, authentication, command structure, and sending a first request" |
+| `ant apply` | `https://platform.claude.com/docs/en/cli-sdks-libraries/cli/apply.md` | "Extract the file layout per resource kind, how a file's kind is inferred, path references between files, `claude-lock.json`, the flags (`--dry-run`, `--yes`, `--force`, `--prune`, `--upgrade`, `--lock-file`), and the CI setup" |
 | `ant beta:sessions connect` | `https://platform.claude.com/docs/en/cli-sdks-libraries/cli/sessions-connect.md` | "Extract the interactive session viewer: keybindings, tool-call allow/deny prompt, `--web` local viewer and its URL/lifetime rules" |
 | Authentication overview | `https://platform.claude.com/docs/en/manage-claude/authentication.md` | "Extract the credential options (API keys, interactive OAuth login, Workload Identity Federation) and when to use each" |
-| WIF reference | `https://platform.claude.com/docs/en/manage-claude/wif-reference.md`  | "Extract credential precedence order, the profile configuration file schema, and the configuration directory layout" |
+| WIF reference | `https://platform.claude.com/docs/en/manage-claude/wif-reference.md` | "Extract credential precedence order, the profile configuration file schema, and the configuration directory layout" |
 
 ---
 
 ## Claude API SDK Repositories
 
-WebFetch these when a binding (class, method, namespace, field) isn't covered in the cached `{lang}/` skill files or in the managed-agents docs above. The SDKs include beta managed-agents support for `/v1/agents`, `/v1/sessions`, `/v1/environments`, and related resources - search the repo for `BetaManagedAgents`, `beta.agents`, `beta.sessions`, or the equivalent namespace for that language.
+Fetch these when a binding (class, method, namespace, field) isn't covered in the cached `{lang}/` skill files or in the managed-agents docs above. The SDKs include beta managed-agents support for `/v1/agents`, `/v1/sessions`, `/v1/environments`, and related resources - search the repo for `BetaManagedAgents`, `beta.agents`, `beta.sessions`, or the equivalent namespace for that language.
 
-| SDK        | URL                                                      | Extraction Prompt                                                                                                       |
-| ---------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Python     | `https://github.com/anthropics/anthropic-sdk-python`     | "Extract beta managed-agents namespaces, classes, and method signatures (`client.beta.agents`, `client.beta.sessions`)" |
+| SDK | URL | What to look for |
+| --- | --- | --- |
+| Python | `https://github.com/anthropics/anthropic-sdk-python` | "Extract beta managed-agents namespaces, classes, and method signatures (`client.beta.agents`, `client.beta.sessions`)" |
 | TypeScript | `https://github.com/anthropics/anthropic-sdk-typescript` | "Extract beta managed-agents namespaces, classes, and method signatures (`client.beta.agents`, `client.beta.sessions`)" |
-| Java       | `https://github.com/anthropics/anthropic-sdk-java`       | "Extract beta managed-agents classes, builders, and method signatures (`client.beta().agents()`, `BetaManagedAgents*`)" |
-| Go         | `https://github.com/anthropics/anthropic-sdk-go`         | "Extract beta managed-agents types and method signatures (`client.Beta.Agents`, `BetaManagedAgents*` event types)"      |
-| Ruby       | `https://github.com/anthropics/anthropic-sdk-ruby`       | "Extract beta managed-agents methods and parameter shapes (`client.beta.agents`, `client.beta.sessions`)"               |
-| C#         | `https://github.com/anthropics/anthropic-sdk-csharp`     | "Extract beta managed-agents classes and method signatures (NuGet package, `BetaManagedAgents*` types)"                 |
-| PHP        | `https://github.com/anthropics/anthropic-sdk-php`        | "Extract beta managed-agents classes and method signatures (`$client->beta->agents`, `BetaManagedAgents*` params)"      |
+| Java | `https://github.com/anthropics/anthropic-sdk-java` | "Extract beta managed-agents classes, builders, and method signatures (`client.beta().agents()`, `BetaManagedAgents*`)" |
+| Go | `https://github.com/anthropics/anthropic-sdk-go` | "Extract beta managed-agents types and method signatures (`client.Beta.Agents`, `BetaManagedAgents*` event types)" |
+| Ruby | `https://github.com/anthropics/anthropic-sdk-ruby` | "Extract beta managed-agents methods and parameter shapes (`client.beta.agents`, `client.beta.sessions`)" |
+| C# | `https://github.com/anthropics/anthropic-sdk-csharp` | "Extract beta managed-agents classes and method signatures (NuGet package, `BetaManagedAgents*` types)" |
+| PHP | `https://github.com/anthropics/anthropic-sdk-php` | "Extract beta managed-agents classes and method signatures (`$client->beta->agents`, `BetaManagedAgents*` params)" |
 
 Each SDK repo also ships runnable programs under `examples/` - including the refusal-fallback / `fallbacks` examples (client-side middleware registration, fallback state, server-side `fallbacks` param). Fetch those for exact per-language syntax instead of translating another language's example.
 
@@ -151,15 +181,15 @@ Each SDK repo also ships runnable programs under `examples/` - including the ref
 
 Authoritative change lists for upgrading the SDK package itself across a major version. The bundled `{lang}/claude-api/sdk-upgrade.md` is the executable form; when the two disagree, the repository guide wins.
 
-| SDK                | URL                                                                         | Extraction Prompt                                                                                                   |
-| ------------------ | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| SDK | URL | What to look for |
+| --- | --- | --- |
 | Python (0.x -> 1.x) | `https://github.com/anthropics/anthropic-sdk-python/blob/main/MIGRATION.md` | "Extract every breaking change with its before/after code, the new minimum Python version, and the upgrade command" |
 
 ---
 
 ## Fallback Strategy
 
-If WebFetch fails (network issues, URL changed):
+If a fetch fails (network issues, URL changed):
 
 1. Use cached content from the language-specific files (note the cache date)
 2. Inform user the data may be outdated

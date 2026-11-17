@@ -16,9 +16,9 @@ system's ramps.
 | **Status** | state (good->critical) | a small fixed scale, reserved meaning, always icon+label |
 
 **Categorical or ordinal?** If swapping the category order would change the
-meaning - funnel stages, size tiers (S/M/L), age bands, cohort buckets - it is
+meaning - funnel stages, size tiers (S/M/L), age bands, cohort buckets - it is  
 **ordinal** and takes a one-hue ramp so the reader sees the order in the color.
-If swapping would not - product names, teams, regions, endpoints - it is
+If swapping would not - product names, teams, regions, endpoints - it is  
 **nominal categorical** and each bar takes the *same* slot-1 hue (one series,
 so no legend box - the title names it), or slots 1..N when there are N separate
 series. Never color nominal bars by their value: that spends the identity channel
@@ -63,7 +63,7 @@ Every categorical color - current or proposed - must pass all six.
 
 ```
 node scripts/validate_palette.js \
-  "#2a78d6,#eb6834,#1baf7a,#eda100,#e87ba4,#008300,#4a3aa7,#e34948" --mode light
+  "#2a78d6,#eb6834,#1baf7a,#eda100,#e87ba4,#008300,#6250d6,#e34948" --mode light
 ```
 
 (`scripts/` is relative to this skill's base directory, shown at the top of the prompt.)
@@ -77,7 +77,7 @@ relief - still exit 0 and require secondary encoding); exit 1 on any FAIL,
 including a normal-vision floor below 15, which is a hard gate. Run once per mode
 (`--mode dark --surface "#1a1a19"`), and add
 `--pairs all` for scatter / bubble / map / small-multiples charts (where any two marks
-can be neighbors - the default adjacent check would hide a collapse). For an
+can be neighbors - the default adjacent check would hide a collapse). For an  
 **ordinal** ramp pass `--ordinal` - it switches to the ramp checks (monotone L,
 adjacent delta L >= 0.06, light-end contrast >= 2.0:1, single hue) instead of the
 categorical six.
@@ -94,9 +94,14 @@ sub-3:1 fill with neither is a fail.
 
 **Scope - what the validator does and doesn't cover.** These six checks validate a
 *categorical* palette (series identity). They do **not** judge a lone status/text
-color or a sequential ramp. For a single status or text color, run a WCAG *text*-
-contrast check (4.5:1 normal, 3:1 large) - `validate_palette.js` exports
-`contrast(a, b)` for exactly this. For sequential/diverging, the check is lightness
+color or a sequential ramp. For a single status or text color, run a *text*-contrast
+check. APCA is an acceptable measure, and tracks what people see more closely than
+WCAG 2's ratio, so go by APCA where the two disagree; that is how `palette.md` picks the
+label inside each fill. Where WCAG 2 AA conformance is required, hold text to its ratio
+instead (4.5:1 normal, 3:1 large). `validate_palette.js` exports `apca(text, background)`
+for APCA (compare absolute values: light text on dark scores negative) and `contrast(a, b)`
+for WCAG 2's ratio.
+For sequential/diverging, the check is lightness
 monotonicity across the ramp, not adjacency CVD - running the categorical validator on
 a sequential ramp **will FAIL by design** (it spans the band; steps sit close), which
 is expected, not a real failure; don't "fix" a good ramp to satisfy it.
@@ -128,7 +133,8 @@ picked among them for its opening.)
 
 Status never follows the theme - it is a small fixed scale (good -> warning -> serious
 -> critical) with reserved meaning, on steps deliberately distinct from the categorical
-slots so a status color never impersonates a series, and always paired with an
+slots so a status color never impersonates a series (one exception: in dark mode good
+is the series green), and always paired with an
 icon + label (on a light surface warning and serious sit below 3:1 by design -
 the pairing is the mitigation). (Exact steps in `palette.md`.) The collision rule: when a series *means* good/bad (error rate, pass/fail) it wears
 status tokens; when it's just "series 4" it wears categorical - never both in one chart.

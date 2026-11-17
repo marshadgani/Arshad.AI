@@ -1,6 +1,6 @@
 # Managed Agents - Java
 
-> **Bindings not shown here:** This README covers the most common managed-agents flows for Java. If you need a class, method, namespace, field, or behavior that isn't shown, WebFetch the Java SDK repo **or the relevant docs page** from `shared/live-sources.md` rather than guess. Do not extrapolate from cURL shapes or another language's SDK.
+> **Bindings not shown here:** This README covers the most common managed-agents flows for Java. If you need a class, method, namespace, field, or behavior that isn't shown, fetch the Java SDK repo **or the relevant docs page** from `shared/live-sources.md` rather than guess. Do not extrapolate from cURL shapes or another language's SDK.
 
 > **Agents are persistent - create once, reference by ID.** Store the agent ID returned by `client.beta().agents().create` and pass it to every subsequent `client.beta().sessions().create`; do not call `agents().create` in the request path. **Recommended:** define agents and environments as version-controlled files synced with `ant apply` - see `shared/anthropic-cli.md` (its live-docs URL is in `shared/live-sources.md`). The CLI owns the control plane (create/update); your code owns the data plane (sessions with the stored ID). The examples below show in-code creation for when you must provision programmatically; in production the create call belongs in setup, not in the request path.
 
@@ -10,6 +10,7 @@
 <dependency>
     <groupId>com.anthropic</groupId>
     <artifactId>anthropic-java</artifactId>
+    <version>3.3.0</version>
 </dependency>
 ```
 
@@ -28,13 +29,16 @@ var client = AnthropicOkHttpClient.fromEnv();
 
 ```java
 import com.anthropic.models.beta.environments.BetaCloudConfigParams;
-import com.anthropic.models.beta.environments.BetaUnrestrictedNetwork;
+import com.anthropic.models.beta.environments.BetaLimitedNetworkParams;
 import com.anthropic.models.beta.environments.EnvironmentCreateParams;
 
 var environment = client.beta().environments().create(EnvironmentCreateParams.builder()
     .name("my-dev-env")
     .config(BetaCloudConfigParams.builder()
-        .networking(BetaUnrestrictedNetwork.builder().build())
+        .networking(BetaLimitedNetworkParams.builder()
+            .allowPackageManagers(true)
+            .allowMcpServers(true)
+            .build())
         .build())
     .build());
 System.out.println("Environment ID: " + environment.id()); // env_...
@@ -44,30 +48,40 @@ System.out.println("Environment ID: " + environment.id()); // env_...
 
 ## Create an Agent (required first step)
 
-> Warning: **There is no inline agent config.** Model, system, and tools live on the agent object, not the session. Always start with `client.beta().agents().create()` - the session takes either `.agent(agent.id())` or the typed `BetaManagedAgentsAgentParams.builder()...build()`.
+> Warning: **A session needs an agent that already exists.** Model, system, and tools are set on the agent object; a session can override them for that session only, with the `agent_with_overrides` form of `agent` (`shared/managed-agents-core.md` § Override agent configuration for a session). Always start with `client.beta().agents().create()` - the session takes `.agent(agent.id())` or the typed `BetaManagedAgentsAgentParams.builder()...build()`.
 
 ### Minimal
+
+The examples on this page turn both web tools off. Set `enabled` to true on `web_fetch` / `web_search` only when the job as described needs the web (a general-purpose or open-ended job stays off; tell the user how to switch it on) - see `shared/managed-agents-tools.md` § Agent Toolset. They also set the `auto` permission policy (Java SDK 2.63.0+), under which a call can pause for your approval - the event loop under Stream Events answers it. When nobody is watching the run, answer `deny`; never answer `allow` to every paused call.
 
 ```java
 import com.anthropic.models.beta.agents.AgentCreateParams;
 import com.anthropic.models.beta.agents.BetaManagedAgentsAgentToolset20260401Params;
+import com.anthropic.models.beta.agents.BetaManagedAgentsAgentToolsetDefaultConfigParams;
+import com.anthropic.models.beta.agents.BetaManagedAgentsAutoPolicy;
+import com.anthropic.models.beta.agents.BetaManagedAgentsModel;
+import com.anthropic.models.beta.agents.BetaManagedAgentsWebFetchToolConfigParams;
+import com.anthropic.models.beta.agents.BetaManagedAgentsWebSearchToolConfigParams;
 import com.anthropic.models.beta.sessions.BetaManagedAgentsAgentParams;
 import com.anthropic.models.beta.sessions.SessionCreateParams;
 
 // 1. Create the agent (reusable, versioned)
 var agent = client.beta().agents().create(AgentCreateParams.builder()
     .name("Coding Assistant")
-    .model("claude-opus-5-5")
+    .model(BetaManagedAgentsModel.of("claude-opus-5-5"))
     .system("You are a helpful coding assistant.")
     .addTool(BetaManagedAgentsAgentToolset20260401Params.builder()
-        .type(BetaManagedAgentsAgentToolset20260401Params.Type.AGENT_TOOLSET_20260401)
+        .defaultConfig(BetaManagedAgentsAgentToolsetDefaultConfigParams.builder()
+            .permissionPolicy(BetaManagedAgentsAutoPolicy.builder().build())
+            .build())
+        .addConfig(BetaManagedAgentsWebFetchToolConfigParams.builder().enabled(false).build())
+        .addConfig(BetaManagedAgentsWebSearchToolConfigParams.builder().enabled(false).build())
         .build())
     .build());
 
 // 2. Start a session
 var session = client.beta().sessions().create(SessionCreateParams.builder()
     .agent(BetaManagedAgentsAgentParams.builder()
-        .type(BetaManagedAgentsAgentParams.Type.AGENT)
         .id(agent.id())
         .version(agent.version())
         .build())
@@ -80,7 +94,7 @@ System.out.println("Trace: https://platform.claude.com/workspaces/default/sessio
 
 ### Updating an Agent
 
-Updates create new versions; the agent object is immutable per version.
+An update that changes the agent creates a new version; the agent object is immutable per version.
 
 ```java
 import com.anthropic.models.beta.agents.AgentUpdateParams;
@@ -111,7 +125,6 @@ import com.anthropic.models.beta.sessions.events.EventSendParams;
 
 client.beta().sessions().events().send(session.id(), EventSendParams.builder()
     .addEvent(BetaManagedAgentsUserMessageEventParams.builder()
-        .type(BetaManagedAgentsUserMessageEventParams.Type.USER_MESSAGE)
         .addTextContent("Review the auth module")
         .build())
     .build());
@@ -124,24 +137,46 @@ client.beta().sessions().events().send(session.id(), EventSendParams.builder()
 ## Stream Events (SSE)
 
 ```java
-import com.anthropic.models.beta.sessions.events.StreamEvents;
+import com.anthropic.models.beta.sessions.events.BetaManagedAgentsAgentEvaluatedPermission;
+import com.anthropic.models.beta.sessions.events.BetaManagedAgentsUserToolConfirmationEventParams;
+import java.util.Optional;
+import java.util.function.BiConsumer;
+
+// Answers a tool call that paused for your decision (always_ask, or auto with no determination)
+BiConsumer<String, Boolean> confirm = (toolUseId, allow) ->
+    client.beta().sessions().events().send(session.id(), EventSendParams.builder()
+        .addEvent(BetaManagedAgentsUserToolConfirmationEventParams.builder()
+            .toolUseId(toolUseId)
+            .result(allow
+                ? BetaManagedAgentsUserToolConfirmationEventParams.Result.ALLOW
+                : BetaManagedAgentsUserToolConfirmationEventParams.Result.DENY)
+            .build())
+        .build());
+var ask = Optional.of(BetaManagedAgentsAgentEvaluatedPermission.ASK);
 
 // Open the stream first, then send the user message
 try (var stream = client.beta().sessions().events().streamStreaming(session.id())) {
     client.beta().sessions().events().send(session.id(), EventSendParams.builder()
         .addEvent(BetaManagedAgentsUserMessageEventParams.builder()
-            .type(BetaManagedAgentsUserMessageEventParams.Type.USER_MESSAGE)
             .addTextContent("Summarize the repo README")
             .build())
         .build());
 
-    for (var event : (Iterable<StreamEvents>) stream.stream()::iterator) {
+    // Iterating the stream directly needs Java SDK 3.3.0+
+    for (var event : stream) {
         if (event.isAgentMessage()) {
-            event.asAgentMessage().content().forEach(block -> System.out.print(block.text()));
+            event.asAgentMessage().content().forEach(block -> block.text().ifPresent(textBlock -> System.out.print(textBlock.text())));
         } else if (event.isAgentToolUse()) {
-            System.out.println("\n[Using tool: " + event.asAgentToolUse().name() + "]");
+            var call = event.asAgentToolUse();
+            System.out.println("\n[Using tool: " + call.name() + "]");
+            // you write approve(): ask a person or apply your own rule; deny when unattended
+            if (call.evaluatedPermission().equals(ask)) confirm.accept(call.id(), approve(event));
+        } else if (event.isAgentMcpToolUse()) {
+            var call = event.asAgentMcpToolUse();
+            if (call.evaluatedPermission().equals(ask)) confirm.accept(call.id(), approve(event));
         } else if (event.isSessionStatusIdle()) {
-            break;
+            // requires_action: waiting on you, keep streaming
+            if (!event.asSessionStatusIdle().stopReason().isRequiresAction()) break;
         } else if (event.isSessionError()) {
             System.out.println("\n[Error]");
             break;
@@ -152,7 +187,7 @@ try (var stream = client.beta().sessions().events().streamStreaming(session.id()
 
 ### Reconnecting and Tailing
 
-When reconnecting mid-session, list past events first to dedupe, then tail live events. The cross-variant `id` field is read from the raw `_json()` value:
+When reconnecting mid-session, list past events first to dedupe, then tail live events. Answer paused calls as in the loop above, including an `ask` in the history that no `user.tool_confirmation` follows. The cross-variant `id` field is read from the raw `_json()` value:
 
 ```java
 import com.anthropic.core.JsonValue;
@@ -169,13 +204,14 @@ try (var stream = client.beta().sessions().events().streamStreaming(session.id()
     }
 
     // Tail live events, skipping anything already seen
-    for (var event : (Iterable<StreamEvents>) stream.stream()::iterator) {
+    for (var event : stream) {
         Optional<Map<String, JsonValue>> obj = event._json().orElseThrow().asObject();
         if (!seenEventIds.add(obj.orElseThrow().get("id").asStringOrThrow())) continue;
         if (event.isAgentMessage()) {
-            event.asAgentMessage().content().forEach(block -> System.out.print(block.text()));
+            event.asAgentMessage().content().forEach(block -> block.text().ifPresent(textBlock -> System.out.print(textBlock.text())));
         } else if (event.isSessionStatusIdle()) {
-            break;
+            // requires_action: answer the paused call as under Stream Events, then keep streaming
+            if (!event.asSessionStatusIdle().stopReason().isRequiresAction()) break;
         }
     }
 }
@@ -218,9 +254,8 @@ var session = client.beta().sessions().create(SessionCreateParams.builder()
     .agent(agent.id())
     .environmentId(environment.id())
     .addResource(BetaManagedAgentsFileResourceParams.builder()
-        .type(BetaManagedAgentsFileResourceParams.Type.FILE)
         .fileId(file.id())
-        .mountPath("/workspace/data.csv")
+        .mountPath("/data.csv")
         .build())
     .build());
 ```
@@ -234,7 +269,6 @@ import com.anthropic.models.beta.sessions.resources.ResourceDeleteParams;
 // Attach an additional file to an open session
 var resource = client.beta().sessions().resources().add(session.id(), ResourceAddParams.builder()
     .betaManagedAgentsFileResourceParams(BetaManagedAgentsFileResourceParams.builder()
-        .type(BetaManagedAgentsFileResourceParams.Type.FILE)
         .fileId(file.id())
         .build())
     .build());
@@ -245,10 +279,10 @@ var listed = client.beta().sessions().resources().list(session.id());
 for (var entry : listed.data()) {
     if (entry.isFile()) {
         var fileResource = entry.asFile();
-        System.out.println(fileResource.id() + " " + fileResource.type());
+        System.out.println(fileResource.id() + " " + fileResource._type());
     } else if (entry.isGitHubRepository()) {
         var repoResource = entry.asGitHubRepository();
-        System.out.println(repoResource.id() + " " + repoResource.type());
+        System.out.println(repoResource.id() + " " + repoResource._type());
     }
 }
 
@@ -296,17 +330,19 @@ import com.anthropic.models.beta.agents.BetaManagedAgentsUrlMcpServerParams;
 // Agent declares MCP server (no auth here - auth goes in a vault)
 var agent = client.beta().agents().create(AgentCreateParams.builder()
     .name("GitHub Assistant")
-    .model("claude-opus-5-5")
+    .model(BetaManagedAgentsModel.of("claude-opus-5-5"))
     .addMcpServer(BetaManagedAgentsUrlMcpServerParams.builder()
-        .type(BetaManagedAgentsUrlMcpServerParams.Type.URL)
         .name("github")
         .url("https://api.githubcopilot.com/mcp/")
         .build())
     .addTool(BetaManagedAgentsAgentToolset20260401Params.builder()
-        .type(BetaManagedAgentsAgentToolset20260401Params.Type.AGENT_TOOLSET_20260401)
+        .defaultConfig(BetaManagedAgentsAgentToolsetDefaultConfigParams.builder()
+            .permissionPolicy(BetaManagedAgentsAutoPolicy.builder().build())
+            .build())
+        .addConfig(BetaManagedAgentsWebFetchToolConfigParams.builder().enabled(false).build())
+        .addConfig(BetaManagedAgentsWebSearchToolConfigParams.builder().enabled(false).build())
         .build())
     .addTool(BetaManagedAgentsMcpToolsetParams.builder()
-        .type(BetaManagedAgentsMcpToolsetParams.Type.MCP_TOOLSET)
         .mcpServerName("github")
         .build())
     .build());
@@ -314,7 +350,6 @@ var agent = client.beta().agents().create(AgentCreateParams.builder()
 // Session attaches vault(s) containing credentials for those MCP server URLs
 var session = client.beta().sessions().create(SessionCreateParams.builder()
     .agent(BetaManagedAgentsAgentParams.builder()
-        .type(BetaManagedAgentsAgentParams.Type.AGENT)
         .id(agent.id())
         .version(agent.version())
         .build())
@@ -354,7 +389,6 @@ var credential = client.beta().vaults().credentials().create(vault.id(),
     CredentialCreateParams.builder()
         .displayName("Alice's Slack")
         .auth(BetaManagedAgentsMcpOAuthCreateParams.builder()
-            .type(BetaManagedAgentsMcpOAuthCreateParams.Type.MCP_OAUTH)
             .mcpServerUrl("https://mcp.slack.com/mcp")
             .accessToken("xoxp-...")
             .expiresAt(OffsetDateTime.parse("2026-04-15T00:00:00Z"))
@@ -373,7 +407,6 @@ client.beta().vaults().credentials().update(credential.id(),
     CredentialUpdateParams.builder()
         .vaultId(vault.id())
         .auth(BetaManagedAgentsMcpOAuthUpdateParams.builder()
-            .type(BetaManagedAgentsMcpOAuthUpdateParams.Type.MCP_OAUTH)
             .accessToken("xoxp-new-...")
             .expiresAt(OffsetDateTime.parse("2026-05-15T00:00:00Z"))
             .refresh(BetaManagedAgentsMcpOAuthRefreshUpdateParams.builder()
@@ -400,7 +433,6 @@ var session = client.beta().sessions().create(SessionCreateParams.builder()
     .environmentId(environment.id())
     .addVaultId(vault.id())
     .addResource(BetaManagedAgentsGitHubRepositoryResourceParams.builder()
-        .type(BetaManagedAgentsGitHubRepositoryResourceParams.Type.GITHUB_REPOSITORY)
         .url("https://github.com/org/repo")
         .mountPath("/workspace/repo")
         .authorizationToken("ghp_your_github_token")
@@ -415,13 +447,11 @@ import java.util.List;
 
 var resources = List.of(
     BetaManagedAgentsGitHubRepositoryResourceParams.builder()
-        .type(BetaManagedAgentsGitHubRepositoryResourceParams.Type.GITHUB_REPOSITORY)
         .url("https://github.com/org/frontend")
         .mountPath("/workspace/frontend")
         .authorizationToken("ghp_your_github_token")
         .build(),
     BetaManagedAgentsGitHubRepositoryResourceParams.builder()
-        .type(BetaManagedAgentsGitHubRepositoryResourceParams.Type.GITHUB_REPOSITORY)
         .url("https://github.com/org/backend")
         .mountPath("/workspace/backend")
         .authorizationToken("ghp_your_github_token")

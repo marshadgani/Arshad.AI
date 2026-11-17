@@ -5,7 +5,7 @@ preserved thinking controls turned on, and report what the API drops and why.
 Dependency-free (Python 3.8+, urllib only). Credentials come from the environment and are never
 printed: ANTHROPIC_API_KEY (sent as x-api-key) or ANTHROPIC_AUTH_TOKEN (sent as
 "Authorization: Bearer ..."; for example the short-lived token an OAuth login provides). When both
-are set only the token is sent -- the API rejects a request carrying both headers. A bearer token
+are set only the token is sent -- with both headers the API would use the key. A bearer token
 also gets the oauth-2025-04-20 beta value, which the API requires for OAuth and workload-identity
 tokens.
 
@@ -44,13 +44,15 @@ reply is not needed and the replay stays cheap), and stream off unless --stream.
 other spelling of the mismatch-behavior field found under block_binding in a capture is removed so
 that only the documented name is sent. A request with no thinking configuration is sent with {type: adaptive} (on models with preserved thinking
 that is what the API runs anyway, and the thinking configuration is outside the compared prefix); a request
-with {type: enabled} is rewritten to adaptive for the same reason; thinking disabled is SKIPPED. On every
+with {type: enabled}, {type: between_tools} or {type: disabled} is rewritten to adaptive for the same reason (the check
+still covers thinking already in the history when a request turns thinking off). On every
 request that declares tools the probe sets tool_choice to none (outside the compared prefix) so that no
 tool -- server-side or the harness's own -- can run during a replay; it never removes tools from the
 capture, because the tool set IS compared. temperature is set to 1 and top_p / top_k are removed (a
 thinking request rejects them). Every such change is printed as a "shaped:" note. Nothing is sent without
 --yes. --count-tokens replays against /v1/messages/count_tokens, which runs the same conversation check
-for free (a 400 in --mode error is the break signal; no input_transformations on a 200).
+for free (a 400 in --mode error is the break signal; no input_transformations on a 200, so drops that are
+not errors -- a model switch, another account's blocks -- do not show there).
 
 Status words per turn: BREAK (a prefix-check drop or rejection), ok (replayed thinking, nothing dropped),
 none (the request replayed no thinking block, so it could not fail), model (only model-check drops: a
@@ -77,7 +79,9 @@ key at all is also NOT EVALUATED: the check never saw the request (a gateway str
 header, or a surface without the controls). So is a 200 carrying a thinking_mismatch_allowed
 entry: the probe sets thinking.block_binding on every replay and a request that sets the field
 never receives one, so the field was stripped on the way (a gateway or proxy rebuilding the
-body) and the check ran record-only. Exit status: 0 clean, 1 inconclusive or errors,
+body) and the check ran record-only. So is a 200 whose only drops are organization_binding_mismatch:
+another account produced those blocks, so they were dropped before the prefix check (a replay key
+from a different account, or a harness that moves one conversation between accounts). Exit status: 0 clean, 1 inconclusive or errors,
 2 breaks found. --json is validated before the first request and written after every request, so
 a bad path costs nothing and a crash loses nothing.
 
@@ -290,7 +294,7 @@ def validate(convs):
 
 
 def prepare(body, mode, model=None, stream=False, max_tokens=16):
-    """Return (shaped body, skip reason or None, notes). Only fields OUTSIDE the compared prefix are touched:
+    """Return (shaped body, notes). Only fields OUTSIDE the compared prefix are touched:
     the model (on request), the thinking configuration, block_binding, max_tokens, stream, tool_choice and
     the sampling parameters a thinking request rejects. system, tools and messages go out exactly as captured."""
     notes = []
@@ -303,14 +307,23 @@ def prepare(body, mode, model=None, stream=False, max_tokens=16):
         # and the thinking configuration is outside the compared prefix, so adding it changes no verdict.
         th = {"type": "adaptive"}
         notes.append("no thinking configuration in the capture: sent with {type: adaptive} (outside the compared prefix)")
-    if th.get("type") == "disabled":
-        return None, "thinking is disabled in this request; nothing to check", notes
     bb = th.get("block_binding")
     if th.get("type") == "enabled":
         # The budget form is rejected by models that only take adaptive thinking; adaptive is accepted everywhere the
         # check runs, and the configuration is outside the compared prefix.
         th = {"type": "adaptive"}
         notes.append("thinking {type: enabled} rewritten to {type: adaptive} (budget_tokens dropped; outside the compared prefix)")
+    if th.get("type") == "between_tools":
+        # block_binding is a 400 with this thinking type (it is accepted only with adaptive), and the thinking
+        # configuration is outside the compared prefix, so the replay goes out as adaptive.
+        th = {"type": "adaptive"}
+        notes.append("thinking {type: between_tools} rewritten to {type: adaptive} (block_binding is a 400 with between_tools; outside the compared prefix)")
+    if th.get("type") == "disabled":
+        # The check still covers the thinking blocks already in the history when the request turns thinking off,
+        # and block_binding is a 400 with this type too, so the replay goes out as adaptive. A request that replays
+        # no thinking block is skipped by the caller, whatever its thinking type.
+        th = {"type": "adaptive"}
+        notes.append("thinking {type: disabled} rewritten to {type: adaptive} (block_binding is a 400 with disabled; outside the compared prefix)")
     if not isinstance(bb, dict):
         bb = {}
     removed = [k for k in bb if k != "prefix_mismatch_behavior"]
@@ -344,7 +357,7 @@ def prepare(body, mode, model=None, stream=False, max_tokens=16):
     if max_tokens:
         b["max_tokens"] = max_tokens
     b["stream"] = bool(stream)
-    return b, None, notes
+    return b, notes
 
 
 
@@ -398,14 +411,14 @@ def post_with_retries(base_url, path, body, betas, api_key, timeout, retries=3, 
 
 def read_credentials():
     """Credential headers from the environment, or None when neither variable is set. Values are
-    never printed by this script. Exactly one header is sent: the API rejects a request carrying
-    x-api-key and Authorization together, so when both variables are set the token wins."""
+    never printed by this script. Exactly one header is sent: with x-api-key and Authorization
+    together the API would use the key, so when both variables are set only the token is sent."""
     key = os.environ.get("ANTHROPIC_API_KEY")
     token = os.environ.get("ANTHROPIC_AUTH_TOKEN")
     if token:
         if key:
             sys.stderr.write("both ANTHROPIC_API_KEY and ANTHROPIC_AUTH_TOKEN are set; sending only the token"
-                             " (the API rejects a request carrying both headers)\n")
+                             " (with both headers the API would use the key)\n")
         return {"authorization": "Bearer " + token}
     if key:
         return {"x-api-key": key}
@@ -421,6 +434,8 @@ def post(base_url, path, body, betas, api_key, timeout):
     req.add_header("content-type", "application/json")
     for name, value in (api_key if isinstance(api_key, dict) else {"x-api-key": api_key}).items():
         req.add_header(name, value)
+    # Stays on 2023-06-01: it accepts every request body 2026-10-21 accepts,
+    # plus captured bodies with fields 2026-10-21 rejects.
     req.add_header("anthropic-version", "2023-06-01")
     req.add_header("anthropic-beta", ",".join(betas))
     t0 = time.time()
@@ -630,10 +645,9 @@ def run_conversation(cid, reqs, args, api_key, betas, sink=None, flush=None):
         if args.max_requests and turn > args.max_requests:
             break
         replayed = count_thinking(body)
-        shaped, skip, shaping_notes = prepare(body, args.mode, args.model, args.stream, args.max_tokens)
-        if not skip and replayed == 0 and not args.include_no_thinking:
+        shaped, shaping_notes = prepare(body, args.mode, args.model, args.stream, args.max_tokens)
+        if replayed == 0 and not args.include_no_thinking:
             skip = "replays no thinking block (nothing for the check to verify); --include-no-thinking to send it anyway"
-        if skip:
             skipped += 1
             if not args.quiet:
                 print("  turn %2d  SKIP   %s" % (turn, skip))
@@ -673,7 +687,11 @@ def run_conversation(cid, reqs, args, api_key, betas, sink=None, flush=None):
         # check (the probe sets it on every request; a request that sets it never receives one): the check
         # ran record-only, so the turn measured nothing and reading it as clean would be a false pass.
         allowed_entries = [t for t in transformations if t.get("type") == ALLOWED_ENTRY["type"]]
-        other_drops = [t for t in transformations if t not in prefix_drops and t not in model_drops and t not in allowed_entries]
+        # An organization_binding_mismatch drop means another account produced the block. It is removed before
+        # the prefix check judges it, so a turn with only these measured nothing: reading it as clean would be
+        # a false pass (a replay key from another account than the capture's, or a harness that switches accounts).
+        account_drops = [t for t in transformations if t.get("type") == DROPPED_ENTRY["type"] and t.get("reason") == "organization_binding_mismatch"]
+        other_drops = [t for t in transformations if t not in prefix_drops and t not in model_drops and t not in allowed_entries and t not in account_drops]
         keys = {}
         for t in prefix_drops:
             keys[t.get("path")] = block_key(resolve_block(shaped, t.get("path") or ""), t.get("path") or "")
@@ -707,7 +725,8 @@ def run_conversation(cid, reqs, args, api_key, betas, sink=None, flush=None):
                 new_paths.append(p)
             seen_keys.add(kkey)
         binding_field_stripped = bool(allowed_entries) and status == 200
-        evaluated = (status == 200 and not missing_transformations and not binding_field_stripped) or rejected
+        other_account = bool(account_drops) and status == 200 and not prefix_drops
+        evaluated = (status == 200 and not missing_transformations and not binding_field_stripped and not other_account) or rejected
         if not evaluated:
             if missing_transformations:
                 unevaluated.append((turn, status, "200 without the input_transformations key: the check never saw this"
@@ -718,6 +737,12 @@ def run_conversation(cid, reqs, args, api_key, betas, sink=None, flush=None):
                                     " thinking.block_binding: the field was stripped before the check (a gateway or"
                                     " proxy rebuilding the body and dropping thinking.block_binding), so the check ran"
                                     " record-only; run --self-test through the same path"))
+            elif other_account:
+                unevaluated.append((turn, status, "200 with organization_binding_mismatch drops: another account produced"
+                                    " those blocks, so they were dropped before the prefix check. If the replay key is from"
+                                    " a different account than the capture, replay with a key from that account, or one"
+                                    " linked to it; if the harness itself moves a conversation between accounts, that is"
+                                    " the finding"))
             else:
                 unevaluated.append((turn, status, (shareable_error(status, msg, error_text, False) or "")[:120]))
         is_break = bool(prefix_drops) or bool(rejected)
@@ -737,6 +762,7 @@ def run_conversation(cid, reqs, args, api_key, betas, sink=None, flush=None):
             "dropped_block_keys": sorted(set(keys.values())), "model_drops": len(model_drops),
             "model_dropped_paths": [t.get("path") for t in model_drops], "other_drops": other_drops,
             "mismatch_allowed": len(allowed_entries), "binding_field_stripped": binding_field_stripped,
+            "account_drops": len(account_drops), "account_dropped_paths": [t.get("path") for t in account_drops],
             "client_digests": digests(shaped), "retries": int(headers.get("x-probe-retries", 0)),
             "prefix_mismatch_header": hdr, "diagnosis": diag,
             "error": shareable_error(status, msg, error_text, bool(rejected)),
@@ -789,6 +815,8 @@ def print_turn(r, full_error=None):
             line += "  model_drops=%d paths=%s (model_binding_mismatch: this model cannot read those blocks -- a model switch, not a prefix edit)" % (r["model_drops"], r["model_dropped_paths"])
         if r["other_drops"]:
             line += "  other=%s" % [(t.get("type"), t.get("reason")) for t in r["other_drops"]]
+        if r.get("account_drops"):
+            line += "  account_drops=%d paths=%s" % (r["account_drops"], r["account_dropped_paths"])
     print(line + "  (%s, %.1fs%s)" % (r["request_id"], r["seconds"], ", %d retr." % r["retries"] if r.get("retries") else ""))
     if r["diagnosis"]:
         d = r["diagnosis"]
@@ -806,6 +834,11 @@ def print_turn(r, full_error=None):
         print("           thinking_mismatch_allowed on this 200 although the request set thinking.block_binding:"
               " the field was stripped before the check (a gateway or proxy rebuilding the body), so the check ran"
               " record-only -- not evaluated")
+    if r.get("account_drops"):
+        print("           organization_binding_mismatch: another account produced those blocks, so they were dropped"
+              " before the prefix check -- if the replay key is from a different account than the capture, replay with"
+              " a key from that account, or one linked to it; if the harness itself moves a conversation between"
+              " accounts, that is the finding%s" % ("" if r.get("evaluated") else " -- not evaluated"))
 
 
 def print_summary(summaries):
@@ -840,7 +873,7 @@ def print_summary(summaries):
             len(unevald), ", ".join("HTTP %s x%d" % (k, v) if k is not None else "network error x%d" % v for k, v in by.items()),
             len(summaries) - n))
     if nothing_sent:
-        print("!! %d conversation(s) had no request to send (every request was skipped: thinking disabled, or no replayed thinking) -- inconclusive, left out of the share" % len(nothing_sent))
+        print("!! %d conversation(s) had no request to send (every request was skipped: no replayed thinking) -- inconclusive, left out of the share" % len(nothing_sent))
     if never_replayed:
         print("!! %d conversation(s) never replayed a thinking block -- a clean result on those proves nothing about binding" % never_replayed)
 
@@ -855,7 +888,7 @@ def self_test(args, api_key, betas):
              "output_config": {"effort": "max"},   # a short turn at default effort often carries no thinking
              "messages": [{"role": "user", "content": q1}]}
     print("self-test 1/3: minting a thinking block ...")
-    shaped, _skip, _n = prepare(body1, args.mode, None, False, max_tokens=0)   # the mint needs a real reply
+    shaped, _n = prepare(body1, args.mode, None, False, max_tokens=0)   # the mint needs a real reply
     status, headers, raw, _ = post_with_retries(args.base_url, "/v1/messages", shaped, betas, api_key, args.timeout)
     msg, tr = parse_body(status, raw, False)
     if status != 200:
@@ -872,7 +905,7 @@ def self_test(args, api_key, betas):
     outcomes = {}
     for name, body, expect in (("honest replay", honest, "[]"), ("edited first message", edited, "a dropped-block entry (or a 400 in --mode error)")):
         print("self-test: %s (expect %s) ..." % (name, expect))
-        shaped, _skip, _n = prepare(body, args.mode, None, args.stream, args.max_tokens)
+        shaped, _n = prepare(body, args.mode, None, args.stream, args.max_tokens)
         status, headers, raw, secs = post_with_retries(args.base_url, "/v1/messages", shaped, betas, api_key, args.timeout)
         msg, tr = parse_body(status, raw, args.stream)
         hdr = headers.get(PREFIX_HEADER)
@@ -971,9 +1004,8 @@ def main(argv=None):
     plan = []
     for v in convs.values():
         for label, b, _h in v:
-            shaped, skip, notes = prepare(b, args.mode, args.model, args.stream, args.max_tokens)
-            if not skip and count_thinking(b) == 0 and not args.include_no_thinking:
-                skip = "replays no thinking block"
+            shaped, notes = prepare(b, args.mode, args.model, args.stream, args.max_tokens)
+            skip = "replays no thinking block" if count_thinking(b) == 0 and not args.include_no_thinking else None
             plan.append((label, b, skip, notes))
     n_send = sum(1 for _l, _b, skip, _n in plan if not skip)
     n_tokens_send = sum(estimate_input_tokens(b) for _l, b, skip, _n in plan if not skip)

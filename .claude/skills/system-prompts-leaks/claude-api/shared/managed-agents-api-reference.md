@@ -1,6 +1,6 @@
 # Managed Agents - Endpoint Reference
 
-All endpoints require `x-api-key` and `anthropic-version: 2023-06-01` headers. Managed Agents endpoints additionally require the `anthropic-beta` header.
+All endpoints require an `anthropic-version` header (for example `2026-10-21`) and an API key, sent in the `x-api-key` header or as `Authorization: Bearer <key>` (the SDK releases that send `2026-10-21` use Bearer). Managed Agents endpoints additionally require the `anthropic-beta` header.
 
 > Most users should define agents and environments as version-controlled files synced with `ant apply` - see `shared/anthropic-cli.md`. The endpoints below are the underlying API that the CLI and SDKs drive.
 
@@ -28,8 +28,8 @@ All resources are under the `beta` namespace. Python and TypeScript share identi
 | Session Events | `sessions.events.list` / `send` / `stream` | `Sessions.Events.List` / `Send` / `StreamEvents` |
 | Session Threads | `sessions.threads.list` / `retrieve` / `archive`; `sessions.threads.events.list` / `stream` | `Sessions.Threads.List` / `Get` / `Archive`; `Sessions.Threads.Events.List` / `StreamEvents` |
 | Session Resources | `sessions.resources.add` / `retrieve` / `update` / `list` / `delete` | `Sessions.Resources.Add` / `Get` / `Update` / `List` / `Delete` |
-| Deployments | `deployments.create` / `update` / `pause` / `unpause` / `archive` / `run` | Not yet documented - WebFetch the SDK repo (`shared/live-sources.md`) |
-| Deployment Runs | `deployment_runs.list` / `retrieve` (TS: `deploymentRuns.*`) | Not yet documented - WebFetch the SDK repo (`shared/live-sources.md`) |
+| Deployments | `deployments.create` / `update` / `pause` / `unpause` / `archive` / `run` | Not yet documented - fetch the SDK repo (`shared/live-sources.md`) |
+| Deployment Runs | `deployment_runs.list` / `retrieve` (TS: `deploymentRuns.*`) | Not yet documented - fetch the SDK repo (`shared/live-sources.md`) |
 | Vaults | `vaults.create` / `retrieve` / `update` / `list` / `delete` / `archive` | `Vaults.New` / `Get` / `Update` / `List` / `Delete` / `Archive` |
 | Credentials | `vaults.credentials.create` / `retrieve` / `update` / `list` / `delete` / `archive` / `mcp_oauth_validate` | `Vaults.Credentials.New` / `Get` / `Update` / `List` / `Delete` / `Archive` / `McpOauthValidate` |
 | Memory Stores | `memory_stores.create` / `retrieve` / `update` / `list` / `delete` / `archive` | `MemoryStores.New` / `Get` / `Update` / `List` / `Delete` / `Archive` |
@@ -37,20 +37,20 @@ All resources are under the `beta` namespace. Python and TypeScript share identi
 | Memory Versions | `memory_stores.memory_versions.list` / `retrieve` / `redact` | `MemoryStores.MemoryVersions.List` / `Get` / `Redact` |
 
 **Naming quirks to watch for:**
-- Agents and Session Threads have **no delete** - only `archive`. Archive is **permanent**: the agent becomes read-only, new sessions cannot reference it, and there is no unarchive. Confirm with the user before archiving a production agent. Environments, Sessions, Vaults, Credentials, and Memory Stores have both `delete` and `archive`; Session Resources, Files, Skills, and Memories are `delete`-only; Memory Versions have neither - only `redact`.
+- Agents and Session Threads have **no delete** - only `archive`. Archive is **permanent**: the agent becomes read-only, new sessions cannot reference it, and there is no unarchive. Environments, Sessions, Vaults, Credentials, and Memory Stores have both `delete` and `archive`; Session Resources, Files, Skills, and Memories are `delete`-only; Memory Versions have neither - only `redact`.
 - Session resources use `add` (not `create`).
 - Go's event stream is `StreamEvents` (not `Stream`).
-- The self-hosted worker class is `EnvironmentWorker` from `anthropic.lib.environments` / `@anthropic-ai/sdk/helpers/beta/environments` / `anthropic-sdk-go/lib/environments`; `client.beta.environments.work.worker(...)` is a factory that returns the same class, alongside the `environments.work.poller/stats/stop` client methods.
+- The self-hosted worker class is `EnvironmentWorker` from `anthropic.lib.environments` / `@anthropic-ai/sdk/helpers/beta/environments` / `anthropic-sdk-go/v2/lib/environments`; `client.beta.environments.work.worker(...)` is a factory that returns the same class, alongside the `environments.work.poller/stats/stop` client methods.
 
 **Agent shorthand:** `agent` on session create accepts three forms - a bare string (`agent="agent_abc123"`, latest version), a pinned reference `{type: "agent", id, version}`, or `{type: "agent_with_overrides", id, version?, model?, system?, tools?, mcp_servers?, skills?}` to override those fields for this session only (see `shared/managed-agents-core.md` -> Override agent configuration for a session).
 
-**Model shorthand:** `model` on agent create accepts either a bare string (`model="claude-opus-5-5"` - uses `standard` speed) or the full config object, which takes `speed`, `effort`, and `inference_geo` alongside `id`: `{id: "claude-opus-5-5", speed: "fast"}`, `{id: "claude-opus-5-5", effort: "high"}`, `{id: "claude-opus-5-5", inference_geo: "us"}`. `effort` accepts a level string (`low`/`medium`/`high`/`xhigh`/`max`) or `{type: "<level>"}`, and in a per-session `model` override it sets the session's effort level (the agent's own `effort` isn't carried over, and a `model` override without `effort` runs at that model's default effort level). `inference_geo` (`"us"` | `"global"`) pins the geography serving the agent's model requests, and is also applied in a per-session `model` override. See `shared/managed-agents-core.md` -> Effort on the agent model / Pinning inference geography. Note: `speed: "fast"` is supported on Claude Opus 5.5, Claude Opus 5, and Opus 4.8 - on the Claude API only, which includes Managed Agents but not Amazon Bedrock, Google Cloud, or Microsoft Foundry. Opus 4.7 fast mode has been removed; `speed: "fast"` on Opus 4.7 returns an error.
+**Model shorthand:** `model` on agent create accepts either a bare string (`model="claude-opus-5-5"` - uses `standard` speed) or the full config object, which takes `speed`, `effort`, and `inference_geo` alongside `id`: `{id: "claude-opus-5-5", speed: "fast"}`, `{id: "claude-opus-5-5", effort: "high"}`, `{id: "claude-opus-5-5", inference_geo: "us"}`. `effort` accepts a level string (`low`/`medium`/`high`/`xhigh`/`max`) or `{type: "<level>"}`, and in a per-session `model` override it sets the session's effort level (the agent's own `effort` isn't carried over, and a `model` override without `effort` runs at that model's default effort level). `inference_geo` (`"us"` | `"global"`) pins the geography serving the agent's model requests, and is also applied in a per-session `model` override. See `shared/managed-agents-core.md` -> Effort on the agent model / Pinning inference geography. Note: in Managed Agents, `speed: "fast"` works only on the Claude API, on Claude Opus 5.5, Claude Opus 5, and Opus 4.8; for Messages API requests and other platforms, see SKILL.md -> Fast Mode. Opus 4.7 fast mode has been removed; `speed: "fast"` on Opus 4.7 returns an error.
 
 ---
 
 ## Agents
 
-**Step one of every flow.** Sessions require a pre-created agent - there is no inline agent config under `managed-agents-2026-04-01`.
+**Step one of every flow.** Sessions require a pre-created agent.
 
 | Method   | Path                                             | Operation        | Description                              |
 | -------- | ------------------------------------------------ | ---------------- | ---------------------------------------- |
@@ -115,7 +115,7 @@ Per-subagent event streams in multiagent sessions. See `shared/managed-agents-mu
 | `GET`    | `/v1/environments/{environment_id}/work/stats`         | WorkQueueStats       | Self-hosted work-queue depth/pending/workers. `x-api-key` auth. See `shared/managed-agents-self-hosted-sandboxes.md`. |
 | `POST`   | `/v1/environments/{environment_id}/work/{work_id}/stop` | StopWork            | Self-hosted: stop a claimed work item. `x-api-key` auth. |
 
-For `type: "self_hosted"`, `config` is the bare `{"type": "self_hosted"}` - `networking` and `packages` do not apply. (`networking` never governs `web_search` / `web_fetch` in either type - those are restricted per-tool with `allowed_domains` / `blocked_domains` in the agent toolset; see `shared/managed-agents-tools.md`.)
+For `type: "self_hosted"`, `config` is the bare `{"type": "self_hosted"}` - `networking` and `packages` do not apply. (With `limited` networking, `allowed_hosts` also applies to `web_search` / `web_fetch`; `unrestricted` networking and self-hosted environments do not limit them. In both environment types they can be turned off (`enabled: false`) or restricted per-tool with `allowed_domains` / `blocked_domains` in the agent toolset; see `shared/managed-agents-tools.md`.)
 
 ## Deployments
 
@@ -230,7 +230,7 @@ Immutable per-mutation snapshots (`memver_...`) - the audit and rollback surface
 
 ### CreateAgent Request Body
 
-**Always start here.** `model`, `system`, `tools`, `mcp_servers`, `skills` are top-level fields on this object - they do NOT go on the session.
+**Always start here.** `model`, `system`, `tools`, `mcp_servers`, `skills` are top-level fields on this object.
 
 ```json
 {
@@ -239,7 +239,14 @@ Immutable per-mutation snapshots (`memver_...`) - the audit and rollback surface
   "description": "string (optional, up to 2048 chars)",
   "system": "string (optional, up to 100,000 chars)",
   "tools": [
-    { "type": "agent_toolset_20260401" }
+    {
+      "type": "agent_toolset_20260401",
+      "default_config": { "permission_policy": { "type": "auto" } },
+      "configs": [
+        { "name": "web_fetch", "enabled": false },
+        { "name": "web_search", "enabled": false }
+      ]
+    }
   ],
   "skills": [
     { "type": "anthropic", "skill_id": "xlsx" },
@@ -253,12 +260,16 @@ Immutable per-mutation snapshots (`memver_...`) - the audit and rollback surface
     }
   ],
   "multiagent": {
-    "type": "coordinator",
-    "agents": [
-      "agent_abc123",
-      { "type": "agent", "id": "agent_def456", "version": 4 },
-      { "type": "self" }
-    ]
+    "type": "multiagent_20261001",
+    "subagents": {
+      "type": "enabled",
+      "predefined_agents": [
+        "agent_abc123",
+        { "type": "agent", "id": "agent_def456", "version": 4 },
+        { "type": "self" }
+      ]
+    },
+    "workflows": { "type": "enabled" }
   },
   "metadata": {
     "key": "value (max 16 pairs, keys <=64 chars, values <=512 chars)"
@@ -266,7 +277,7 @@ Immutable per-mutation snapshots (`memver_...`) - the audit and rollback surface
 }
 ```
 
-> Limits: `tools` max 128, `skills` max 20, `mcp_servers` max 20 (unique names). `multiagent.agents` 1-20 entries (string ID | `{type:"agent",id,version?}` | `{type:"self"}` | `{type:"advisor",model}`, at most one advisor) - see `shared/managed-agents-multiagent.md`.
+> Limits: `tools` max 256, `skills` max 500, `mcp_servers` max 20 (unique names). `multiagent` is `{type:"multiagent_20261001", workflows?, subagents?, advisor?}` - see `shared/managed-agents-multiagent.md` (an existing agent can have the older `coordinator` type: § Declare the roster on the coordinator -> Moving off the `coordinator` type). Each member is `{type:"enabled"}` or `{type:"disabled"}`; enabled `workflows` and `subagents` each take optional `predefined_agents` (up to 20 entries: string ID | `{type:"agent",id,version?}` | `{type:"self"}`) and `inline_agents` (`{type:"enabled"}` or `{type:"disabled"}`, default enabled; disabled with an empty list is a 400), enabled `advisor` requires `model`; `workflows` and `subagents` default to enabled, `advisor` to disabled (§ Dynamic workflows).
 
 ### CreateSession Request Body
 
@@ -361,7 +372,7 @@ Immutable per-mutation snapshots (`memver_...`) - the audit and rollback surface
 }
 ```
 
-> `system.message` events (append system-level context for this turn and later ones) use the same envelope with `type: "system.message"` - supported on Claude Fable 5.1, Claude Mythos 5.1, Claude Fable 5, Claude Mythos 5, Claude Opus 5.5, Claude Opus 5, Claude Opus 4.8, and Claude Sonnet 5.5 (not Claude Sonnet 5), checked against the agent's *primary* model only; see `shared/managed-agents-events.md` § Adding system context mid-session.
+> `system.message` events (append system-level context for this turn and later ones) use the same envelope with `type: "system.message"` - supported on Claude Fable 5.2, Claude Mythos 5.2, Claude Fable 5.1, Claude Mythos 5.1, Claude Fable 5, Claude Mythos 5, Claude Opus 5.5, Claude Opus 5, Claude Opus 4.8, Claude Sonnet 5.5, and Claude Haiku 5.5 (not Claude Sonnet 5), checked against the agent's *primary* model only; see `shared/managed-agents-events.md` § Adding system context mid-session.
 
 ### Define Outcome Event
 

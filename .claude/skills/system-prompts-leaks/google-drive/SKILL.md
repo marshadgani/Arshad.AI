@@ -1,62 +1,58 @@
 ---
-name: "google_drive"
-description: "Work with the user's Google Drive: files, folders, uploads, downloads, and sharing."
-icon: "google_drive"
-metadata: { "includeInPrompt": false }
+name: google-drive
+description: Use connected Google Drive as the single entrypoint for Drive, Docs, Sheets, and Slides work. Use when the user wants to find, fetch, organize, share, export, copy, or delete Drive files, or summarize and edit Google Docs, Google Sheets, and Google Slides through one unified Google Drive plugin.
 ---
 
 # Google Drive
 
-Everything runs through `hatch_gws_cli drive ...`. Raw API calls are space-separated (`<resource> <method>`) and take a `--params` JSON object for query and path values, plus a `--json` body when creating or editing. Run `hatch_gws_cli drive <command> --help` for a command's flags, and `hatch_gws_cli schema drive.files.list` (and the like) for a raw method's `--params` and `--json` shape. Check the shape before an unfamiliar method.
+Use this as the top-level router for Google file work inside the unified Google Drive plugin. Do not route the user toward separate Google Docs, Google Sheets, or Google Slides plugins.
 
-## Connecting
+Start with Google Drive for file discovery and file lifecycle tasks, then route to narrower sibling skills only when the task becomes specific to Docs, Sheets, or Slides.
 
-Drive needs a one-time connect before commands return data. Run `hatch_gws_cli drive status`. If it comes back not connected with a `connect_url`, post that exact URL as `[Connect Google Drive](<connect_url>)`, then stop and wait for the user to tap it. If no URL is returned, report that connection is unavailable and stop; never invent one. Connecting is the user's step, so never open the sign-in, drive a browser to it, point the user to Settings or a Google account page, or ask for credentials. If status comes back unavailable, say Google Drive is not available on this device and stop.
+## Workflow
 
-Disconnect with `hatch_gws_cli drive disconnect`. Post `[Disconnect Google Drive](<disconnect_url>)` only when the command returns that URL. If status remains connected after the link was posted, re-post the same link and let the user finish in the browser; never send them to a Google account, security, or third-party-access page, and never loop on status. If no link is returned, rerun status once and report its state without inventing a link. If a later command reports an auth error, rerun status: post its connect link and wait when disconnected, retry the command once when connected, or report that Drive is unavailable when there is no usable link. Auth flows only through status and disconnect. Never hand-author credential files or run raw `gws auth`.
+1. Ground the target file first.
+- If the user did not provide an exact file URL or ID, use Google Drive search, recent files, folder listing, or metadata reads to identify the right file.
+- If the request starts as "find X and then update it," do the Drive discovery step first instead of guessing the target.
 
-Most people have one Google account, and that is the default: run commands with no account flag. If the user names one of several linked Drives ("my work Drive"), list them with `hatch_gws_cli drive accounts`, match the user's words to exactly one `display_name`, and pass its `account_id` as `--account <account_id>`. If there is no exact match, ask which account rather than guessing or silently falling back to the default.
+2. Stay in the base Google Drive workflow for Drive-native tasks.
+- Use the base workflow for search, fetch, recent files, folders, sharing, copying, deleting, exporting, revision history, file moves, and other file-lifecycle work that is not primarily about editing Docs, Sheets, or Slides content.
+- For version-history requests, including "previous version," "revision history," "what changed since the last version," or "compare to the prior revision," ground the file, fetch the current content, use `list_file_revisions`, fetch the immediately previous revision or the user-named revision with `fetch_file_revision`, then compare the fetched revision against the current content. Do not say previous versions are unsupported until you have checked whether revision tools are available for the target file.
+- For file move requests, ground the source file and target folder, read the file metadata including its current parents, then use `update_file` with `addParents` for the target folder and `removeParents` for only the verified source parent or parents that should no longer contain it. Preserve unrelated parents, and verify the move by reading metadata or listing the target folder before the final response.
+- Before any export or raw-file fetch, read or reuse Drive metadata so the MIME type and Google Drive URL are known. Use `export_file` only to convert a native Google Doc, Sheet, or Slide into an explicitly requested format; it returns an authenticated file reference, not inline bytes or base64. Google limits `files.export` responses to **10 MB**; oversized exports fail rather than returning truncated content. For a larger native PDF, use `download_file(id=file_id, mime_type="application/pdf")` when the streaming action is available. It calls Google's `files.download` API and returns a top-level materializable `file_uri`. Once `download_file` is unavailable and canonical `fetch` uses that streamed download path, use `fetch(url=google_drive_url, download_raw_file=True, raw_export_mime_type="application/pdf")` instead. A native-file `fetch` that still uses `files.export` cannot bypass the 10 MB limit. For PDFs, images, ZIPs, Office files, recordings, and other stored, non-native files, use `fetch(url=google_drive_url, download_raw_file=True)`. Use only the authenticated top-level `file_uri` or materialized `workspace_path`; never request inline base64 unless an existing caller explicitly opts into bounded legacy compatibility. Use `fetch` without `download_raw_file` for bounded, best-effort readable text. Do not retry `export_file` after metadata shows a non-native MIME type.
 
-## Common flows
+3. Route to the narrowest sibling skill that matches the file type and job.
+- Drive, Docs, Sheets, or Slides comment creation, comment replies, comment resolution, or review-by-comments: use [google-drive-comments](../google-drive-comments/SKILL.md).
+- Google Docs net-new creation, content summary, revision planning, prose rewriting, or section edits: use [google-docs](../google-docs/SKILL.md).
+- Google Sheets creation, local spreadsheet import, range inspection, table cleanup, data restructuring, formula design or repair, chart creation or repair, or batch updates: use [google-sheets](../google-sheets/SKILL.md).
+- Google Slides deck summary, content edits, new deck creation, local presentation import, visual cleanup, structural repair, or template migration: use [google-slides](../google-slides/SKILL.md).
 
-### Find and read
+## Routing Rules
 
-- See what is in Drive: `drive files list --params '{"pageSize":20}'`. To browse inside one folder, query by its id: `drive files list --params "{\"q\":\"'<folder_id>' in parents and trashed=false\",\"pageSize\":50}"`.
-- Search for a file: `drive files list --params "{\"q\":\"name contains 'budget' and trashed=false\",\"pageSize\":20}"`. Drive query operands use single quotes; use `fullText contains 'text'` to search inside content.
-- Get one file's details: `drive files get --params '{"fileId":"<id>","fields":"id,name,mimeType,parents,webViewLink,modifiedTime,owners"}'`.
+- If the request is ambiguous between Drive and a file-type surface, use the artifact itself as the tie-breaker:
+  - Doc -> Docs skill
+  - Sheet -> Sheets skill
+  - Deck -> Slides skill
+- If the user wants to find a file and then edit it, do both in one flow: Drive for discovery, then the file-type skill for the edit.
+- If the user wants a Google Workspace outcome but has not named a file type yet, start with Drive discovery instead of asking them to choose among separate Google plugins.
+- If the user asks to create a new Google Doc, route to the Docs skill; it owns the mandatory local `.docx` -> native Google Docs import workflow and the explicit-user-override boundary. Do not create a blank Google Doc directly from this router.
+- If the user asks to import a local `.docx` into Google Docs, route to the Docs skill and use its native conversion workflow. Preserve the source file type only when the user explicitly asks for that.
+- If the user asks to create a new Google Sheet, route to the Sheets skill. The Sheets skill should prefer the `[@spreadsheets](plugin://spreadsheets@openai-primary-runtime)` plugin or `$Excel` skill to create a local `.xlsx`, then import it as native Google Sheets.
+- If the user asks to import a local `.xlsx`, `.xls`, `.ods`, `.csv`, or `.tsv` into Google Sheets, route to the Sheets skill and use native Google Sheets conversion by default. Preserve the source file type only when the user explicitly asks for that.
+- If the user asks to create a new Google Slides deck, route to the Slides skill; it owns the mandatory local `.pptx` -> native Google Slides import workflow and the explicit-user-override boundary. Do not create a blank Google Slides deck directly from this router.
+- If the user asks to import a local `.ppt`, `.pptx`, or `.odp` into Google Slides, route to the Slides skill and use its native conversion workflow. Preserve the source file type only when the user explicitly asks for that.
+- If the user asks to export or download an existing Drive file, choose the action from metadata: native Google Docs, Sheets, and Slides files use `export_file` for explicit conversions within Google's **10 MB** limit. For a larger native PDF, prefer the currently available streaming `download_file(id=file_id, mime_type="application/pdf")`; after canonical `fetch` adopts the same streamed download path and `download_file` is removed, use `fetch(url=google_drive_url, download_raw_file=True, raw_export_mime_type="application/pdf")`. Stored, non-native PDFs, images, ZIPs, CSVs, Office files, audio, and video use `fetch(url=google_drive_url, download_raw_file=True)`. Use the returned top-level `file_uri` or its authenticated, materialized `workspace_path`; do not expose inline binary, base64, or a bearer URL. Base64 is available only when an existing compatibility caller explicitly requests the bounded legacy behavior.
 
-### Upload and download
+## Write Safety
 
-- Upload a local file the user gave you: `drive +upload ...` (run `drive +upload --help` for its flags). Confirm the local path exists first, and drop it into a folder by passing that folder's id. `+upload` always creates a new file. Every upload path must be absolute and inside the home directory. Relative and `/tmp` paths fail.
-- Replace an existing file's content, keeping its id and link: `drive files update --params '{"fileId":"<id>"}' --upload <absolute_path>`. Uploading an Office file into a Google-native Doc or Slides file converts it in place. The Docs and Slides skills own when to do that. Never upload into a Google Sheet. Google replaces the full contents, so the upload discards the user's other tabs. The Sheets skill formats through the Sheets API instead.
-- Download a stored binary file to a local path: `drive files get --params '{"fileId":"<id>","alt":"media"}' --output <path>`. The output path is the user's choice, so ask or reuse one they named.
+- Preserve the user's existing file organization, sharing state, and target artifact unless the request clearly asks to change them.
+- When a task can be satisfied by a file-level Drive operation alone, do not load heavier Docs, Sheets, or Slides skills.
+- For write-heavy Sheets or Slides work, read the specialized skill before the first large update so request shapes stay grounded.
+- For any file import or explicit direct create that returns a user-facing Google Workspace link, wait for the write action to complete and verify the created file with connector readback or Drive metadata readback before returning the URL. Use only a URL or id observed from the completed connector result or readback; never synthesize or predict the URL.
 
-### Create and organize
+## Related Skills
 
-- New folder: `drive files create --params '{"ignoreDefaultVisibility":true}' --json '{"name":"Q3 Docs","mimeType":"application/vnd.google-apps.folder","parents":["<parent_folder_id>"]}'`. Use `"root"` as the parent for the top level. This opts out of domain-wide default visibility; the folder still inherits its parent's sharing.
-- Rename: `drive files update --params '{"fileId":"<id>"}' --json '{"name":"Q3 Budget"}'`.
-- Move: `drive files update --params '{"fileId":"<id>","addParents":"<dest_folder_id>","removeParents":"<current_folder_id>"}'`. Read the current parent from a `files get` first so you remove the right one. Moves use sharing approval because the destination can grant access.
-- Copy into My Drive: `drive files copy --params '{"fileId":"<id>","ignoreDefaultVisibility":true}' --json '{"name":"Copy of Q3 Budget","parents":["root"]}'`. Use the requested destination folder instead when specified. Omitting the destination can inherit the source's parent and uses shared-create approval.
-- Share: `drive permissions create --params '{"fileId":"<id>"}' --json '{"type":"user","role":"reader","emailAddress":"alex@example.com"}'`. Use `writer` only when the user asks for edit access.
-
-### Remove
-
-- Prefer trashing, which the user can undo: `drive files update --params '{"fileId":"<id>"}' --json '{"trashed":true}'`. Restore with `{"trashed":false}`.
-- Permanent delete cannot be undone: `drive files delete --params '{"fileId":"<id>"}'`. Only use it when the user clearly wants the item gone for good. Say plainly that it cannot be recovered; for a folder, also say that permanently deleting it removes the user's owned files and folders inside it.
-
-## Rules
-
-- Follow the tool's approval flow. Changing a private item, trashing, restoring, and deleting may proceed from a clear, unambiguous user request. Moves and permission changes use sharing approval. Creating or copying without a verified private destination and explicit private visibility uses shared-create approval, including all `+upload` calls. My Drive placement alone does not rule out domain-wide default visibility. Confirm before creating in a shared folder or modifying an already shared item because other people can see the changes.
-- Prefer the reversible path. Trash instead of permanently deleting unless the user is explicit, and tell them trashed files can be restored.
-- Use only the file and folder ids returned by an earlier command. Never invent or rewrite an id.
-- Verify a local path before you upload from it or download to it. Never invent a path.
-- Talk to the user in plain language only. Never show raw commands or JSON. Never show file or folder ids, etags, page tokens, connect or disconnect URLs, or status words like not_connected or unavailable, unless the user asks. Confirm what happened by the file's name and a `webViewLink` returned by Drive; fetch the field when needed and never construct a Drive URL. Keep ids only in your working context to chain the next command.
-- Never print tokens, secrets, or credential material. Redact them if they appear in tool output.
-- Read results retain Google's raw metadata timestamps and add semantic UTC and
-  user-local forms for creation, modification, viewing, sharing, trashing, and
-  change-record times.
-
-## Limits
-
-- Reading, editing, or exporting the contents of a Google Doc, Sheet, or Slides file is the job of those skills, not this one. Never run `drive files export` or otherwise pull a Google-native file's contents through Drive, even as a fallback when another skill's connection fails; say that opening its contents needs the Docs, Sheets, or Slides skill and stop. Drive handles the file itself: finding it, its details, and moving, sharing, or removing it. The binary download recipe above (`alt=media`) only fetches stored binary files, never Google-native ones.
-- Comments, shared drives, and approval requests are not first-class flows here. If a task needs one, check its shape with `hatch_gws_cli schema drive.<resource>.<method>`; treat any write as shared and confirm before it, because there is no seeded, tested private-write recipe for those surfaces.
+- Comments: [google-drive-comments](../google-drive-comments/SKILL.md)
+- Docs: [google-docs](../google-docs/SKILL.md)
+- Sheets: [google-sheets](../google-sheets/SKILL.md)
+- Slides: [google-slides](../google-slides/SKILL.md)

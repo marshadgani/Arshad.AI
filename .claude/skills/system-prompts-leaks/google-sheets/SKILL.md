@@ -1,78 +1,129 @@
 ---
-name: "google_sheets"
-description: "Read, write, and manage the user's Google Sheets."
-icon: "google_sheets"
-metadata: { "includeInPrompt": false }
+name: google-sheets
+description: Analyze and edit connected Google Sheets with range precision. Use when the user wants to create Google Sheets, find a spreadsheet, inspect tabs or ranges, search rows, plan formulas, create or repair charts, clean or restructure tables, write concise summaries, or make explicit cell-range updates.
 ---
 
 # Google Sheets
 
-## Purpose
-Manage Google Sheets through `hatch_gws_cli`; the vendored Google Workspace CLI is the only implementation path.
+Use this skill to keep spreadsheet work grounded in the exact spreadsheet, sheet, range, headers, and formulas that matter.
 
-## Tooling
-Use `exec` to run:
+## Purpose Of This File
 
-```sh
-hatch_gws_cli sheets <resource> <method> [flags]
+This file covers:
+
+1. routing to the right spreadsheet workflow
+2. stateful operation and mandatory routing to reference files
+3. live-read/search safety for direct connector calls
+4. final-response citations and delivery
+
+Detailed editing, formula, chart, upload, live-read/search, and batch-update rules live in `references/`.  
+Latency is not a constraint for this skill, so always read the relevant reference files before performing the task.  
+If the user has not provided explicit style direction, read `references/style-profiles.md` and apply the appropriate Google Sheets destination default before authoring workbook formatting.
+
+## Default Routing
+
+1. New Google Sheet from a native Google Sheets reference or template URL: copy the entire source workbook with the Drive file-copy action, then trim or repair the copy. Treat a deep-linked `gid` as the initial view, not copy scope. Duplicate one source sheet only when the user explicitly requests a single-sheet extraction. Do not rebuild through `.xlsx` when chips, validation, formulas, rich links, or formatting matter.
+2. Other new Google Sheets creation: Inspect the available skills and plugins for the registered `Spreadsheets` capability. It may be exposed as the `$Spreadsheets` skill, the `@Spreadsheets` plugin, or the plugin URI `plugin://spreadsheets@openai-primary-runtime`. If found, load and follow its instructions.
+   - If a system spreadsheet plugin or skill is installed, YOU MUST use it to create a local `.xlsx`. Then import the `.xlsx` into Drive as a native Google Sheets spreadsheet. For table-like option/list/dropdown columns, seed a valid row and add native table `DROPDOWN` columns post-import.
+   - If neither skill is installed, create the spreadsheet directly with Google Sheets MCP.
+3. Existing Google Sheets edits: use Google Sheets MCP directly.
+
+Deliver the verified native Google Sheet. Never include the local `.xlsx` unless explicitly asked for by the user.
+
+## File Safety
+
+Treat a provided Google Sheet as read-only unless the user explicitly asks to edit that file. When a task uses the Sheet as a reference, template, similar structure, or data source, copy it or create a separate Sheet, then verify the output spreadsheet ID differs before writing.
+
+## Canonical Workflow Bias
+
+Prefer one simple proven workflow over a large tree of recovery branches.  
+When a task matches a known successful pattern, follow that pattern directly instead of re-evaluating every possible fallback path.  
+Do not let accumulated edge-case guardrails turn a straightforward Sheets task into a long blocker-analysis exercise.
+
+For sheet creation and editing tasks, prefer this sequence when viable:
+
+1. Gather the required source material.
+2. Pick the correct default routing.
+3. Establish the sheet checklist or sheet plan.
+4. Build or edit the sheet.
+5. Verify the sheet is clean, complete, native, and scannable per `references/reference-visual-quality.md`.
+6. Stop once the verified workflow has succeeded.
+
+If a simple verified workflow is viable, use it. Do not drift into speculative alternate paths.
+
+## Required Read Order (No Skips)
+
+For every route that creates, imports, or edits a Google Sheet, read `references/reference-visual-quality.md` before final verification.
+
+If Default Routing uses native Google Sheets reference-follow creation:
+1. Read `references/reference-edit-workflow.md`
+2. Read `references/reference-live-read-search-safety.md`
+3. Read `references/reference-native-cell-structure.md`
+4. Read `references/reference-batch-update-recipes.md`
+
+If Default Routing uses the system spreadsheet plugin or skill like `[@spreadsheets](plugin://spreadsheets@openai-primary-runtime)` or `$Spreadsheets`:
+1. Read the plugin/skill, e.g. `[@spreadsheets](plugin://spreadsheets@openai-primary-runtime)`
+2. Read `references/reference-import-spreadsheet-to-native-sheets.md`
+3. If the new Sheet has explicit or reference-derived option/list/dropdown columns, read `references/reference-batch-update-recipes.md` before the post-import table batch update.
+
+If Default Routing uses connector edit workflow:
+
+1. Read `references/reference-edit-workflow.md`.
+2. Before any direct live range read, cell read, or `search_spreadsheet_rows`, read `references/reference-live-read-search-safety.md`.
+3. Read every task-specific file from the matrix below.
+4. If the task spans multiple categories, read all matching files.
+5. If uncertain, read every file in `references/`.
+
+## Final Answer Requirement
+
+Unless Default Routing selected native Google Sheets reference-follow creation, if the registered `Spreadsheets` capability like the `[@spreadsheets](plugin://spreadsheets@openai-primary-runtime)` plugin is available, you MUST use one of them to create a local `.xlsx` and import it to Google Drive with `upload_mode: "native_google_sheets"`.
+
+### Final Response Citations
+
+- **Create/edit:** for created or edited spreadsheets, cite each final deliverable exactly once with `purpose="output"`, in its own paragraph. Briefly describe the result without repeating its filename, path, or link. Never put output directives inside prose or list items.
+- **Q&A and summaries:** Every file whose contents you summarize or use to support an answer MUST receive a `:codex-file-citation{...}` with `purpose="source"` in the final response. Use the source citation in place of the filename, wherever the filename would appear. Do not write the filename separately and append its citation at the end. Files merely inspected but not used in the answer need no citation. Do not emit output citations for unchanged files or read-only answers.
+
+- Emit `:codex-file-citation{...}` directly, without backticks, code fences, or a Markdown-link wrapper. Use verified targets only. No need to cite or reference intermediate work.
+
+Deliver a native Google Sheets file even when another authoring workflow was used to build it, unless the user explicitly requests preservation of the source file type or no conversion. Set `path` to its verified native URL returned by the connector and omit `mode`. Citation directives are exempt from "Return web URLs as Markdown links."
+
+Some illustrative examples, real responses use verified targets outside code fences.
+
+```text
+:codex-file-citation{path="https://docs.google.com/spreadsheets/d/<verified-file-id>" purpose="output"}
 ```
 
-### Connection management
-
-```sh
-hatch_gws_cli sheets status
-hatch_gws_cli sheets disconnect
+```text
+The review of :codex-file-citation{path="https://docs.google.com/spreadsheets/d/<verified-file-id>" purpose="source"} is due Friday.
 ```
 
-### Sheets operations
+### Spreadsheets location
 
-Core patterns:
-- `hatch_gws_cli sheets status`
-- `hatch_gws_cli sheets disconnect`
-- `hatch_gws_cli schema sheets.spreadsheets.get`
-- `hatch_gws_cli schema sheets.spreadsheets.create`
-- `hatch_gws_cli schema sheets.spreadsheets.values.get`
-- `hatch_gws_cli schema sheets.spreadsheets.values.append`
-- `hatch_gws_cli schema sheets.spreadsheets.batchUpdate`
+Use/create `ChatGPT` at My Drive root. Place new spreadsheets created from scratch or from a template there.  
+Edit existing spreadsheets in place.
 
-Common raw API calls:
-- `hatch_gws_cli sheets spreadsheets get --params '{"spreadsheetId":"<spreadsheet_id>"}'`
-- `hatch_gws_cli sheets spreadsheets create --json '{"properties":{"title":"My Spreadsheet"}}'`
-- `hatch_gws_cli sheets spreadsheets values get --params '{"spreadsheetId":"<spreadsheet_id>","range":"Sheet1!A1:D10"}'`
-- `hatch_gws_cli sheets spreadsheets values append --params '{"spreadsheetId":"<spreadsheet_id>","range":"Sheet1!A:D","valueInputOption":"USER_ENTERED"}' --json '{"values":[["a","b"],["c","d"]]}'`
-- `hatch_gws_cli sheets spreadsheets batchUpdate --params '{"spreadsheetId":"<spreadsheet_id>"}' --json '{"requests":[{"addSheet":{"properties":{"title":"Q2"}}}]}'`
+Respect user-specified locations.
 
-Vendored helpers are also available:
-- `hatch_gws_cli sheets +read ...`
-- `hatch_gws_cli sheets +append ...`
+## Connector Load Checklist
 
-JSON output contract:
-- `status`: parse `status`, `connect_url`, and `disconnect_url`
-- `disconnect`: parse `ok`, `action`, `status`, and `disconnect_url`
+1. Confirm the exact target Google Sheet URL or spreadsheet id before editing an existing spreadsheet.
+2. If the user only gives a title or title keywords, use the connector/app search path to identify candidate spreadsheets before asking for a URL.
+3. Resolve and record the spreadsheet id, target sheet names, and `sheetId` values.
+4. Read spreadsheet metadata before deeper reads or writes.
+5. For direct live range reads, cell reads, or `search_spreadsheet_rows`, use exact visible tab names from metadata, bounded ranges, and the recovery rules in `references/reference-live-read-search-safety.md`. Do not guess `Sheet1`, scan whole grids, or retry oversized row searches.
+6. Before each edit pass, identify the exact sheet, range, headers, formulas, and validation constraints being edited through connector reads.
+7. Re-read target cells before writing when live values, formulas, formatting, or validation could affect the write.
 
-## Formatting spreadsheet content
+## Task To Reference Map
 
-Write and format the spreadsheet through the Sheets API. Do not upload a file over it.
-
-1. Write the values with `spreadsheets.create`, `values.update`, or `values.append`. Set `valueInputOption` to `USER_ENTERED` so Sheets parses dates, currency, and formulas.
-2. Set the styling in one `spreadsheets.batchUpdate` call. `repeatCell` with `userEnteredFormat` sets the header style and the number formats. `updateSheetProperties` freezes the header row. `updateDimensionProperties` sets column widths. A new spreadsheet can carry these formats in the `spreadsheets.create` body instead.
-3. Read the result back before you call it ready. A successful write proves the API accepted the request, not that the sheet reads correctly. `spreadsheets.get` returns no cell data by default, so pass a field mask: `hatch_gws_cli sheets spreadsheets get --params '{"spreadsheetId":"<spreadsheet_id>","ranges":"<tab>!A1:F10","fields":"sheets(properties(title,gridProperties(frozenRowCount)),data(rowData(values(formattedValue,effectiveFormat(backgroundColor,numberFormat,textFormat)))))"}'`
-4. Never publish a `.xlsx` file over a spreadsheet with `drive files update`. Google replaces the full contents of the file, so that upload discards every other tab and every edit the user made. To change one part of a spreadsheet, use `values.update` or `spreadsheets.batchUpdate`. To give the user a workbook to download, build a spreadsheet artifact and attach the file.
-
-## Auth
-Authentication is handled by the wrapper's `status` and `disconnect` subcommands. Do not hand-write credential files or run raw `gws auth ...`.
-
-## First-use setup flow
-1. Run `hatch_gws_cli sheets status`.
-2. If `status` is `unavailable`, tell the user that Google Sheets is not available on this device. Do not offer alternative integration approaches or ask the user for credentials.
-3. If `status` is `not_connected` and `connect_url` is present, replace `<connect_url>` with the returned URL and share exactly this Markdown link: `[Connect Google Sheets](<connect_url>)`; do not paste the raw URL separately. Wait for the user to reconnect.
-4. Once `status` is `connected`, proceed with Sheets operations.
-
-## Operating Rules
-1. Use `schema` before unfamiliar Sheets methods so `--params` and `--json` match the current vendored CLI contract.
-2. Use A1 notation for ranges unless the user explicitly wants a different API path.
-3. Creating a spreadsheet, clearing cells, and editing a spreadsheet owned only by the user may proceed from a clear request. Confirm before editing a shared spreadsheet because its contents can be exposed to or changed for other people.
-4. Treat spreadsheet IDs and sheet IDs as opaque strings and only use IDs returned by prior commands or explicit user input.
-5. Run `hatch_gws_cli sheets disconnect`. After running it, when `disconnect_url` is present, replace `<disconnect_url>` with the returned URL and share exactly this Markdown link: `[Disconnect Google Sheets](<disconnect_url>)`; do not paste the raw URL separately.
-6. Prefer `spreadsheets.get` or `sheets +read` before writing when you need to inspect current sheet structure or cell contents. To write or style a sheet, follow "Formatting spreadsheet content" above.
-7. After a read or write action, confirm the user-visible result only. Do not surface raw API identifiers (spreadsheet and sheet IDs) or other internal response fields (page tokens/cursors, raw JSON) in text shown to the user unless the user asks for them or you need them to troubleshoot a failure; keep using them internally to chain follow-up commands.
+| Task area | Required reference file |
+| --- | --- |
+| Existing spreadsheet edit workflow, grounding, validation-backed cells, output conventions, and write planning | `references/reference-edit-workflow.md` |
+| Direct live range reads, cell reads, row searches, tab/range recovery, and oversized search avoidance | `references/reference-live-read-search-safety.md` |
+| Adding or inserting rows or columns beside populated data while preserving validation, chips, formulas, and formatting | `references/reference-native-cell-structure.md` |
+| Reference/template following from a provided Google Sheet | `references/reference-native-cell-structure.md` |
+| Raw Sheets write shapes and example `batch_update` bodies | `references/reference-batch-update-recipes.md` |
+| Importing a local spreadsheet and upgrading intended tables to native Sheets tables | `references/reference-import-spreadsheet-to-native-sheets.md` |
+| Formula design, repair, rollout, or syntax refresh | `references/reference-formula-patterns.md` |
+| Chart creation, repair, chart-spec recall, or repositioning | `references/reference-chart-recipes.md` |
+| Unspecified styling for native Google Sheets destinations | `references/style-profiles.md` |

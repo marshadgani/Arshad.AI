@@ -10,7 +10,7 @@
 | **MCP tools** (`mcp_toolset`) | Anthropic's orchestration layer | Capabilities exposed by connected MCP servers. Grant access per-server via the toolset. |
 | **Custom tools** | **You** - your application handles the call and returns results | Agent emits a `agent.custom_tool_use` event, session goes `idle`, you send back a `user.custom_tool_result` event. |
 
-**Recommendation:** Enable all prebuilt tools via `agent_toolset_20260401`, then disable individually as needed.
+**Recommendation:** Enable the prebuilt tools via `agent_toolset_20260401` with `web_fetch` and `web_search` disabled and `auto` as the toolset's permission policy, and turn a web tool on only when the job needs it.
 
 **Versioning:** The toolset is a versioned, static resource. When underlying tools change, a new toolset version is created (hence `_20260401`) so you always know exactly what you're getting.
 
@@ -29,28 +29,21 @@ The `agent_toolset_20260401` provides these built-in tools:
 | `web_fetch` | Fetch content from a URL |
 | `web_search` | Search the web for information |
 
-Enable the full toolset:
-
-```json
-{
-  "tools": [
-    { "type": "agent_toolset_20260401" }
-  ]
-}
-```
+**Start with the web tools off.** A bare `{ "type": "agent_toolset_20260401" }` enables all eight, and of the environment's `networking` choices only `limited` restricts the two web tools (§ Web search & web fetch settings). List both in `configs` explicitly, as in the example below, and set `enabled: true` only on the ones the job needs (`web_search` to find pages, `web_fetch` to read a URL), with the sites in `allowed_domains` when they are known in advance, and under `limited` networking in the environment's `allowed_hosts` too.
 
 ### Per-Tool Configuration
 
-Override defaults for individual tools. This example enables everything except bash:
+Override defaults for individual tools. This example enables everything except the web tools and sets the `auto` permission policy (§ Permission Policies):
 
 ```json
 {
   "tools": [
     {
       "type": "agent_toolset_20260401",
-      "default_config": { "enabled": true },
+      "default_config": { "enabled": true, "permission_policy": { "type": "auto" } },
       "configs": [
-        { "name": "bash", "enabled": false }
+        { "name": "web_fetch", "enabled": false },
+        { "name": "web_search", "enabled": false }
       ]
     }
   ]
@@ -63,7 +56,7 @@ Override defaults for individual tools. This example enables everything except b
 | `default_config` | No | Applied to all tools. `{ "enabled": bool, "permission_policy": {...} }` |
 | `configs` | No | Per-tool overrides: `[{ "name": "...", "type": "...", "enabled": bool, "permission_policy": {...} }]`. `name` identifies the tool (values from the table above); `type` is optional in requests (same value as `name`; the server infers it) and always present in responses. `web_search` / `web_fetch` entries also accept web settings - see § Web search & web fetch settings below. |
 
-> **Typed SDKs:** each `configs` entry is a member of a union with one member per built-in tool (eight: `BetaManagedAgentsWebFetchToolConfigParams`, `...WebSearchToolConfigParams`, `...BashToolConfigParams`, ...), discriminated by `type`. Python/TypeScript/Ruby dicts and hashes with just `name` + `enabled` + `permission_policy` are unchanged. In Go, Java, C#, and PHP, `configs` is the union itself - build each entry from its per-tool type (Go: `BetaManagedAgentsAgentToolConfigUnionParamsUnion{OfWebFetch: &anthropic.BetaManagedAgentsWebFetchToolConfigParams{...}}` - the arms are `OfBash` / `OfRead` / `OfWrite` / `OfEdit` / `OfGlob` / `OfGrep` / `OfWebFetch` / `OfWebSearch`; Java: `.addConfig(BetaManagedAgentsWebFetchToolConfigParams.builder()...build())`; C#: `new BetaManagedAgentsWebFetchToolConfigParams { Enabled = false }`; PHP: `BetaManagedAgentsWebFetchToolConfigParams::with(enabled: false)`). Code written against an SDK where all tools shared one config type must update how it constructs entries.
+> **Typed SDKs:** each `configs` entry is a member of a union with one member per built-in tool (eight: `BetaManagedAgentsWebFetchToolConfigParams`, `...WebSearchToolConfigParams`, `...BashToolConfigParams`, ...), discriminated by `type`. Python/TypeScript/Ruby dicts and hashes with just `name` + `enabled` + `permission_policy` are unchanged. In Go, Java, C#, and PHP, `configs` is the union itself - build each entry from its per-tool type (Go: `BetaManagedAgentsAgentToolConfigParamsUnion{OfWebFetch: &anthropic.BetaManagedAgentsWebFetchToolConfigParams{...}}` - the arms are `OfBash` / `OfRead` / `OfWrite` / `OfEdit` / `OfGlob` / `OfGrep` / `OfWebFetch` / `OfWebSearch`; Java: `.addConfig(BetaManagedAgentsWebFetchToolConfigParams.builder()...build())`; C#: `new BetaManagedAgentsWebFetchToolConfigParams { Enabled = false }`; PHP: `BetaManagedAgentsWebFetchToolConfigParams::with(enabled: false)`). Code written against an SDK where all tools shared one config type must update how it constructs entries.
 
 ### Permission Policies
 
@@ -73,24 +66,26 @@ Control whether server-executed tools (agent toolset + MCP) run automatically, w
 |---|---|
 | `always_allow` | Tool executes automatically. Default for the agent toolset. |
 | `always_ask` | Session emits `session.status_idle` (`stop_reason.type: requires_action`) and pauses until you send a `user.tool_confirmation` event. Default for MCP toolsets. |
-| `auto` | The server evaluates each call (tool + input + session content so far) and **runs it, denies it, or pauses for your approval**. Neither toolset kind defaults to `auto`. See § `auto` below. |
+| `auto` | The server evaluates each call (tool + input + session content so far) and **runs it, denies it, or pauses for your approval**. Neither toolset kind defaults to `auto` - set it explicitly; recommended for the agent toolset. Leave an `mcp_toolset` at its `always_ask` default unless the user asks for fewer approvals: there `auto` lets calls to a third-party service run with no one reviewing them. See § `auto` below. |
 
 ```json
 {
   "type": "agent_toolset_20260401",
   "default_config": {
     "enabled": true,
-    "permission_policy": { "type": "always_allow" }
+    "permission_policy": { "type": "auto" }
   },
   "configs": [
-    { "name": "bash", "permission_policy": { "type": "always_ask" } }
+    { "name": "bash", "permission_policy": { "type": "always_ask" } },
+    { "name": "web_fetch", "enabled": false },
+    { "name": "web_search", "enabled": false }
   ]
 }
 ```
 
 **Responding to `always_ask`** (and to `auto` calls that pause): send a `user.tool_confirmation` event with `tool_use_id` set to the **event ID** (`sevt_...`, not a `toolu_` ID) of the triggering `agent.tool_use` / `agent.mcp_tool_use` event. Several confirmations can go in one `events` request:
 
-```json
+```yaml
 { "type": "user.tool_confirmation", "tool_use_id": "sevt_abc123", "result": "allow" }
 { "type": "user.tool_confirmation", "tool_use_id": "sevt_def456", "result": "deny", "deny_message": "Read .env.example instead" }
 ```
@@ -110,13 +105,17 @@ Set `{"type": "auto"}` anywhere a `permission_policy` is accepted: a toolset's `
 ```json
 {
   "name": "Ops Agent",
-  "model": "claude-opus-5",
+  "model": "claude-opus-5-5",
   "mcp_servers": [{ "type": "url", "name": "github", "url": "https://mcp.example.com/github" }],
   "tools": [
     {
       "type": "agent_toolset_20260401",
       "default_config": { "permission_policy": { "type": "auto" } },
-      "configs": [{ "name": "bash", "permission_policy": { "type": "always_ask" } }]
+      "configs": [
+        { "name": "bash", "permission_policy": { "type": "always_ask" } },
+        { "name": "web_fetch", "enabled": false },
+        { "name": "web_search", "enabled": false }
+      ]
     },
     {
       "type": "mcp_toolset",
@@ -127,7 +126,7 @@ Set `{"type": "auto"}` anywhere a `permission_policy` is accepted: a toolset's `
 }
 ```
 
-Pass the same shape as an untyped dict / object literal / hash in Python, TypeScript, and Ruby. The typed SDKs (Go, Java, C#, PHP) need a generated type for the `auto` policy that ships with each SDK's release of the feature - until then, build the request in an untyped language or via cURL / `ant`. Python and TypeScript also only type-check `{"type": "auto"}` from the release that adds it (the wire API accepts it regardless).
+Pass the same shape as an untyped dict / object literal / hash in Python, TypeScript, and Ruby. The typed SDKs have a type for the policy (Go 1.72.0+: `OfAuto: &anthropic.BetaManagedAgentsAutoPolicyParam{}` in the `PermissionPolicy` union; Java 2.63.0+: `.permissionPolicy(BetaManagedAgentsAutoPolicy.builder().build())`; PHP 0.48.0+: `permissionPolicy: BetaManagedAgentsAutoPolicy::with()`; C# 12.48.0+: `PermissionPolicy = new BetaManagedAgentsAutoPolicy()`) - on an older release, upgrade or build the request via cURL / `ant`. Python and TypeScript also only type-check `{"type": "auto"}` from the release that adds it (the wire API accepts it regardless).
 
 **What the evaluation trusts.** The server treats session content as material to assess, not instructions to follow. Text you post in `user.message` events (including end-user text you relay there) counts as *your intent* and can lead the server to allow a call it would otherwise deny - though some calls are evaluated as high-risk regardless. The same words in a tool result, a fetched webpage, an MCP server response, or a message between session threads carry no such weight. If you relay untrusted end-user input in `user.message`, the server reads it as your intent too and it can get a call allowed - put `always_ask` on the tools you would not let that end user run without review.
 
@@ -173,7 +172,7 @@ To enable only specific tools, flip the default off and opt-in per tool:
   "tools": [
     {
       "type": "agent_toolset_20260401",
-      "default_config": { "enabled": false },
+      "default_config": { "enabled": false, "permission_policy": { "type": "auto" } },
       "configs": [
         { "name": "bash", "enabled": true },
         { "name": "read", "enabled": true }
@@ -185,21 +184,26 @@ To enable only specific tools, flip the default off and opt-in per tool:
 
 ### Web search & web fetch settings (domain filters)
 
-`web_search` and `web_fetch` run on Anthropic's servers regardless of environment type, so an environment's `networking` policy **does not** govern them (see `shared/managed-agents-environments.md` -> Networking). To control what they can reach, set `allowed_domains` (only these hosts) **or** `blocked_domains` (never these hosts) - never both on one entry - on the tool's `configs` entry. Each tool carries its own list. Organization-level web search/fetch settings in the Console apply to the Messages API only, not to Managed Agents sessions.
+`web_search` and `web_fetch` run on Anthropic's servers regardless of environment type. With `limited` networking, `allowed_hosts` also applies to them: `web_fetch` returns an error result for a URL on a host that `allowed_hosts` does not match, `web_search` omits results from such hosts, and when `allowed_hosts` lists no hosts neither returns a page or a search result. A host added to `allowed_hosts` for these tools is also open to the sandbox. `unrestricted` networking and self-hosted environments do not limit them (see `shared/managed-agents-environments.md` -> Networking). To control what they can reach whatever the environment, set `allowed_domains` (only these hosts) **or** `blocked_domains` (never these hosts) - never both on one entry - on the tool's `configs` entry. Each tool carries its own list.
+
+The organization's web search and web fetch settings on the Console's **Capabilities** page (`https://platform.claude.com/settings/capabilities`) also apply in sessions: if an admin turns a tool off, its calls return an error result to the agent and the session continues. With organization domain restrictions set, `web_search` returns only results that both the organization's list and the tool's own list allow, and `web_fetch` returns an error result for a URL, or any URL a redirect leads to, that either list excludes. The Web Search & Fetch Restrictions page in `shared/live-sources.md` has the full rules.
 
 ```json
 {
   "type": "agent_toolset_20260401",
+  "default_config": { "permission_policy": { "type": "auto" } },
   "configs": [
     {
       "type": "web_search",
       "name": "web_search",
+      "enabled": true,
       "allowed_domains": ["docs.example.com", "arxiv.org"],
       "user_location": { "type": "approximate", "country": "US", "timezone": "America/Los_Angeles" }
     },
     {
       "type": "web_fetch",
       "name": "web_fetch",
+      "enabled": true,
       "blocked_domains": ["ads.example.com"],
       "max_content_tokens": 50000
     }
@@ -241,7 +245,7 @@ Custom tools are executed by **your application**, not Anthropic. The flow:
 4. You send back a `user.custom_tool_result` event with the output
 5. Session resumes `running`
 
-No permission policy needed - you're the one executing.
+No permission policy needed - you're the one executing. A custom tool's name can't start with `mcp__` or `ant__` or match a built-in agent tool's name (400); an agent that already stores an `ant__` tool accepts only an update that sends `tools` without it, and a new session that would run with such a tool is refused (400).
 
 ```json
 {
@@ -315,13 +319,13 @@ This keeps secrets out of reusable agent definitions. Each vault credential is t
 **Vaults** store credentials that Anthropic manages on your behalf. Two credential categories:
 
 - **MCP credentials** (`mcp_oauth`, `static_bearer`) - keyed by `mcp_server_url`. When the agent connects to a server at that URL, the token is injected automatically. **Matching is normalized, not byte-exact:** scheme and host are lowercased, and default ports and trailing slashes are stripped, so host casing, an explicit default port, or a trailing slash won't break the match. A different path, subdomain, or *non-default* port will. If nothing matches, the connection is attempted unauthenticated. `mcp_oauth` tokens are auto-refreshed via the standard OAuth 2.0 `refresh_token` grant. This is the only way to authenticate MCP servers.
-- **Environment variables** (`environment_variable`) - keyed by `secret_name` (the env var name). The sandbox sees only an **opaque placeholder**; the real secret is substituted into the outbound request **at egress**. Use this for any service that authenticates through an environment variable: CLIs (`aws`, `gcloud`, `stripe`), SDKs, or direct `curl` calls from the `bash` tool.
+- **Environment variables** (`environment_variable`) - keyed by `secret_name` (the env var name). The sandbox sees only an **opaque placeholder**; the real secret is substituted into the outbound request **at egress**. Use this for any service that authenticates through an environment variable: CLIs, SDKs, or direct `curl` calls from the `bash` tool, as long as the client sends the secret verbatim in the request (see the caveats below).
 
 Secret fields you supply (`token`, `access_token`, `refresh_token`, `client_secret`, `secret_value`) are write-only - never returned in API responses.
 
 #### Credentials and the sandbox
 
-Vaults store credentials; those credentials **never enter the sandbox**. This is a deliberate security boundary - code running in the sandbox (including anything the agent writes) cannot read or exfiltrate a vaulted credential, even under prompt injection. Instead, credentials are injected by Anthropic-side proxies **after** a request leaves the sandbox:
+Vaults store credentials; those credentials **are never placed in the sandbox**. This is a deliberate security boundary - code running in the sandbox (including anything the agent writes) cannot read a vaulted credential, even under prompt injection, unless a service sends it back (an endpoint that echoes request headers, for example: responses reach the sandbox unredacted, so allow only hosts you trust). Instead, credentials are injected by Anthropic-side proxies **after** a request leaves the sandbox:
 
 - **MCP tool calls** are routed through an Anthropic-side proxy that fetches the credential from the vault and adds it to the outbound request.
 - **Git operations on attached GitHub repositories** (`git pull`, `git push`, GitHub REST calls) are routed through a git proxy that injects the `github_repository` resource's `authorization_token` the same way.
@@ -376,15 +380,16 @@ Omit `refresh` entirely if you only have an access token with no refresh capabil
 
 ```json
 {
-  "display_name": "Twilio API key for sandbox",
+  "display_name": "Notion API key for sandbox",
   "auth": {
     "type": "environment_variable",
-    "secret_name": "TWILIO_API_KEY",
-    "secret_value": "sk-your-secret-here",
+    "secret_name": "NOTION_API_KEY",
+    "secret_value": "ntn_your-secret-here",
     "networking": {
       "type": "limited",
-      "allowed_hosts": ["api.twilio.com", "*.twilio.com"]
-    }
+      "allowed_hosts": ["api.notion.com"]
+    },
+    "injection_location": { "header": true, "body": false }
   }
 }
 ```
@@ -400,11 +405,11 @@ Omit `refresh` entirely if you only have an access token with no refresh capabil
 
 A credential must have at least one location enabled; a create or update that would disable both returns 400, as does explicit `null` for the object or either field (omit instead). The response always returns both fields with their resolved values.
 
-> Warning: **Credentials created in the Console are header-only by default** - unlike the API, where omitting the field enables both. If your client sends the secret in the request body (a form-encoded token request, for example), the placeholder passes through literally and the service rejects it with its own authentication error. Tick body injection in the Console form, or `POST` the credential with `{"injection_location": {"body": true}}`.
+> Warning: **Credentials created in the Console are header-only by default** - unlike the API, where omitting the field enables both. If your client sends the secret in the request body (an API that reads the key from a form or JSON field, say), the placeholder passes through literally and the service rejects it with its own authentication error. Tick body injection in the Console form, or `POST` the credential with `{"injection_location": {"body": true}}`.
 
 > Warning: **Two networking layers, both required.** `networking.allowed_hosts` on the credential controls which requests *use the secret*, not which requests are *allowed*. The agent must also be able to reach the domain at the **environment level** (`unrestricted`, or the host listed in the environment's `allowed_hosts` - see `shared/managed-agents-environments.md`). A domain missing from either layer means the secret-substituted request fails.
 
-> Warning: **Client-side validation caveat.** Substitution happens at egress, not inside the sandbox - clients that validate the credential *format* locally before making a network request (e.g. a CLI that checks the key starts with `sk-`) will see the opaque placeholder and may fail at startup. If a client rejects the credential before any network call, that's why.
+> Warning: **Client-side caveats.** Substitution happens at egress, not inside the sandbox - clients that validate the credential *format* locally before making a network request (e.g. a CLI that checks the key starts with `sk-`) will see the opaque placeholder and may fail at startup. If a client rejects the credential before any network call, that's why. For the same reason a client that computes a request signature from the secret (AWS SigV4, for example) signs with the placeholder and the service rejects the request. Substitution is also outbound only, so a client that exchanges the secret for a session token (an OAuth client-credentials grant) receives that token in the sandbox unredacted: do such exchanges yourself and store the resulting token in the vault instead.
 
 > Tip: **Scope the key minimally.** The agent can do anything the key allows; a key with broader permissions than the task needs increases the blast radius if the agent behaves unexpectedly.
 
@@ -432,7 +437,7 @@ Skills reach the agent two ways: **attached** through the agent's `skills` array
 | **Pre-built Anthropic skills** | Common document tasks (PowerPoint, Excel, Word, PDF). Reference by name (e.g. `xlsx`). |
 | **Custom skills** | Skills you've created in your organization via the Skills API. Reference by `skill_id` + optional `version`. |
 
-**Max 20 skills per agent.** Agent creation uses `managed-agents-2026-04-01`; the separate Skills API (for managing custom skill definitions) uses `skills-2025-10-02`.
+**Max 500 skills per session, counted once across all its agents.** Agent creation uses `managed-agents-2026-04-01`; the separate Skills API (for managing custom skill definitions) is out of beta and needs no beta header.
 
 ### Enabling skills on a session
 
@@ -442,7 +447,7 @@ Skills are attached to the **agent** definition via `agents.create()`:
 const agent = await client.beta.agents.create(
   {
     name: "Financial Agent",
-    model: "claude-opus-5",
+    model: "claude-opus-5-5",
     system: "You are a financial analysis agent.",
     skills: [
       { type: "anthropic", skill_id: "xlsx" },
@@ -457,7 +462,7 @@ Python:
 ```python
 agent = client.beta.agents.create(
     name="Financial Agent",
-    model="claude-opus-5",
+    model="claude-opus-5-5",
     system="You are a financial analysis agent.",
     skills=[
         {"type": "anthropic", "skill_id": "xlsx"},

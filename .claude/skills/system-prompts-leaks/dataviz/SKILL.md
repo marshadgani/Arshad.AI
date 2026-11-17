@@ -22,7 +22,6 @@ description: >
   "sparkline", "heatmap", "legend", "axis", "tooltip", "chart colors", "color
   by series".
 ---
-
 # Data Visualization
 
 A chart is **read by people and executed by you**. This skill turns "make it look
@@ -37,7 +36,7 @@ the method consumes them unchanged. A **validated default palette** is the
 reference instance, fully specified in `references/palette.md`. To target your
 brand, read that file's structure and substitute its values - touch nothing else.
 
-> The single most important habit: **the color part is computable, so compute it.**
+> The single most important habit: **the color part is computable, so compute it.**  
 > Never eyeball whether a palette is colorblind-safe - run `scripts/validate_palette.js`.
 
 ## The procedure - do these in order
@@ -71,6 +70,7 @@ Color comes LAST. Most bad charts pick colors first.
    it), so identity is never color-alone; a table view exists; dark mode is **selected** - its own
    steps from the same ramps, validated against the dark surface, not an automatic
    flip; texture is available for the CVD/print/forced-colors case.
+   One exception to direct name labels: the tall segmented bar (*Figures* in `references/marks-and-anatomy.md`).
 7. **Render it and look at it.** The validator checks color, not layout - open or
    screenshot the output and eyeball it for label collisions, geometry, and overflow
    before calling it done.
@@ -97,6 +97,7 @@ of what goes wrong. If your chart matches an entry, it's wrong.
   obligates visible labels or a table view - it is not dismissable.
 - **Thin marks; a legend always present for >= 2 series (none for one), with
   selective direct labels (never a number on every point); recessive grid/axes.**
+  One exception, legend kept: the tall segmented bar (*Figures* in `references/marks-and-anatomy.md`).
 - **Text wears text tokens, never the series color** - values, labels, and legends
   stay in primary/secondary/muted ink; a colored mark beside them carries identity.
 - **Status colors are reserved** (good/warning/serious/critical) and never reused
@@ -113,7 +114,7 @@ instance - every value filled in - is `references/palette.md`.
 | **Categorical theme** | the fixed hue order (a named theme); default + alternates |
 | **Sequential hue** | the default single hue for magnitude |
 | **Diverging pair** | two warm/cool poles + a neutral midpoint |
-| **Status palette** | good / warning / serious / critical - steps distinct from categorical |
+| **Status palette** | good / warning / serious / critical - steps distinct from categorical, except that dark-mode good is the series green |
 | **Texture fill** | one directional hand-drawn fill, used at 45° / 135° |
 | **Surfaces** | light & dark chart-surface colors (the validator needs these) |
 | **Filter controls** | date-range & dimension controls (behavioral spec in `interaction.md`) |
