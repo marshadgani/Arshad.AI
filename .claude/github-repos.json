@@ -5573,7 +5573,7 @@
     "codegraph": {
       "url": "https://github.com/colbymchenry/codegraph.git",
       "name": "codegraph",
-      "last_fetched": "2026-10-05 19:33 UTC",
+      "last_fetched": "2026-11-17 13:36 UTC",
       "components": {
         "skills": [
           "agent-eval",
