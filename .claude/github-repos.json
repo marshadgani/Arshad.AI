@@ -227,11 +227,12 @@
     "obsidian-skills": {
       "url": "https://github.com/kepano/obsidian-skills.git",
       "name": "obsidian-skills",
-      "last_fetched": "2026-10-05 19:31 UTC",
+      "last_fetched": "2026-11-17 13:33 UTC",
       "components": {
         "skills": [
           "obsidian-cli",
           "obsidian-bases",
+          "obsidian-headless",
           "knap",
           "json-canvas",
           "defuddle",
