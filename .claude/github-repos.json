@@ -55,7 +55,7 @@
     "repomix": {
       "url": "https://github.com/yamadashy/repomix.git",
       "name": "repomix",
-      "last_fetched": "2026-10-05 19:30 UTC",
+      "last_fetched": "2026-11-17 13:33 UTC",
       "components": {
         "skills": [
           "repomix-explorer",
@@ -105,7 +105,7 @@
     "superpowers": {
       "url": "https://github.com/obra/superpowers.git",
       "name": "superpowers",
-      "last_fetched": "2026-10-05 19:30 UTC",
+      "last_fetched": "2026-11-17 13:33 UTC",
       "components": {
         "skills": [
           "using-superpowers",
@@ -127,9 +127,12 @@
         "agents": [],
         "commands": [],
         "hooks": [
+          "test-run-hook-cmd-windows.sh",
           "test-session-start.sh"
         ],
-        "token_optimization": []
+        "token_optimization": [
+          "RELEASE-NOTES.md"
+        ]
       }
     },
     "ui-ux-pro-max": {
