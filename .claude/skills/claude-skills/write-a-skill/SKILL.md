@@ -133,7 +133,7 @@ Validation tools + cs-* wrapper sit alongside this skill. Run all 6 review-check
 python scripts/skill_review_checklist_runner.py path/to/skill-folder
 ```
 
-See [references/companion_tooling.md](references/companion_tooling.md) for the tool catalogue, cs-skill-author persona agent, and `/cs:write-a-skill` slash command.
+See [references/companion_tooling.md](references/companion_tooling.md) for the tool catalogue, cs-skill-author persona agent, and `/cs-write-a-skill` slash command.
 
 ## When the knowledge is in a document, not your head
 
@@ -143,8 +143,8 @@ document into a knowledge-base skill (core frameworks + on-demand chapters + glo
 patterns + cheatsheet) and can package the result as a plugin.
 
 ```
-/cs:book-to-skill <path|folder|glob> [skill-name]     # compile the source
-/cs:book-to-plugin <compiled-skill-dir>               # wrap it as a plugin
+/cs-book-to-skill <path|folder|glob> [skill-name]     # compile the source
+/cs-book-to-plugin <compiled-skill-dir>               # wrap it as a plugin
 ```
 
 Rule of thumb: **author first, compile second.** A hand-written skill states what you want the
@@ -155,3 +155,14 @@ both, they are two skills, not one.
 
 **Version:** 1.0.0
 **Derived:** Matt Pocock (MIT) + this repo's wrapper
+
+## More in this skill
+
+Load these only when the task needs them.
+
+- [references/description_design_patterns.md](references/description_design_patterns.md) — Description Design Patterns for Skills
+- [references/progressive_disclosure_principles.md](references/progressive_disclosure_principles.md) — Progressive Disclosure for Skill Files
+- [references/quality_gates_for_skills.md](references/quality_gates_for_skills.md) — Quality Gates for Skill Libraries
+
+- `python3 scripts/skill_description_validator.py --help` — Validate a skill's description against Matt Pocock's rules
+- `python3 scripts/skill_structure_validator.py --help` — Validate a skill folder structure against Matt Pocock's pattern

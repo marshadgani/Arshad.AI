@@ -1,6 +1,6 @@
 ---
 name: "ux-researcher-designer"
-description: UX research and design toolkit for Senior UX Designer/Researcher including data-driven persona generation, journey mapping, usability testing frameworks, and research synthesis. Use when conducting user research, creating personas, mapping user journeys, planning usability tests, or validating designs.
+description: "UX research: personas, journey maps, usability test plans, synthesis. Use whenever the user asks who their users are or why they struggle."
 ---
 
 # UX Researcher & Designer

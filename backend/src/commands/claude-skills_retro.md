@@ -1,15 +1,9 @@
 ---
-title: "/retro — Slash Command for AI Coding Agents"
-description: "Analyze sprint retrospectives for patterns and action item tracking. Usage: /retro analyze <retro_data.json>. Slash command for Claude Code, Codex CLI, Gemini CLI."
+name: retro
+description: "Analyze sprint retrospectives for patterns and action item tracking. Usage: /retro analyze <retro_data.json>"
 ---
 
 # /retro
-
-<div class="page-meta" markdown>
-<span class="meta-badge">:material-console: Slash Command</span>
-<span class="meta-badge">:material-github: <a href="https://github.com/alirezarezvani/claude-skills/tree/main/commands/retro.md">Source</a></span>
-</div>
-
 
 Analyze retrospective data for recurring themes, sentiment trends, and action item effectiveness.
 

@@ -1,11 +1,12 @@
 ---
+disable-model-invocation: true
 name: "cs-workflow-build"
-description: "/cs:workflow-build <task-description> — Design and write a deterministic Claude Code workflow (.js). Opens with intake questions, infers-and-proposes a topology when the request is vague, then scaffolds + validates the file. Use when building or running a custom Claude Code workflow."
+description: "/cs-workflow-build <task-description> — Design and write a deterministic Claude Code workflow (.js). Opens with intake questions, infers-and-proposes a topology when the request is vague, then scaffolds + validates the file. Use when building or running a custom Claude Code workflow."
 ---
 
-# /cs:workflow-build — Workflow Architect Intake
+# /cs-workflow-build — Workflow Architect Intake
 
-**Command:** `/cs:workflow-build <task-description>`
+**Command:** `/cs-workflow-build <task-description>`
 
 Designs a deterministic multi-agent workflow for Claude Code's Workflow tool. Always opens with intake; never writes a file before the topology is confirmed.
 
@@ -29,7 +30,7 @@ Ask the opening question set. Lead with #1.
 ## Step 2 — If the user is vague, infer and propose (don't loop on questions)
 
 ```bash
-python ../skills/workflow-builder/scripts/workflow_intake.py --task "<their request>" \
+python ${CLAUDE_PLUGIN_ROOT}/skills/workflow-builder/scripts/workflow_intake.py --task "<their request>" \
   --units unknown --stages unknown --needs-all unknown --structured unknown
 ```
 
@@ -38,7 +39,7 @@ Present the result as "here's what I'd build and why": recommended topology (+ r
 ## Step 3 — Confirm the shape, then scaffold
 
 ```bash
-python ../skills/workflow-builder/scripts/scaffold_workflow.py \
+python ${CLAUDE_PLUGIN_ROOT}/skills/workflow-builder/scripts/scaffold_workflow.py \
   --topology <fan-out|pipeline|barrier|loop|judge-panel> --name <name> --description "..." \
   > .claude/workflows/<name>.js
 ```
@@ -46,7 +47,7 @@ python ../skills/workflow-builder/scripts/scaffold_workflow.py \
 ## Step 4 — Validate before running
 
 ```bash
-python ../skills/workflow-builder/scripts/validate_workflow.py .claude/workflows/<name>.js
+python ${CLAUDE_PLUGIN_ROOT}/skills/workflow-builder/scripts/validate_workflow.py .claude/workflows/<name>.js
 ```
 
 Fix every FAIL. WARNs need a one-line justification.
@@ -88,7 +89,7 @@ export CLAUDE_CODE_WORKFLOWS=1   # the feature is off by default
 
 - Agent: [`cs-workflow-architect`](../agents/cs-workflow-architect.md)
 - Skill: [`workflow-builder`](../skills/workflow-builder/SKILL.md)
-- Adjacent: `/cs:write-a-skill` (authoring skills, not workflows)
+- Adjacent: `/cs-write-a-skill` (authoring skills, not workflows)
 
 ---
 

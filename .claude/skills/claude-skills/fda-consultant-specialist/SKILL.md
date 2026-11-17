@@ -1,6 +1,6 @@
 ---
 name: "fda-consultant-specialist"
-description: FDA regulatory consultant for medical device companies. Provides 510(k)/PMA/De Novo pathway guidance, QMSR (21 CFR 820, which incorporates ISO 13485:2016 by reference since 2026-02-02; formerly QSR) compliance, HIPAA assessments, and device cybersecurity. Use when user mentions FDA submission, 510(k), PMA, De Novo, QMSR, QSR, ISO 13485 for FDA, premarket, predicate device, substantial equivalence, HIPAA medical device, or FDA cybersecurity.
+description: "Use for FDA medical device questions: 510(k) vs De Novo vs PMA, predicates and substantial equivalence, QMSR (21 CFR 820), HIPAA or device cybersecurity. Runs fda_submission_tracker.py, qsr_compliance_checker.py and hipaa_risk_assessment.py."
 ---
 
 # FDA Consultant Specialist
@@ -102,7 +102,7 @@ Phase 4: Review
 | Indications for Use | Form 3881, patient population, use environment |
 | SE Comparison | Side-by-side comparison with predicate |
 | Performance Testing | Bench, biocompatibility, electrical safety |
-| Software Documentation | Level of concern, hazard analysis (IEC 62304) |
+| Software Documentation | Documentation level (Basic or Enhanced, June 2023 guidance, which replaced level of concern), risk management file, IEC 62304 |
 | Labeling | IFU, package labels, warnings |
 | 510(k) Summary | Public summary of submission |
 

@@ -1,15 +1,9 @@
 ---
-title: "/flag-cleanup — Slash Command for AI Coding Agents"
-description: "Run the quarterly feature-flag cleanup workflow on the current repo. Slash command for Claude Code, Codex CLI, Gemini CLI."
+name: flag-cleanup
+description: Run the quarterly feature-flag cleanup workflow on the current repo
 ---
 
 # /flag-cleanup
-
-<div class="page-meta" markdown>
-<span class="meta-badge">:material-console: Slash Command</span>
-<span class="meta-badge">:material-github: <a href="https://github.com/alirezarezvani/claude-skills/tree/main/commands/flag-cleanup.md">Source</a></span>
-</div>
-
 
 Run the full feature-flag cleanup workflow:
 

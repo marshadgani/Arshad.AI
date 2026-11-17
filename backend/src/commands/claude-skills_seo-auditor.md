@@ -1,15 +1,13 @@
 ---
-title: "/seo-auditor — Slash Command for AI Coding Agents"
-description: "Scan and optimize documentation files for SEO. Audits README.md files and docs/ pages for meta tags, headings, keywords, readability, duplicate. Slash command for Claude Code, Codex CLI, Gemini CLI."
+name: seo-auditor
+description: |
+  Scan and optimize documentation files for SEO. Audits README.md files and docs/ pages for
+  meta tags, headings, keywords, readability, duplicate content, and broken links. Applies
+  fixes, updates sitemap.xml, and generates a report. Usage: /seo-auditor [path]
+argument-hint: "[path]"
 ---
 
 # /seo-auditor
-
-<div class="page-meta" markdown>
-<span class="meta-badge">:material-console: Slash Command</span>
-<span class="meta-badge">:material-github: <a href="https://github.com/alirezarezvani/claude-skills/tree/main/commands/seo-auditor.md">Source</a></span>
-</div>
-
 
 Systematically scan, audit, and optimize documentation files for SEO. Targets README.md files and docs/ pages — fixes issues in place, preserves rankings on high-performing pages, and generates a final report.
 

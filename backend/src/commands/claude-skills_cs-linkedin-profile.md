@@ -1,12 +1,13 @@
 ---
+disable-model-invocation: true
 name: "cs-linkedin-profile"
-description: "/cs:linkedin-profile — Audit a LinkedIn profile 0-100, rank every fix by points per hour, score the headline on five dimensions against the 220-character cap, and assemble an About section that survives the '…see more' fold."
+description: "/cs-linkedin-profile — Audit a LinkedIn profile 0-100, rank every fix by points per hour, score the headline on five dimensions against the 220-character cap, and assemble an About section that survives the '…see more' fold."
 argument-hint: "[your headline, or a description of your profile section by section]"
 ---
 
-# /cs:linkedin-profile — Audit first, rewrite what pays
+# /cs-linkedin-profile — Audit first, rewrite what pays
 
-**Command:** `/cs:linkedin-profile [headline or profile description]`
+**Command:** `/cs-linkedin-profile [headline or profile description]`
 
 Nothing is fetched. You describe your own profile, or fill in
 `skills/linkedin-profile/assets/profile_worksheet.md`.
@@ -32,15 +33,15 @@ Nothing is fetched. You describe your own profile, or fill in
 
 ```bash
 # 1. Whole profile, fixes ranked by leverage
-python3 ../skills/linkedin-profile/scripts/profile_completeness_auditor.py \
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/linkedin-profile/scripts/profile_completeness_auditor.py \
   --input profile.json --output human      # or --sample to see the shape
 
 # 2. Headline — iterate to exit 0
-python3 ../skills/linkedin-profile/scripts/headline_scorer.py \
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/linkedin-profile/scripts/headline_scorer.py \
   --headline "..." --output human
 
 # 3. About — refuses a broken fold, a missing CTA, or an over-length section
-python3 ../skills/linkedin-profile/scripts/about_section_builder.py \
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/linkedin-profile/scripts/about_section_builder.py \
   --input about.json --output human
 ```
 
@@ -61,4 +62,4 @@ python3 ../skills/linkedin-profile/scripts/about_section_builder.py \
 ## Related
 
 - Skill: [`linkedin-profile`](../skills/linkedin-profile/SKILL.md)
-- Run [`/cs:linkedin-plan`](cs-linkedin-plan.md) first if the audience answer is still fuzzy
+- Run [`/cs-linkedin-plan`](cs-linkedin-plan.md) first if the audience answer is still fuzzy

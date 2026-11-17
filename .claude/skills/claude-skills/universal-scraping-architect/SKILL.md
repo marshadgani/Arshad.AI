@@ -1,6 +1,6 @@
 ---
 name: "universal-scraping-architect"
-description: "Use for web scraping, crawling, document extraction, API parsing, or building validation-heavy data pipelines using Firecrawl or local Python scripts."
+description: "Build a scraper or extractor for sites, PDFs or paginated APIs and validate the fields (Firecrawl or local Python). Load whenever the user wants data pulled from pages, files or an API, or a scraper broke."
 ---
 
 # Universal Scraping Architect
@@ -62,3 +62,11 @@ Surface these issues WITHOUT being asked when you notice them in context:
 ## Related Skills
 - **data-cleaning**: Use when the scraped data requires complex statistical normalization or deduplication.
 - **browser-automation**: Use for highly interactive scraping requiring user emulation (clicks, logins) where Firecrawl is insufficient.
+
+## More in this skill
+
+Load these only when the task needs them.
+
+- [references/firecrawl-technical-guide.md](references/firecrawl-technical-guide.md) — Firecrawl Technical Guide
+- [references/local-extraction-patterns.md](references/local-extraction-patterns.md) — Local Extraction Patterns (BeautifulSoup + pandas)
+- [references/scraping-ethics-security.md](references/scraping-ethics-security.md) — Scraping Ethics, Robots.txt, and Security

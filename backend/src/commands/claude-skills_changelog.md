@@ -1,15 +1,10 @@
 ---
-title: "/changelog — Slash Command for AI Coding Agents"
-description: "Generate changelogs from git history and validate conventional commits. Usage: /changelog <generate|lint> [options]. Slash command for Claude Code, Codex CLI, Gemini CLI."
+name: changelog
+description: "Generate changelogs from git history and validate conventional commits. Usage: /changelog <generate|lint> [options]"
+argument-hint: "<generate|lint> [options]"
 ---
 
 # /changelog
-
-<div class="page-meta" markdown>
-<span class="meta-badge">:material-console: Slash Command</span>
-<span class="meta-badge">:material-github: <a href="https://github.com/alirezarezvani/claude-skills/tree/main/commands/changelog.md">Source</a></span>
-</div>
-
 
 Generate Keep a Changelog entries from git history and validate commit message format.
 

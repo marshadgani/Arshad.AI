@@ -1,9 +1,10 @@
 ---
+disable-model-invocation: true
 description: Model headcount + tooling capacity for ops teams (CX/Support/CS/BizOps/IT ops/Finance ops) using Erlang-C queueing math. Sizes the team around the bottleneck process-mapper found. NOT engineering capacity. Direct invocation of the capacity-planner skill.
 argument-hint: "<team + demand intake or path to capacity JSON>"
 ---
 
-# /cs:capacity-plan — Ops capacity sizing + utilization risk + hiring sequence
+# /cs-capacity-plan — Ops capacity sizing + utilization risk + hiring sequence
 
 Run the `capacity-planner` skill on this input:
 

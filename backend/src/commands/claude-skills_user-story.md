@@ -1,15 +1,10 @@
 ---
-title: "/user-story — Slash Command for AI Coding Agents"
-description: "Generate user stories with acceptance criteria and sprint planning. Usage: /user-story <generate|sprint> [options]. Slash command for Claude Code, Codex CLI, Gemini CLI."
+name: user-story
+description: "Generate user stories with acceptance criteria and sprint planning. Usage: /user-story <generate|sprint> [options]"
+argument-hint: "<generate|sprint> [options]"
 ---
 
 # /user-story
-
-<div class="page-meta" markdown>
-<span class="meta-badge">:material-console: Slash Command</span>
-<span class="meta-badge">:material-github: <a href="https://github.com/alirezarezvani/claude-skills/tree/main/commands/user-story.md">Source</a></span>
-</div>
-
 
 Generate structured user stories with acceptance criteria, story points, and sprint capacity planning.
 

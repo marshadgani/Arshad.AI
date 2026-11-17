@@ -1,9 +1,10 @@
 ---
+disable-model-invocation: true
 description: Set, show, or advance the per-session agent-launcher goal (./my-agent/goal.json) — the through-line of a CMA launch. Backs the opt-in SessionStart hook. Subcommands map to goal_state.py init/set/status/advance.
 argument-hint: "set \"<goal>\" | status | advance | phase <name>"
 ---
 
-# /cs:goal — manage the session goal
+# /cs-goal — manage the session goal
 
 The goal is one sentence for one agent. It selects the phase and the loop shape.
 

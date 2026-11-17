@@ -1,19 +1,20 @@
 ---
 name: "quality-manager-qms-iso13485"
-description: ISO 13485 Quality Management System implementation and maintenance for medical device organizations. Provides QMS design, documentation control, internal auditing, CAPA management, and certification support. Use when working with medical device quality systems, preparing for ISO 13485 audits, managing regulatory compliance documentation, setting up corrective actions, or building audit preparation programs. Useful for quality management, audit preparation, regulatory compliance, medical device documentation, and corrective action workflows.
-triggers:
-  - ISO 13485
-  - QMS implementation
-  - quality management system
-  - document control
-  - internal audit
-  - management review
-  - quality manual
-  - CAPA process
-  - process validation
-  - design control
-  - supplier qualification
-  - quality records
+description: "Build or maintain an ISO 13485 medical device QMS: design, documentation, CAPA, audit prep. Use whenever the user faces a 13485 certification audit or needs quality procedures."
+metadata:
+  triggers:
+    - ISO 13485
+    - QMS implementation
+    - quality management system
+    - document control
+    - internal audit
+    - management review
+    - quality manual
+    - CAPA process
+    - process validation
+    - design control
+    - supplier qualification
+    - quality records
 ---
 
 # Quality Manager - QMS ISO 13485 Specialist

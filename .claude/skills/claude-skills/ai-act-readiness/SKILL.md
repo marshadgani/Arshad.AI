@@ -1,11 +1,11 @@
 ---
 name: "ai-act-readiness"
-description: "/cs:ai-act-readiness <system> — EU AI Act 6-question forcing interrogation. Use during AI-system intake, before EU deployment, or during annual compliance refresh as Article 113 obligations phase in (2025-02-02 / 2025-08-02 / 2026-08-02 / 2027-08-02)."
+description: "EU AI Act readiness: risk tier, duties, deadlines. Load whenever AI ships in the EU or the user asks if the Act applies."
 ---
 
-# /cs:ai-act-readiness — EU AI Act Forcing Questions
+# /compliance-os:ai-act-readiness — EU AI Act Forcing Questions
 
-**Command:** `/cs:ai-act-readiness <system>`
+**Command:** `/compliance-os:ai-act-readiness <system>`
 
 The EU AI Act compliance operator pressure-tests any AI system before EU deployment. Six Article-cited questions before any EU placement, conformity assessment, or annual compliance refresh.
 
@@ -34,10 +34,10 @@ The EU AI Act compliance operator pressure-tests any AI system before EU deploym
 - Run `ai_system_risk_classifier.py`
 
 ### 3. Article 43: For high-risk, Module A or Module H?
-**Biometrics → Module H (notified body) by default; others → Module A if harmonised standards applied.**
+**Annex III points 2-8 → Module A (internal control, Article 43(2)). Biometrics → provider's choice of Module A or H if harmonised standards or common specifications are applied in full, otherwise Module H (Article 43(1)).**
 - Run `conformity_assessment_planner.py`
 - Module A (Annex VI): internal control with presumption of conformity if Article 40 harmonised standards applied
-- Module H (Annex VII): full QMS + notified body for biometrics or where standards lacking
+- Module H (Annex VII): full QMS + notified body; optional for biometrics with standards applied, mandatory for biometrics where standards or common specifications do not exist, were not applied or only partly applied, or a standard was published with a restriction
 - Annex IV technical documentation: 8 items required before placing on market
 
 ### 4. Article 25: What role does the company play?
@@ -68,13 +68,13 @@ The EU AI Act compliance operator pressure-tests any AI system before EU deploym
 
 ```bash
 # 1. Risk classification
-python ra-qm-team/skills/eu-ai-act-specialist/scripts/ai_system_risk_classifier.py systems.json
+python ${CLAUDE_PLUGIN_ROOT}/vendor/ra-qm-team/eu-ai-act-specialist/scripts/ai_system_risk_classifier.py systems.json
 
 # 2. If high-risk: conformity assessment
-python ra-qm-team/skills/eu-ai-act-specialist/scripts/conformity_assessment_planner.py system.json
+python ${CLAUDE_PLUGIN_ROOT}/vendor/ra-qm-team/eu-ai-act-specialist/scripts/conformity_assessment_planner.py system.json
 
 # 3. Per-role obligation matrix
-python ra-qm-team/skills/eu-ai-act-specialist/scripts/ai_act_obligation_tracker.py roles.json
+python ${CLAUDE_PLUGIN_ROOT}/vendor/ra-qm-team/eu-ai-act-specialist/scripts/ai_act_obligation_tracker.py roles.json
 
 # 4. Cross-framework reuse (ISO 42001 etc.)
 python ../../skills/compliance-os/scripts/cross_framework_mapper.py program.json
@@ -98,14 +98,14 @@ python ../../skills/compliance-os/scripts/cross_framework_mapper.py program.json
 - Systemic-risk GPAI: yes/no (per Article 51 10^25 FLOPs threshold)
 
 ## Conformity Assessment (if high-risk)
-- Module: A | A_with_caveats | H | sectoral
+- Module: A | A_with_caveats | A_or_H | H | sectoral
 - Citation: Article 43 + Annex VI/VII
-- Notified body required: yes | no | optional
+- Notified body required: yes | no | provider_choice | depends_on_sectoral_law
 - Annex IV pack status: complete | in-progress | not-started
 
 ## Obligation Matrix
 - Total obligations: N
-- By deadline phase: 2025-02-02=A, 2025-08-02=B, 2026-08-02=C, 2027-08-02=D
+- By deadline phase: 2025-02-02=A, 2025-08-02=B, 2026-08-02=C (Art. 50), 2027-12-02=D (Annex III high-risk), 2028-08-02=E (Annex I high-risk); dates per Regulation (EU) 2026/1744
 - Highest-priority unmet obligation: <Article + description>
 
 ## Transparency (Article 50)
@@ -131,18 +131,18 @@ python ../../skills/compliance-os/scripts/cross_framework_mapper.py program.json
 
 ## Routing
 
-- `/cs:compliance-readiness` — for multi-framework view (combine with ISO 42001 + GDPR)
-- `/cs:aims-audit` — for ISO 42001 deep-dive
-- `/cs:caio-review` — for executive AI strategy decisions
-- `/cs:gc-review` — for novel-case legal review (GPAI threshold, Article 5 boundary, substantial-modification)
-- `/cs:decide` — to log the verdict
-- `/cs:freeze 30` — on EU launch commitments (regulatory exposure)
+- `/compliance-os:compliance-readiness` — for multi-framework view (combine with ISO 42001 + GDPR)
+- `/compliance-os:aims-audit` — for ISO 42001 deep-dive
+- `/c-level-agents:caio-review` — for executive AI strategy decisions
+- `/c-level-agents:gc-review` — for novel-case legal review (GPAI threshold, Article 5 boundary, substantial-modification)
+- `/c-level-agents:decide` — to log the verdict
+- `/c-level-agents:freeze 30` — on EU launch commitments (regulatory exposure)
 
 ## Related
 
 - Agent: [`cs-ai-act-compliance`](../../agents/cs-ai-act-compliance.md)
-- Skill: [`eu-ai-act-specialist`](../../../ra-qm-team/skills/eu-ai-act-specialist/SKILL.md)
-- Adjacent: `../../skills/compliance-os/`, `../aims-audit/`, `../compliance-readiness/`, `../../../ra-qm-team/skills/gdpr-dsgvo-expert/`
+- Skill: [`eu-ai-act-specialist`](${CLAUDE_PLUGIN_ROOT}/vendor/ra-qm-team/eu-ai-act-specialist/SKILL.md)
+- Adjacent: `../../skills/compliance-os/`, `../aims-audit/`, `../compliance-readiness/`, `${CLAUDE_PLUGIN_ROOT}/vendor/ra-qm-team/gdpr-dsgvo-expert/`
 
 ---
 

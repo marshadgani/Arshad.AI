@@ -1,10 +1,6 @@
 ---
 name: caveman
-description: >
-  Ultra-compressed communication mode. Cuts token usage ~75% by dropping
-  filler, articles, and pleasantries while keeping full technical accuracy.
-  Use when user says "caveman mode", "talk like caveman", "use caveman",
-  "less tokens", "be brief", or invokes /caveman.
+description: "Terse mode: drop filler, articles and pleasantries, keep technical accuracy, about 75% fewer tokens, and stay in it. Load whenever the user asks for fewer words, shorter answers, less tokens, caveman mode or /caveman."
 license: MIT
 metadata:
   derived_from: "https://github.com/mattpocock/skills/tree/main/skills/productivity/caveman"
@@ -61,9 +57,20 @@ Example -- destructive op:
 
 ## Tooling
 
-See [references/companion_tooling.md](references/companion_tooling.md). Tools: compressor + estimator + lint. Agent: `cs-caveman-mode`. Command: `/cs:caveman`.
+See [references/companion_tooling.md](references/companion_tooling.md). Tools: compressor + estimator + lint. Agent: `cs-caveman-mode`. Command: `/cs-caveman`.
 
 ---
 
 **Version:** 1.0.0
 **Derived:** Matt Pocock (MIT) + this repo's wrapper
+
+## More in this skill
+
+Load these only when the task needs them.
+
+- [references/compression_principles.md](references/compression_principles.md) — Compression Principles for LLM Output
+- [references/when_caveman_backfires.md](references/when_caveman_backfires.md) — When Caveman Backfires
+
+- `python3 scripts/caveman_compressor.py --help` — Apply Matt Pocock's caveman compression rules to text
+- `python3 scripts/caveman_lint.py --help` — Lint a response for caveman-mode compliance
+- `python3 scripts/token_savings_estimator.py --help` — Estimate token-cost savings from caveman compression

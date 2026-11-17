@@ -1,15 +1,9 @@
 ---
-title: "/operator-audit — Slash Command for AI Coding Agents"
-description: "Run the full Kubernetes Operator audit (CRD + reconcile + capability) on the current repo. Slash command for Claude Code, Codex CLI, Gemini CLI."
+name: operator-audit
+description: Run the full Kubernetes Operator audit (CRD + reconcile + capability) on the current repo
 ---
 
 # /operator-audit
-
-<div class="page-meta" markdown>
-<span class="meta-badge">:material-console: Slash Command</span>
-<span class="meta-badge">:material-github: <a href="https://github.com/alirezarezvani/claude-skills/tree/main/commands/operator-audit.md">Source</a></span>
-</div>
-
 
 Run the full audit on a Kubernetes Operator repository:
 

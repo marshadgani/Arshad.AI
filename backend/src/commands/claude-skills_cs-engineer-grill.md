@@ -1,15 +1,10 @@
 ---
-title: "/cs-engineer-grill — Slash Command for AI Coding Agents"
-description: "Cross-role engineering grill — Matt Pocock 7 questions per role × 3 roles (fullstack / frontend / backend) = up to 21 forcing questions, one per. Slash command for Claude Code, Codex CLI, Gemini CLI."
+name: cs-engineer-grill
+description: "Cross-role engineering grill — Matt Pocock 7 questions per role × 3 roles (fullstack / frontend / backend) = up to 21 forcing questions, one per turn, with canon citations and kill criteria. Default: ask which lane first; `--all` runs all 21."
+argument-hint: "<plan or architecture to grill> [--lane fullstack|frontend|backend|all]"
 ---
 
-# /cs-engineer-grill
-
-<div class="page-meta" markdown>
-<span class="meta-badge">:material-console: Slash Command</span>
-<span class="meta-badge">:material-github: <a href="https://github.com/alirezarezvani/claude-skills/tree/main/commands/cs-engineer-grill.md">Source</a></span>
-</div>
-
+# /cs-engineer-grill — Cross-role engineering forcing-question grill
 
 Walk the user through the Matt Pocock forcing-question discipline before they lock any engineering decision. This is the **grill-with-docs** pattern (canon-anchored, recommended answers, kill criteria) applied across the three engineering role lanes.
 
@@ -87,6 +82,6 @@ Questions live in `engineering-team/skills/senior-backend/references/forcing_que
 
 ## Related commands
 
-- `/cs:fullstack-review`, `/cs:frontend-review`, `/cs:backend-review` — single-lane deep dives
+- `/cs-fullstack-review`, `/cs-frontend-review`, `/cs-backend-review` — single-lane deep dives
 - `/karpathy-check` — Karpathy review before commit
-- `/cs:grill-bizops`, `/cs:grill-commercial` — sibling cross-domain grills (BizOps + Commercial v2.8.0)
+- `/cs-grill-bizops`, `/cs-grill-commercial` — sibling cross-domain grills (BizOps + Commercial v2.8.0)

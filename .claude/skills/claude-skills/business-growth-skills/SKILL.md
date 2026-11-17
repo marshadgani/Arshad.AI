@@ -1,24 +1,25 @@
 ---
 name: "business-growth-skills"
-description: "Router/index for the 4 business & growth skills bundled in this plugin: customer-success-manager (health scoring, churn risk, expansion), sales-engineer (RFP analysis, competitive matrices, PoC planning), revenue-operations (pipeline, forecast accuracy, GTM efficiency), and contract-and-proposal-writer. Use when a growth/revenue request doesn't obviously match one skill and you need to pick the right one (e.g., 'which accounts are at risk', 'should we bid on this RFP')."
-version: 2.9.0
-author: Alireza Rezvani
+description: "Use when a growth request needs routing between customer-success-manager, sales-engineer, revenue-operations, contract-and-proposal-writer and support-ops."
 license: MIT
-tags:
-  - business
-  - customer-success
-  - sales
-  - revenue-operations
-  - growth
-agents:
-  - claude-code
-  - codex-cli
-  - openclaw
+metadata:
+  version: 2.9.0
+  author: Alireza Rezvani
+  tags:
+    - business
+    - customer-success
+    - sales
+    - revenue-operations
+    - growth
+  agents:
+    - claude-code
+    - codex-cli
+    - openclaw
 ---
 
 # Business & Growth Skills — Router
 
-This plugin bundles **4 skills** (this router is the 5th folder under `business-growth/skills/`). Each skill is self-contained.
+This plugin bundles **5 skills** (this router is the 6th folder under `business-growth/skills/`). Each skill is self-contained.
 
 ## Routing table
 
@@ -30,6 +31,7 @@ Match the request, then load `business-growth/skills/<skill>/SKILL.md`. If multi
 | RFP/RFI coverage, competitive positioning, PoC plans | sales-engineer | `skills/sales-engineer/` |
 | Pipeline coverage, forecast accuracy (MAPE), GTM efficiency | revenue-operations | `skills/revenue-operations/` |
 | Proposals, contracts, statements of work, DPAs | contract-and-proposal-writer | `skills/contract-and-proposal-writer/` |
+| Support SLAs, agent staffing (Erlang C), ticket deflection | support-ops | `skills/support-ops/` |
 
 ## Quick start
 

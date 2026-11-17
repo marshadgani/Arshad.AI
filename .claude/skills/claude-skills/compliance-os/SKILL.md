@@ -1,6 +1,6 @@
 ---
 name: "compliance-os"
-description: "Compliance OS — meta-orchestrator that lets compliance teams CONFIGURE which frameworks apply, COMPUTE cross-framework control overlap, SIMULATE internal audits, and CONSOLIDATE evidence across multiple frameworks. Four decisions: (1) Given a company profile, which of the 12 supported frameworks apply (ISO 27001/13485/42001/14971, EU AI Act, MDR 745, GDPR, SOC 2, FDA QSR, NIST CSF 2.0, NIS2, HIPAA)? (2) Across selected frameworks, which controls overlap and how much evidence reuses? (3) For a given framework + scope, what does a realistic mock audit produce — drawing from the 205-scenario library? (4) Across selected frameworks, what's the unified evidence checklist with reuse map? Use when standing up a multi-framework program, planning the annual audit calendar, or preparing for certification stage 1. Does NOT replace per-framework skills (it orchestrates them)."
+description: "Use when running several compliance frameworks at once: which apply, where controls overlap, a mock audit or one evidence checklist. Runs framework_selector.py, cross_framework_mapper.py, audit_simulator.py and evidence_pool_generator.py."
 license: MIT
 metadata:
   version: 1.0.0
@@ -21,7 +21,7 @@ Multi-framework compliance program orchestration. **Four decisions, no per-frame
 3. **What does a mock audit produce?** — `audit_simulator.py` generates 8–15 finding scenarios with severity distribution matching IIA expectations + interview questions per control
 4. **What's the unified evidence checklist?** — `evidence_pool_generator.py` consolidates evidence across enabled frameworks; outputs which artefact satisfies which controls across which frameworks
 
-This skill is **NOT** a per-framework deep-dive. The per-framework skills (`ra-qm-team/skills/iso42001-specialist/`, `compliance-team-eu-ai-act/`, `ra-qm-team/skills/gdpr-dsgvo-expert/`, etc.) do the operational work. Compliance OS orchestrates them.
+This skill is **NOT** a per-framework deep-dive. The per-framework skills (`${CLAUDE_PLUGIN_ROOT}/vendor/ra-qm-team/iso42001-specialist/`, `compliance-team-eu-ai-act/`, `${CLAUDE_PLUGIN_ROOT}/vendor/ra-qm-team/gdpr-dsgvo-expert/`, etc.) do the operational work. Compliance OS orchestrates them.
 
 This skill is **NOT** a substitute for binding legal advice. Cross-framework mappings reflect published guidance (ISO standards, regulations, EDPB/Commission guidance, IIA / AICPA professional standards). Novel cross-walks should be reviewed with counsel.
 
@@ -180,17 +180,17 @@ python scripts/evidence_pool_generator.py program.json
 
 ## Adjacent Skills
 
-- `ra-qm-team/skills/iso42001-specialist/` — ISO 42001 deep-dive (paired with compliance-team-iso42001 plugin)
-- `ra-qm-team/skills/eu-ai-act-specialist/` — EU AI Act deep-dive (paired with compliance-team-eu-ai-act plugin)
-- `ra-qm-team/skills/information-security-manager-iso27001/` — ISO 27001 ISMS deep-dive
-- `ra-qm-team/skills/quality-manager-qms-iso13485/` — ISO 13485 QMS deep-dive
-- `ra-qm-team/skills/gdpr-dsgvo-expert/` — GDPR deep-dive
-- `ra-qm-team/skills/soc2-compliance/` — SOC 2 deep-dive
-- `ra-qm-team/skills/fda-consultant-specialist/` — FDA QSR deep-dive
-- `ra-qm-team/skills/mdr-745-specialist/` — EU MDR 745 deep-dive
-- `ra-qm-team/skills/risk-management-specialist/` — ISO 14971 deep-dive
+- `${CLAUDE_PLUGIN_ROOT}/vendor/ra-qm-team/iso42001-specialist/` — ISO 42001 deep-dive (paired with compliance-team-iso42001 plugin)
+- `${CLAUDE_PLUGIN_ROOT}/vendor/ra-qm-team/eu-ai-act-specialist/` — EU AI Act deep-dive (paired with compliance-team-eu-ai-act plugin)
+- `${CLAUDE_PLUGIN_ROOT}/vendor/ra-qm-team/information-security-manager-iso27001/` — ISO 27001 ISMS deep-dive
+- `${CLAUDE_PLUGIN_ROOT}/vendor/ra-qm-team/quality-manager-qms-iso13485/` — ISO 13485 QMS deep-dive
+- `${CLAUDE_PLUGIN_ROOT}/vendor/ra-qm-team/gdpr-dsgvo-expert/` — GDPR deep-dive
+- `${CLAUDE_PLUGIN_ROOT}/vendor/ra-qm-team/soc2-compliance/` — SOC 2 deep-dive
+- `${CLAUDE_PLUGIN_ROOT}/vendor/ra-qm-team/fda-consultant-specialist/` — FDA QSR deep-dive
+- `${CLAUDE_PLUGIN_ROOT}/vendor/ra-qm-team/mdr-745-specialist/` — EU MDR 745 deep-dive
+- `${CLAUDE_PLUGIN_ROOT}/vendor/ra-qm-team/risk-management-specialist/` — ISO 14971 deep-dive
 - `c-level-advisor/chief-ai-officer-advisor/` — Executive AI risk decisions (build-vs-buy, model selection)
-- `c-level-advisor/skills/general-counsel-advisor/` — Legal review for novel cases
+- `${CLAUDE_PLUGIN_ROOT}/vendor/c-level-advisor/general-counsel-advisor/` — Legal review for novel cases
 
 ## References
 

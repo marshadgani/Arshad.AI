@@ -1,9 +1,10 @@
 ---
+disable-model-invocation: true
 description: Top-level Research Operations router. Classifies an enterprise research inquiry (clinical study design / R&D finance / market research / product research) and forks context to the right sub-skill via the research-ops-skills orchestrator, returning a ≤200-word digest with a named owner and one grill challenge.
 argument-hint: "<research inquiry: study design, R&D budget, market size, user research, etc.>"
 ---
 
-# /cs:research-ops — Research Operations router
+# /cs-research-ops — Research Operations router
 
 Route this inquiry through the `research-ops-skills` orchestrator:
 

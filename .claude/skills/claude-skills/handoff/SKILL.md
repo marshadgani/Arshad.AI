@@ -1,6 +1,6 @@
 ---
 name: handoff
-description: Compact the current conversation into a handoff document for another agent to pick up. References existing artifacts (PRDs, plans, ADRs, issues, commits, diffs) by path or URL instead of duplicating them. Use when user wants to hand off the conversation to a fresh agent or starts a new session that picks up prior work.
+description: "Compact the current conversation into a handoff document for another agent to pick up, referencing existing artifacts (PRDs, plans, ADRs, issues, commits, diffs) by path or URL instead of duplicating them. Use whenever the user wants to hand off to a fresh agent, is ending a session mid-task, asks for a handoff doc or a summary of state, decisions and next steps for the next session, or starts a new session that picks up prior work."
 argument-hint: "What will the next session be used for?"
 license: MIT
 metadata:
@@ -33,9 +33,21 @@ If the user passed arguments, treat them as a description of what the next sessi
 
 ## Tooling
 
-See [references/companion_tooling.md](references/companion_tooling.md). Tools: template + dedup + recommender. Agent: `cs-handoff-author`. Command: `/cs:handoff`.
+See [references/companion_tooling.md](references/companion_tooling.md). Tools: template + dedup + recommender. Agent: `cs-handoff-author`. Command: `/cs-handoff`.
 
 ---
 
 **Version:** 1.0.0
 **Derived:** Matt Pocock (MIT) + this repo's wrapper
+
+## More in this skill
+
+Load these only when the task needs them.
+
+- [references/deduplication_discipline.md](references/deduplication_discipline.md) — Deduplication Discipline for Handoffs
+- [references/handoff_structure.md](references/handoff_structure.md) — Handoff Document Structure
+- [references/next_session_skill_matching.md](references/next_session_skill_matching.md) — Skill Matching for the Next Session
+
+- `python3 scripts/artifact_deduplicator.py --help` — Detect content in a handoff draft that should be referenced not duplicated
+- `python3 scripts/handoff_template_generator.py --help` — Generate a handoff document scaffold tailored to next-session focus
+- `python3 scripts/skill_recommender.py --help` — Recommend which skills the next session should use

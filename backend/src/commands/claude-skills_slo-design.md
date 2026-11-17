@@ -1,15 +1,9 @@
 ---
-title: "/slo-design — Slash Command for AI Coding Agents"
-description: "Interactive wizard to design an SLO with SLI, target, error budget, and burn-rate alerts. Slash command for Claude Code, Codex CLI, Gemini CLI."
+name: slo-design
+description: Interactive wizard to design an SLO with SLI, target, error budget, and burn-rate alerts
 ---
 
 # /slo-design
-
-<div class="page-meta" markdown>
-<span class="meta-badge">:material-console: Slash Command</span>
-<span class="meta-badge">:material-github: <a href="https://github.com/alirezarezvani/claude-skills/tree/main/commands/slo-design.md">Source</a></span>
-</div>
-
 
 Step through SLO design using the `slo-architect` skill. Produces an SLO definition, computes error budget + multi-window burn-rate alerts, and runs the reviewer to catch common bugs.
 

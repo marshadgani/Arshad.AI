@@ -1,15 +1,10 @@
 ---
-title: "/financial-health — Slash Command for AI Coding Agents"
-description: "Run financial ratio analysis, DCF valuation, budget variance analysis, and rolling forecasts. Usage: /financial-health <ratios|dcf|budget|forecast>. Slash command for Claude Code, Codex CLI, Gemini CLI."
+name: financial-health
+description: "Run financial ratio analysis, DCF valuation, budget variance analysis, and rolling forecasts. Usage: /financial-health <ratios|dcf|budget|forecast> <data.json>"
+argument-hint: "<ratios|dcf|budget|forecast> <data.json>"
 ---
 
 # /financial-health
-
-<div class="page-meta" markdown>
-<span class="meta-badge">:material-console: Slash Command</span>
-<span class="meta-badge">:material-github: <a href="https://github.com/alirezarezvani/claude-skills/tree/main/commands/financial-health.md">Source</a></span>
-</div>
-
 
 Analyze financial statements, build valuation models, assess budget variances, and construct forecasts.
 

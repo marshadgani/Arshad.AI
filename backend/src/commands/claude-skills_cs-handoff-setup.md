@@ -1,19 +1,20 @@
 ---
+disable-model-invocation: true
 name: cs-handoff-setup
 description: "First-run setup for the handoff skill. Walks 5 questions (save location, retention, redaction strictness, git context, recommender scope) and writes the config. Run any time to reconfigure."
 argument-hint: "[--project to set project-specific overrides]"
 allowed-tools: ["Bash"]
 ---
 
-# /cs:handoff-setup
+# /cs-handoff-setup
 
 Configure the handoff skill. Walks 5 questions (plus 1-2 optional) and writes the config. Re-run any time.
 
 ## Invocation
 
 ```
-/cs:handoff-setup                 # configure global defaults
-/cs:handoff-setup --project       # set project-specific overrides
+/cs-handoff-setup                 # configure global defaults
+/cs-handoff-setup --project       # set project-specific overrides
 ```
 
 ## Questions
@@ -44,11 +45,11 @@ rm ~/.config/handoff/.setup-declined 2>/dev/null
 ## Run
 
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/handoff/scripts/setup.py
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/session-handoff/scripts/setup.py
 ```
 
 For project-scoped overrides:
 
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/skills/handoff/scripts/setup.py --reconfigure --project
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/session-handoff/scripts/setup.py --reconfigure --project
 ```

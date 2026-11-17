@@ -1,21 +1,23 @@
 ---
 name: "ra-qm-skills"
-description: "Router/index for the 15 regulatory & quality-management skills bundled in this plugin (ISO 13485 QMS, EU MDR 2017/745, FDA submissions under QMSR, ISO 14971 risk, CAPA, document control, ISO 27001/ISMS, ISO 42001 AIMS, EU AI Act, GDPR/DSGVO, SOC 2, auditing). Use when a compliance request doesn't obviously match one skill and you need to pick the right one (e.g., 'prepare us for an ISO 13485 audit', 'is my AI system high-risk under the AI Act')."
-version: 2.9.0
-author: Alireza Rezvani
+description: "Router for regulatory and quality skills: ISO 13485, MDR, FDA, ISO 14971, CAPA, ISO 27001, ISO 42001, EU AI Act, GDPR, SOC 2. Use whenever a compliance request fits no single one."
+disable-model-invocation: true
 license: MIT
-tags:
-  - regulatory
-  - quality-management
-  - iso-13485
-  - mdr
-  - fda
-  - iso-27001
-  - gdpr
-agents:
-  - claude-code
-  - codex-cli
-  - openclaw
+metadata:
+  version: 2.9.0
+  author: Alireza Rezvani
+  tags:
+    - regulatory
+    - quality-management
+    - iso-13485
+    - mdr
+    - fda
+    - iso-27001
+    - gdpr
+  agents:
+    - claude-code
+    - codex-cli
+    - openclaw
 ---
 
 # Regulatory Affairs & Quality Management Skills — Router

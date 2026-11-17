@@ -1,6 +1,6 @@
 ---
 name: linkedin-strategy
-description: Use when someone needs a LinkedIn plan rather than a post — content pillars, positioning for a career change or consulting or thought leadership, a sustainable posting cadence, or a newsletter decision. Triggers on "what should I post about", "how often should I post", "LinkedIn content strategy", "should I start a LinkedIn newsletter", "grow my following", "90-day plan". Validates the positioning brief, sizes the week against real hours and refuses a plan that will not survive week five, and gates a newsletter against eligibility and a six-month cadence commitment.
+description: "Build a LinkedIn plan rather than a post: content pillars, positioning, a sustainable cadence, whether to start a newsletter. Use whenever the user asks what to post about, how often, or how to grow."
 license: MIT
 metadata:
   version: 1.0.0

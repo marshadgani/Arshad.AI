@@ -1,16 +1,17 @@
 ---
+disable-model-invocation: true
 description: Convert a markdown PR writeup or code review (with ```diff blocks and > [!BLOCKER]/[!MAJOR]/[!MINOR]/[!NIT] severity callouts) into a single-file 2-column HTML review. Top jump-nav lists every finding by severity. Diff on the left, severity-tagged annotation cards on the right, mandatory named reviewer footer. Refuses without --reviewer (a code review must name a human) or if no diff hunks present.
 argument-hint: "<path to markdown> --reviewer \"<name>\" [--title \"<PR title>\"] [--severity-convention \"<a,b,c,d>\"]"
 ---
 
-# /cs:md-review — Code-review markdown → 2-column HTML
+# /cs-md-review — Code-review markdown → 2-column HTML
 
 Convert the review markdown at **$ARGUMENTS** into a single-file 2-column HTML review.
 
 ## Pre-flight gates (refuse, never override)
 
 1. **Input < 100 lines** → refuse (markdown wins below Shihipar's threshold).
-2. **Design-system not onboarded** → refuse, surface `/cs:design-system`.
+2. **Design-system not onboarded** → refuse, surface `/cs-design-system`.
 3. **`--reviewer` missing** → refuse (a code review must name a human reviewer).
 4. **No diff hunks present** → refuse, route to `md-document` instead.
 5. **Output directory unwritable** → refuse, ask user for alternate via `--out`.
@@ -19,19 +20,19 @@ Convert the review markdown at **$ARGUMENTS** into a single-file 2-column HTML r
 
 ```bash
 # 1. Resolve output path (uses doctype=review → review- prefix)
-python3 markdown-html/skills/markdown-html-orchestrator/scripts/output_path_resolver.py \
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/markdown-html-orchestrator/scripts/output_path_resolver.py \
     --input "<path>.md" --doctype review
 
 # 2. Parse diff hunks
-python3 markdown-html/skills/md-review/scripts/diff_parser.py \
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/md-review/scripts/diff_parser.py \
     --input "<path>.md" --output /tmp/hunks.json
 
 # 3. Extract severity-tagged annotations, attached to nearest hunk
-python3 markdown-html/skills/md-review/scripts/annotation_extractor.py \
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/md-review/scripts/annotation_extractor.py \
     --input "<path>.md" --diff-blocks /tmp/hunks.json --output /tmp/annotations.json
 
 # 4. Render — --reviewer is mandatory
-python3 markdown-html/skills/md-review/scripts/review_html_renderer.py \
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/md-review/scripts/review_html_renderer.py \
     --diff-blocks /tmp/hunks.json --annotations /tmp/annotations.json \
     --reviewer "<reviewer-name>" --title "<PR title>" \
     --output <resolved-out>.html

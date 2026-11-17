@@ -1,12 +1,13 @@
 ---
+disable-model-invocation: true
 name: "cs-meeting-actions"
-description: "/cs:meeting-actions — Turn raw meeting notes into an owned action-item checklist: extracts checkboxes, ACTION:/TODO: lines, '@name will …' and 'Name will … by date' patterns, groups by owner, and flags every ORPHAN (no owner) and NO-DUE item. An action without an owner and a date is not an action."
+description: "/cs-meeting-actions — Turn raw meeting notes into an owned action-item checklist: extracts checkboxes, ACTION:/TODO: lines, '@name will …' and 'Name will … by date' patterns, groups by owner, and flags every ORPHAN (no owner) and NO-DUE item. An action without an owner and a date is not an action."
 argument-hint: "[path to notes file, or paste the notes]"
 ---
 
-# /cs:meeting-actions — Raw Notes → Owned Action Checklist
+# /cs-meeting-actions — Raw Notes → Owned Action Checklist
 
-**Command:** `/cs:meeting-actions [notes file or pasted notes]`
+**Command:** `/cs-meeting-actions [notes file or pasted notes]`
 
 A meeting that ends without owned, dated actions was theater. This command runs immediately after
 the meeting — while attendees still remember what they agreed to — and turns the messy notes into a
@@ -21,7 +22,7 @@ checklist where every item has a name and a date, or is loudly flagged until it 
 
 ## When NOT to Run
 
-- Before the meeting → use `/cs:meeting-prep` (cost gate + agenda)
+- Before the meeting → use `/cs-meeting-prep` (cost gate + agenda)
 - Triaging your own private brain-dump → `productivity/capture` owns that
 - Turning actions into Jira issues and sprint work → `project-management/` owns delivery flow
 
@@ -52,13 +53,13 @@ checklist where every item has a name and a date, or is loudly flagged until it 
 
 ```bash
 # From a notes file
-python ../skills/meetings/scripts/action_item_extractor.py --input notes.md
+python ${CLAUDE_PLUGIN_ROOT}/skills/meetings/scripts/action_item_extractor.py --input notes.md
 
 # From pasted notes on stdin
-cat notes.md | python ../skills/meetings/scripts/action_item_extractor.py
+cat notes.md | python ${CLAUDE_PLUGIN_ROOT}/skills/meetings/scripts/action_item_extractor.py
 
 # Machine-readable, for piping into other checklists
-python ../skills/meetings/scripts/action_item_extractor.py --input notes.md --json
+python ${CLAUDE_PLUGIN_ROOT}/skills/meetings/scripts/action_item_extractor.py --input notes.md --json
 ```
 
 Then walk the flags: assign every ORPHAN, date every NO-DUE, and post the checklist.
@@ -67,14 +68,14 @@ Then walk the flags: assign every ORPHAN, date every NO-DUE, and post the checkl
 
 - Checklist delivered, every ORPHAN either assigned by the user or explicitly left flagged → done.
 - Zero actions extracted → say so plainly and ask whether the meeting actually decided anything
-  (that's a `/cs:meeting-prep` conversation for next time). Don't fabricate items.
+  (that's a `/cs-meeting-prep` conversation for next time). Don't fabricate items.
 - User says "just give me the list" → checklist + summary counts, no assignment walkthrough.
 
 ## Related
 
 - Agent: [`cs-meeting-discipline`](../agents/cs-meeting-discipline.md)
 - Skill: [`meetings`](../skills/meetings/SKILL.md)
-- Sibling command: [`/cs:meeting-prep`](cs-meeting-prep.md) (pre-meeting gate + agenda)
+- Sibling command: [`/cs-meeting-prep`](cs-meeting-prep.md) (pre-meeting gate + agenda)
 
 ---
 

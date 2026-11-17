@@ -1,6 +1,6 @@
 ---
 name: spinning-up-deep-rl
-description: "Knowledge base from \"Spinning Up in Deep RL\" by Joshua Achiam (OpenAI, MIT-licensed). Use when applying Achiam's frameworks for RL fundamentals and MDPs, the model-free algorithm taxonomy, policy gradient derivations, the six reference algorithms (VPG, TRPO, PPO, DDPG, TD3, SAC), debugging silently-failing RL code, or running rigorous multi-seed RL experiments."
+description: "Learn or apply deep reinforcement learning with OpenAI Spinning Up: policy gradients, VPG, PPO, SAC, TD3, DDPG, TRPO. Use whenever an RL agent will not learn, reward stays flat, or the user asks how PPO or SAC works."
 ---
 
 # Spinning Up in Deep RL
@@ -16,9 +16,9 @@ description: "Knowledge base from \"Spinning Up in Deep RL\" by Joshua Achiam (O
 - **"what chapters do you have?"** — the full index
 
 ```
-/cs:spinning-up-deep-rl                      # core frameworks + chapter index
-/cs:spinning-up-deep-rl entropy regularization   # topic index -> ch19, read that chapter
-/cs:spinning-up-deep-rl ch09                 # one chapter summary
+/cs-spinning-up-deep-rl                      # core frameworks + chapter index
+/cs-spinning-up-deep-rl entropy regularization   # topic index -> ch19, read that chapter
+/cs-spinning-up-deep-rl ch09                 # one chapter summary
 ```
 
 When you ask about something not in Core Frameworks, I read the relevant chapter file before

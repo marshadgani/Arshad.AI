@@ -1,15 +1,10 @@
 ---
-title: "/project-health — Slash Command for AI Coding Agents"
-description: "Portfolio health dashboard and risk matrix analysis. Usage: /project-health <dashboard|risk> [options]. Slash command for Claude Code, Codex CLI, Gemini CLI."
+name: project-health
+description: "Portfolio health dashboard and risk matrix analysis. Usage: /project-health <dashboard|risk> [options]"
+argument-hint: "<dashboard|risk> [options]"
 ---
 
 # /project-health
-
-<div class="page-meta" markdown>
-<span class="meta-badge">:material-console: Slash Command</span>
-<span class="meta-badge">:material-github: <a href="https://github.com/alirezarezvani/claude-skills/tree/main/commands/project-health.md">Source</a></span>
-</div>
-
 
 Generate portfolio health dashboards and risk matrices for project oversight.
 

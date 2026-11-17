@@ -1,6 +1,6 @@
 ---
 name: "database-designer"
-description: "Use when the user asks to design database schemas, plan data migrations, optimize queries, choose between SQL and NoSQL, or model data relationships."
+description: "Design a database schema: tables, relationships, indexes, normalization, SQL vs NoSQL, migration plans. Use whenever the user asks how to structure their data, which database to pick, or before writing DDL."
 ---
 
 # Database Designer - POWERFUL Tier Skill
@@ -312,3 +312,10 @@ Fixes:
 - **senior-backend** — application-layer patterns (connection pooling, ORM best practices)
 - **senior-devops** — infrastructure provisioning for database clusters and replicas
 
+## More in this skill
+
+Load these only when the task needs them.
+
+- [references/database_selection_decision_tree.md](references/database_selection_decision_tree.md) — Database Selection Decision Tree
+- [references/index_strategy_patterns.md](references/index_strategy_patterns.md) — Index Strategy Patterns
+- [references/normalization_guide.md](references/normalization_guide.md) — Database Normalization Guide

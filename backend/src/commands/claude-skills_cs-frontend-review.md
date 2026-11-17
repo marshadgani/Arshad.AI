@@ -1,15 +1,10 @@
 ---
-title: "/cs-frontend-review — Slash Command for AI Coding Agents"
-description: "Frontend engineering review — walks the 7 Matt Pocock forcing questions (device, LCP target, rendering, bundle budget, SEO vs auth, design system. Slash command for Claude Code, Codex CLI, Gemini CLI."
+name: cs-frontend-review
+description: Frontend engineering review — walks the 7 Matt Pocock forcing questions (device, LCP target, rendering, bundle budget, SEO vs auth, design system, WCAG), picks the framework + rendering profile, forks into specialists (a11y-audit, performance-profiler, epic-design). Invokes the cs-frontend-engineer agent with context fork.
+argument-hint: "<problem or surface to review>"
 ---
 
-# /cs-frontend-review
-
-<div class="page-meta" markdown>
-<span class="meta-badge">:material-console: Slash Command</span>
-<span class="meta-badge">:material-github: <a href="https://github.com/alirezarezvani/claude-skills/tree/main/commands/cs-frontend-review.md">Source</a></span>
-</div>
-
+# /cs-frontend-review — Frontend engineering review
 
 Use the `cs-frontend-engineer` agent (uses `context: fork`) to handle this inquiry:
 
@@ -69,7 +64,7 @@ Profiles live at `engineering-team/skills/senior-frontend/profiles/`. Four built
 
 ## Related commands
 
-- `/cs:fullstack-review` — full-stack lens (parent)
-- `/cs:backend-review` — for API contract on the consumer side
-- `/cs:engineer-grill` — cross-role 21-question grill
+- `/cs-fullstack-review` — full-stack lens (parent)
+- `/cs-backend-review` — for API contract on the consumer side
+- `/cs-engineer-grill` — cross-role 21-question grill
 - `/karpathy-check` — Karpathy 4-principle review

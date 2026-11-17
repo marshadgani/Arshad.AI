@@ -1,12 +1,13 @@
 ---
+disable-model-invocation: true
 name: "cs-dl-reading-path"
-description: "/cs:dl-reading-path — Build a prerequisite-closed reading path through the Deep Learning book from a goal, a background and the hours you actually have. Refuses to route a goal the 2016 book does not cover, and names what covers it instead."
+description: "/cs-dl-reading-path — Build a prerequisite-closed reading path through the Deep Learning book from a goal, a background and the hours you actually have. Refuses to route a goal the 2016 book does not cover, and names what covers it instead."
 argument-hint: "[your goal — what you want to be able to do after reading]"
 ---
 
-# /cs:dl-reading-path — A route, not a page count
+# /cs-dl-reading-path — A route, not a page count
 
-**Command:** `/cs:dl-reading-path [goal]`
+**Command:** `/cs-dl-reading-path [goal]`
 
 The book's part order is not its dependency order. Front-to-back means weeks in Chapters 2–4
 before touching a network, which is where most readers stop.
@@ -19,7 +20,7 @@ before touching a network, which is where most readers stop.
    - Realistic study hours per week?
 2. **Run the planner:**
    ```bash
-   python3 engineering/deep-learning-book/skills/deep-learning-book/scripts/reading_path_planner.py \
+   python3 ${CLAUDE_PLUGIN_ROOT}/skills/deep-learning-book/scripts/reading_path_planner.py \
        --goal "<goal>" --background <bg> --hours-per-week <n>
    ```
 3. **Handle the refusals rather than working around them.**

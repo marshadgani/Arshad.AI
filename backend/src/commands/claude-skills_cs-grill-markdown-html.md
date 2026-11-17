@@ -1,9 +1,10 @@
 ---
-description: Matt-Pocock-style forcing-question grill for markdown-html conversions. Walks 5 cited-canon questions (purpose, line-count threshold, design-system onboarding, output path, doctype confidence) one at a time with a recommended answer. Run before /cs:markdown-html when you want clarity about what the HTML is for, not just a route to the closest sub-skill.
+disable-model-invocation: true
+description: Matt-Pocock-style forcing-question grill for markdown-html conversions. Walks 5 cited-canon questions (purpose, line-count threshold, design-system onboarding, output path, doctype confidence) one at a time with a recommended answer. Run before /cs-markdown-html when you want clarity about what the HTML is for, not just a route to the closest sub-skill.
 argument-hint: "<path to markdown file>"
 ---
 
-# /cs:grill-markdown-html — Pre-conversion grill
+# /cs-grill-markdown-html — Pre-conversion grill
 
 Walk the user through 5 forcing questions before routing to the converter. **One question per turn**, with a recommended answer and a canon citation. The user must answer Q1 before Q2 is asked. Never bundle.
 
@@ -35,14 +36,14 @@ If under 100 lines, refuse the conversion. Do NOT proceed.
 
 > **Has the design-system been onboarded?**
 >
-> Recommended: yes, globally. Run `python3 markdown-html/skills/design-system/scripts/onboard.py` (or `--defaults` for zero-touch) if not.
+> Recommended: yes, globally. Run `python3 ${CLAUDE_PLUGIN_ROOT}/skills/design-system/scripts/onboard.py` (or `--defaults` for zero-touch) if not.
 >
 > Canon: research-ops onboarding pattern (`research-ops/CLAUDE.md` §8); WCAG 2.2 §1.4.3.
 
 Check via:
 
 ```bash
-python3 markdown-html/skills/design-system/scripts/config_loader.py --status
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/design-system/scripts/config_loader.py --status
 ```
 
 If `setup_completed: false`, surface onboarding. Do NOT proceed without it.
@@ -58,7 +59,7 @@ If `setup_completed: false`, surface onboarding. Do NOT proceed without it.
 Resolve via:
 
 ```bash
-python3 markdown-html/skills/markdown-html-orchestrator/scripts/output_path_resolver.py \
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/markdown-html-orchestrator/scripts/output_path_resolver.py \
     --input "$ARGUMENTS" --doctype <verdict>
 ```
 
@@ -73,7 +74,7 @@ python3 markdown-html/skills/markdown-html-orchestrator/scripts/output_path_reso
 Classify via:
 
 ```bash
-python3 markdown-html/skills/markdown-html-orchestrator/scripts/doctype_classifier.py \
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/markdown-html-orchestrator/scripts/doctype_classifier.py \
     --input "$ARGUMENTS" --output human
 ```
 
@@ -85,4 +86,4 @@ python3 markdown-html/skills/markdown-html-orchestrator/scripts/doctype_classifi
 - **Refuse, don't override.** If Q2 or Q3 fails, the conversion does not proceed. The grill protects against silent-failure.
 - **Walk depth-first.** Finish all 5 questions for THIS conversion before starting a different one.
 
-After Q5, hand off to `/cs:markdown-html <path>` to actually run the conversion with the confirmed answers in hand.
+After Q5, hand off to `/cs-markdown-html <path>` to actually run the conversion with the confirmed answers in hand.

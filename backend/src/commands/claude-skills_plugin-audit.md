@@ -1,15 +1,14 @@
 ---
-title: "/plugin-audit — Slash Command for AI Coding Agents"
-description: "Comprehensive audit pipeline for skills, plugins, agents, and commands. Validates structure, quality, security, marketplace compliance. Slash command for Claude Code, Codex CLI, Gemini CLI."
+name: plugin-audit
+description: |
+  Comprehensive audit pipeline for skills, plugins, agents, and commands. Validates structure,
+  quality, security, marketplace compliance, cross-platform compatibility, and ecosystem integration.
+  Runs all built-in validation tools, invokes domain-appropriate agents for code review,
+  and produces a pass/fail gate report. Usage: /plugin-audit <skill-path>
+argument-hint: "<skill-path>"
 ---
 
 # /plugin-audit
-
-<div class="page-meta" markdown>
-<span class="meta-badge">:material-console: Slash Command</span>
-<span class="meta-badge">:material-github: <a href="https://github.com/alirezarezvani/claude-skills/tree/main/commands/plugin-audit.md">Source</a></span>
-</div>
-
 
 Full audit pipeline for any skill, plugin, agent, or command in this repository. Runs 8 validation phases, auto-fixes what it can, and only stops for user input on critical decisions (breaking changes, new dependencies).
 

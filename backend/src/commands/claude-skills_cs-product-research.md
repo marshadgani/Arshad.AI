@@ -1,9 +1,10 @@
 ---
+disable-model-invocation: true
 description: Product / user research methodology. Select the right method for the goal (generative vs evaluative vs validation), compute method-based saturation / sample size with an explicit confidence level, and synthesize coded observations into insights while flagging single-source anecdotes. Never fabricates insight. Direct invocation of the product-research skill.
 argument-hint: "<research context: goal, product stage, segments, coded observations>"
 ---
 
-# /cs:product-research — Study design + saturation + insight synthesis
+# /cs-product-research — Study design + saturation + insight synthesis
 
 Run the `product-research` skill on this input:
 
@@ -30,7 +31,7 @@ Run the `product-research` skill on this input:
 
 ## First run + optimization
 
-- **Onboard first:** `python3 skills/product-research/scripts/onboard.py` (product profile, insight source-threshold, saturation method, high-stakes flag) — saved config pre-configures every tool. `--show` lists the questions.
+- **Onboard first:** `python3 ${CLAUDE_PLUGIN_ROOT}/skills/product-research/scripts/onboard.py` (product profile, insight source-threshold, saturation method, high-stakes flag) — saved config pre-configures every tool. `--show` lists the questions.
 - **Optimize (opt-in):** only if the user asks to optimize the synthesis/run a loop, hand off to autoresearch via `skills/product-research/scripts/ar_evaluator.py` (`validated_insights`, higher is better).
 
 ## Distinct from

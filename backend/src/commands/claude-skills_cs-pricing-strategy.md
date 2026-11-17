@@ -1,9 +1,10 @@
 ---
+disable-model-invocation: true
 description: Pricing model selection (subscription / usage / value / hybrid), Van Westendorp WTP analysis, packaging design. Recommends a model + range, never a specific number. Direct invocation of the pricing-strategist skill.
 argument-hint: "<pricing context: industry, deal size, customer count, value drivers>"
 ---
 
-# /cs:pricing-strategy — Pricing model + WTP + packaging
+# /cs-pricing-strategy — Pricing model + WTP + packaging
 
 Run the `pricing-strategist` skill on this input:
 

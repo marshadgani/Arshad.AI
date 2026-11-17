@@ -1,15 +1,10 @@
 ---
-title: "/sprint-plan — Slash Command for AI Coding Agents"
-description: "Capacity-gated sprint planning — runs capacity math, carry-over check, and a definition-of-ready gate before committing scope. Usage: /sprint-plan. Slash command for Claude Code, Codex CLI, Gemini CLI."
+name: sprint-plan
+description: "Capacity-gated sprint planning — runs capacity math, carry-over check, and a definition-of-ready gate before committing scope. Usage: /sprint-plan <goal> [capacity]"
+argument-hint: <goal> [capacity-in-points-or-person-days]
 ---
 
 # /sprint-plan
-
-<div class="page-meta" markdown>
-<span class="meta-badge">:material-console: Slash Command</span>
-<span class="meta-badge">:material-github: <a href="https://github.com/alirezarezvani/claude-skills/tree/main/commands/sprint-plan.md">Source</a></span>
-</div>
-
 
 Create a sprint plan for `$ARGUMENTS` with explicit capacity math, a carry-over check, and a definition-of-ready gate. The first token(s) of `$ARGUMENTS` are the sprint goal; a trailing number is treated as team capacity (story points or person-days). If no capacity is given, compute it in Phase 1 — never invent it.
 

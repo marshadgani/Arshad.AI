@@ -1,6 +1,6 @@
 ---
 name: "ma-playbook"
-description: "M&A strategy for acquiring companies or being acquired. Due diligence, valuation, integration, and deal structure. Use when evaluating acquisitions, preparing for acquisition, M&A due diligence, integration planning, or deal negotiation."
+description: "Buy a company or sell yours: diligence, valuation, terms, integration. Use whenever M&A or an exit comes up."
 license: MIT
 metadata:
   version: 1.0.0

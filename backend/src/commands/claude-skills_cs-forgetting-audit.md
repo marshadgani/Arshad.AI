@@ -1,9 +1,10 @@
 ---
+disable-model-invocation: true
 description: Run only the blocking forgetting gate on a memory design or store — what leaves, and on what rule.
 argument-hint: "[policy JSON, or a memory directory to audit]"
 ---
 
-# /cs:forgetting-audit
+# /cs-forgetting-audit
 
 The short pass. Skip the cost and architecture work; answer one question about
 `$ARGUMENTS`:
@@ -15,14 +16,14 @@ The short pass. Skip the cost and architecture work; answer one question about
 If given a policy JSON:
 
 ```bash
-python skills/memory-engineering/scripts/forgetting_policy_linter.py --policy <policy.json>
+python ${CLAUDE_PLUGIN_ROOT}/skills/memory-engineering/scripts/forgetting_policy_linter.py --policy <policy.json>
 ```
 
 If given a directory, first show what is actually accumulating, then gate:
 
 ```bash
-python skills/memory-engineering/scripts/memory_density_auditor.py --dir <path>
-python skills/memory-engineering/scripts/forgetting_policy_linter.py --policy <policy.json>
+python ${CLAUDE_PLUGIN_ROOT}/skills/memory-engineering/scripts/memory_density_auditor.py --dir <path>
+python ${CLAUDE_PLUGIN_ROOT}/skills/memory-engineering/scripts/forgetting_policy_linter.py --policy <policy.json>
 ```
 
 If no policy file exists, that is the answer — nothing leaves the store. Show

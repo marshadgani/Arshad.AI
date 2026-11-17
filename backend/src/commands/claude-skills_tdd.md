@@ -1,15 +1,10 @@
 ---
-title: "/tdd — Slash Command for AI Coding Agents"
-description: "Run a red-green-refactor TDD workflow — generate failing tests first, implement to green, then check coverage gaps. Usage: /tdd. Slash command for Claude Code, Codex CLI, Gemini CLI."
+name: tdd
+description: "Run a red-green-refactor TDD workflow — generate failing tests first, implement to green, then check coverage gaps. Usage: /tdd <generate|coverage|validate> [target]"
+argument-hint: <generate|coverage|validate> [file-or-dir]
 ---
 
 # /tdd
-
-<div class="page-meta" markdown>
-<span class="meta-badge">:material-console: Slash Command</span>
-<span class="meta-badge">:material-github: <a href="https://github.com/alirezarezvani/claude-skills/tree/main/commands/tdd.md">Source</a></span>
-</div>
-
 
 Drive a test-first workflow for `$ARGUMENTS` using the TDD Guide skill. The first word of `$ARGUMENTS` selects the mode (`generate`, `coverage`, or `validate`); the rest is the target file or directory. If `$ARGUMENTS` is empty, ask which mode and target.
 

@@ -1,6 +1,6 @@
 ---
 name: "migration-architect"
-description: "Zero-downtime migration planning, compatibility validation, and rollback strategy generation. Tools for system, database, and infrastructure migrations with minimal business impact. Use when planning a database migration, infrastructure cutover, system replacement, or any high-risk transition that needs explicit rollback paths."
+description: "Plan a migration with zero or minimal downtime: phased plan, compatibility check, rollback scripts, for schemas, databases and services. Load whenever the user must change a live table, move a database or cut over without downtime."
 ---
 
 # Migration Architect
@@ -427,3 +427,11 @@ resource "aws_instance" "green_environment" {
 ```
 
 This Migration Architect skill provides a comprehensive framework for planning, executing, and validating complex system migrations while minimizing business impact and technical risk. The combination of automated tools, proven patterns, and detailed procedures enables organizations to confidently undertake even the most complex migration projects.
+
+## More in this skill
+
+Load these only when the task needs them.
+
+- [references/data_reconciliation_strategies.md](references/data_reconciliation_strategies.md) — Data Reconciliation Strategies
+- [references/migration_patterns_catalog.md](references/migration_patterns_catalog.md) — Migration Patterns Catalog
+- [references/zero_downtime_techniques.md](references/zero_downtime_techniques.md) — Zero-Downtime Migration Techniques

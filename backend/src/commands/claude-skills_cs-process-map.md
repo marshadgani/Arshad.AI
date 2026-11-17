@@ -1,9 +1,10 @@
 ---
+disable-model-invocation: true
 description: Map an internal business process (BPMN-style swim lanes), measure cycle time, and detect bottlenecks where work spends most of its time waiting. Direct invocation of the process-mapper skill.
 argument-hint: "<process description or path to process JSON>"
 ---
 
-# /cs:process-map — BPMN-style process mapping + bottleneck detection
+# /cs-process-map — BPMN-style process mapping + bottleneck detection
 
 Run the `process-mapper` skill on this input:
 

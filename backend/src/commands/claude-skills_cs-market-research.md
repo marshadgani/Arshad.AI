@@ -1,9 +1,10 @@
 ---
+disable-model-invocation: true
 description: Market research methodology. Size a market as TAM/SAM/SOM computed BOTH top-down and bottoms-up (never a single number), plan a survey sample size with finite-population correction and per-segment minimums, and score candidate segments against Kotler's criteria. Outputs always show method + assumptions. Direct invocation of the market-research skill.
 argument-hint: "<market context: total market value, customer count, price, survey params, candidate segments>"
 ---
 
-# /cs:market-research — TAM/SAM/SOM + survey sampling + segmentation
+# /cs-market-research — TAM/SAM/SOM + survey sampling + segmentation
 
 Run the `market-research` skill on this input:
 
@@ -30,7 +31,7 @@ Run the `market-research` skill on this input:
 
 ## First run + optimization
 
-- **Onboard first:** `python3 skills/market-research/scripts/onboard.py` (market profile, survey confidence, margin of error, sizing method) — saved config pre-configures every tool. `--show` lists the questions.
+- **Onboard first:** `python3 ${CLAUDE_PLUGIN_ROOT}/skills/market-research/scripts/onboard.py` (market profile, survey confidence, margin of error, sizing method) — saved config pre-configures every tool. `--show` lists the questions.
 - **Optimize (opt-in):** only if the user asks to reconcile the sizing/run a loop, hand off to autoresearch via `skills/market-research/scripts/ar_evaluator.py` (`tam_divergence`, lower is better).
 
 ## Distinct from

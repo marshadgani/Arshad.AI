@@ -1,9 +1,10 @@
 ---
+disable-model-invocation: true
 description: Clinical study design. Select and classify endpoints, estimate sample size / power (means / proportions / survival), and score a study plan for a GO / GO-WITH-CONDITIONS / REDESIGN / NO-GO phase-gate decision. Every output is an ESTIMATE plus a named clinical owner — never clinical fact. Direct invocation of the clinical-research skill.
 argument-hint: "<study context: indication, design, endpoints, effect size, target enrollment>"
 ---
 
-# /cs:clinical-research — Endpoint selection + sample-size + phase-gate feasibility
+# /cs-clinical-research — Endpoint selection + sample-size + phase-gate feasibility
 
 Run the `clinical-research` skill on this input:
 
@@ -30,7 +31,7 @@ Run the `clinical-research` skill on this input:
 
 ## First run + optimization
 
-- **Onboard first:** `python3 skills/clinical-research/scripts/onboard.py` (area, alpha, power, dropout, named owners) — saved config pre-configures every tool. `--show` lists the questions.
+- **Onboard first:** `python3 ${CLAUDE_PLUGIN_ROOT}/skills/clinical-research/scripts/onboard.py` (area, alpha, power, dropout, named owners) — saved config pre-configures every tool. `--show` lists the questions.
 - **Optimize (opt-in):** only if the user asks to optimize/run a loop, hand off to autoresearch via `skills/clinical-research/scripts/ar_evaluator.py` (`feasibility_composite`, higher is better).
 
 ## Distinct from
