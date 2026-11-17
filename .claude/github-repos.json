@@ -4418,7 +4418,7 @@
     "openmontage": {
       "url": "https://github.com/calesthio/OpenMontage.git",
       "name": "OpenMontage",
-      "last_fetched": "2026-10-05 19:32 UTC",
+      "last_fetched": "2026-11-17 13:35 UTC",
       "components": {
         "skills": [
           "flux-best-practices",
@@ -4480,6 +4480,7 @@
           "threejs-materials",
           "hyperframes-cli",
           "vercel-composition-patterns",
+          "provider-refresh-oct23",
           "atlas-cloud",
           "provider-model-refresh",
           "video-download",
@@ -4514,6 +4515,7 @@
           "ffmpeg",
           "svg-character-animation",
           "manim-composer",
+          "pika-h3-flex",
           "hyperframes-creative",
           "gemini-omni",
           "text-to-speech",
@@ -4586,7 +4588,8 @@
           "backlot",
           "ink-art",
           "animated-drawing",
-          "backlot"
+          "backlot",
+          "reel"
         ],
         "hooks": [],
         "token_optimization": []
