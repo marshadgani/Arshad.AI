@@ -3853,9 +3853,12 @@
     "headroom": {
       "url": "https://github.com/headroomlabs-ai/headroom.git",
       "name": "headroom",
-      "last_fetched": "2026-10-05 19:32 UTC",
+      "last_fetched": "2026-11-17 13:35 UTC",
       "components": {
-        "skills": [],
+        "skills": [
+          "headroom",
+          "headroom"
+        ],
         "agents": [],
         "commands": [],
         "hooks": [],
@@ -3864,12 +3867,12 @@
           "agno.md",
           "ccr.md",
           "transforms.md",
+          "learn.md",
           "langchain.md",
           "ARCHITECTURE.md",
           "index.md",
-          "README.md",
-          "benchmark.py",
-          "scenarios.py"
+          "proxy.md",
+          "README.md"
         ]
       }
     },
